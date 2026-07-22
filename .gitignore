@@ -2,3 +2,6 @@ captain-*.mjs
 node_modules/
 dist/
 coverage/
+.auth/
+playwright-report/
+test-results/
