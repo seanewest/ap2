@@ -2,6 +2,12 @@
 
 AP2 is a minimal static site published with GitHub Pages.
 
+## Developer bootstrap
+
+See the [Microsoft Entra developer bootstrap guide](gh-docs/developer-bootstrap.md)
+to create or tear down the minimal multi-tenant application registration from
+Azure Cloud Shell.
+
 ## Run locally
 
 From the repository root, run:
