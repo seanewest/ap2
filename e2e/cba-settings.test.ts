@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   certificateOrigins,
   loadCbaE2eSettings,
+  STUDENT_OPERATOR,
   STUDENT_TENANT_ID,
 } from "./cba-settings";
 
@@ -19,6 +20,12 @@ afterEach(async () => {
 });
 
 describe("CBA browser settings", () => {
+  it("uses the dedicated Student operator", () => {
+    expect(STUDENT_OPERATOR).toBe(
+      "after-party-operator@corywest.onmicrosoft.com",
+    );
+  });
+
   it("targets both exact Microsoft certificate-authentication origins", () => {
     expect(certificateOrigins(STUDENT_TENANT_ID)).toEqual([
       "https://certauth.login.microsoftonline.com",
