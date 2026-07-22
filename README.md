@@ -34,6 +34,10 @@ npm run typecheck
 npm run build
 ```
 
+The real browser CBA check is intentionally separate because it signs the
+Student operator in and out against Microsoft Entra. See the
+[CBA browser test guide](docs/cba-browser-test.md).
+
 Run an Azure CLI command only after asserting the exact tenant selected by the
 CLI and its access token:
 

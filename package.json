@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/build-docs.ts",
     "report:codex": "node scripts/codex-session-report.ts",
+    "test:e2e:cba": "playwright test --config playwright.cba.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -15,6 +16,7 @@
     "@azure/msal-browser": "5.17.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.1",
     "@types/node": "24.10.4",
     "jsdom": "29.1.1",
     "marked": "18.0.7",

@@ -47,5 +47,8 @@ Use the development automation app for backend and infrastructure tests.
 Use a CBA-enabled student operator for SPA tests, reusing saved browser sessions
 when possible.
 
+The [SPA CBA browser test](cba-browser-test.md) uses a fresh Playwright context
+instead of a human browser profile or shared browser session.
+
 Test simulated-user login locally in a container that resembles the deployed
 backend browser environment.

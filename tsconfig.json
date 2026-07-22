@@ -17,5 +17,12 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "scripts", "vite.config.ts", "vitest.config.ts"]
+  "include": [
+    "e2e",
+    "src",
+    "scripts",
+    "playwright.cba.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
 }
