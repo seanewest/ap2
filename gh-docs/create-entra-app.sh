@@ -5,6 +5,8 @@ IFS=$'\n\t'
 
 readonly DEFAULT_DISPLAY_NAME='After Party Exploratory'
 readonly APP_DISPLAY_NAME="${AP2_APP_DISPLAY_NAME:-$DEFAULT_DISPLAY_NAME}"
+readonly LOCAL_SPA_REDIRECT_URI='http://localhost:5173/'
+readonly PRODUCTION_SPA_REDIRECT_URI='https://seanewest.github.io/ap2/'
 
 die() {
   printf 'Error: %s\n' "$*" >&2
@@ -46,7 +48,10 @@ verify_application() {
   app_json="$(az ad app show --id "$app_id" --output json --only-show-errors)" ||
     die "Could not read application $app_id after creation or lookup."
 
-  jq -e --arg name "$APP_DISPLAY_NAME" '
+  jq -e \
+    --arg name "$APP_DISPLAY_NAME" \
+    --arg localRedirect "$LOCAL_SPA_REDIRECT_URI" \
+    --arg productionRedirect "$PRODUCTION_SPA_REDIRECT_URI" '
     .displayName == $name and
     .signInAudience == "AzureADMultipleOrgs" and
     ((.identifierUris // []) | length) == 0 and
@@ -55,7 +60,7 @@ verify_application() {
     ((.requiredResourceAccess // []) | length) == 0 and
     ((.appRoles // []) | length) == 0 and
     ((.api.oauth2PermissionScopes // []) | length) == 0 and
-    ((.spa.redirectUris // []) | length) == 0 and
+    ((.spa.redirectUris // []) | sort) == ([$localRedirect, $productionRedirect] | sort) and
     ((.web.redirectUris // []) | length) == 0 and
     ((.publicClient.redirectUris // []) | length) == 0
   ' <<<"$app_json" >/dev/null ||
@@ -84,7 +89,7 @@ verify_application() {
 }
 
 main() {
-  local apps_json count created_json app_id status
+  local apps_json count create_body created_json app_id status
 
   require_command az
   require_command jq
@@ -99,10 +104,23 @@ main() {
   case "$count" in
     0)
       printf 'No exact-name application exists; creating the application object only.\n'
+      create_body="$(
+        jq -cn \
+          --arg displayName "$APP_DISPLAY_NAME" \
+          --arg localRedirect "$LOCAL_SPA_REDIRECT_URI" \
+          --arg productionRedirect "$PRODUCTION_SPA_REDIRECT_URI" \
+          '{
+            displayName: $displayName,
+            signInAudience: "AzureADMultipleOrgs",
+            spa: {redirectUris: [$localRedirect, $productionRedirect]}
+          }'
+      )"
       created_json="$(
-        az ad app create \
-          --display-name "$APP_DISPLAY_NAME" \
-          --sign-in-audience AzureADMultipleOrgs \
+        az rest \
+          --method post \
+          --url 'https://graph.microsoft.com/v1.0/applications' \
+          --headers 'Content-Type=application/json' \
+          --body "$create_body" \
           --output json \
           --only-show-errors
       )" || die 'Microsoft Entra application creation failed.'

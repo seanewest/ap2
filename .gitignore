@@ -1,2 +1,4 @@
 captain-*.mjs
-
+node_modules/
+dist/
+coverage/

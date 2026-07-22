@@ -8,6 +8,14 @@ Prefer architecture that is easy and efficient to test.
 
 Prefer end to end testing that uses a similar path as the product itself, when possible.
 
+### Speed
+
+Use subagents when you can parallelize work.
+
+Prefer fast feedback loops.
+
+Try to avoid repeated operations that incur wait times (e.g. merging, github or tenant operations)
+
 ### Simplicity
 
 Prefer solutions that keep the overall system simple.

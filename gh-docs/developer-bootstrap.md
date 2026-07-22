@@ -1,9 +1,9 @@
 # Developer bootstrap: Microsoft Entra application
 
 This developer-only workflow creates one minimal, multi-tenant Microsoft Entra
-application registration. It does not create a service principal, credential,
-redirect URI, identifier URI, API permission, tenant domain, or other Azure
-resource.
+application registration with the two SPA redirect URIs used by local Vite and
+the public site. It does not create a service principal, credential, identifier
+URI, API permission, tenant domain, or other Azure resource.
 
 ## 1. Open Cloud Shell and verify the tenant
 
@@ -37,8 +37,17 @@ curl -fsSL https://seanewest.github.io/ap2/gh-docs/create-entra-app.sh | bash
 The script prints the selected tenant before doing anything. If there is no
 exact-name match, it creates only an application object named
 `After Party Exploratory` with `signInAudience` set to
-`AzureADMultipleOrgs`. One match is verified and reported without creating a
-duplicate. More than one match causes the script to stop.
+`AzureADMultipleOrgs` and these exact SPA redirect URIs:
+
+- `http://localhost:5173/`
+- `https://seanewest.github.io/ap2/`
+
+One match is verified and reported without creating a duplicate. More than one
+match causes the script to stop.
+
+Deleting and recreating the application gives it a new client ID. After a
+recreation, update `AFTER_PARTY_CLIENT_ID` in `src/auth/config.ts` before
+building or deploying the SPA.
 
 ## 3. Tear down the application
 
