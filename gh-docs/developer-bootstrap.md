@@ -42,8 +42,9 @@ duplicate. More than one match causes the script to stop.
 
 ## 3. Tear down the application
 
-> **Destructive:** this permanently deletes the exact-name application object
-> from the selected tenant.
+> **Destructive:** this deletes the exact-name application object from the
+> selected tenant. Microsoft Entra may retain a recoverable deleted item
+> according to the tenant's retention policy.
 
 [Inspect the teardown script](https://seanewest.github.io/ap2/gh-docs/delete-entra-app.sh),
 then run the explicitly confirmed teardown:
