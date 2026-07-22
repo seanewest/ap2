@@ -34,6 +34,47 @@ npm run typecheck
 npm run build
 ```
 
+## Student-owned API
+
+The API is a separate, framework-free Node/TypeScript process. `GET /health` is
+public for container health checks. `GET /api/whoami` first verifies an RS256
+Bearer token's signature, issuer, audience, and lifetime, then permits only:
+
+- delegated tokens from Student operator object ID
+  `ba97e987-da4c-43e1-ab79-3daa8014440e`; or
+- app-only tokens from development automation client ID
+  `7eb78f18-b49c-495c-a571-af03f06b58a9`.
+
+Both must be issued in immutable Student tenant
+`92563293-315c-4b6c-9b90-bcb47ee8c970`. Delegated and app-only claim shapes are
+kept distinct. Azure and Microsoft Graph calls are not implemented; future
+use-case-specific calls belong behind `api/cloud-operations.ts`.
+
+Build and start the API locally with explicit verification configuration:
+
+```sh
+npm run build:api
+AUTH_ISSUER='https://issuer.example/tenant/v2.0' \
+AUTH_AUDIENCE='api://audience' \
+AUTH_JWKS_URL='https://issuer.example/discovery/v2.0/keys' \
+npm run api
+```
+
+Startup fails if any of those three settings is absent. The allowed operator
+and automation IDs can be overridden with `AUTH_OPERATOR_OBJECT_ID` and
+`AUTH_AUTOMATION_CLIENT_ID`; the Student tenant cannot be overridden. Plain
+HTTP JWKS is disabled unless `AUTH_ALLOW_INSECURE_JWKS=true`, which exists only
+for isolated local tests.
+
+`npm test` includes claims-policy unit tests and signed-JWT tests through a real
+local HTTP server. With a running Docker daemon, the following also builds and
+starts the image, waits for Docker health, sends signed delegated and app-only
+Bearer requests, checks a rejection, and verifies SIGTERM shutdown:
+
+```sh
+npm run test:container
+```
+
 The real browser CBA check is intentionally separate because it signs the
 Student operator in and out against Microsoft Entra. See the
 [CBA browser test guide](docs/cba-browser-test.md).

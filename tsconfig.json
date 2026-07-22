@@ -18,6 +18,7 @@
     "noUncheckedIndexedAccess": true
   },
   "include": [
+    "api",
     "e2e",
     "src",
     "scripts",
