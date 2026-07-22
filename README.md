@@ -4,6 +4,10 @@ AP2 is a minimal TypeScript SPA that signs operators in with their Microsoft
 work or school account. It uses the multitenant `After Party Exploratory`
 application registration and requests identity scopes only.
 
+## Architecture
+
+See [Identities](docs/identities.md).
+
 ## Developer bootstrap
 
 See the [Microsoft Entra developer bootstrap guide](gh-docs/developer-bootstrap.md)
@@ -28,6 +32,27 @@ Run the deterministic checks without Azure:
 npm test
 npm run typecheck
 npm run build
+```
+
+Run an Azure CLI command only after asserting the exact tenant selected by the
+CLI and its access token:
+
+```sh
+scripts/az-in-tenant.sh '<tenant-id>' -- account show
+```
+
+Summarize the most recently modified local Codex transcript, including elapsed
+turn time, measured tool time, token use, and automatic goal retries:
+
+```sh
+npm run report:codex
+```
+
+Pass a transcript path to report on a specific session. For clean
+machine-readable output, invoke the script directly:
+
+```sh
+node scripts/codex-session-report.ts '<session.jsonl>' --json
 ```
 
 ## Deploy
