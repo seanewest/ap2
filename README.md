@@ -45,19 +45,25 @@ CLI and its access token:
 scripts/az-in-tenant.sh '<tenant-id>' -- account show
 ```
 
-Summarize the most recently modified local Codex transcript, including elapsed
-turn time, measured tool time, token use, and automatic goal retries:
+Summarize a local Codex transcript, including wall and Codex-reported active
+time, slow tool calls, likely stalls, token use, and automatic goal retries.
+Select the worker explicitly when several agents share `CODEX_HOME`:
 
 ```sh
-npm run report:codex
+npm run report:codex -- --name Lebron
+npm run report:codex -- --name Durant
 ```
 
-Pass a transcript path to report on a specific session. For clean
-machine-readable output, invoke the script directly:
+You can also select with `--thread-id` or `--path`. For valid JSON with no npm
+banner, use npm's silent mode or invoke the script directly:
 
 ```sh
-node scripts/codex-session-report.ts '<session.jsonl>' --json
+npm run --silent report:codex -- --name Lebron --json
+node scripts/codex-session-report.ts --name Lebron --json
 ```
+
+See the [Codex session report guide](docs/codex-session-report.md) for timing
+semantics and selection fallbacks.
 
 ## Deploy
 
