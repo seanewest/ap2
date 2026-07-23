@@ -116,7 +116,7 @@ describe("HTTP After Party API client", () => {
           accepted: true,
           sender: "homer.simpson@corywest.onmicrosoft.com",
           recipient: "marge.simpson@corywest.onmicrosoft.com",
-          subject: "Quarterly access review",
+          subject: "Dinner tonight",
           messageId: "must-not-escape",
           accessToken: "response-must-not-escape",
         }),
@@ -145,7 +145,7 @@ describe("HTTP After Party API client", () => {
       accepted: true,
       sender: "homer.simpson@corywest.onmicrosoft.com",
       recipient: "marge.simpson@corywest.onmicrosoft.com",
-      subject: "Quarterly access review",
+      subject: "Dinner tonight",
     });
     expect(JSON.stringify(result)).not.toContain("messageId");
     expect(JSON.stringify(result)).not.toContain("sensitive-access-token");
@@ -217,7 +217,7 @@ describe("HTTP After Party API client", () => {
           accepted: true,
           sender: "homer.simpson@corywest.onmicrosoft.com",
           recipient: "marge.simpson@corywest.onmicrosoft.com",
-          subject: "Quarterly access review",
+          subject: "Dinner tonight",
         }),
         { status: 200 },
       ),
@@ -235,7 +235,7 @@ describe("HTTP After Party API client", () => {
           accepted: false,
           sender: "homer.simpson@corywest.onmicrosoft.com",
           recipient: "marge.simpson@corywest.onmicrosoft.com",
-          subject: "Quarterly access review",
+          subject: "Dinner tonight",
         }),
         { status: 202 },
       ),
@@ -244,6 +244,24 @@ describe("HTTP After Party API client", () => {
       new HttpAfterPartyApi(
         "https://student-api.example",
         malformed,
+      ).sendSimulatedEmail("token"),
+    ).rejects.toEqual(new ApiAccessError());
+
+    const wrongRecipient = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          accepted: true,
+          sender: "homer.simpson@corywest.onmicrosoft.com",
+          recipient: "someone-else@corywest.onmicrosoft.com",
+          subject: "Dinner tonight",
+        },
+        { status: 202 },
+      ),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        wrongRecipient,
       ).sendSimulatedEmail("token"),
     ).rejects.toEqual(new ApiAccessError());
   });

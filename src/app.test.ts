@@ -405,7 +405,7 @@ describe("After Party authentication UI", () => {
       accepted: true,
       sender: "homer.simpson@corywest.onmicrosoft.com",
       recipient: "marge.simpson@corywest.onmicrosoft.com",
-      subject: "Quarterly access review",
+      subject: "Dinner tonight",
       secret: "must-not-render",
     } as SimulatedEmailResult);
     const app = createAfterPartyApp(root, authentication, api);
@@ -432,7 +432,7 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain(
       "marge.simpson@corywest.onmicrosoft.com",
     );
-    expect(root.textContent).toContain("Quarterly access review");
+    expect(root.textContent).toContain("Dinner tonight");
     expect(root.textContent).not.toContain("sensitive-access-token");
     expect(root.textContent).not.toContain("must-not-render");
     expect(simulatedEmailButton()?.disabled).toBe(true);
@@ -472,7 +472,7 @@ describe("After Party authentication UI", () => {
       accepted: true,
       sender: "homer.simpson@corywest.onmicrosoft.com",
       recipient: "marge.simpson@corywest.onmicrosoft.com",
-      subject: "Quarterly access review",
+      subject: "Dinner tonight",
     });
     await nextTask();
     expect(apiButton()?.disabled).toBe(false);

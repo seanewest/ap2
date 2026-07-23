@@ -54,6 +54,13 @@ Student rehearsal Container App and returns only its name, region, running
 status, and latest ready revision. See [API identity](docs/api-identity.md) for the
 fixed target and the Dev-app command.
 
+`POST /api/simulated-email` uses the same caller policy, then signs the fixed
+Homer test user in through headless Microsoft CBA and makes one Graph
+`sendMail` attempt to the fixed Marge recipient. The SPA exposes one explicit
+control and reports only Graph acceptance—not delivery. This path is disabled
+until its three Homer CBA settings are configured; see
+[API identity](docs/api-identity.md).
+
 Build and start the API locally with explicit verification configuration:
 
 ```sh
@@ -73,7 +80,8 @@ tenant cannot be overridden. Plain HTTP JWKS is disabled unless
 `npm test` includes claims-policy unit tests and signed-JWT tests through a real
 local HTTP server. With rootless Podman available, the following also builds and
 starts the image, waits for container health, sends signed delegated and app-only
-Bearer requests, checks a rejection, and verifies SIGTERM shutdown:
+Bearer requests, checks a rejection, launches the production headless Chromium,
+and verifies SIGTERM shutdown:
 
 ```sh
 npm run test:container

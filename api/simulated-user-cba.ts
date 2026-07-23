@@ -1,11 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
 import { chromium, type BrowserContext, type Page } from "playwright";
 import { decodeJwt } from "jose";
-
-export const STUDENT_TENANT_ID = "92563293-315c-4b6c-9b90-bcb47ee8c970";
-export const HOMER_OBJECT_ID = "6e54e3a9-7651-4520-a331-047550ae6fca";
-export const HOMER_UPN = "homer.simpson@corywest.onmicrosoft.com";
-export const HOMER_DISPLAY_NAME = "Homer Simpson";
+import { STUDENT_TENANT_ID } from "./identity.js";
+import {
+  GRAPH_MAIL_SEND_SCOPE,
+  HOMER_DISPLAY_NAME,
+  HOMER_OBJECT_ID,
+  HOMER_USER_PRINCIPAL_NAME,
+  type DelegatedGraphToken,
+  type DelegatedGraphTokenProvider,
+} from "./simulated-email.js";
 
 const GRAPH_ORIGIN = "https://graph.microsoft.com";
 const CERTIFICATE_AUTHENTICATION_ORIGIN =
@@ -55,7 +59,9 @@ export class SimulatedUserCbaError extends Error {
   }
 }
 
-export class HomerDelegatedTokenProvider {
+export class HomerDelegatedTokenProvider
+  implements DelegatedGraphTokenProvider
+{
   readonly #clientId: string;
   readonly #pfxPath: string;
   readonly #pfxPassphrase: string;
@@ -92,7 +98,25 @@ export class HomerDelegatedTokenProvider {
     this.#timeoutMs = timeoutMs;
   }
 
-  async getAccessToken(): Promise<string> {
+  async getToken(scope: string): Promise<DelegatedGraphToken> {
+    if (scope !== GRAPH_MAIL_SEND_SCOPE) {
+      throw new SimulatedUserCbaError(
+        "The simulated user token scope is not allowed.",
+      );
+    }
+
+    const token = await this.#getAccessToken();
+    return {
+      token,
+      identity: {
+        tenantId: STUDENT_TENANT_ID,
+        objectId: HOMER_OBJECT_ID,
+        userPrincipalName: HOMER_USER_PRINCIPAL_NAME,
+      },
+    };
+  }
+
+  async #getAccessToken(): Promise<string> {
     if (
       this.#cachedAccessToken &&
       this.#now() < this.#cachedAccessToken.expiresAtMs - CACHE_SKEW_MS
@@ -204,7 +228,7 @@ export class HomerDelegatedTokenProvider {
       value.id !== HOMER_OBJECT_ID ||
       value.displayName !== HOMER_DISPLAY_NAME ||
       typeof value.userPrincipalName !== "string" ||
-      value.userPrincipalName.toLowerCase() !== HOMER_UPN
+      value.userPrincipalName.toLowerCase() !== HOMER_USER_PRINCIPAL_NAME
     ) {
       throw new SimulatedUserCbaError(
         "Microsoft Graph did not confirm the fixed simulated user.",
@@ -344,7 +368,7 @@ async function completeCertificateSignIn(
 
     const username = page.locator('input[name="loginfmt"]:visible');
     if (!usernameSubmitted && (await username.isVisible().catch(() => false))) {
-      await username.fill(HOMER_UPN);
+      await username.fill(HOMER_USER_PRINCIPAL_NAME);
       await page.locator("#idSIButton9").click();
       usernameSubmitted = true;
       await pause();
@@ -415,7 +439,7 @@ function createAuthorizeUrl(input: {
     state: input.state,
     code_challenge: input.challenge,
     code_challenge_method: "S256",
-    login_hint: HOMER_UPN,
+    login_hint: HOMER_USER_PRINCIPAL_NAME,
   }).toString();
   return url;
 }

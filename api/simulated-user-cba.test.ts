@@ -1,14 +1,17 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
-  HOMER_DISPLAY_NAME,
-  HOMER_OBJECT_ID,
-  HOMER_UPN,
   HomerDelegatedTokenProvider,
   SimulatedUserCbaError,
-  STUDENT_TENANT_ID,
   type AuthorizationCodeBrowser,
 } from "./simulated-user-cba.js";
+import { STUDENT_TENANT_ID } from "./identity.js";
+import {
+  GRAPH_MAIL_SEND_SCOPE,
+  HOMER_DISPLAY_NAME,
+  HOMER_OBJECT_ID,
+  HOMER_USER_PRINCIPAL_NAME,
+} from "./simulated-email.js";
 
 const CLIENT_ID = "11111111-1111-4111-8111-111111111111";
 const NOW = Date.UTC(2026, 6, 23, 12);
@@ -37,7 +40,7 @@ function homerResponse(): Response {
   return Response.json({
     id: HOMER_OBJECT_ID,
     displayName: HOMER_DISPLAY_NAME,
-    userPrincipalName: HOMER_UPN,
+    userPrincipalName: HOMER_USER_PRINCIPAL_NAME,
   });
 }
 
@@ -90,8 +93,12 @@ describe("HomerDelegatedTokenProvider", () => {
     const { request, calls } = createRequest(token);
     const provider = createProvider({ browser, request });
 
-    await expect(provider.getAccessToken()).resolves.toBe(token);
-    await expect(provider.getAccessToken()).resolves.toBe(token);
+    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).resolves.toEqual(
+      delegatedToken(token),
+    );
+    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).resolves.toEqual(
+      delegatedToken(token),
+    );
 
     expect(acquire).toHaveBeenCalledTimes(1);
     const browserCall = acquire.mock.calls.at(0);
@@ -102,7 +109,7 @@ describe("HomerDelegatedTokenProvider", () => {
     expect(browserRequest.pfxPath).toBe("/run/secrets/homer.pfx");
     expect(browserRequest.pfxPassphrase).toBe(PASSPHRASE);
     expect(browserRequest.authorizeUrl.searchParams.get("login_hint")).toBe(
-      HOMER_UPN,
+      HOMER_USER_PRINCIPAL_NAME,
     );
     const scopes = browserRequest.authorizeUrl.searchParams
       .get("scope")
@@ -156,11 +163,14 @@ describe("HomerDelegatedTokenProvider", () => {
       request,
     });
 
-    const first = provider.getAccessToken();
-    const second = provider.getAccessToken();
+    const first = provider.getToken(GRAPH_MAIL_SEND_SCOPE);
+    const second = provider.getToken(GRAPH_MAIL_SEND_SCOPE);
     release("authorization-code");
 
-    await expect(Promise.all([first, second])).resolves.toEqual([token, token]);
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      delegatedToken(token),
+      delegatedToken(token),
+    ]);
     expect(acquire).toHaveBeenCalledTimes(1);
   });
 
@@ -180,9 +190,13 @@ describe("HomerDelegatedTokenProvider", () => {
     ) as unknown as typeof fetch;
     const provider = createProvider({ browser, request, now: () => now });
 
-    await expect(provider.getAccessToken()).resolves.toBe(firstToken);
+    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).resolves.toEqual(
+      delegatedToken(firstToken),
+    );
     now = NOW + 8 * 60 * 1_000;
-    await expect(provider.getAccessToken()).resolves.toBe(secondToken);
+    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).resolves.toEqual(
+      delegatedToken(secondToken),
+    );
     expect(acquire).toHaveBeenCalledTimes(2);
   });
 
@@ -195,7 +209,7 @@ describe("HomerDelegatedTokenProvider", () => {
     const { request } = createRequest(accessToken(claims));
     const provider = createProvider({ browser, request });
 
-    await expect(provider.getAccessToken()).rejects.toThrow(
+    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).rejects.toThrow(
       "Microsoft returned an invalid simulated-user access token.",
     );
   });
@@ -211,13 +225,13 @@ describe("HomerDelegatedTokenProvider", () => {
         return Response.json({
           id: HOMER_OBJECT_ID,
           displayName: "Not Homer",
-          userPrincipalName: HOMER_UPN,
+          userPrincipalName: HOMER_USER_PRINCIPAL_NAME,
         });
       },
     ) as unknown as typeof fetch;
     const provider = createProvider({ browser, request });
 
-    await expect(provider.getAccessToken()).rejects.toThrow(
+    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).rejects.toThrow(
       "Microsoft Graph did not confirm the fixed simulated user.",
     );
   });
@@ -230,11 +244,41 @@ describe("HomerDelegatedTokenProvider", () => {
     };
     const provider = createProvider({ browser });
 
-    const error = await provider.getAccessToken().catch((value) => value);
+    const error = await provider
+      .getToken(GRAPH_MAIL_SEND_SCOPE)
+      .catch((value) => value);
     expect(error).toBeInstanceOf(SimulatedUserCbaError);
     expect(error.message).toBe(
       "Simulated user authentication could not be completed.",
     );
     expect(error.message).not.toContain(PASSPHRASE);
   });
+
+  it("refuses any token scope except the fixed Mail.Send scope", async () => {
+    const { browser, acquire } = createBrowser();
+    const provider = createProvider({ browser });
+
+    await expect(
+      provider.getToken("https://graph.microsoft.com/User.Read"),
+    ).rejects.toThrow("simulated user token scope is not allowed");
+    expect(acquire).not.toHaveBeenCalled();
+  });
 });
+
+function delegatedToken(token: string): {
+  token: string;
+  identity: {
+    tenantId: string;
+    objectId: string;
+    userPrincipalName: string;
+  };
+} {
+  return {
+    token,
+    identity: {
+      tenantId: STUDENT_TENANT_ID,
+      objectId: HOMER_OBJECT_ID,
+      userPrincipalName: HOMER_USER_PRINCIPAL_NAME,
+    },
+  };
+}

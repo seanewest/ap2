@@ -25,6 +25,12 @@ export interface SimulatedEmailResult {
   subject: string;
 }
 
+const SIMULATED_EMAIL_SENDER =
+  "homer.simpson@corywest.onmicrosoft.com";
+const SIMULATED_EMAIL_RECIPIENT =
+  "marge.simpson@corywest.onmicrosoft.com";
+const SIMULATED_EMAIL_SUBJECT = "Dinner tonight";
+
 export interface AfterPartyApi {
   checkAccess(accessToken: string): Promise<ApiCallerIdentity>;
   getRehearsalStatus(accessToken: string): Promise<RehearsalStatus>;
@@ -184,11 +190,8 @@ function isSafeSimulatedEmailResult(
   const result = value as Record<string, unknown>;
   return (
     result.accepted === true &&
-    typeof result.sender === "string" &&
-    result.sender.length > 0 &&
-    typeof result.recipient === "string" &&
-    result.recipient.length > 0 &&
-    typeof result.subject === "string" &&
-    result.subject.length > 0
+    result.sender === SIMULATED_EMAIL_SENDER &&
+    result.recipient === SIMULATED_EMAIL_RECIPIENT &&
+    result.subject === SIMULATED_EMAIL_SUBJECT
   );
 }

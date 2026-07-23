@@ -3,11 +3,12 @@ import { STUDENT_TENANT_ID } from "./identity.js";
 export const HOMER_OBJECT_ID = "6e54e3a9-7651-4520-a331-047550ae6fca";
 export const HOMER_USER_PRINCIPAL_NAME =
   "homer.simpson@corywest.onmicrosoft.com";
+export const HOMER_DISPLAY_NAME = "Homer Simpson";
 export const MARGE_USER_PRINCIPAL_NAME =
   "marge.simpson@corywest.onmicrosoft.com";
 export const SIMULATED_EMAIL_SUBJECT = "Dinner tonight";
 
-const GRAPH_MAIL_SEND_SCOPE = "https://graph.microsoft.com/Mail.Send";
+export const GRAPH_MAIL_SEND_SCOPE = "https://graph.microsoft.com/Mail.Send";
 const GRAPH_SEND_MAIL_URL = "https://graph.microsoft.com/v1.0/me/sendMail";
 const SIMULATED_EMAIL_BODY =
   "Hi Marge,\n\nI'm running a few minutes late. Could you start dinner without me?\n\nHomer";

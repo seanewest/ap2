@@ -26,9 +26,12 @@ Student tenant
 │   │   └── CBA browser-test operator: after-party-operator@corywest.onmicrosoft.com
 │   ├── app-only caller: development automation app
 │   │
-│   └── Runtime managed identity
-│       ├── calls Azure as the runtime
-│       └── calls Microsoft Graph as the runtime
+│   ├── Runtime managed identity
+│   │   └── calls Azure as the runtime
+│   │
+│   └── Homer simulated-user identity
+│       ├── signs in with CBA in a fresh headless browser context
+│       └── calls Microsoft Graph with a delegated token
 ```
 
 ## Backend identities

@@ -49,6 +49,37 @@ running status, and latest ready revision. Deployment must grant that managed
 identity read access to the target; this repository does not assign Azure
 roles.
 
+## One internal email
+
+`POST /api/simulated-email` uses the same exact delegated and app-only caller
+policy. The authorized caller triggers one fixed operation; the API then uses
+Homer's delegated CBA identity to make one Graph `sendMail` attempt:
+
+- sender: `homer.simpson@corywest.onmicrosoft.com`
+- recipient: `marge.simpson@corywest.onmicrosoft.com`
+- subject: `Dinner tonight`
+
+The API does not retry Graph. A `202` means Microsoft accepted the request, not
+that delivery is confirmed. Tokens are cached only in process memory, no
+refresh token is requested, and every browser acquisition uses a fresh
+non-persistent context.
+
+Production enables the operation only when all three settings are present:
+
+- `HOMER_CBA_CLIENT_ID`: UUID of the existing public client
+- `HOMER_CBA_PFX_PATH`: absolute path to the externally mounted Homer PFX
+- `HOMER_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
+
+The public client must already allow the fixed `http://localhost` redirect and
+have consent for delegated `User.Read` and `Mail.Send`. Homer must already have
+working Student CBA. The container needs outbound access to Microsoft login,
+certificate authentication, and Graph endpoints. This application work does
+not create consent, identity, certificate, or tenant configuration.
+
+The disposable rehearsal assumes one controlled click against one API replica.
+It does not claim exactly-once delivery across callers, replicas, or restarts,
+and intentionally adds no job or durable idempotency system.
+
 ## Identity setup and rollback
 
 Use separate `AZURE_CONFIG_DIR` directories for Product and Student. The setup

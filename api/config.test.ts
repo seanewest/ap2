@@ -49,6 +49,60 @@ describe("loadApiConfig", () => {
       STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
     ]);
     expect(config.callerPolicy.automationClientId).toBe(DEVELOPMENT_AUTOMATION_CLIENT_ID);
+    expect(config.homerCba).toBeUndefined();
+  });
+
+  it("accepts one complete Homer CBA configuration", () => {
+    const config = loadApiConfig({
+      AUTH_ISSUER: "https://issuer.example/",
+      AUTH_AUDIENCE: "api://audience",
+      AUTH_JWKS_URL: "https://issuer.example/keys",
+      HOMER_CBA_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+      HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
+      HOMER_CBA_PFX_PASSPHRASE: "secret-passphrase",
+    });
+
+    expect(config.homerCba).toEqual({
+      clientId: "11111111-1111-4111-8111-111111111111",
+      pfxPath: "/run/secrets/homer.pfx",
+      pfxPassphrase: "secret-passphrase",
+    });
+  });
+
+  it.each([
+    ["HOMER_CBA_CLIENT_ID", "11111111-1111-4111-8111-111111111111"],
+    ["HOMER_CBA_PFX_PATH", "/run/secrets/homer.pfx"],
+    ["HOMER_CBA_PFX_PASSPHRASE", "secret-passphrase"],
+  ])("rejects partial Homer CBA configuration with only %s", (name, value) => {
+    expect(() =>
+      loadApiConfig({
+        AUTH_ISSUER: "https://issuer.example/",
+        AUTH_AUDIENCE: "api://audience",
+        AUTH_JWKS_URL: "https://issuer.example/keys",
+        [name]: value,
+      }),
+    ).toThrow("must be configured together");
+  });
+
+  it("rejects an invalid Homer client ID or non-absolute PFX path", () => {
+    const environment = {
+      AUTH_ISSUER: "https://issuer.example/",
+      AUTH_AUDIENCE: "api://audience",
+      AUTH_JWKS_URL: "https://issuer.example/keys",
+      HOMER_CBA_CLIENT_ID: "not-a-client-id",
+      HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
+      HOMER_CBA_PFX_PASSPHRASE: "secret-passphrase",
+    };
+    expect(() => loadApiConfig(environment)).toThrow(
+      "HOMER_CBA_CLIENT_ID must be a UUID",
+    );
+    expect(() =>
+      loadApiConfig({
+        ...environment,
+        HOMER_CBA_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+        HOMER_CBA_PFX_PATH: "homer.pfx",
+      }),
+    ).toThrow("HOMER_CBA_PFX_PATH must be an absolute path");
   });
 
   it.each(["", "user-one,", "user-one,user-one"])(

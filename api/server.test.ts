@@ -290,10 +290,29 @@ describe("local API", () => {
 
     const response = await simulatedEmailRequest(claims);
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
     await expect(response.json()).resolves.toEqual(simulatedEmailResult);
     expect(simulatedEmailOperation.send).toHaveBeenCalledOnce();
     expect(simulatedEmailOperation.send).toHaveBeenCalledWith();
+  });
+
+  it("returns the configured CORS origin on an accepted simulated email", async () => {
+    simulatedEmailOperation.send.mockClear();
+
+    const response = await simulatedEmailRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      "http://localhost:5173",
+    );
+
+    expect(response.status).toBe(202);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:5173",
+    );
+    expect(simulatedEmailOperation.send).toHaveBeenCalledOnce();
   });
 
   it("does not send simulated email for an unauthorized caller", async () => {
@@ -443,11 +462,13 @@ async function protectedRequest(
 
 async function simulatedEmailRequest(
   claims: Record<string, unknown>,
+  origin?: string,
 ): Promise<Response> {
   return fetch(`${baseUrl}/api/simulated-email`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${fixtureToken(claims)}`,
+      ...(origin ? { Origin: origin } : {}),
     },
   });
 }

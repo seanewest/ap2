@@ -139,12 +139,18 @@ async function simulatedEmail(
   response: ServerResponse,
   dependencies: ApiDependencies,
 ): Promise<void> {
-  await handleAuthorizedRequest(request, response, dependencies, () => {
-    if (!dependencies.simulatedEmailOperation) {
-      throw new Error("Simulated email operation is not configured");
-    }
-    return dependencies.simulatedEmailOperation.send();
-  });
+  await handleAuthorizedRequest(
+    request,
+    response,
+    dependencies,
+    () => {
+      if (!dependencies.simulatedEmailOperation) {
+        throw new Error("Simulated email operation is not configured");
+      }
+      return dependencies.simulatedEmailOperation.send();
+    },
+    202,
+  );
 }
 
 async function handleAuthorizedRequest(
@@ -152,6 +158,7 @@ async function handleAuthorizedRequest(
   response: ServerResponse,
   dependencies: ApiDependencies,
   operation: (caller: AuthorizedCaller) => unknown | Promise<unknown>,
+  successStatus = 200,
 ): Promise<void> {
   const token = readBearerToken(request.headers.authorization);
   if (!token) {
@@ -162,7 +169,7 @@ async function handleAuthorizedRequest(
   try {
     const claims = await dependencies.tokenVerifier.verify(token);
     const caller = authorizeClaims(claims, dependencies.callerPolicy);
-    sendJson(response, 200, await operation(caller));
+    sendJson(response, successStatus, await operation(caller));
   } catch (error) {
     if (error instanceof CallerNotAllowedError) {
       sendJson(response, 403, { error: "forbidden" });
