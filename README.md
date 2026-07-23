@@ -48,8 +48,7 @@ Bearer token's signature, issuer, audience, and lifetime, then permits only:
 
 Both must be issued in immutable Student tenant
 `92563293-315c-4b6c-9b90-bcb47ee8c970`. Delegated and app-only claim shapes are
-kept distinct. Azure and Microsoft Graph calls are not implemented; future
-use-case-specific calls belong behind `api/cloud-operations.ts`.
+kept distinct. Azure and Microsoft Graph calls are not implemented.
 
 Build and start the API locally with explicit verification configuration:
 

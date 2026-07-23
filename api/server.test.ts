@@ -1,8 +1,10 @@
 // @vitest-environment node
 
-import { generateKeyPairSync, sign, type KeyObject } from "node:crypto";
+import { generateKeyPairSync, sign } from "node:crypto";
 import type { AddressInfo } from "node:net";
+import { createLocalJWKSet, type JWK } from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { defaultCallerPolicy } from "./auth-policy.js";
 import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   REQUIRED_APPLICATION_ROLE,
@@ -10,10 +12,9 @@ import {
   STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
   STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
-  defaultCallerPolicy,
-} from "./auth-policy.js";
-import { JwtVerifier, type SigningKeyProvider } from "./jwt-verifier.js";
+} from "./identity.js";
 import { createApiServer } from "./server.js";
+import { JoseTokenVerifier } from "./token-verifier.js";
 
 const ISSUER = "https://fixtures.example/student/v2.0";
 const AUDIENCE = "api://ap2-fixture";
@@ -21,16 +22,19 @@ const KEY_ID = "fixture-key";
 const NOW = 2_000_000_000;
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-const signingKeys: SigningKeyProvider = {
-  async getSigningKey(keyId: string): Promise<KeyObject> {
-    if (keyId !== KEY_ID) {
-      throw new Error("Unknown key");
-    }
-    return publicKey;
-  },
-};
+const publicJwk = {
+  ...publicKey.export({ format: "jwk" }),
+  kid: KEY_ID,
+  alg: "RS256",
+  use: "sig",
+} as JWK;
 const server = createApiServer({
-  jwtVerifier: new JwtVerifier({ issuer: ISSUER, audience: AUDIENCE, signingKeys, now: () => NOW }),
+  tokenVerifier: new JoseTokenVerifier({
+    issuer: ISSUER,
+    audience: AUDIENCE,
+    keyResolver: createLocalJWKSet({ keys: [publicJwk] }),
+    now: () => NOW,
+  }),
   callerPolicy: defaultCallerPolicy,
   allowedOrigin: "http://localhost:5173",
 });
@@ -231,6 +235,7 @@ describe("local API", () => {
     ["wrong audience", { aud: "api://wrong" }],
     ["expired lifetime", { exp: NOW - 60 }],
     ["future not-before time", { nbf: NOW + 60 }],
+    ["missing expiration", { exp: undefined }],
   ])("rejects a correctly signed token with %s", async (_label, registeredClaim) => {
     const response = await protectedRequest({
       tid: STUDENT_TENANT_ID,

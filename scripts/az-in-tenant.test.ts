@@ -3,10 +3,12 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  PRODUCT_TENANT_ID,
+  STUDENT_TENANT_ID,
+} from "../api/identity.js";
 
 const temporaryDirectories: string[] = [];
-const productTenant = "b224230b-e540-4726-bae7-00b92b1c1cbc";
-const studentTenant = "92563293-315c-4b6c-9b90-bcb47ee8c970";
 
 afterEach(async () => {
   await Promise.all(
@@ -57,17 +59,34 @@ describe("az-in-tenant.sh", () => {
   it("runs only when the selected account and token match the expected tenant", async () => {
     const fakePath = await fakeAzurePath();
 
-    const success = runWrapper(fakePath, productTenant, productTenant, productTenant);
+    const success = runWrapper(
+      fakePath,
+      PRODUCT_TENANT_ID,
+      PRODUCT_TENANT_ID,
+      PRODUCT_TENANT_ID,
+    );
     expect(success.status).toBe(0);
     expect(success.stdout).toContain("requested command: ad app list");
-    expect(success.stderr).toContain(`Azure tenant asserted: Fake tenant (${productTenant})`);
+    expect(success.stderr).toContain(
+      `Azure tenant asserted: Fake tenant (${PRODUCT_TENANT_ID})`,
+    );
 
-    const wrongAccount = runWrapper(fakePath, productTenant, studentTenant, productTenant);
+    const wrongAccount = runWrapper(
+      fakePath,
+      PRODUCT_TENANT_ID,
+      STUDENT_TENANT_ID,
+      PRODUCT_TENANT_ID,
+    );
     expect(wrongAccount.status).toBe(1);
     expect(wrongAccount.stdout).not.toContain("requested command");
     expect(wrongAccount.stderr).toContain("Tenant mismatch");
 
-    const wrongToken = runWrapper(fakePath, productTenant, productTenant, studentTenant);
+    const wrongToken = runWrapper(
+      fakePath,
+      PRODUCT_TENANT_ID,
+      PRODUCT_TENANT_ID,
+      STUDENT_TENANT_ID,
+    );
     expect(wrongToken.status).toBe(1);
     expect(wrongToken.stdout).not.toContain("requested command");
     expect(wrongToken.stderr).toContain("Token tenant mismatch");

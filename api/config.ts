@@ -2,8 +2,8 @@ import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   STUDENT_DELEGATED_USER_OBJECT_IDS,
   STUDENT_TENANT_ID,
-  type CallerPolicy,
-} from "./auth-policy.js";
+} from "./identity.js";
+import type { CallerPolicy } from "./auth-policy.js";
 
 export interface ApiConfig {
   host: string;

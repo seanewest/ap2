@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   CallerNotAllowedError,
-  DEVELOPMENT_AUTOMATION_CLIENT_ID,
   InvalidClaimsError,
+  authorizeClaims,
+  defaultCallerPolicy,
+} from "./auth-policy.js";
+import {
+  DEVELOPMENT_AUTOMATION_CLIENT_ID,
   REQUIRED_APPLICATION_ROLE,
   REQUIRED_DELEGATED_SCOPE,
   STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
   STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
-  authorizeClaims,
-  defaultCallerPolicy,
-} from "./auth-policy.js";
+} from "./identity.js";
 
 describe("authorizeClaims", () => {
   it.each([

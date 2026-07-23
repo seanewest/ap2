@@ -4,7 +4,7 @@ import {
   STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
   STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
-} from "./auth-policy.js";
+} from "./identity.js";
 import { loadApiConfig } from "./config.js";
 
 describe("loadApiConfig", () => {

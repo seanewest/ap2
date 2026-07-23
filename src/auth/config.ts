@@ -1,4 +1,6 @@
-export const AFTER_PARTY_CLIENT_ID = "c91c7af4-b1b8-4730-a240-4a1c6137ab15";
+import { AFTER_PARTY_CLIENT_ID } from "../../api/identity";
+
+export { AFTER_PARTY_CLIENT_ID };
 export const ORGANIZATIONS_AUTHORITY =
   "https://login.microsoftonline.com/organizations";
 export const SIGN_IN_SCOPES = ["openid", "profile"] as const;

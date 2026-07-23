@@ -11,6 +11,7 @@ FROM node:24-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/dist-api ./dist-api
+COPY --from=build /app/node_modules/jose ./node_modules/jose
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=3s --retries=3 \

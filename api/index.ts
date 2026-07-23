@@ -1,19 +1,16 @@
 import { loadApiConfig } from "./config.js";
-import { RemoteJwksSigningKeyProvider } from "./jwks.js";
-import { JwtVerifier } from "./jwt-verifier.js";
 import { createApiServer } from "./server.js";
+import { createRemoteTokenVerifier } from "./token-verifier.js";
 
 const config = loadApiConfig();
-const signingKeys = new RemoteJwksSigningKeyProvider(config.jwksUrl, {
-  allowInsecureHttp: config.allowInsecureJwks,
-});
-const jwtVerifier = new JwtVerifier({
+const tokenVerifier = createRemoteTokenVerifier({
   issuer: config.issuer,
   audience: config.audience,
-  signingKeys,
+  jwksUrl: config.jwksUrl,
+  allowInsecureHttp: config.allowInsecureJwks,
 });
 const server = createApiServer({
-  jwtVerifier,
+  tokenVerifier,
   callerPolicy: config.callerPolicy,
   allowedOrigin: config.allowedOrigin,
 });

@@ -2,11 +2,13 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  AFTER_PARTY_CLIENT_ID,
+  DEVELOPMENT_AUTOMATION_CLIENT_ID as AUTOMATION_CLIENT_ID,
+  REQUIRED_APPLICATION_ROLE,
+  STUDENT_TENANT_ID,
+} from "../api/identity.ts";
 
-const STUDENT_TENANT_ID = "92563293-315c-4b6c-9b90-bcb47ee8c970";
-const AFTER_PARTY_CLIENT_ID = "c91c7af4-b1b8-4730-a240-4a1c6137ab15";
-const AUTOMATION_CLIENT_ID = "7eb78f18-b49c-495c-a571-af03f06b58a9";
-const REQUIRED_APPLICATION_ROLE = "access_as_application";
 const ISSUER = `https://login.microsoftonline.com/${STUDENT_TENANT_ID}/v2.0`;
 const JWKS_URL =
   `https://login.microsoftonline.com/${STUDENT_TENANT_ID}` +

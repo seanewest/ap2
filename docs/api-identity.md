@@ -26,6 +26,8 @@ App-only access requires the exact application role, `idtyp: app`, and
 development automation client ID
 `7eb78f18-b49c-495c-a571-af03f06b58a9`. Both paths also require the Student
 tenant, configured issuer and audience, and a verified Microsoft signature.
+The API uses `jose` remote JWKS resolution and JWT verification with only
+RS256 accepted.
 
 `AUTH_DELEGATED_USER_OBJECT_IDS` can replace the delegated allowlist with a
 comma-separated list. `AUTH_AUTOMATION_CLIENT_ID` can replace the app-only

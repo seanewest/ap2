@@ -9,15 +9,17 @@ import {
   writeFileSync,
 } from "node:fs";
 import { resolve } from "node:path";
+import {
+  AFTER_PARTY_CLIENT_ID,
+  DEVELOPMENT_AUTOMATION_CLIENT_ID as AUTOMATION_CLIENT_ID,
+  PRODUCT_TENANT_ID,
+  REQUIRED_APPLICATION_ROLE as APPLICATION_ROLE,
+  REQUIRED_DELEGATED_SCOPE as DELEGATED_SCOPE,
+  STUDENT_TENANT_ID,
+} from "../api/identity.ts";
 
-const PRODUCT_TENANT_ID = "b224230b-e540-4726-bae7-00b92b1c1cbc";
-const STUDENT_TENANT_ID = "92563293-315c-4b6c-9b90-bcb47ee8c970";
-const AFTER_PARTY_CLIENT_ID = "c91c7af4-b1b8-4730-a240-4a1c6137ab15";
-const AUTOMATION_CLIENT_ID = "7eb78f18-b49c-495c-a571-af03f06b58a9";
 const APPLICATION_ID_URI = `api://${AFTER_PARTY_CLIENT_ID}`;
-const DELEGATED_SCOPE = "access_as_user";
 const DELEGATED_SCOPE_ID = "59c976f0-118f-436f-8938-e0f2f0f1c84b";
-const APPLICATION_ROLE = "access_as_application";
 const APPLICATION_ROLE_ID = "b6e481bc-9bf3-4faf-8b11-5d3e80ba1724";
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
 

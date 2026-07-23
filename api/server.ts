@@ -5,10 +5,10 @@ import {
   authorizeClaims,
   type CallerPolicy,
 } from "./auth-policy.js";
-import { InvalidTokenError, type JwtVerifier } from "./jwt-verifier.js";
+import { InvalidTokenError, type TokenVerifier } from "./token-verifier.js";
 
 export interface ApiDependencies {
-  jwtVerifier: JwtVerifier;
+  tokenVerifier: TokenVerifier;
   callerPolicy: CallerPolicy;
   allowedOrigin?: string;
 }
@@ -96,7 +96,7 @@ async function whoAmI(
   }
 
   try {
-    const claims = await dependencies.jwtVerifier.verify(token);
+    const claims = await dependencies.tokenVerifier.verify(token);
     const caller = authorizeClaims(claims, dependencies.callerPolicy);
     sendJson(response, 200, caller);
   } catch (error) {
