@@ -49,28 +49,38 @@ describe("loadApiConfig", () => {
       STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
     ]);
     expect(config.callerPolicy.automationClientId).toBe(DEVELOPMENT_AUTOMATION_CLIENT_ID);
-    expect(config.homerCba).toBeUndefined();
+    expect(config.simulatedUsersCba).toBeUndefined();
   });
 
-  it("accepts one complete Homer CBA configuration", () => {
+  it("accepts complete per-user CBA configuration under one client", () => {
     const config = loadApiConfig({
       AUTH_ISSUER: "https://issuer.example/",
       AUTH_AUDIENCE: "api://audience",
       AUTH_JWKS_URL: "https://issuer.example/keys",
-      HOMER_CBA_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+      SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
       HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
       HOMER_CBA_PFX_PASSPHRASE: "secret-passphrase",
+      MARGE_CBA_OBJECT_ID: "22222222-2222-4222-8222-222222222222",
+      MARGE_CBA_PFX_PATH: "/run/secrets/marge.pfx",
+      MARGE_CBA_PFX_PASSPHRASE: "another-secret",
     });
 
-    expect(config.homerCba).toEqual({
+    expect(config.simulatedUsersCba).toEqual({
       clientId: "11111111-1111-4111-8111-111111111111",
-      pfxPath: "/run/secrets/homer.pfx",
-      pfxPassphrase: "secret-passphrase",
+      homer: {
+        pfxPath: "/run/secrets/homer.pfx",
+        pfxPassphrase: "secret-passphrase",
+      },
+      marge: {
+        objectId: "22222222-2222-4222-8222-222222222222",
+        pfxPath: "/run/secrets/marge.pfx",
+        pfxPassphrase: "another-secret",
+      },
     });
   });
 
   it.each([
-    ["HOMER_CBA_CLIENT_ID", "11111111-1111-4111-8111-111111111111"],
+    ["SIMULATED_USER_CLIENT_ID", "11111111-1111-4111-8111-111111111111"],
     ["HOMER_CBA_PFX_PATH", "/run/secrets/homer.pfx"],
     ["HOMER_CBA_PFX_PASSPHRASE", "secret-passphrase"],
   ])("rejects partial Homer CBA configuration with only %s", (name, value) => {
@@ -89,20 +99,45 @@ describe("loadApiConfig", () => {
       AUTH_ISSUER: "https://issuer.example/",
       AUTH_AUDIENCE: "api://audience",
       AUTH_JWKS_URL: "https://issuer.example/keys",
-      HOMER_CBA_CLIENT_ID: "not-a-client-id",
+      SIMULATED_USER_CLIENT_ID: "not-a-client-id",
       HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
       HOMER_CBA_PFX_PASSPHRASE: "secret-passphrase",
     };
     expect(() => loadApiConfig(environment)).toThrow(
-      "HOMER_CBA_CLIENT_ID must be a UUID",
+      "SIMULATED_USER_CLIENT_ID must be a UUID",
     );
     expect(() =>
       loadApiConfig({
         ...environment,
-        HOMER_CBA_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+        SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
         HOMER_CBA_PFX_PATH: "homer.pfx",
       }),
     ).toThrow("HOMER_CBA_PFX_PATH must be an absolute path");
+  });
+
+  it("rejects partial or invalid Marge configuration independently", () => {
+    const base = {
+      AUTH_ISSUER: "https://issuer.example/",
+      AUTH_AUDIENCE: "api://audience",
+      AUTH_JWKS_URL: "https://issuer.example/keys",
+      SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+    };
+    expect(() =>
+      loadApiConfig({
+        ...base,
+        MARGE_CBA_PFX_PATH: "/run/secrets/marge.pfx",
+      }),
+    ).toThrow(
+      "MARGE_CBA_PFX_PATH and MARGE_CBA_PFX_PASSPHRASE must be configured together",
+    );
+    expect(() =>
+      loadApiConfig({
+        ...base,
+        MARGE_CBA_OBJECT_ID: "not-a-uuid",
+        MARGE_CBA_PFX_PATH: "/run/secrets/marge.pfx",
+        MARGE_CBA_PFX_PASSPHRASE: "secret",
+      }),
+    ).toThrow("MARGE_CBA_OBJECT_ID must be a UUID");
   });
 
   it.each(["", "user-one,", "user-one,user-one"])(

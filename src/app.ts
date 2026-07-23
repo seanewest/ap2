@@ -10,6 +10,7 @@ import {
   ApiAccessError,
   type AfterPartyApi,
   type ApiCallerIdentity,
+  type OneDriveProofResult,
   type RehearsalStatus,
   type SimulatedEmailResult,
 } from "./api/client";
@@ -36,6 +37,19 @@ type SimulatedEmailState =
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
 
+type OneDriveProofStage =
+  | "not-started"
+  | "uncertain"
+  | "shared"
+  | "verified"
+  | "removed";
+
+type OneDriveProofState = {
+  stage: OneDriveProofStage;
+  activity: "idle" | "sharing" | "verifying" | "removing";
+  message?: string;
+};
+
 type ViewState =
   | { kind: "initial" }
   | { kind: "processing"; message: string }
@@ -46,6 +60,7 @@ type ViewState =
       apiAccess: ApiAccessState;
       rehearsalStatus: RehearsalStatusState;
       simulatedEmail: SimulatedEmailState;
+      oneDriveProof: OneDriveProofState;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -58,6 +73,7 @@ export function createAfterPartyApp(
   root: HTMLElement,
   authentication: Authentication,
   api: AfterPartyApi,
+  storage: Pick<Storage, "getItem" | "setItem"> = window.localStorage,
 ): AfterPartyApp {
   let state: ViewState = { kind: "initial" };
 
@@ -103,19 +119,22 @@ export function createAfterPartyApp(
       state.kind !== "signed-in" ||
       state.apiAccess.kind === "loading" ||
       state.rehearsalStatus.kind === "loading" ||
-      state.simulatedEmail.kind === "loading"
+      state.simulatedEmail.kind === "loading" ||
+      state.oneDriveProof.activity !== "idle"
     ) {
       return;
     }
     const account = state.account;
     const rehearsalStatus = state.rehearsalStatus;
     const simulatedEmail = state.simulatedEmail;
+    const oneDriveProof = state.oneDriveProof;
     setState({
       kind: "signed-in",
       account,
       apiAccess: { kind: "loading" },
       rehearsalStatus,
       simulatedEmail,
+      oneDriveProof,
     });
 
     try {
@@ -128,6 +147,7 @@ export function createAfterPartyApp(
           apiAccess: { kind: "success", caller },
           rehearsalStatus,
           simulatedEmail,
+          oneDriveProof,
         });
       }
     } catch (error) {
@@ -141,6 +161,7 @@ export function createAfterPartyApp(
           apiAccess: { kind: "cancelled" },
           rehearsalStatus,
           simulatedEmail,
+          oneDriveProof,
         });
         return;
       }
@@ -154,6 +175,7 @@ export function createAfterPartyApp(
         apiAccess: { kind: "error", message },
         rehearsalStatus,
         simulatedEmail,
+        oneDriveProof,
       });
     }
   };
@@ -163,19 +185,22 @@ export function createAfterPartyApp(
       state.kind !== "signed-in" ||
       state.rehearsalStatus.kind === "loading" ||
       state.apiAccess.kind === "loading" ||
-      state.simulatedEmail.kind === "loading"
+      state.simulatedEmail.kind === "loading" ||
+      state.oneDriveProof.activity !== "idle"
     ) {
       return;
     }
     const account = state.account;
     const apiAccess = state.apiAccess;
     const simulatedEmail = state.simulatedEmail;
+    const oneDriveProof = state.oneDriveProof;
     setState({
       kind: "signed-in",
       account,
       apiAccess,
       rehearsalStatus: { kind: "loading" },
       simulatedEmail,
+      oneDriveProof,
     });
 
     try {
@@ -188,6 +213,7 @@ export function createAfterPartyApp(
           apiAccess,
           rehearsalStatus: { kind: "success", status },
           simulatedEmail,
+          oneDriveProof,
         });
       }
     } catch (error) {
@@ -201,6 +227,7 @@ export function createAfterPartyApp(
           apiAccess,
           rehearsalStatus: { kind: "cancelled" },
           simulatedEmail,
+          oneDriveProof,
         });
         return;
       }
@@ -214,6 +241,7 @@ export function createAfterPartyApp(
         apiAccess,
         rehearsalStatus: { kind: "error", message },
         simulatedEmail,
+        oneDriveProof,
       });
     }
   };
@@ -224,19 +252,22 @@ export function createAfterPartyApp(
       state.apiAccess.kind === "loading" ||
       state.rehearsalStatus.kind === "loading" ||
       state.simulatedEmail.kind === "loading" ||
-      state.simulatedEmail.kind === "success"
+      state.simulatedEmail.kind === "success" ||
+      state.oneDriveProof.activity !== "idle"
     ) {
       return;
     }
     const account = state.account;
     const apiAccess = state.apiAccess;
     const rehearsalStatus = state.rehearsalStatus;
+    const oneDriveProof = state.oneDriveProof;
     setState({
       kind: "signed-in",
       account,
       apiAccess,
       rehearsalStatus,
       simulatedEmail: { kind: "loading" },
+      oneDriveProof,
     });
 
     try {
@@ -250,6 +281,7 @@ export function createAfterPartyApp(
           apiAccess,
           rehearsalStatus,
           simulatedEmail: { kind: "success", result },
+          oneDriveProof,
         });
       }
     } catch (error) {
@@ -263,6 +295,7 @@ export function createAfterPartyApp(
           apiAccess,
           rehearsalStatus,
           simulatedEmail: { kind: "cancelled" },
+          oneDriveProof,
         });
         return;
       }
@@ -276,6 +309,119 @@ export function createAfterPartyApp(
         apiAccess,
         rehearsalStatus,
         simulatedEmail: { kind: "error", message },
+        oneDriveProof,
+      });
+    }
+  };
+
+  const runOneDriveProofAction = async (
+    action: "share" | "verify" | "remove",
+  ): Promise<void> => {
+    if (
+      state.kind !== "signed-in" ||
+      state.apiAccess.kind === "loading" ||
+      state.rehearsalStatus.kind === "loading" ||
+      state.simulatedEmail.kind === "loading" ||
+      state.oneDriveProof.activity !== "idle" ||
+      !isAllowedOneDriveAction(state.oneDriveProof.stage, action)
+    ) {
+      return;
+    }
+    const account = state.account;
+    const apiAccess = state.apiAccess;
+    const rehearsalStatus = state.rehearsalStatus;
+    const simulatedEmail = state.simulatedEmail;
+    const previousStage = state.oneDriveProof.stage;
+    setState({
+      kind: "signed-in",
+      account,
+      apiAccess,
+      rehearsalStatus,
+      simulatedEmail,
+      oneDriveProof: {
+        stage: previousStage,
+        activity:
+          action === "share"
+            ? "sharing"
+            : action === "verify"
+              ? "verifying"
+              : "removing",
+      },
+    });
+
+    try {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      if (action !== "verify") {
+        persistOneDriveStage(storage, account, "uncertain");
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus,
+          simulatedEmail,
+          oneDriveProof: {
+            stage: "uncertain",
+            activity: action === "share" ? "sharing" : "removing",
+          },
+        });
+      }
+      const result =
+        action === "share"
+          ? await api.shareOneDriveProof(accessToken)
+          : action === "verify"
+            ? await api.verifyOneDriveProof(accessToken)
+            : await api.removeOneDriveProof(accessToken);
+      if (isCurrentSignedInAccount(state, account)) {
+        const nextStage = oneDriveStage(result);
+        persistOneDriveStage(storage, account, nextStage);
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus,
+          simulatedEmail,
+          oneDriveProof: { stage: nextStage, activity: "idle" },
+        });
+      }
+    } catch (error) {
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      if (error instanceof AccessTokenCancelledError) {
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus,
+          simulatedEmail,
+          oneDriveProof: {
+            stage: previousStage,
+            activity: "idle",
+            message: "The OneDrive action was cancelled before it started.",
+          },
+        });
+        return;
+      }
+      const stage = action === "verify" ? previousStage : "uncertain";
+      const fallback =
+        action === "verify"
+          ? "Marge access could not be verified. No file was changed."
+          : "The OneDrive change was not confirmed. Do not repeat sharing; verify or clean up explicitly.";
+      const message =
+        error instanceof AccessTokenError || error instanceof ApiAccessError
+          ? error.message
+          : fallback;
+      setState({
+        kind: "signed-in",
+        account,
+        apiAccess,
+        rehearsalStatus,
+        simulatedEmail,
+        oneDriveProof: { stage, activity: "idle", message },
       });
     }
   };
@@ -297,6 +443,15 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='send-simulated-email']")
       ?.addEventListener("click", () => void sendSimulatedEmail());
+    root
+      .querySelector<HTMLButtonElement>("[data-action='share-onedrive-proof']")
+      ?.addEventListener("click", () => void runOneDriveProofAction("share"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='verify-onedrive-proof']")
+      ?.addEventListener("click", () => void runOneDriveProofAction("verify"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='remove-onedrive-proof']")
+      ?.addEventListener("click", () => void runOneDriveProofAction("remove"));
   };
 
   const start = async (): Promise<void> => {
@@ -314,6 +469,10 @@ export function createAfterPartyApp(
               apiAccess: { kind: "idle" },
               rehearsalStatus: { kind: "idle" },
               simulatedEmail: { kind: "idle" },
+              oneDriveProof: {
+                stage: readOneDriveStage(storage, startup.account),
+                activity: "idle",
+              },
             }
           : { kind: "signed-out" },
       );
@@ -371,7 +530,8 @@ function createStatePanel(state: ViewState): HTMLElement {
       const apiOperationLoading =
         state.apiAccess.kind === "loading" ||
         state.rehearsalStatus.kind === "loading" ||
-        state.simulatedEmail.kind === "loading";
+        state.simulatedEmail.kind === "loading" ||
+        state.oneDriveProof.activity !== "idle";
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
@@ -382,6 +542,10 @@ function createStatePanel(state: ViewState): HTMLElement {
         ),
         createSimulatedEmailPanel(
           state.simulatedEmail,
+          apiOperationLoading,
+        ),
+        createOneDriveProofPanel(
+          state.oneDriveProof,
           apiOperationLoading,
         ),
         createButton("Sign out", "sign-out", "secondary"),
@@ -418,7 +582,10 @@ function createButton(
     | "sign-out"
     | "check-api"
     | "check-rehearsal"
-    | "send-simulated-email",
+    | "send-simulated-email"
+    | "share-onedrive-proof"
+    | "verify-onedrive-proof"
+    | "remove-onedrive-proof",
   className: string,
   disabled = false,
 ): HTMLButtonElement {
@@ -472,6 +639,72 @@ function createSimulatedEmailPanel(
       "send-simulated-email",
       "primary",
       apiOperationLoading || state.kind === "success",
+    ),
+  );
+  return panel;
+}
+
+function createOneDriveProofPanel(
+  state: OneDriveProofState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+  panel.append(
+    createStatus(
+      "Real tenant activity: Homer creates one fixed harmless file, shares it read-only with Marge, and cleanup moves it to Homer's recycle bin.",
+      "notice",
+    ),
+  );
+
+  if (state.activity !== "idle") {
+    panel.setAttribute("aria-busy", "true");
+    panel.append(
+      createStatus(
+        state.activity === "sharing"
+          ? "Creating and sharing the fixed OneDrive proof…"
+          : state.activity === "verifying"
+            ? "Signing in as Marge and verifying the exact file bytes…"
+            : "Validating and removing the fixed OneDrive proof…",
+      ),
+    );
+  } else {
+    const message =
+      state.stage === "not-started"
+        ? "OneDrive proof: not started in this browser."
+        : state.stage === "shared"
+          ? "OneDrive proof: shared read-only with Marge. Access is not yet verified."
+          : state.stage === "verified"
+            ? "OneDrive proof: Marge access and exact file bytes verified."
+            : state.stage === "removed"
+              ? "OneDrive proof: removed to Homer's recycle bin."
+              : "OneDrive proof: the last change outcome is uncertain. Do not share again; verify or clean up explicitly.";
+    panel.append(createStatus(message, state.stage === "uncertain" ? "notice" : "status"));
+  }
+  if (state.message) {
+    panel.append(createStatus(state.message, "error"));
+  }
+
+  panel.append(
+    createButton(
+      "Create and share OneDrive proof",
+      "share-onedrive-proof",
+      "primary",
+      apiOperationLoading || state.stage !== "not-started",
+    ),
+    createButton(
+      "Verify as Marge",
+      "verify-onedrive-proof",
+      "secondary",
+      apiOperationLoading ||
+        (state.stage !== "shared" && state.stage !== "uncertain"),
+    ),
+    createButton(
+      "Clean up OneDrive proof",
+      "remove-onedrive-proof",
+      "secondary",
+      apiOperationLoading ||
+        !["shared", "verified", "uncertain"].includes(state.stage),
     ),
   );
   return panel;
@@ -596,6 +829,48 @@ function isCurrentSignedInAccount(
   account: AccountIdentity,
 ): state is Extract<ViewState, { kind: "signed-in" }> {
   return state.kind === "signed-in" && state.account.accountId === account.accountId;
+}
+
+function isAllowedOneDriveAction(
+  stage: OneDriveProofStage,
+  action: "share" | "verify" | "remove",
+): boolean {
+  if (action === "share") {
+    return stage === "not-started";
+  }
+  if (action === "verify") {
+    return stage === "shared" || stage === "uncertain";
+  }
+  return stage === "shared" || stage === "verified" || stage === "uncertain";
+}
+
+function oneDriveStage(result: OneDriveProofResult): OneDriveProofStage {
+  return result.state;
+}
+
+function oneDriveStorageKey(account: AccountIdentity): string {
+  return `ap2.onedrive-share-proof.${account.tenantId}.${account.accountId}`;
+}
+
+function readOneDriveStage(
+  storage: Pick<Storage, "getItem">,
+  account: AccountIdentity,
+): OneDriveProofStage {
+  const value = storage.getItem(oneDriveStorageKey(account));
+  return value === "uncertain" ||
+    value === "shared" ||
+    value === "verified" ||
+    value === "removed"
+    ? value
+    : "not-started";
+}
+
+function persistOneDriveStage(
+  storage: Pick<Storage, "setItem">,
+  account: AccountIdentity,
+  stage: OneDriveProofStage,
+): void {
+  storage.setItem(oneDriveStorageKey(account), stage);
 }
 
 function appendIdentity(

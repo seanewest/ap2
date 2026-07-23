@@ -64,9 +64,11 @@ that delivery is confirmed. Tokens are cached only in process memory, no
 refresh token is requested, and every browser acquisition uses a fresh
 non-persistent context.
 
-Production enables the operation only when all three settings are present:
+Production enables Homer's operation only when the shared client and both
+Homer certificate settings are present:
 
-- `HOMER_CBA_CLIENT_ID`: UUID of the existing public client
+- `SIMULATED_USER_CLIENT_ID`: UUID of the existing shared multitenant public
+  client
 - `HOMER_CBA_PFX_PATH`: absolute path to the externally mounted Homer PFX
 - `HOMER_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
 
@@ -79,6 +81,41 @@ not create consent, identity, certificate, or tenant configuration.
 The disposable rehearsal assumes one controlled click against one API replica.
 It does not claim exactly-once delivery across callers, replicas, or restarts,
 and intentionally adds no job or durable idempotency system.
+
+## OneDrive share proof
+
+`POST`, `GET`, and `DELETE /api/onedrive-share-proof` use the same exact
+delegated and app-only caller policy. The three methods are deliberately
+separate human actions:
+
+- `POST` refuses an existing `/AP2-OneDrive-share-proof.txt`, creates that
+  fixed file with the exact rehearsal sentence, and grants only
+  `marge.simpson@corywest.onmicrosoft.com` read access. Sign-in is required and
+  no invitation is sent.
+- `GET` signs in as Marge and reads the exact drive/item content path. It
+  succeeds only when the metadata and bytes match.
+- `DELETE` resolves the fixed path, validates its metadata and bytes, then
+  deletes once using its eTag. OneDrive moves the item to the recycle bin.
+
+The API never retries an upload-session creation, upload, invite, or delete.
+After an uncertain mutation response, the UI disables sharing and offers only
+explicit verification or cleanup. Its stage is stored per signed-in account in
+browser storage so a reload does not blindly repeat a mutation.
+
+Homer uses delegated `Files.ReadWrite`; Marge uses delegated `Files.Read`.
+The shared public client must already have those grants and its existing
+`http://localhost` redirect. In addition to Homer's settings, verification is
+enabled only when all three Marge settings are present:
+
+- `MARGE_CBA_OBJECT_ID`: Marge's immutable Student object ID
+- `MARGE_CBA_PFX_PATH`: absolute path to the externally mounted Marge PFX
+- `MARGE_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
+
+Each simulated user has a separate in-memory token cache and disposable
+Playwright context. Partial per-user certificate configuration fails startup.
+The operation returns only its safe stage, fixed path, identity, and access
+summary; it never returns tokens, credentials, item IDs, eTags, upload URLs, or
+raw Graph responses.
 
 ## Identity setup and rollback
 

@@ -153,6 +153,102 @@ describe("HTTP After Party API client", () => {
   });
 
   it.each([
+    [
+      "shareOneDriveProof",
+      "POST",
+      201,
+      {
+        state: "shared",
+        path: "/AP2-OneDrive-share-proof.txt",
+        owner: "homer.simpson@corywest.onmicrosoft.com",
+        recipient: "marge.simpson@corywest.onmicrosoft.com",
+        access: "read",
+      },
+    ],
+    [
+      "verifyOneDriveProof",
+      "GET",
+      200,
+      {
+        state: "verified",
+        path: "/AP2-OneDrive-share-proof.txt",
+        verifiedAs: "marge.simpson@corywest.onmicrosoft.com",
+        contentMatches: true,
+      },
+    ],
+    [
+      "removeOneDriveProof",
+      "DELETE",
+      200,
+      {
+        state: "removed",
+        path: "/AP2-OneDrive-share-proof.txt",
+      },
+    ],
+  ] as const)(
+    "%s uses the fixed API route and returns only safe fields",
+    async (methodName, method, status, body) => {
+      const request = vi.fn<typeof fetch>().mockResolvedValue(
+        Response.json(
+          { ...body, token: "must-not-escape", rawGraphResponse: {} },
+          { status },
+        ),
+      );
+      const client = new HttpAfterPartyApi(
+        "https://student-api.example/base",
+        request,
+      );
+
+      const result = await client[methodName]("sensitive-access-token");
+
+      expect(request).toHaveBeenCalledWith(
+        "https://student-api.example/base/api/onedrive-share-proof",
+        {
+          method,
+          credentials: "omit",
+          redirect: "error",
+          headers: { Authorization: "Bearer sensitive-access-token" },
+        },
+      );
+      expect(result).toEqual(body);
+      expect(JSON.stringify(result)).not.toContain("token");
+      expect(JSON.stringify(result)).not.toContain("rawGraphResponse");
+    },
+  );
+
+  it("rejects a mismatched or malformed OneDrive proof response", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          state: "verified",
+          path: "/AP2-OneDrive-share-proof.txt",
+          verifiedAs: "someone-else@corywest.onmicrosoft.com",
+          contentMatches: true,
+        },
+        { status: 200 },
+      ),
+    );
+    const client = new HttpAfterPartyApi("https://student-api.example", request);
+
+    await expect(client.verifyOneDriveProof("token")).rejects.toEqual(
+      new ApiAccessError(),
+    );
+  });
+
+  it("makes a OneDrive conflict understandable without leaking details", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response("provider detail", { status: 409 }));
+    const client = new HttpAfterPartyApi("https://student-api.example", request);
+
+    await expect(client.shareOneDriveProof("token")).rejects.toEqual(
+      new ApiAccessError(
+        "The OneDrive proof file is not in the expected state. Nothing was changed.",
+      ),
+    );
+  });
+
+  it.each([
     [401, "API access needs Microsoft authorization. Try again."],
     [403, "This account is not allowed to use the API."],
     [500, "The API could not complete the access check. Try again."],

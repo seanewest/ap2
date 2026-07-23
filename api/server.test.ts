@@ -21,6 +21,10 @@ import {
   SIMULATED_EMAIL_SUBJECT,
   type SimulatedEmailResult,
 } from "./simulated-email.js";
+import {
+  ONEDRIVE_PROOF_PATH,
+  type OneDriveProofResult,
+} from "./onedrive-share-proof.js";
 import { JoseTokenVerifier } from "./token-verifier.js";
 
 const ISSUER = "https://fixtures.example/student/v2.0";
@@ -53,6 +57,27 @@ const simulatedEmailResult: SimulatedEmailResult = {
 const simulatedEmailOperation = {
   send: vi.fn().mockResolvedValue(simulatedEmailResult),
 };
+const oneDriveResults = {
+  shared: {
+    state: "shared",
+    path: ONEDRIVE_PROOF_PATH,
+    owner: HOMER_USER_PRINCIPAL_NAME,
+    recipient: MARGE_USER_PRINCIPAL_NAME,
+    access: "read",
+  },
+  verified: {
+    state: "verified",
+    path: ONEDRIVE_PROOF_PATH,
+    verifiedAs: MARGE_USER_PRINCIPAL_NAME,
+    contentMatches: true,
+  },
+  removed: { state: "removed", path: ONEDRIVE_PROOF_PATH },
+} as const satisfies Record<string, OneDriveProofResult>;
+const oneDriveShareProofOperation = {
+  share: vi.fn().mockResolvedValue(oneDriveResults.shared),
+  verify: vi.fn().mockResolvedValue(oneDriveResults.verified),
+  remove: vi.fn().mockResolvedValue(oneDriveResults.removed),
+};
 const server = createApiServer({
   tokenVerifier: new JoseTokenVerifier({
     issuer: ISSUER,
@@ -63,6 +88,7 @@ const server = createApiServer({
   callerPolicy: defaultCallerPolicy,
   rehearsalStatusProvider,
   simulatedEmailOperation,
+  oneDriveShareProofOperation,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -145,6 +171,24 @@ describe("local API", () => {
       });
 
       expect(response.status).toBe(403);
+    },
+  );
+
+  it.each(["GET", "POST", "DELETE"])(
+    "allows only the exact OneDrive method/header preflight for %s",
+    async (method) => {
+      const response = await fetch(`${baseUrl}/api/onedrive-share-proof`, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "http://localhost:5173",
+          "Access-Control-Request-Method": method,
+          "Access-Control-Request-Headers": "Authorization",
+        },
+      });
+      expect(response.status).toBe(204);
+      expect(response.headers.get("access-control-allow-methods")).toBe(
+        "GET, POST, DELETE",
+      );
     },
   );
 
@@ -329,6 +373,57 @@ describe("local API", () => {
   });
 
   it.each([
+    ["POST", "share", oneDriveResults.shared, 201],
+    ["GET", "verify", oneDriveResults.verified, 200],
+    ["DELETE", "remove", oneDriveResults.removed, 200],
+  ] as const)(
+    "%s runs the exact OneDrive operation for both authorized caller shapes",
+    async (method, operation, expected, status) => {
+      const mock = oneDriveShareProofOperation[operation];
+      mock.mockClear();
+      for (const claims of [
+        {
+          tid: STUDENT_TENANT_ID,
+          oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+          scp: REQUIRED_DELEGATED_SCOPE,
+        },
+        {
+          tid: STUDENT_TENANT_ID,
+          idtyp: "app",
+          azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+          roles: [REQUIRED_APPLICATION_ROLE],
+        },
+      ]) {
+        const response = await protectedRequest(
+          claims,
+          undefined,
+          "/api/onedrive-share-proof",
+          method,
+        );
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toEqual(expected);
+      }
+      expect(mock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("does not run a OneDrive operation for an unauthorized caller", async () => {
+    oneDriveShareProofOperation.share.mockClear();
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: "unknown",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/onedrive-share-proof",
+      "POST",
+    );
+    expect(response.status).toBe(403);
+    expect(oneDriveShareProofOperation.share).not.toHaveBeenCalled();
+  });
+
+  it.each([
     [
       "another tenant",
       {
@@ -451,8 +546,10 @@ async function protectedRequest(
   claims: Record<string, unknown>,
   origin?: string,
   path = "/api/whoami",
+  method = "GET",
 ): Promise<Response> {
   return fetch(`${baseUrl}${path}`, {
+    method,
     headers: {
       Authorization: `Bearer ${fixtureToken(claims)}`,
       ...(origin ? { Origin: origin } : {}),

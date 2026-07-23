@@ -6,10 +6,15 @@ import {
 } from "./identity.js";
 import type { CallerPolicy } from "./auth-policy.js";
 
-export interface HomerCbaConfig {
-  clientId: string;
+export interface SimulatedUserCertificateConfig {
   pfxPath: string;
   pfxPassphrase: string;
+}
+
+export interface SimulatedUsersCbaConfig {
+  clientId: string;
+  homer?: SimulatedUserCertificateConfig;
+  marge?: SimulatedUserCertificateConfig & { objectId: string };
 }
 
 export interface ApiConfig {
@@ -21,7 +26,7 @@ export interface ApiConfig {
   allowInsecureJwks: boolean;
   allowedOrigin?: string;
   callerPolicy: CallerPolicy;
-  homerCba?: HomerCbaConfig;
+  simulatedUsersCba?: SimulatedUsersCbaConfig;
 }
 
 export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): ApiConfig {
@@ -41,39 +46,75 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): Api
       automationClientId:
         environment.AUTH_AUTOMATION_CLIENT_ID ?? DEVELOPMENT_AUTOMATION_CLIENT_ID,
     },
-    homerCba: parseHomerCbaConfig(environment),
+    simulatedUsersCba: parseSimulatedUsersCbaConfig(environment),
   };
 }
 
-function parseHomerCbaConfig(
+function parseSimulatedUsersCbaConfig(
   environment: NodeJS.ProcessEnv,
-): HomerCbaConfig | undefined {
-  const values = [
-    environment.HOMER_CBA_CLIENT_ID,
-    environment.HOMER_CBA_PFX_PATH,
-    environment.HOMER_CBA_PFX_PASSPHRASE,
-  ];
-  if (values.every((value) => value === undefined)) {
+): SimulatedUsersCbaConfig | undefined {
+  const clientId = environment.SIMULATED_USER_CLIENT_ID;
+  const homer = parseCertificate(
+    environment,
+    "HOMER_CBA_PFX_PATH",
+    "HOMER_CBA_PFX_PASSPHRASE",
+  );
+  const marge = parseMargeCertificate(environment);
+
+  if (clientId === undefined && !homer && !marge) {
     return undefined;
   }
-  if (values.some((value) => !value)) {
+  if (!clientId || (!homer && !marge)) {
     throw new Error(
-      "HOMER_CBA_CLIENT_ID, HOMER_CBA_PFX_PATH, and HOMER_CBA_PFX_PASSPHRASE must be configured together",
+      "SIMULATED_USER_CLIENT_ID and at least one complete simulated-user certificate must be configured together",
     );
   }
-
-  const [clientId, pfxPath, pfxPassphrase] = values as [
-    string,
-    string,
-    string,
-  ];
   if (!isUuid(clientId)) {
-    throw new Error("HOMER_CBA_CLIENT_ID must be a UUID");
+    throw new Error("SIMULATED_USER_CLIENT_ID must be a UUID");
   }
-  if (!isAbsolute(pfxPath)) {
-    throw new Error("HOMER_CBA_PFX_PATH must be an absolute path");
+  return { clientId, homer, marge };
+}
+
+function parseMargeCertificate(
+  environment: NodeJS.ProcessEnv,
+): SimulatedUsersCbaConfig["marge"] {
+  const certificate = parseCertificate(
+    environment,
+    "MARGE_CBA_PFX_PATH",
+    "MARGE_CBA_PFX_PASSPHRASE",
+  );
+  const objectId = environment.MARGE_CBA_OBJECT_ID;
+  if (!certificate && objectId === undefined) {
+    return undefined;
   }
-  return { clientId, pfxPath, pfxPassphrase };
+  if (!certificate || !objectId) {
+    throw new Error(
+      "MARGE_CBA_OBJECT_ID, MARGE_CBA_PFX_PATH, and MARGE_CBA_PFX_PASSPHRASE must be configured together",
+    );
+  }
+  if (!isUuid(objectId)) {
+    throw new Error("MARGE_CBA_OBJECT_ID must be a UUID");
+  }
+  return { ...certificate, objectId };
+}
+
+function parseCertificate(
+  environment: NodeJS.ProcessEnv,
+  pathName: string,
+  passphraseName: string,
+): SimulatedUserCertificateConfig | undefined {
+  const path = environment[pathName];
+  const passphrase = environment[passphraseName];
+  if (path === undefined && passphrase === undefined) {
+    return undefined;
+  }
+  if (!path || !passphrase) {
+    throw new Error(`${pathName} and ${passphraseName} must be configured together`);
+  }
+  if (!isAbsolute(path)) {
+    throw new Error(`${pathName} must be an absolute path`);
+  }
+  return { pfxPath: path, pfxPassphrase: passphrase };
 }
 
 function parseDelegatedUserObjectIds(value: string | undefined): readonly string[] {

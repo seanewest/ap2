@@ -2,8 +2,22 @@ import { ManagedIdentityCredential } from "@azure/identity";
 import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
-import { DelegatedGraphSimulatedEmailOperation } from "./simulated-email.js";
-import { HomerDelegatedTokenProvider } from "./simulated-user-cba.js";
+import {
+  DelegatedGraphOneDriveShareProof,
+  GRAPH_FILES_READ_SCOPE,
+  GRAPH_FILES_READ_WRITE_SCOPE,
+} from "./onedrive-share-proof.js";
+import {
+  DelegatedGraphSimulatedEmailOperation,
+  GRAPH_MAIL_SEND_SCOPE,
+} from "./simulated-email.js";
+import {
+  HOMER_IDENTITY,
+  MARGE_DISPLAY_NAME,
+  MARGE_USER_PRINCIPAL_NAME,
+  type SimulatedUserIdentity,
+} from "./simulated-user.js";
+import { SimulatedUserDelegatedTokenProvider } from "./simulated-user-cba.js";
 import { createRemoteTokenVerifier } from "./token-verifier.js";
 
 const config = loadApiConfig();
@@ -13,11 +27,43 @@ const tokenVerifier = createRemoteTokenVerifier({
   jwksUrl: config.jwksUrl,
   allowInsecureHttp: config.allowInsecureJwks,
 });
-const simulatedEmailOperation = config.homerCba
-  ? new DelegatedGraphSimulatedEmailOperation(
-      new HomerDelegatedTokenProvider(config.homerCba),
-    )
+const homerTokenProvider = config.simulatedUsersCba?.homer
+  ? new SimulatedUserDelegatedTokenProvider({
+      clientId: config.simulatedUsersCba.clientId,
+      ...config.simulatedUsersCba.homer,
+      identity: HOMER_IDENTITY,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, GRAPH_FILES_READ_WRITE_SCOPE],
+    })
   : undefined;
+const margeIdentity: SimulatedUserIdentity | undefined =
+  config.simulatedUsersCba?.marge
+    ? {
+        tenantId: HOMER_IDENTITY.tenantId,
+        objectId: config.simulatedUsersCba.marge.objectId,
+        displayName: MARGE_DISPLAY_NAME,
+        userPrincipalName: MARGE_USER_PRINCIPAL_NAME,
+      }
+    : undefined;
+const margeTokenProvider =
+  config.simulatedUsersCba?.marge && margeIdentity
+    ? new SimulatedUserDelegatedTokenProvider({
+        clientId: config.simulatedUsersCba.clientId,
+        ...config.simulatedUsersCba.marge,
+        identity: margeIdentity,
+        allowedScopes: [GRAPH_FILES_READ_SCOPE],
+      })
+    : undefined;
+const simulatedEmailOperation = homerTokenProvider
+  ? new DelegatedGraphSimulatedEmailOperation(homerTokenProvider)
+  : undefined;
+const oneDriveShareProofOperation =
+  homerTokenProvider && margeTokenProvider && margeIdentity
+    ? new DelegatedGraphOneDriveShareProof(
+        homerTokenProvider,
+        margeTokenProvider,
+        margeIdentity,
+      )
+    : undefined;
 const server = createApiServer({
   tokenVerifier,
   callerPolicy: config.callerPolicy,
@@ -25,6 +71,7 @@ const server = createApiServer({
     new ManagedIdentityCredential(),
   ),
   simulatedEmailOperation,
+  oneDriveShareProofOperation,
   allowedOrigin: config.allowedOrigin,
 });
 

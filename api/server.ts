@@ -8,6 +8,10 @@ import {
 } from "./auth-policy.js";
 import type { RehearsalStatusProvider } from "./rehearsal-status.js";
 import type { SimulatedEmailOperation } from "./simulated-email.js";
+import {
+  OneDriveProofConflictError,
+  type OneDriveShareProofOperation,
+} from "./onedrive-share-proof.js";
 import { InvalidTokenError, type TokenVerifier } from "./token-verifier.js";
 
 export interface ApiDependencies {
@@ -15,6 +19,7 @@ export interface ApiDependencies {
   callerPolicy: CallerPolicy;
   rehearsalStatusProvider: RehearsalStatusProvider;
   simulatedEmailOperation?: SimulatedEmailOperation;
+  oneDriveShareProofOperation?: OneDriveShareProofOperation;
   allowedOrigin?: string;
 }
 
@@ -46,7 +51,7 @@ async function route(
     request.method === "OPTIONS" &&
     (pathname === "/api/whoami" || pathname === "/api/rehearsal-status")
   ) {
-    handleProtectedPreflight(request, response, origin, "GET");
+    handleProtectedPreflight(request, response, origin, ["GET"]);
     return;
   }
 
@@ -54,7 +59,19 @@ async function route(
     request.method === "OPTIONS" &&
     pathname === "/api/simulated-email"
   ) {
-    handleProtectedPreflight(request, response, origin, "POST");
+    handleProtectedPreflight(request, response, origin, ["POST"]);
+    return;
+  }
+
+  if (
+    request.method === "OPTIONS" &&
+    pathname === "/api/onedrive-share-proof"
+  ) {
+    handleProtectedPreflight(request, response, origin, [
+      "GET",
+      "POST",
+      "DELETE",
+    ]);
     return;
   }
 
@@ -78,6 +95,30 @@ async function route(
     return;
   }
 
+  if (
+    request.method === "POST" &&
+    pathname === "/api/onedrive-share-proof"
+  ) {
+    await oneDriveShareProof(request, response, dependencies, "share");
+    return;
+  }
+
+  if (
+    request.method === "GET" &&
+    pathname === "/api/onedrive-share-proof"
+  ) {
+    await oneDriveShareProof(request, response, dependencies, "verify");
+    return;
+  }
+
+  if (
+    request.method === "DELETE" &&
+    pathname === "/api/onedrive-share-proof"
+  ) {
+    await oneDriveShareProof(request, response, dependencies, "remove");
+    return;
+  }
+
   sendJson(response, 404, { error: "not_found" });
 }
 
@@ -85,7 +126,7 @@ function handleProtectedPreflight(
   request: IncomingMessage,
   response: ServerResponse,
   origin: string | undefined,
-  method: "GET" | "POST",
+  methods: readonly ("GET" | "POST" | "DELETE")[],
 ): void {
   const requestedHeaders = (
     request.headers["access-control-request-headers"] ?? ""
@@ -95,7 +136,12 @@ function handleProtectedPreflight(
     .filter(Boolean);
   if (
     !origin ||
-    request.headers["access-control-request-method"] !== method ||
+    !methods.includes(
+      request.headers["access-control-request-method"] as
+        | "GET"
+        | "POST"
+        | "DELETE",
+    ) ||
     requestedHeaders.length !== 1 ||
     requestedHeaders[0] !== "authorization"
   ) {
@@ -105,7 +151,7 @@ function handleProtectedPreflight(
 
   response.writeHead(204, {
     "Access-Control-Allow-Headers": "Authorization",
-    "Access-Control-Allow-Methods": method,
+    "Access-Control-Allow-Methods": methods.join(", "),
     "Cache-Control": "no-store",
   });
   response.end();
@@ -153,6 +199,27 @@ async function simulatedEmail(
   );
 }
 
+async function oneDriveShareProof(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+  action: "share" | "verify" | "remove",
+): Promise<void> {
+  await handleAuthorizedRequest(
+    request,
+    response,
+    dependencies,
+    () => {
+      const operation = dependencies.oneDriveShareProofOperation;
+      if (!operation) {
+        throw new Error("OneDrive share proof is not configured");
+      }
+      return operation[action]();
+    },
+    action === "share" ? 201 : 200,
+  );
+}
+
 async function handleAuthorizedRequest(
   request: IncomingMessage,
   response: ServerResponse,
@@ -177,6 +244,10 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof InvalidTokenError || error instanceof InvalidClaimsError) {
       sendUnauthorized(response);
+      return;
+    }
+    if (error instanceof OneDriveProofConflictError) {
+      sendJson(response, 409, { error: "proof_state_conflict" });
       return;
     }
     throw error;

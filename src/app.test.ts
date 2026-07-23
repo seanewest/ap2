@@ -12,6 +12,7 @@ import {
   ApiAccessError,
   type AfterPartyApi,
   type ApiCallerIdentity,
+  type OneDriveProofResult,
   type RehearsalStatus,
   type SimulatedEmailResult,
 } from "./api/client";
@@ -38,6 +39,24 @@ class FakeApi implements AfterPartyApi {
     vi.fn<(accessToken: string) => Promise<RehearsalStatus>>();
   sendSimulatedEmail =
     vi.fn<(accessToken: string) => Promise<SimulatedEmailResult>>();
+  shareOneDriveProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<OneDriveProofResult, { state: "shared" }>>
+    >();
+  verifyOneDriveProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<OneDriveProofResult, { state: "verified" }>>
+    >();
+  removeOneDriveProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<OneDriveProofResult, { state: "removed" }>>
+    >();
 }
 
 describe("After Party authentication UI", () => {
@@ -46,6 +65,7 @@ describe("After Party authentication UI", () => {
   let api: FakeApi;
 
   beforeEach(() => {
+    localStorage.clear();
     document.body.innerHTML = '<div id="app"></div>';
     root = document.querySelector<HTMLElement>("#app")!;
     authentication = new FakeAuthentication();
@@ -68,6 +88,9 @@ describe("After Party authentication UI", () => {
     expect(apiButton()).toBeNull();
     expect(rehearsalButton()).toBeNull();
     expect(simulatedEmailButton()).toBeNull();
+    expect(oneDriveShareButton()).toBeNull();
+    expect(oneDriveVerifyButton()).toBeNull();
+    expect(oneDriveRemoveButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -486,6 +509,117 @@ describe("After Party authentication UI", () => {
     expect(simulatedEmailButton()?.disabled).toBe(true);
   });
 
+  it("runs share, Marge verification, and cleanup only on separate clicks", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.shareOneDriveProof.mockResolvedValue({
+      state: "shared",
+      path: "/AP2-OneDrive-share-proof.txt",
+      owner: "homer.simpson@corywest.onmicrosoft.com",
+      recipient: "marge.simpson@corywest.onmicrosoft.com",
+      access: "read",
+    });
+    api.verifyOneDriveProof.mockResolvedValue({
+      state: "verified",
+      path: "/AP2-OneDrive-share-proof.txt",
+      verifiedAs: "marge.simpson@corywest.onmicrosoft.com",
+      contentMatches: true,
+    });
+    api.removeOneDriveProof.mockResolvedValue({
+      state: "removed",
+      path: "/AP2-OneDrive-share-proof.txt",
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    expect(root.textContent).toContain("not started in this browser");
+    expect(root.textContent).toContain("Real tenant activity");
+    oneDriveShareButton()?.click();
+    await nextTask();
+    expect(api.shareOneDriveProof).toHaveBeenCalledWith("temporary-token");
+    expect(api.verifyOneDriveProof).not.toHaveBeenCalled();
+    expect(api.removeOneDriveProof).not.toHaveBeenCalled();
+    expect(root.textContent).toContain("shared read-only with Marge");
+
+    oneDriveVerifyButton()?.click();
+    await nextTask();
+    expect(api.verifyOneDriveProof).toHaveBeenCalledWith("temporary-token");
+    expect(api.removeOneDriveProof).not.toHaveBeenCalled();
+    expect(root.textContent).toContain("exact file bytes verified");
+
+    oneDriveRemoveButton()?.click();
+    await nextTask();
+    expect(api.removeOneDriveProof).toHaveBeenCalledWith("temporary-token");
+    expect(root.textContent).toContain("removed to Homer's recycle bin");
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    expect(oneDriveVerifyButton()?.disabled).toBe(true);
+    expect(oneDriveRemoveButton()?.disabled).toBe(true);
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it("records an uncertain mutation before the request and restores it after reload", async () => {
+    const deferred = createDeferred<
+      Extract<OneDriveProofResult, { state: "shared" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.shareOneDriveProof.mockReturnValue(deferred.promise);
+    let app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    oneDriveShareButton()?.click();
+    await nextTask();
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("uncertain");
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    expect(simulatedEmailButton()?.disabled).toBe(true);
+
+    document.body.innerHTML = '<div id="app"></div>';
+    root = document.querySelector<HTMLElement>("#app")!;
+    app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+    expect(root.textContent).toContain("last change outcome is uncertain");
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    expect(oneDriveVerifyButton()?.disabled).toBe(false);
+    expect(oneDriveRemoveButton()?.disabled).toBe(false);
+  });
+
+  it("preserves the prior stage when read-only verification fails", async () => {
+    localStorage.setItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+      "shared",
+    );
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.verifyOneDriveProof.mockRejectedValue(
+      new ApiAccessError("Marge access could not be verified."),
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    oneDriveVerifyButton()?.click();
+    await nextTask();
+    expect(root.textContent).toContain("Marge access could not be verified.");
+    expect(oneDriveVerifyButton()?.disabled).toBe(false);
+    expect(oneDriveRemoveButton()?.disabled).toBe(false);
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("shared");
+  });
+
   function signInButton(): HTMLButtonElement {
     return root.querySelector<HTMLButtonElement>("[data-action='sign-in']")!;
   }
@@ -503,6 +637,24 @@ describe("After Party authentication UI", () => {
   function simulatedEmailButton(): HTMLButtonElement | null {
     return root.querySelector<HTMLButtonElement>(
       "[data-action='send-simulated-email']",
+    );
+  }
+
+  function oneDriveShareButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='share-onedrive-proof']",
+    );
+  }
+
+  function oneDriveVerifyButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='verify-onedrive-proof']",
+    );
+  }
+
+  function oneDriveRemoveButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='remove-onedrive-proof']",
     );
   }
 });

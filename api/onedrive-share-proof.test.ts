@@ -1,0 +1,292 @@
+// @vitest-environment node
+
+import { describe, expect, it, vi } from "vitest";
+import {
+  DelegatedGraphOneDriveShareProof,
+  GRAPH_FILES_READ_SCOPE,
+  GRAPH_FILES_READ_WRITE_SCOPE,
+  ONEDRIVE_PROOF_CONTENT,
+  ONEDRIVE_PROOF_FILE_NAME,
+  ONEDRIVE_PROOF_PATH,
+  OneDriveProofConflictError,
+} from "./onedrive-share-proof.js";
+import {
+  HOMER_IDENTITY,
+  MARGE_DISPLAY_NAME,
+  MARGE_USER_PRINCIPAL_NAME,
+  type DelegatedGraphTokenProvider,
+  type SimulatedUserIdentity,
+} from "./simulated-user.js";
+
+const MARGE_IDENTITY: SimulatedUserIdentity = {
+  tenantId: HOMER_IDENTITY.tenantId,
+  objectId: "22222222-2222-4222-8222-222222222222",
+  displayName: MARGE_DISPLAY_NAME,
+  userPrincipalName: MARGE_USER_PRINCIPAL_NAME,
+};
+const PROOF_SIZE = Buffer.byteLength(ONEDRIVE_PROOF_CONTENT);
+const ITEM = {
+  id: "proof-item",
+  name: ONEDRIVE_PROOF_FILE_NAME,
+  size: PROOF_SIZE,
+  file: { mimeType: "text/plain" },
+  eTag: '"proof-etag"',
+  parentReference: { driveId: "homer-drive" },
+};
+
+function tokenProvider(identity: SimulatedUserIdentity, token: string) {
+  return {
+    getToken: vi.fn(async () => ({ token, identity })),
+  } satisfies DelegatedGraphTokenProvider;
+}
+
+function operation(
+  responses: readonly Response[],
+): {
+  operation: DelegatedGraphOneDriveShareProof;
+  request: ReturnType<typeof vi.fn>;
+  homer: ReturnType<typeof tokenProvider>;
+  marge: ReturnType<typeof tokenProvider>;
+} {
+  const queue = [...responses];
+  const request = vi.fn(async () => {
+    const response = queue.shift();
+    if (!response) {
+      throw new Error("Unexpected Graph request");
+    }
+    return response;
+  });
+  const homer = tokenProvider(HOMER_IDENTITY, "homer-token");
+  const marge = tokenProvider(MARGE_IDENTITY, "marge-token");
+  return {
+    operation: new DelegatedGraphOneDriveShareProof(
+      homer,
+      marge,
+      MARGE_IDENTITY,
+      request as typeof fetch,
+    ),
+    request,
+    homer,
+    marge,
+  };
+}
+
+describe("DelegatedGraphOneDriveShareProof", () => {
+  it("creates the fixed bytes once and grants only Marge read access", async () => {
+    const fixture = operation([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json({
+        value: [
+          {
+            roles: ["read"],
+            invitation: {
+              email: MARGE_USER_PRINCIPAL_NAME,
+              signInRequired: true,
+            },
+          },
+        ],
+      }),
+    ]);
+
+    await expect(fixture.operation.share()).resolves.toEqual({
+      state: "shared",
+      path: ONEDRIVE_PROOF_PATH,
+      owner: HOMER_IDENTITY.userPrincipalName,
+      recipient: MARGE_USER_PRINCIPAL_NAME,
+      access: "read",
+    });
+    expect(fixture.homer.getToken).toHaveBeenCalledWith(
+      GRAPH_FILES_READ_WRITE_SCOPE,
+    );
+    expect(fixture.marge.getToken).not.toHaveBeenCalled();
+    expect(fixture.request).toHaveBeenCalledTimes(5);
+    const calls = fixture.request.mock.calls as Array<[string, RequestInit]>;
+    const pathCheck = requiredCall(calls, 0);
+    const createSession = requiredCall(calls, 2);
+    const upload = requiredCall(calls, 3);
+    const invite = requiredCall(calls, 4);
+    expect(pathCheck[0]).toBe(
+      `https://graph.microsoft.com/v1.0/me/drive/root:/${ONEDRIVE_PROOF_FILE_NAME}?$select=id,name,size,file,eTag,parentReference`,
+    );
+    expect(createSession[0]).toBe(
+      `https://graph.microsoft.com/v1.0/me/drive/items/root-item:/${ONEDRIVE_PROOF_FILE_NAME}:/createUploadSession`,
+    );
+    expect(JSON.parse(createSession[1].body as string)).toEqual({
+      item: {
+        "@microsoft.graph.conflictBehavior": "fail",
+        name: ONEDRIVE_PROOF_FILE_NAME,
+      },
+    });
+    expect(upload).toEqual([
+      "https://upload.example/proof",
+      {
+        method: "PUT",
+        redirect: "error",
+        headers: {
+          "Content-Length": String(PROOF_SIZE),
+          "Content-Range": `bytes 0-${PROOF_SIZE - 1}/${PROOF_SIZE}`,
+          "Content-Type": "text/plain; charset=utf-8",
+        },
+        body: ONEDRIVE_PROOF_CONTENT,
+      },
+    ]);
+    expect(JSON.parse(invite[1].body as string)).toEqual({
+      recipients: [{ email: MARGE_USER_PRINCIPAL_NAME }],
+      requireSignIn: true,
+      sendInvitation: false,
+      roles: ["read"],
+    });
+  });
+
+  it("aborts before mutation when the fixed path exists", async () => {
+    const fixture = operation([Response.json(ITEM)]);
+
+    await expect(fixture.operation.share()).rejects.toBeInstanceOf(
+      OneDriveProofConflictError,
+    );
+    expect(fixture.request).toHaveBeenCalledOnce();
+  });
+
+  it("does not retry after an ambiguous mutating response", async () => {
+    const fixture = operation([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      new Response("ambiguous", { status: 503 }),
+    ]);
+
+    await expect(fixture.operation.share()).rejects.toThrow(
+      "upload session returned HTTP 503",
+    );
+    expect(fixture.request).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports an upload-session race as a collision without retry", async () => {
+    const fixture = operation([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      new Response(undefined, { status: 409 }),
+    ]);
+
+    await expect(fixture.operation.share()).rejects.toBeInstanceOf(
+      OneDriveProofConflictError,
+    );
+    expect(fixture.request).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry an ambiguous invitation result", async () => {
+    const fixture = operation([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json({ value: [] }),
+    ]);
+
+    await expect(fixture.operation.share()).rejects.toThrow(
+      "sharing returned HTTP 200",
+    );
+    expect(fixture.request).toHaveBeenCalledTimes(5);
+  });
+
+  it("verifies exact bytes through Marge's direct drive/item content path", async () => {
+    const fixture = operation([
+      Response.json(ITEM),
+      Response.json(ITEM),
+      new Response(undefined, {
+        status: 302,
+        headers: { Location: "https://download.example/proof" },
+      }),
+      new Response(ONEDRIVE_PROOF_CONTENT),
+    ]);
+
+    await expect(fixture.operation.verify()).resolves.toEqual({
+      state: "verified",
+      path: ONEDRIVE_PROOF_PATH,
+      verifiedAs: MARGE_USER_PRINCIPAL_NAME,
+      contentMatches: true,
+    });
+    expect(fixture.marge.getToken).toHaveBeenCalledWith(GRAPH_FILES_READ_SCOPE);
+    const calls = fixture.request.mock.calls as Array<[string, RequestInit]>;
+    const directMetadata = requiredCall(calls, 1);
+    const graphContent = requiredCall(calls, 2);
+    const directContent = requiredCall(calls, 3);
+    expect(directMetadata[0]).toBe(
+      "https://graph.microsoft.com/v1.0/drives/homer-drive/items/proof-item?$select=id,name,size,file,eTag,parentReference",
+    );
+    expect(graphContent[0]).toBe(
+      "https://graph.microsoft.com/v1.0/drives/homer-drive/items/proof-item/content",
+    );
+    expect(graphContent[1].headers).toEqual({
+      Authorization: "Bearer marge-token",
+    });
+    expect(directContent[1].headers).toBeUndefined();
+  });
+
+  it("rejects malformed metadata and mismatched content", async () => {
+    const malformed = operation([Response.json({ ...ITEM, size: 1 })]);
+    await expect(malformed.operation.verify()).rejects.toThrow(
+      "invalid OneDrive proof file",
+    );
+
+    const changed = operation([
+      Response.json(ITEM),
+      new Response("changed"),
+    ]);
+    await expect(changed.operation.remove()).rejects.toBeInstanceOf(
+      OneDriveProofConflictError,
+    );
+    expect(changed.request).toHaveBeenCalledTimes(2);
+  });
+
+  it("validates the fixed file then deletes once with its eTag", async () => {
+    const fixture = operation([
+      Response.json(ITEM),
+      new Response(ONEDRIVE_PROOF_CONTENT),
+      new Response(undefined, { status: 204 }),
+    ]);
+
+    await expect(fixture.operation.remove()).resolves.toEqual({
+      state: "removed",
+      path: ONEDRIVE_PROOF_PATH,
+    });
+    expect(fixture.request).toHaveBeenCalledTimes(3);
+    expect(fixture.request.mock.calls[2]).toEqual([
+      "https://graph.microsoft.com/v1.0/me/drive/items/proof-item",
+      {
+        method: "DELETE",
+        redirect: "error",
+        headers: {
+          Authorization: "Bearer homer-token",
+          "If-Match": '"proof-etag"',
+        },
+      },
+    ]);
+  });
+
+  it("does not retry cleanup after an eTag conflict", async () => {
+    const fixture = operation([
+      Response.json(ITEM),
+      new Response(ONEDRIVE_PROOF_CONTENT),
+      new Response(undefined, { status: 412 }),
+    ]);
+
+    await expect(fixture.operation.remove()).rejects.toBeInstanceOf(
+      OneDriveProofConflictError,
+    );
+    expect(fixture.request).toHaveBeenCalledTimes(3);
+  });
+});
+
+function requiredCall(
+  calls: Array<[string, RequestInit]>,
+  index: number,
+): [string, RequestInit] {
+  const call = calls.at(index);
+  if (!call) {
+    throw new Error(`Expected request ${index + 1}.`);
+  }
+  return call;
+}

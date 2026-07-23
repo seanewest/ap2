@@ -58,8 +58,14 @@ fixed target and the Dev-app command.
 Homer test user in through headless Microsoft CBA and makes one Graph
 `sendMail` attempt to the fixed Marge recipient. The SPA exposes one explicit
 control and reports only Graph acceptance—not delivery. This path is disabled
-until its three Homer CBA settings are configured; see
+until the shared client and Homer CBA settings are configured; see
 [API identity](docs/api-identity.md).
+
+`/api/onedrive-share-proof` adds three explicit controls for one fixed
+Homer-to-Marge view-only share rehearsal: create/share, verify exact bytes as
+Marge, and validate/remove to Homer's recycle bin. Mutations are never retried,
+and partial Homer or Marge CBA configuration fails closed. The exact
+configuration and boundaries are in [API identity](docs/api-identity.md).
 
 Build and start the API locally with explicit verification configuration:
 

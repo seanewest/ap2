@@ -3,13 +3,10 @@ import { chromium, type BrowserContext, type Page } from "playwright";
 import { decodeJwt } from "jose";
 import { STUDENT_TENANT_ID } from "./identity.js";
 import {
-  GRAPH_MAIL_SEND_SCOPE,
-  HOMER_DISPLAY_NAME,
-  HOMER_OBJECT_ID,
-  HOMER_USER_PRINCIPAL_NAME,
   type DelegatedGraphToken,
   type DelegatedGraphTokenProvider,
-} from "./simulated-email.js";
+  type SimulatedUserIdentity,
+} from "./simulated-user.js";
 
 const GRAPH_ORIGIN = "https://graph.microsoft.com";
 const CERTIFICATE_AUTHENTICATION_ORIGINS = [
@@ -18,12 +15,7 @@ const CERTIFICATE_AUTHENTICATION_ORIGINS = [
 ] as const;
 const DEFAULT_REDIRECT_URI = "http://localhost";
 const CACHE_SKEW_MS = 120_000;
-const REQUIRED_GRAPH_SCOPES = ["User.Read", "Mail.Send"] as const;
-const AUTHORIZATION_SCOPES = [
-  "openid",
-  "profile",
-  ...REQUIRED_GRAPH_SCOPES.map((scope) => `${GRAPH_ORIGIN}/${scope}`),
-] as const;
+const GRAPH_USER_READ_SCOPE = `${GRAPH_ORIGIN}/User.Read`;
 
 interface AuthorizationCodeRequest {
   authorizeUrl: URL;
@@ -31,6 +23,7 @@ interface AuthorizationCodeRequest {
   redirectUri: string;
   pfxPath: string;
   pfxPassphrase: string;
+  userPrincipalName: string;
   timeoutMs: number;
 }
 
@@ -38,10 +31,12 @@ export interface AuthorizationCodeBrowser {
   acquireAuthorizationCode(request: AuthorizationCodeRequest): Promise<string>;
 }
 
-export interface HomerDelegatedTokenProviderOptions {
+export interface SimulatedUserDelegatedTokenProviderOptions {
   clientId: string;
   pfxPath: string;
   pfxPassphrase: string;
+  identity: SimulatedUserIdentity;
+  allowedScopes: readonly string[];
   browser?: AuthorizationCodeBrowser;
   request?: typeof fetch;
   now?: () => number;
@@ -61,25 +56,32 @@ export class SimulatedUserCbaError extends Error {
   }
 }
 
-export class HomerDelegatedTokenProvider
+export class SimulatedUserDelegatedTokenProvider
   implements DelegatedGraphTokenProvider
 {
   readonly #clientId: string;
   readonly #pfxPath: string;
   readonly #pfxPassphrase: string;
+  readonly #identity: SimulatedUserIdentity;
+  readonly #allowedScopes: ReadonlySet<string>;
   readonly #browser: AuthorizationCodeBrowser;
   readonly #request: typeof fetch;
   readonly #now: () => number;
   readonly #redirectUri: string;
   readonly #timeoutMs: number;
-  #cachedAccessToken: CachedAccessToken | undefined;
-  #acquisition: Promise<string> | undefined;
+  readonly #cachedAccessTokens = new Map<string, CachedAccessToken>();
+  readonly #acquisitions = new Map<string, Promise<string>>();
 
-  constructor(options: HomerDelegatedTokenProviderOptions) {
+  constructor(options: SimulatedUserDelegatedTokenProviderOptions) {
     if (
       !isUuid(options.clientId) ||
       options.pfxPath.length === 0 ||
-      options.pfxPassphrase.length === 0
+      options.pfxPassphrase.length === 0 ||
+      options.identity.tenantId !== STUDENT_TENANT_ID ||
+      !isUuid(options.identity.objectId) ||
+      options.identity.displayName.length === 0 ||
+      options.identity.userPrincipalName.length === 0 ||
+      options.allowedScopes.length === 0
     ) {
       throw new TypeError("The simulated-user CBA configuration is incomplete.");
     }
@@ -93,6 +95,8 @@ export class HomerDelegatedTokenProvider
     this.#clientId = options.clientId;
     this.#pfxPath = options.pfxPath;
     this.#pfxPassphrase = options.pfxPassphrase;
+    this.#identity = options.identity;
+    this.#allowedScopes = new Set(options.allowedScopes);
     this.#browser = options.browser ?? new PlaywrightAuthorizationCodeBrowser();
     this.#request = (options.request ?? fetch).bind(globalThis);
     this.#now = options.now ?? Date.now;
@@ -101,41 +105,45 @@ export class HomerDelegatedTokenProvider
   }
 
   async getToken(scope: string): Promise<DelegatedGraphToken> {
-    if (scope !== GRAPH_MAIL_SEND_SCOPE) {
+    if (!this.#allowedScopes.has(scope)) {
       throw new SimulatedUserCbaError(
         "The simulated user token scope is not allowed.",
       );
     }
 
-    const token = await this.#getAccessToken();
+    const token = await this.#getAccessToken(scope);
     return {
       token,
       identity: {
-        tenantId: STUDENT_TENANT_ID,
-        objectId: HOMER_OBJECT_ID,
-        userPrincipalName: HOMER_USER_PRINCIPAL_NAME,
+        tenantId: this.#identity.tenantId,
+        objectId: this.#identity.objectId,
+        userPrincipalName: this.#identity.userPrincipalName,
       },
     };
   }
 
-  async #getAccessToken(): Promise<string> {
+  async #getAccessToken(scope: string): Promise<string> {
+    const cachedAccessToken = this.#cachedAccessTokens.get(scope);
     if (
-      this.#cachedAccessToken &&
-      this.#now() < this.#cachedAccessToken.expiresAtMs - CACHE_SKEW_MS
+      cachedAccessToken &&
+      this.#now() < cachedAccessToken.expiresAtMs - CACHE_SKEW_MS
     ) {
-      return this.#cachedAccessToken.token;
+      return cachedAccessToken.token;
     }
 
-    if (!this.#acquisition) {
-      this.#acquisition = this.#acquireAccessToken().finally(() => {
-        this.#acquisition = undefined;
+    let acquisition = this.#acquisitions.get(scope);
+    if (!acquisition) {
+      acquisition = this.#acquireAccessToken(scope).finally(() => {
+        this.#acquisitions.delete(scope);
       });
+      this.#acquisitions.set(scope, acquisition);
     }
-    return this.#acquisition;
+    return acquisition;
   }
 
-  async #acquireAccessToken(): Promise<string> {
+  async #acquireAccessToken(scope: string): Promise<string> {
     try {
+      const authorizationScopes = buildAuthorizationScopes(scope);
       const pkce = createPkce();
       const state = base64Url(randomBytes(32));
       const authorizeUrl = createAuthorizeUrl({
@@ -143,6 +151,8 @@ export class HomerDelegatedTokenProvider
         redirectUri: this.#redirectUri,
         state,
         challenge: pkce.challenge,
+        scopes: authorizationScopes,
+        userPrincipalName: this.#identity.userPrincipalName,
       });
       const code = await this.#browser.acquireAuthorizationCode({
         authorizeUrl,
@@ -150,15 +160,25 @@ export class HomerDelegatedTokenProvider
         redirectUri: this.#redirectUri,
         pfxPath: this.#pfxPath,
         pfxPassphrase: this.#pfxPassphrase,
+        userPrincipalName: this.#identity.userPrincipalName,
         timeoutMs: this.#timeoutMs,
       });
-      const token = await this.#exchangeCode(code, pkce.verifier);
-      const expiresAtMs = validateAccessToken(token, this.#now());
-      await this.#verifyHomer(token);
-      this.#cachedAccessToken = { token, expiresAtMs };
+      const token = await this.#exchangeCode(
+        code,
+        pkce.verifier,
+        authorizationScopes,
+      );
+      const expiresAtMs = validateAccessToken(
+        token,
+        this.#now(),
+        this.#identity,
+        scope,
+      );
+      await this.#verifyIdentity(token);
+      this.#cachedAccessTokens.set(scope, { token, expiresAtMs });
       return token;
     } catch (error) {
-      this.#cachedAccessToken = undefined;
+      this.#cachedAccessTokens.delete(scope);
       if (error instanceof SimulatedUserCbaError) {
         throw error;
       }
@@ -168,7 +188,11 @@ export class HomerDelegatedTokenProvider
     }
   }
 
-  async #exchangeCode(code: string, verifier: string): Promise<string> {
+  async #exchangeCode(
+    code: string,
+    verifier: string,
+    scopes: readonly string[],
+  ): Promise<string> {
     let response: Response;
     try {
       response = await this.#request(
@@ -182,7 +206,7 @@ export class HomerDelegatedTokenProvider
             redirect_uri: this.#redirectUri,
             grant_type: "authorization_code",
             code_verifier: verifier,
-            scope: AUTHORIZATION_SCOPES.join(" "),
+            scope: scopes.join(" "),
           }),
         },
       );
@@ -206,7 +230,7 @@ export class HomerDelegatedTokenProvider
     return value.access_token;
   }
 
-  async #verifyHomer(accessToken: string): Promise<void> {
+  async #verifyIdentity(accessToken: string): Promise<void> {
     let response: Response;
     try {
       response = await this.#request(
@@ -227,10 +251,11 @@ export class HomerDelegatedTokenProvider
     if (
       !response.ok ||
       !isRecord(value) ||
-      value.id !== HOMER_OBJECT_ID ||
-      value.displayName !== HOMER_DISPLAY_NAME ||
+      value.id !== this.#identity.objectId ||
+      value.displayName !== this.#identity.displayName ||
       typeof value.userPrincipalName !== "string" ||
-      value.userPrincipalName.toLowerCase() !== HOMER_USER_PRINCIPAL_NAME
+      value.userPrincipalName.toLowerCase() !==
+        this.#identity.userPrincipalName.toLowerCase()
     ) {
       throw new SimulatedUserCbaError(
         "Microsoft Graph did not confirm the fixed simulated user.",
@@ -266,7 +291,12 @@ class PlaywrightAuthorizationCodeBrowser implements AuthorizationCodeBrowser {
           waitUntil: "domcontentloaded",
           timeout: 45_000,
         });
-        return await completeCertificateSignIn(page, callback, request.timeoutMs);
+        return await completeCertificateSignIn(
+          page,
+          callback,
+          request.timeoutMs,
+          request.userPrincipalName,
+        );
       } finally {
         await context.close();
       }
@@ -322,6 +352,7 @@ async function completeCertificateSignIn(
   page: Page,
   callback: CallbackObserver,
   timeoutMs: number,
+  userPrincipalName: string,
 ): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   let accountSelectionHandled = false;
@@ -370,7 +401,7 @@ async function completeCertificateSignIn(
 
     const username = page.locator('input[name="loginfmt"]:visible');
     if (!usernameSubmitted && (await username.isVisible().catch(() => false))) {
-      await username.fill(HOMER_USER_PRINCIPAL_NAME);
+      await username.fill(userPrincipalName);
       await page.locator("#idSIButton9").click();
       usernameSubmitted = true;
       await pause();
@@ -428,6 +459,8 @@ function createAuthorizeUrl(input: {
   redirectUri: string;
   state: string;
   challenge: string;
+  scopes: readonly string[];
+  userPrincipalName: string;
 }): URL {
   const url = new URL(
     `https://login.microsoftonline.com/${STUDENT_TENANT_ID}/oauth2/v2.0/authorize`,
@@ -437,16 +470,21 @@ function createAuthorizeUrl(input: {
     response_type: "code",
     redirect_uri: input.redirectUri,
     response_mode: "query",
-    scope: AUTHORIZATION_SCOPES.join(" "),
+    scope: input.scopes.join(" "),
     state: input.state,
     code_challenge: input.challenge,
     code_challenge_method: "S256",
-    login_hint: HOMER_USER_PRINCIPAL_NAME,
+    login_hint: input.userPrincipalName,
   }).toString();
   return url;
 }
 
-function validateAccessToken(token: string, nowMs: number): number {
+function validateAccessToken(
+  token: string,
+  nowMs: number,
+  identity: SimulatedUserIdentity,
+  requestedScope: string,
+): number {
   let claims;
   try {
     claims = decodeJwt(token);
@@ -461,9 +499,10 @@ function validateAccessToken(token: string, nowMs: number): number {
   const expiresAtMs =
     typeof claims.exp === "number" ? claims.exp * 1_000 : Number.NaN;
   if (
-    claims.tid !== STUDENT_TENANT_ID ||
-    claims.oid !== HOMER_OBJECT_ID ||
-    !REQUIRED_GRAPH_SCOPES.every((scope) => scopes.includes(scope)) ||
+    claims.tid !== identity.tenantId ||
+    claims.oid !== identity.objectId ||
+    !scopes.includes("User.Read") ||
+    !scopes.includes(graphScopeName(requestedScope)) ||
     !Number.isFinite(expiresAtMs) ||
     expiresAtMs <= nowMs + CACHE_SKEW_MS
   ) {
@@ -472,6 +511,20 @@ function validateAccessToken(token: string, nowMs: number): number {
     );
   }
   return expiresAtMs;
+}
+
+function buildAuthorizationScopes(requestedScope: string): readonly string[] {
+  return ["openid", "profile", GRAPH_USER_READ_SCOPE, requestedScope];
+}
+
+function graphScopeName(scope: string): string {
+  const url = new URL(scope);
+  if (url.origin !== GRAPH_ORIGIN || url.pathname.split("/").length !== 2) {
+    throw new SimulatedUserCbaError(
+      "The simulated user token scope is not allowed.",
+    );
+  }
+  return url.pathname.slice(1);
 }
 
 function createPkce(): { verifier: string; challenge: string } {
