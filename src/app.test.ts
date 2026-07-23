@@ -436,6 +436,9 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).not.toContain("sensitive-access-token");
     expect(root.textContent).not.toContain("must-not-render");
     expect(simulatedEmailButton()?.disabled).toBe(true);
+    expect(
+      simulatedEmailButton()?.closest('[aria-busy="true"]'),
+    ).toBeNull();
 
     simulatedEmailButton()?.click();
     await nextTask();
@@ -461,6 +464,9 @@ describe("After Party authentication UI", () => {
     expect(apiButton()?.disabled).toBe(true);
     expect(rehearsalButton()?.disabled).toBe(true);
     expect(simulatedEmailButton()?.disabled).toBe(true);
+    expect(
+      simulatedEmailButton()?.closest('[aria-busy="true"]'),
+    ).not.toBeNull();
     apiButton()?.click();
     rehearsalButton()?.click();
     await nextTask();
