@@ -5,13 +5,12 @@ import {
   AFTER_PARTY_CLIENT_ID,
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   STUDENT_TENANT_ID,
-} from "../api/identity.js";
+} from "../api/identity.ts";
 import {
   HttpAfterPartyApi,
   type AfterPartyApi,
   type RehearsalStatus,
-} from "../src/api/client.js";
-import { resolveApiBaseUrl } from "../src/api/config.js";
+} from "../src/api/client.ts";
 
 export const AUTOMATION_API_SCOPE =
   `api://${AFTER_PARTY_CLIENT_ID}/.default` as const;
@@ -52,7 +51,19 @@ function requiredApiBaseUrl(configuredUrl: string | undefined): string {
   if (!configuredUrl?.trim()) {
     throw new Error("AP2_API_BASE_URL is required");
   }
-  return resolveApiBaseUrl(configuredUrl);
+  const url = new URL(configuredUrl.trim());
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error(
+      "AP2_API_BASE_URL must be an HTTP(S) URL without credentials, query, or fragment",
+    );
+  }
+  return url.toString().replace(/\/$/, "");
 }
 
 function secureCertificatePath(configuredPath: string | undefined): string {
