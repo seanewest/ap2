@@ -109,6 +109,49 @@ describe("HTTP After Party API client", () => {
     expect(JSON.stringify(status)).not.toContain("managedIdentity");
   });
 
+  it("posts one simulated email and returns only the safe accepted fields", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          accepted: true,
+          sender: "homer.simpson@corywest.onmicrosoft.com",
+          recipient: "marge.simpson@corywest.onmicrosoft.com",
+          subject: "Dinner tonight",
+          messageId: "must-not-escape",
+          accessToken: "response-must-not-escape",
+        }),
+        { status: 202, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    );
+
+    const result = await client.sendSimulatedEmail("sensitive-access-token");
+
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/simulated-email",
+      {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        headers: {
+          Authorization: "Bearer sensitive-access-token",
+        },
+      },
+    );
+    expect(result).toEqual({
+      accepted: true,
+      sender: "homer.simpson@corywest.onmicrosoft.com",
+      recipient: "marge.simpson@corywest.onmicrosoft.com",
+      subject: "Dinner tonight",
+    });
+    expect(JSON.stringify(result)).not.toContain("messageId");
+    expect(JSON.stringify(result)).not.toContain("sensitive-access-token");
+    expect(JSON.stringify(result)).not.toContain("response-must-not-escape");
+  });
+
   it.each([
     [401, "API access needs Microsoft authorization. Try again."],
     [403, "This account is not allowed to use the API."],
@@ -164,6 +207,62 @@ describe("HTTP After Party API client", () => {
         "https://student-api.example",
         request,
       ).getRehearsalStatus("token"),
+    ).rejects.toEqual(new ApiAccessError());
+  });
+
+  it("requires HTTP 202 and safe fields for a simulated email acceptance", async () => {
+    const wrongStatus = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          accepted: true,
+          sender: "homer.simpson@corywest.onmicrosoft.com",
+          recipient: "marge.simpson@corywest.onmicrosoft.com",
+          subject: "Dinner tonight",
+        }),
+        { status: 200 },
+      ),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        wrongStatus,
+      ).sendSimulatedEmail("token"),
+    ).rejects.toEqual(new ApiAccessError());
+
+    const malformed = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          accepted: false,
+          sender: "homer.simpson@corywest.onmicrosoft.com",
+          recipient: "marge.simpson@corywest.onmicrosoft.com",
+          subject: "Dinner tonight",
+        }),
+        { status: 202 },
+      ),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        malformed,
+      ).sendSimulatedEmail("token"),
+    ).rejects.toEqual(new ApiAccessError());
+
+    const wrongRecipient = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          accepted: true,
+          sender: "homer.simpson@corywest.onmicrosoft.com",
+          recipient: "someone-else@corywest.onmicrosoft.com",
+          subject: "Dinner tonight",
+        },
+        { status: 202 },
+      ),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        wrongRecipient,
+      ).sendSimulatedEmail("token"),
     ).rejects.toEqual(new ApiAccessError());
   });
 });

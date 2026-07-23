@@ -1,9 +1,16 @@
+import { isAbsolute } from "node:path";
 import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   STUDENT_DELEGATED_USER_OBJECT_IDS,
   STUDENT_TENANT_ID,
 } from "./identity.js";
 import type { CallerPolicy } from "./auth-policy.js";
+
+export interface HomerCbaConfig {
+  clientId: string;
+  pfxPath: string;
+  pfxPassphrase: string;
+}
 
 export interface ApiConfig {
   host: string;
@@ -14,6 +21,7 @@ export interface ApiConfig {
   allowInsecureJwks: boolean;
   allowedOrigin?: string;
   callerPolicy: CallerPolicy;
+  homerCba?: HomerCbaConfig;
 }
 
 export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): ApiConfig {
@@ -33,7 +41,39 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): Api
       automationClientId:
         environment.AUTH_AUTOMATION_CLIENT_ID ?? DEVELOPMENT_AUTOMATION_CLIENT_ID,
     },
+    homerCba: parseHomerCbaConfig(environment),
   };
+}
+
+function parseHomerCbaConfig(
+  environment: NodeJS.ProcessEnv,
+): HomerCbaConfig | undefined {
+  const values = [
+    environment.HOMER_CBA_CLIENT_ID,
+    environment.HOMER_CBA_PFX_PATH,
+    environment.HOMER_CBA_PFX_PASSPHRASE,
+  ];
+  if (values.every((value) => value === undefined)) {
+    return undefined;
+  }
+  if (values.some((value) => !value)) {
+    throw new Error(
+      "HOMER_CBA_CLIENT_ID, HOMER_CBA_PFX_PATH, and HOMER_CBA_PFX_PASSPHRASE must be configured together",
+    );
+  }
+
+  const [clientId, pfxPath, pfxPassphrase] = values as [
+    string,
+    string,
+    string,
+  ];
+  if (!isUuid(clientId)) {
+    throw new Error("HOMER_CBA_CLIENT_ID must be a UUID");
+  }
+  if (!isAbsolute(pfxPath)) {
+    throw new Error("HOMER_CBA_PFX_PATH must be an absolute path");
+  }
+  return { clientId, pfxPath, pfxPassphrase };
 }
 
 function parseDelegatedUserObjectIds(value: string | undefined): readonly string[] {
@@ -84,4 +124,10 @@ function parsePort(value: string): number {
     throw new Error("PORT must be an integer from 0 through 65535");
   }
   return port;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }

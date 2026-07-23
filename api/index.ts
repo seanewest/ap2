@@ -2,6 +2,8 @@ import { ManagedIdentityCredential } from "@azure/identity";
 import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
+import { DelegatedGraphSimulatedEmailOperation } from "./simulated-email.js";
+import { HomerDelegatedTokenProvider } from "./simulated-user-cba.js";
 import { createRemoteTokenVerifier } from "./token-verifier.js";
 
 const config = loadApiConfig();
@@ -11,12 +13,18 @@ const tokenVerifier = createRemoteTokenVerifier({
   jwksUrl: config.jwksUrl,
   allowInsecureHttp: config.allowInsecureJwks,
 });
+const simulatedEmailOperation = config.homerCba
+  ? new DelegatedGraphSimulatedEmailOperation(
+      new HomerDelegatedTokenProvider(config.homerCba),
+    )
+  : undefined;
 const server = createApiServer({
   tokenVerifier,
   callerPolicy: config.callerPolicy,
   rehearsalStatusProvider: new AzureRehearsalStatusProvider(
     new ManagedIdentityCredential(),
   ),
+  simulatedEmailOperation,
   allowedOrigin: config.allowedOrigin,
 });
 

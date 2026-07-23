@@ -19,7 +19,8 @@
   "dependencies": {
     "@azure/identity": "4.13.1",
     "@azure/msal-browser": "5.17.1",
-    "jose": "6.2.4"
+    "jose": "6.2.4",
+    "playwright": "1.61.1"
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",

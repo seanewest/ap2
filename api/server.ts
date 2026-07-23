@@ -7,12 +7,14 @@ import {
   type CallerPolicy,
 } from "./auth-policy.js";
 import type { RehearsalStatusProvider } from "./rehearsal-status.js";
+import type { SimulatedEmailOperation } from "./simulated-email.js";
 import { InvalidTokenError, type TokenVerifier } from "./token-verifier.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
   callerPolicy: CallerPolicy;
   rehearsalStatusProvider: RehearsalStatusProvider;
+  simulatedEmailOperation?: SimulatedEmailOperation;
   allowedOrigin?: string;
 }
 
@@ -44,7 +46,15 @@ async function route(
     request.method === "OPTIONS" &&
     (pathname === "/api/whoami" || pathname === "/api/rehearsal-status")
   ) {
-    handleProtectedGetPreflight(request, response, origin);
+    handleProtectedPreflight(request, response, origin, "GET");
+    return;
+  }
+
+  if (
+    request.method === "OPTIONS" &&
+    pathname === "/api/simulated-email"
+  ) {
+    handleProtectedPreflight(request, response, origin, "POST");
     return;
   }
 
@@ -63,13 +73,19 @@ async function route(
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/simulated-email") {
+    await simulatedEmail(request, response, dependencies);
+    return;
+  }
+
   sendJson(response, 404, { error: "not_found" });
 }
 
-function handleProtectedGetPreflight(
+function handleProtectedPreflight(
   request: IncomingMessage,
   response: ServerResponse,
   origin: string | undefined,
+  method: "GET" | "POST",
 ): void {
   const requestedHeaders = (
     request.headers["access-control-request-headers"] ?? ""
@@ -79,7 +95,7 @@ function handleProtectedGetPreflight(
     .filter(Boolean);
   if (
     !origin ||
-    request.headers["access-control-request-method"] !== "GET" ||
+    request.headers["access-control-request-method"] !== method ||
     requestedHeaders.length !== 1 ||
     requestedHeaders[0] !== "authorization"
   ) {
@@ -89,7 +105,7 @@ function handleProtectedGetPreflight(
 
   response.writeHead(204, {
     "Access-Control-Allow-Headers": "Authorization",
-    "Access-Control-Allow-Methods": "GET",
+    "Access-Control-Allow-Methods": method,
     "Cache-Control": "no-store",
   });
   response.end();
@@ -118,11 +134,31 @@ async function rehearsalStatus(
   );
 }
 
+async function simulatedEmail(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(
+    request,
+    response,
+    dependencies,
+    () => {
+      if (!dependencies.simulatedEmailOperation) {
+        throw new Error("Simulated email operation is not configured");
+      }
+      return dependencies.simulatedEmailOperation.send();
+    },
+    202,
+  );
+}
+
 async function handleAuthorizedRequest(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
   operation: (caller: AuthorizedCaller) => unknown | Promise<unknown>,
+  successStatus = 200,
 ): Promise<void> {
   const token = readBearerToken(request.headers.authorization);
   if (!token) {
@@ -133,7 +169,7 @@ async function handleAuthorizedRequest(
   try {
     const claims = await dependencies.tokenVerifier.verify(token);
     const caller = authorizeClaims(claims, dependencies.callerPolicy);
-    sendJson(response, 200, await operation(caller));
+    sendJson(response, successStatus, await operation(caller));
   } catch (error) {
     if (error instanceof CallerNotAllowedError) {
       sendJson(response, 403, { error: "forbidden" });

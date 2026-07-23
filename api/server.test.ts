@@ -15,6 +15,12 @@ import {
 } from "./identity.js";
 import type { RehearsalStatus } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
+import {
+  HOMER_USER_PRINCIPAL_NAME,
+  MARGE_USER_PRINCIPAL_NAME,
+  SIMULATED_EMAIL_SUBJECT,
+  type SimulatedEmailResult,
+} from "./simulated-email.js";
 import { JoseTokenVerifier } from "./token-verifier.js";
 
 const ISSUER = "https://fixtures.example/student/v2.0";
@@ -38,6 +44,15 @@ const rehearsalStatus: RehearsalStatus = {
 const rehearsalStatusProvider = {
   getStatus: vi.fn().mockResolvedValue(rehearsalStatus),
 };
+const simulatedEmailResult: SimulatedEmailResult = {
+  accepted: true,
+  sender: HOMER_USER_PRINCIPAL_NAME,
+  recipient: MARGE_USER_PRINCIPAL_NAME,
+  subject: SIMULATED_EMAIL_SUBJECT,
+};
+const simulatedEmailOperation = {
+  send: vi.fn().mockResolvedValue(simulatedEmailResult),
+};
 const server = createApiServer({
   tokenVerifier: new JoseTokenVerifier({
     issuer: ISSUER,
@@ -47,6 +62,7 @@ const server = createApiServer({
   }),
   callerPolicy: defaultCallerPolicy,
   rehearsalStatusProvider,
+  simulatedEmailOperation,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -90,6 +106,45 @@ describe("local API", () => {
       expect(response.headers.get("access-control-allow-headers")).toBe(
         "Authorization",
       );
+    },
+  );
+
+  it("allows only POST with Authorization to preflight the simulated email", async () => {
+    const response = await fetch(`${baseUrl}/api/simulated-email`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:5173",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Authorization",
+      },
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:5173",
+    );
+    expect(response.headers.get("access-control-allow-methods")).toBe("POST");
+    expect(response.headers.get("access-control-allow-headers")).toBe(
+      "Authorization",
+    );
+  });
+
+  it.each([
+    ["GET", "Authorization"],
+    ["POST", "Authorization, Content-Type"],
+  ])(
+    "rejects simulated email preflight for %s with %s",
+    async (method, headers) => {
+      const response = await fetch(`${baseUrl}/api/simulated-email`, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "http://localhost:5173",
+          "Access-Control-Request-Method": method,
+          "Access-Control-Request-Headers": headers,
+        },
+      });
+
+      expect(response.status).toBe(403);
     },
   );
 
@@ -207,6 +262,70 @@ describe("local API", () => {
 
     expect(response.status).toBe(403);
     expect(rehearsalStatusProvider.getStatus).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "delegated operator",
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+    ],
+    [
+      "development automation app",
+      {
+        tid: STUDENT_TENANT_ID,
+        idtyp: "app",
+        azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+        roles: [REQUIRED_APPLICATION_ROLE],
+      },
+    ],
+  ])("sends the fixed simulated email for the authorized %s", async (
+    _label,
+    claims,
+  ) => {
+    simulatedEmailOperation.send.mockClear();
+
+    const response = await simulatedEmailRequest(claims);
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toEqual(simulatedEmailResult);
+    expect(simulatedEmailOperation.send).toHaveBeenCalledOnce();
+    expect(simulatedEmailOperation.send).toHaveBeenCalledWith();
+  });
+
+  it("returns the configured CORS origin on an accepted simulated email", async () => {
+    simulatedEmailOperation.send.mockClear();
+
+    const response = await simulatedEmailRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      "http://localhost:5173",
+    );
+
+    expect(response.status).toBe(202);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:5173",
+    );
+    expect(simulatedEmailOperation.send).toHaveBeenCalledOnce();
+  });
+
+  it("does not send simulated email for an unauthorized caller", async () => {
+    simulatedEmailOperation.send.mockClear();
+
+    const response = await simulatedEmailRequest({
+      tid: STUDENT_TENANT_ID,
+      oid: "unknown",
+      scp: REQUIRED_DELEGATED_SCOPE,
+    });
+
+    expect(response.status).toBe(403);
+    expect(simulatedEmailOperation.send).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -334,6 +453,19 @@ async function protectedRequest(
   path = "/api/whoami",
 ): Promise<Response> {
   return fetch(`${baseUrl}${path}`, {
+    headers: {
+      Authorization: `Bearer ${fixtureToken(claims)}`,
+      ...(origin ? { Origin: origin } : {}),
+    },
+  });
+}
+
+async function simulatedEmailRequest(
+  claims: Record<string, unknown>,
+  origin?: string,
+): Promise<Response> {
+  return fetch(`${baseUrl}/api/simulated-email`, {
+    method: "POST",
     headers: {
       Authorization: `Bearer ${fixtureToken(claims)}`,
       ...(origin ? { Origin: origin } : {}),

@@ -11,6 +11,7 @@ import {
   type AfterPartyApi,
   type ApiCallerIdentity,
   type RehearsalStatus,
+  type SimulatedEmailResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
 
@@ -28,6 +29,13 @@ type RehearsalStatusState =
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
 
+type SimulatedEmailState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "success"; result: SimulatedEmailResult }
+  | { kind: "cancelled" }
+  | { kind: "error"; message: string };
+
 type ViewState =
   | { kind: "initial" }
   | { kind: "processing"; message: string }
@@ -37,6 +45,7 @@ type ViewState =
       account: AccountIdentity;
       apiAccess: ApiAccessState;
       rehearsalStatus: RehearsalStatusState;
+      simulatedEmail: SimulatedEmailState;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -93,17 +102,20 @@ export function createAfterPartyApp(
     if (
       state.kind !== "signed-in" ||
       state.apiAccess.kind === "loading" ||
-      state.rehearsalStatus.kind === "loading"
+      state.rehearsalStatus.kind === "loading" ||
+      state.simulatedEmail.kind === "loading"
     ) {
       return;
     }
     const account = state.account;
     const rehearsalStatus = state.rehearsalStatus;
+    const simulatedEmail = state.simulatedEmail;
     setState({
       kind: "signed-in",
       account,
       apiAccess: { kind: "loading" },
       rehearsalStatus,
+      simulatedEmail,
     });
 
     try {
@@ -115,6 +127,7 @@ export function createAfterPartyApp(
           account,
           apiAccess: { kind: "success", caller },
           rehearsalStatus,
+          simulatedEmail,
         });
       }
     } catch (error) {
@@ -127,6 +140,7 @@ export function createAfterPartyApp(
           account,
           apiAccess: { kind: "cancelled" },
           rehearsalStatus,
+          simulatedEmail,
         });
         return;
       }
@@ -139,6 +153,7 @@ export function createAfterPartyApp(
         account,
         apiAccess: { kind: "error", message },
         rehearsalStatus,
+        simulatedEmail,
       });
     }
   };
@@ -147,17 +162,20 @@ export function createAfterPartyApp(
     if (
       state.kind !== "signed-in" ||
       state.rehearsalStatus.kind === "loading" ||
-      state.apiAccess.kind === "loading"
+      state.apiAccess.kind === "loading" ||
+      state.simulatedEmail.kind === "loading"
     ) {
       return;
     }
     const account = state.account;
     const apiAccess = state.apiAccess;
+    const simulatedEmail = state.simulatedEmail;
     setState({
       kind: "signed-in",
       account,
       apiAccess,
       rehearsalStatus: { kind: "loading" },
+      simulatedEmail,
     });
 
     try {
@@ -169,6 +187,7 @@ export function createAfterPartyApp(
           account,
           apiAccess,
           rehearsalStatus: { kind: "success", status },
+          simulatedEmail,
         });
       }
     } catch (error) {
@@ -181,6 +200,7 @@ export function createAfterPartyApp(
           account,
           apiAccess,
           rehearsalStatus: { kind: "cancelled" },
+          simulatedEmail,
         });
         return;
       }
@@ -193,6 +213,69 @@ export function createAfterPartyApp(
         account,
         apiAccess,
         rehearsalStatus: { kind: "error", message },
+        simulatedEmail,
+      });
+    }
+  };
+
+  const sendSimulatedEmail = async (): Promise<void> => {
+    if (
+      state.kind !== "signed-in" ||
+      state.apiAccess.kind === "loading" ||
+      state.rehearsalStatus.kind === "loading" ||
+      state.simulatedEmail.kind === "loading" ||
+      state.simulatedEmail.kind === "success"
+    ) {
+      return;
+    }
+    const account = state.account;
+    const apiAccess = state.apiAccess;
+    const rehearsalStatus = state.rehearsalStatus;
+    setState({
+      kind: "signed-in",
+      account,
+      apiAccess,
+      rehearsalStatus,
+      simulatedEmail: { kind: "loading" },
+    });
+
+    try {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      const result = await api.sendSimulatedEmail(accessToken);
+      if (isCurrentSignedInAccount(state, account)) {
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus,
+          simulatedEmail: { kind: "success", result },
+        });
+      }
+    } catch (error) {
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      if (error instanceof AccessTokenCancelledError) {
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus,
+          simulatedEmail: { kind: "cancelled" },
+        });
+        return;
+      }
+      const message =
+        error instanceof AccessTokenError || error instanceof ApiAccessError
+          ? error.message
+          : "The internal email could not be submitted. Try again.";
+      setState({
+        kind: "signed-in",
+        account,
+        apiAccess,
+        rehearsalStatus,
+        simulatedEmail: { kind: "error", message },
       });
     }
   };
@@ -211,6 +294,9 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='check-rehearsal']")
       ?.addEventListener("click", () => void checkRehearsalStatus());
+    root
+      .querySelector<HTMLButtonElement>("[data-action='send-simulated-email']")
+      ?.addEventListener("click", () => void sendSimulatedEmail());
   };
 
   const start = async (): Promise<void> => {
@@ -227,6 +313,7 @@ export function createAfterPartyApp(
               account: startup.account,
               apiAccess: { kind: "idle" },
               rehearsalStatus: { kind: "idle" },
+              simulatedEmail: { kind: "idle" },
             }
           : { kind: "signed-out" },
       );
@@ -283,13 +370,18 @@ function createStatePanel(state: ViewState): HTMLElement {
     case "signed-in":
       const apiOperationLoading =
         state.apiAccess.kind === "loading" ||
-        state.rehearsalStatus.kind === "loading";
+        state.rehearsalStatus.kind === "loading" ||
+        state.simulatedEmail.kind === "loading";
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
         createApiAccessPanel(state.apiAccess, apiOperationLoading),
         createRehearsalStatusPanel(
           state.rehearsalStatus,
+          apiOperationLoading,
+        ),
+        createSimulatedEmailPanel(
+          state.simulatedEmail,
           apiOperationLoading,
         ),
         createButton("Sign out", "sign-out", "secondary"),
@@ -321,7 +413,12 @@ function createStatus(message: string, className = "status"): HTMLElement {
 
 function createButton(
   label: string,
-  action: "sign-in" | "sign-out" | "check-api" | "check-rehearsal",
+  action:
+    | "sign-in"
+    | "sign-out"
+    | "check-api"
+    | "check-rehearsal"
+    | "send-simulated-email",
   className: string,
   disabled = false,
 ): HTMLButtonElement {
@@ -332,6 +429,52 @@ function createButton(
   button.textContent = label;
   button.disabled = disabled;
   return button;
+}
+
+function createSimulatedEmailPanel(
+  state: SimulatedEmailState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+
+  panel.append(
+    createStatus(
+      "This creates real tenant activity: one internal email from Homer Simpson to Marge Simpson.",
+      "notice",
+    ),
+  );
+
+  if (state.kind === "loading") {
+    panel.setAttribute("aria-busy", "true");
+    panel.append(createStatus("Submitting the internal email…"));
+  } else if (state.kind === "success") {
+    panel.append(
+      createStatus(
+        "Microsoft accepted the email request (202). Delivery is not confirmed.",
+      ),
+      createSimulatedEmailResultList(state.result),
+    );
+  } else if (state.kind === "cancelled") {
+    panel.append(
+      createStatus(
+        "The internal email request was cancelled. No acceptance was recorded.",
+        "notice",
+      ),
+    );
+  } else if (state.kind === "error") {
+    panel.append(createStatus(state.message, "error"));
+  }
+
+  panel.append(
+    createButton(
+      "Send one internal email: Homer → Marge",
+      "send-simulated-email",
+      "primary",
+      apiOperationLoading || state.kind === "success",
+    ),
+  );
+  return panel;
 }
 
 function createRehearsalStatusPanel(
@@ -433,6 +576,18 @@ function createRehearsalStatusList(
   appendIdentity(list, "Region", status.region);
   appendIdentity(list, "Running status", status.runningStatus);
   appendIdentity(list, "Latest ready revision", status.latestReadyRevision);
+  return list;
+}
+
+function createSimulatedEmailResultList(
+  result: SimulatedEmailResult,
+): HTMLDListElement {
+  const list = document.createElement("dl");
+  list.className = "identity-list";
+  appendIdentity(list, "Accepted", result.accepted ? "Yes" : "No");
+  appendIdentity(list, "Sender", result.sender);
+  appendIdentity(list, "Recipient", result.recipient);
+  appendIdentity(list, "Subject", result.subject);
   return list;
 }
 

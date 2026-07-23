@@ -39,6 +39,7 @@ async function main(): Promise<void> {
 
   try {
     runPodman(["build", "--format", "docker", "--tag", image, "."], "inherit");
+    verifyHeadlessChromium();
     runPodman([
       "run",
       "--detach",
@@ -122,7 +123,9 @@ async function main(): Promise<void> {
     }
     runPodman(["rm", container]);
     containerCreated = false;
-    console.log("Container build, health, authorization, and clean shutdown passed");
+    console.log(
+      "Container build, headless browser, health, authorization, and clean shutdown passed",
+    );
   } finally {
     if (containerCreated) {
       spawnSync("podman", ["rm", "--force", container], { encoding: "utf8" });
@@ -130,6 +133,33 @@ async function main(): Promise<void> {
     spawnSync("podman", ["image", "rm", "--force", image], { encoding: "utf8" });
     await close(jwksServer);
   }
+}
+
+function verifyHeadlessChromium(): void {
+  const proof = [
+    "import { chromium } from 'playwright';",
+    "const browser = await chromium.launch({ headless: true });",
+    "const context = await browser.newContext();",
+    "const page = await context.newPage();",
+    "await page.setContent('<title>AP2 browser proof</title>');",
+    "if ((await page.title()) !== 'AP2 browser proof') process.exitCode = 1;",
+    "await context.close();",
+    "await browser.close();",
+  ].join(" ");
+  runPodman([
+    "run",
+    "--rm",
+    "--read-only",
+    "--cap-drop",
+    "ALL",
+    "--tmpfs",
+    "/tmp:rw,size=256m",
+    image,
+    "node",
+    "--input-type=module",
+    "--eval",
+    proof,
+  ]);
 }
 
 function createJwksServer(publicKey: KeyObject): Server {

@@ -13,6 +13,7 @@ import {
   type AfterPartyApi,
   type ApiCallerIdentity,
   type RehearsalStatus,
+  type SimulatedEmailResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
 
@@ -35,6 +36,8 @@ class FakeApi implements AfterPartyApi {
   checkAccess = vi.fn<(accessToken: string) => Promise<ApiCallerIdentity>>();
   getRehearsalStatus =
     vi.fn<(accessToken: string) => Promise<RehearsalStatus>>();
+  sendSimulatedEmail =
+    vi.fn<(accessToken: string) => Promise<SimulatedEmailResult>>();
 }
 
 describe("After Party authentication UI", () => {
@@ -64,6 +67,7 @@ describe("After Party authentication UI", () => {
     expect(signInButton().textContent).toBe("Sign in with Microsoft");
     expect(apiButton()).toBeNull();
     expect(rehearsalButton()).toBeNull();
+    expect(simulatedEmailButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -81,6 +85,9 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain("student-tenant-id");
     expect(root.textContent).toContain("student-object-id");
     expect(root.textContent).not.toContain("token");
+    expect(simulatedEmailButton()?.textContent).toBe(
+      "Send one internal email: Homer → Marge",
+    );
   });
 
   it("restores a signed-in account from cached state", async () => {
@@ -153,6 +160,7 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain("You are signed out");
     expect(apiButton()).toBeNull();
     expect(rehearsalButton()).toBeNull();
+    expect(simulatedEmailButton()).toBeNull();
   });
 
   it("requests the exact scope and renders only safe API identity fields", async () => {
@@ -227,15 +235,19 @@ describe("After Party authentication UI", () => {
 
     expect(apiButton()?.disabled).toBe(true);
     expect(rehearsalButton()?.disabled).toBe(true);
+    expect(simulatedEmailButton()?.disabled).toBe(true);
     rehearsalButton()?.click();
+    simulatedEmailButton()?.click();
     await nextTask();
     expect(authentication.acquireAccessToken).toHaveBeenCalledTimes(1);
     expect(api.getRehearsalStatus).not.toHaveBeenCalled();
+    expect(api.sendSimulatedEmail).not.toHaveBeenCalled();
 
     deferred.resolve({ callerType: "delegated", tenantId: "student-tenant" });
     await nextTask();
     expect(apiButton()?.disabled).toBe(false);
     expect(rehearsalButton()?.disabled).toBe(false);
+    expect(simulatedEmailButton()?.disabled).toBe(false);
   });
 
   it("shows a safe failure and allows retry", async () => {
@@ -382,6 +394,98 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain("Rehearsal status received");
   });
 
+  it("submits one fixed internal email and disables it after Microsoft accepts it", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("sensitive-access-token");
+    api.sendSimulatedEmail.mockResolvedValue({
+      accepted: true,
+      sender: "homer.simpson@corywest.onmicrosoft.com",
+      recipient: "marge.simpson@corywest.onmicrosoft.com",
+      subject: "Dinner tonight",
+      secret: "must-not-render",
+    } as SimulatedEmailResult);
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    expect(root.textContent).toContain(
+      "one internal email from Homer Simpson to Marge Simpson",
+    );
+    simulatedEmailButton()?.click();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.sendSimulatedEmail).toHaveBeenCalledWith(
+      "sensitive-access-token",
+    );
+    expect(root.textContent).toContain(
+      "Microsoft accepted the email request (202). Delivery is not confirmed.",
+    );
+    expect(root.textContent).toContain(
+      "homer.simpson@corywest.onmicrosoft.com",
+    );
+    expect(root.textContent).toContain(
+      "marge.simpson@corywest.onmicrosoft.com",
+    );
+    expect(root.textContent).toContain("Dinner tonight");
+    expect(root.textContent).not.toContain("sensitive-access-token");
+    expect(root.textContent).not.toContain("must-not-render");
+    expect(simulatedEmailButton()?.disabled).toBe(true);
+    expect(
+      simulatedEmailButton()?.closest('[aria-busy="true"]'),
+    ).toBeNull();
+
+    simulatedEmailButton()?.click();
+    await nextTask();
+    expect(api.sendSimulatedEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("serializes the internal email with the other API operations", async () => {
+    const deferred = createDeferred<SimulatedEmailResult>();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.sendSimulatedEmail.mockReturnValue(deferred.promise);
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    simulatedEmailButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain("Submitting the internal email");
+    expect(apiButton()?.disabled).toBe(true);
+    expect(rehearsalButton()?.disabled).toBe(true);
+    expect(simulatedEmailButton()?.disabled).toBe(true);
+    expect(
+      simulatedEmailButton()?.closest('[aria-busy="true"]'),
+    ).not.toBeNull();
+    apiButton()?.click();
+    rehearsalButton()?.click();
+    await nextTask();
+    expect(authentication.acquireAccessToken).toHaveBeenCalledTimes(1);
+    expect(api.checkAccess).not.toHaveBeenCalled();
+    expect(api.getRehearsalStatus).not.toHaveBeenCalled();
+
+    deferred.resolve({
+      accepted: true,
+      sender: "homer.simpson@corywest.onmicrosoft.com",
+      recipient: "marge.simpson@corywest.onmicrosoft.com",
+      subject: "Dinner tonight",
+    });
+    await nextTask();
+    expect(apiButton()?.disabled).toBe(false);
+    expect(rehearsalButton()?.disabled).toBe(false);
+    expect(simulatedEmailButton()?.disabled).toBe(true);
+  });
+
   function signInButton(): HTMLButtonElement {
     return root.querySelector<HTMLButtonElement>("[data-action='sign-in']")!;
   }
@@ -393,6 +497,12 @@ describe("After Party authentication UI", () => {
   function rehearsalButton(): HTMLButtonElement | null {
     return root.querySelector<HTMLButtonElement>(
       "[data-action='check-rehearsal']",
+    );
+  }
+
+  function simulatedEmailButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='send-simulated-email']",
     );
   }
 });

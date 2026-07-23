@@ -18,9 +18,23 @@ export interface RehearsalStatus {
   latestReadyRevision: string;
 }
 
+export interface SimulatedEmailResult {
+  accepted: true;
+  sender: string;
+  recipient: string;
+  subject: string;
+}
+
+const SIMULATED_EMAIL_SENDER =
+  "homer.simpson@corywest.onmicrosoft.com";
+const SIMULATED_EMAIL_RECIPIENT =
+  "marge.simpson@corywest.onmicrosoft.com";
+const SIMULATED_EMAIL_SUBJECT = "Dinner tonight";
+
 export interface AfterPartyApi {
   checkAccess(accessToken: string): Promise<ApiCallerIdentity>;
   getRehearsalStatus(accessToken: string): Promise<RehearsalStatus>;
+  sendSimulatedEmail(accessToken: string): Promise<SimulatedEmailResult>;
 }
 
 export class ApiAccessError extends Error {
@@ -33,12 +47,17 @@ export class ApiAccessError extends Error {
 export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly whoAmIUrl: string;
   private readonly rehearsalStatusUrl: string;
+  private readonly simulatedEmailUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
     this.whoAmIUrl = new URL("api/whoami", `${baseUrl}/`).toString();
     this.rehearsalStatusUrl = new URL(
       "api/rehearsal-status",
+      `${baseUrl}/`,
+    ).toString();
+    this.simulatedEmailUrl = new URL(
+      "api/simulated-email",
       `${baseUrl}/`,
     ).toString();
     this.request = request.bind(globalThis);
@@ -73,14 +92,37 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     };
   }
 
+  async sendSimulatedEmail(
+    accessToken: string,
+  ): Promise<SimulatedEmailResult> {
+    const value = await this.getAuthorizedJson(
+      this.simulatedEmailUrl,
+      accessToken,
+      "POST",
+      202,
+    );
+    if (!isSafeSimulatedEmailResult(value)) {
+      throw new ApiAccessError();
+    }
+
+    return {
+      accepted: true,
+      sender: value.sender,
+      recipient: value.recipient,
+      subject: value.subject,
+    };
+  }
+
   private async getAuthorizedJson(
     url: string,
     accessToken: string,
+    method = "GET",
+    expectedStatus?: number,
   ): Promise<unknown> {
     let response: Response;
     try {
       response = await this.request(url, {
-        method: "GET",
+        method,
         credentials: "omit",
         redirect: "error",
         headers: {
@@ -97,7 +139,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     if (response.status === 403) {
       throw new ApiAccessError("This account is not allowed to use the API.");
     }
-    if (!response.ok) {
+    if (expectedStatus === undefined ? !response.ok : response.status !== expectedStatus) {
       throw new ApiAccessError();
     }
 
@@ -136,5 +178,20 @@ function isSafeRehearsalStatus(value: unknown): value is RehearsalStatus {
     runningStatuses.some((candidate) => candidate === status.runningStatus) &&
     typeof status.latestReadyRevision === "string" &&
     status.latestReadyRevision.length > 0
+  );
+}
+
+function isSafeSimulatedEmailResult(
+  value: unknown,
+): value is SimulatedEmailResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  return (
+    result.accepted === true &&
+    result.sender === SIMULATED_EMAIL_SENDER &&
+    result.recipient === SIMULATED_EMAIL_RECIPIENT &&
+    result.subject === SIMULATED_EMAIL_SUBJECT
   );
 }
