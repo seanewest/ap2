@@ -20,7 +20,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
     this.whoAmIUrl = new URL("api/whoami", `${baseUrl}/`).toString();
-    this.request = request;
+    this.request = request.bind(globalThis);
   }
 
   async checkAccess(accessToken: string): Promise<ApiCallerIdentity> {

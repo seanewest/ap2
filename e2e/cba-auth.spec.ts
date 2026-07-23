@@ -4,7 +4,7 @@ import {
   STUDENT_TENANT_ID,
 } from "./cba-settings";
 
-test("signs the Student operator in and out through Microsoft CBA", async ({
+test("signs in, checks delegated API access, and signs out through Microsoft CBA", async ({
   page,
 }) => {
   await page.goto("./");
@@ -31,6 +31,41 @@ test("signs the Student operator in and out through Microsoft CBA", async ({
     page.locator("dd").getByText(STUDENT_TENANT_ID, { exact: true }),
   ).toBeVisible();
 
+  const whoAmIResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === "GET" &&
+      url.pathname === "/api/whoami"
+    );
+  });
+  const whoAmIFailure = new Promise<never>((_resolve, reject) => {
+    page.on("requestfailed", (request) => {
+      const url = new URL(request.url());
+      if (
+        request.method() === "GET" &&
+        url.pathname === "/api/whoami"
+      ) {
+        reject(
+          new Error(
+            `Browser API request to ${url.origin} failed: ` +
+              (request.failure()?.errorText ?? "unknown transport error"),
+          ),
+        );
+      }
+    });
+  });
+  await page.getByRole("button", { name: "Check API access" }).click();
+  await expect(page.getByText("Checking API access…")).toBeVisible();
+  expect((await Promise.race([whoAmIResponse, whoAmIFailure])).status()).toBe(200);
+  await expect(page.getByText("API access confirmed.")).toBeVisible();
+  await expect(
+    page.locator("dd").getByText("delegated", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator("dd").getByText(STUDENT_TENANT_ID, { exact: true }),
+  ).toHaveCount(2);
+  await expect(page.getByText(/bearer|access token|eyJ/i)).toHaveCount(0);
+
   const logoutRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return (
@@ -48,9 +83,15 @@ test("signs the Student operator in and out through Microsoft CBA", async ({
   await expect(
     page.getByRole("button", { name: "Sign in with Microsoft" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Check API access" }),
+  ).toHaveCount(0);
 
   await page.reload();
   await expect(page.getByText("You are signed out.")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Check API access" }),
+  ).toHaveCount(0);
 });
 
 async function enterStudentOperator(page: Page): Promise<void> {

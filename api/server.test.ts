@@ -31,6 +31,7 @@ const signingKeys: SigningKeyProvider = {
 const server = createApiServer({
   jwtVerifier: new JwtVerifier({ issuer: ISSUER, audience: AUDIENCE, signingKeys, now: () => NOW }),
   callerPolicy: defaultCallerPolicy,
+  allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
 
@@ -51,6 +52,64 @@ describe("local API", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: "ok" });
+  });
+
+  it("allows only the configured origin to preflight the protected route", async () => {
+    const response = await fetch(`${baseUrl}/api/whoami`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:5173",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "Authorization",
+      },
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:5173",
+    );
+    expect(response.headers.get("access-control-allow-methods")).toBe("GET");
+    expect(response.headers.get("access-control-allow-headers")).toBe(
+      "Authorization",
+    );
+  });
+
+  it("rejects another origin and broader preflight requests", async () => {
+    const otherOrigin = await fetch(`${baseUrl}/api/whoami`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://other.example",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "Authorization",
+      },
+    });
+    expect(otherOrigin.status).toBe(403);
+    expect(otherOrigin.headers.get("access-control-allow-origin")).toBeNull();
+
+    const broaderRequest = await fetch(`${baseUrl}/api/whoami`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:5173",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Authorization, Content-Type",
+      },
+    });
+    expect(broaderRequest.status).toBe(403);
+  });
+
+  it("returns CORS headers on an allowed delegated request", async () => {
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      "http://localhost:5173",
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:5173",
+    );
   });
 
   it("classifies the signed delegated operator", async () => {
@@ -176,9 +235,15 @@ describe("local API", () => {
   });
 });
 
-async function protectedRequest(claims: Record<string, unknown>): Promise<Response> {
+async function protectedRequest(
+  claims: Record<string, unknown>,
+  origin?: string,
+): Promise<Response> {
   return fetch(`${baseUrl}/api/whoami`, {
-    headers: { Authorization: `Bearer ${fixtureToken(claims)}` },
+    headers: {
+      Authorization: `Bearer ${fixtureToken(claims)}`,
+      ...(origin ? { Origin: origin } : {}),
+    },
   });
 }
 

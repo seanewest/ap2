@@ -19,6 +19,11 @@ role, `idtyp: app`, and development automation client ID. Both paths also
 require the Student tenant, configured issuer and audience, and a verified
 Microsoft signature.
 
+Browser access is disabled unless `CORS_ALLOWED_ORIGIN` names one exact
+HTTP(S) origin. The `/api/whoami` preflight accepts only that origin, `GET`, and
+the `Authorization` header. Requests without an `Origin` header remain
+available to the app-only proof and other non-browser clients.
+
 ## Identity setup and rollback
 
 Use separate `AZURE_CONFIG_DIR` directories for Product and Student. The setup
@@ -58,7 +63,7 @@ AP2_AUTOMATION_CERTIFICATE_PATH='<certificate-pem-outside-git>' \
   node scripts/test-real-api-token.ts
 ```
 
-The existing CBA browser harness proves SPA sign-in and sign-out but does not
-request or expose an API access token. The delegated `access_as_user` proof is
-therefore intentionally deferred to the integration/join goal so it can use the
-concurrently developed SPA API button without duplicating that UI work.
+The CBA browser harness proves the delegated path against a rootless Podman API
+configured with the Student Microsoft issuer and JWKS, the Product app
+audience, and `CORS_ALLOWED_ORIGIN=http://localhost:5173`. It clicks the SPA
+sign-in, API-access, and sign-out buttons and exposes no token.

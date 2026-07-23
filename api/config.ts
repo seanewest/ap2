@@ -12,6 +12,7 @@ export interface ApiConfig {
   audience: string;
   jwksUrl: string;
   allowInsecureJwks: boolean;
+  allowedOrigin?: string;
   callerPolicy: CallerPolicy;
 }
 
@@ -23,6 +24,7 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): Api
     audience: required(environment, "AUTH_AUDIENCE"),
     jwksUrl: required(environment, "AUTH_JWKS_URL"),
     allowInsecureJwks: environment.AUTH_ALLOW_INSECURE_JWKS === "true",
+    allowedOrigin: parseAllowedOrigin(environment.CORS_ALLOWED_ORIGIN),
     callerPolicy: {
       tenantId: STUDENT_TENANT_ID,
       operatorObjectId: environment.AUTH_OPERATOR_OBJECT_ID ?? STUDENT_OPERATOR_OBJECT_ID,
@@ -30,6 +32,24 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): Api
         environment.AUTH_AUTOMATION_CLIENT_ID ?? DEVELOPMENT_AUTOMATION_CLIENT_ID,
     },
   };
+}
+
+function parseAllowedOrigin(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const url = new URL(value);
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("CORS_ALLOWED_ORIGIN must be one exact HTTP(S) origin");
+  }
+  return url.origin;
 }
 
 function required(environment: NodeJS.ProcessEnv, name: string): string {

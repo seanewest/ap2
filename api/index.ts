@@ -12,7 +12,11 @@ const jwtVerifier = new JwtVerifier({
   audience: config.audience,
   signingKeys,
 });
-const server = createApiServer({ jwtVerifier, callerPolicy: config.callerPolicy });
+const server = createApiServer({
+  jwtVerifier,
+  callerPolicy: config.callerPolicy,
+  allowedOrigin: config.allowedOrigin,
+});
 
 server.listen(config.port, config.host, () => {
   const address = server.address();

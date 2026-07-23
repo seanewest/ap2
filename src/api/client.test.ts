@@ -44,6 +44,30 @@ describe("HTTP After Party API client", () => {
     expect(JSON.stringify(caller)).not.toContain("response-must-not-escape");
   });
 
+  it("invokes browser fetch with the global receiver", async () => {
+    const request = vi.fn(function (this: unknown) {
+      expect(this).toBe(globalThis);
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            callerType: "delegated",
+            tenantId: "student-tenant",
+          }),
+          { status: 200 },
+        ),
+      );
+    }) as typeof fetch;
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example",
+      request,
+    );
+
+    await expect(client.checkAccess("token")).resolves.toEqual({
+      callerType: "delegated",
+      tenantId: "student-tenant",
+    });
+  });
+
   it.each([
     [401, "API access needs Microsoft authorization. Try again."],
     [403, "This account is not allowed to use the API."],

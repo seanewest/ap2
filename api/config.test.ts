@@ -46,4 +46,38 @@ describe("loadApiConfig", () => {
     expect(config.callerPolicy.operatorObjectId).toBe(STUDENT_OPERATOR_OBJECT_ID);
     expect(config.callerPolicy.automationClientId).toBe(DEVELOPMENT_AUTOMATION_CLIENT_ID);
   });
+
+  it("accepts one exact browser origin and otherwise leaves CORS disabled", () => {
+    expect(
+      loadApiConfig({
+        AUTH_ISSUER: "https://issuer.example/",
+        AUTH_AUDIENCE: "api://audience",
+        AUTH_JWKS_URL: "https://issuer.example/keys",
+        CORS_ALLOWED_ORIGIN: "http://localhost:5173/",
+      }).allowedOrigin,
+    ).toBe("http://localhost:5173");
+    expect(
+      loadApiConfig({
+        AUTH_ISSUER: "https://issuer.example/",
+        AUTH_AUDIENCE: "api://audience",
+        AUTH_JWKS_URL: "https://issuer.example/keys",
+      }).allowedOrigin,
+    ).toBeUndefined();
+  });
+
+  it.each([
+    "ftp://localhost:5173",
+    "http://user:password@localhost:5173",
+    "http://localhost:5173/path",
+    "http://localhost:5173?query=value",
+  ])("rejects an unsafe CORS origin: %s", (origin) => {
+    expect(() =>
+      loadApiConfig({
+        AUTH_ISSUER: "https://issuer.example/",
+        AUTH_AUDIENCE: "api://audience",
+        AUTH_JWKS_URL: "https://issuer.example/keys",
+        CORS_ALLOWED_ORIGIN: origin,
+      }),
+    ).toThrow("CORS_ALLOWED_ORIGIN must be one exact HTTP(S) origin");
+  });
 });

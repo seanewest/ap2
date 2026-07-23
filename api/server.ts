@@ -10,6 +10,7 @@ import { InvalidTokenError, type JwtVerifier } from "./jwt-verifier.js";
 export interface ApiDependencies {
   jwtVerifier: JwtVerifier;
   callerPolicy: CallerPolicy;
+  allowedOrigin?: string;
 }
 
 export function createApiServer(dependencies: ApiDependencies): Server {
@@ -26,6 +27,20 @@ async function route(
   dependencies: ApiDependencies,
 ): Promise<void> {
   const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+  const origin = request.headers.origin;
+  if (origin) {
+    if (!dependencies.allowedOrigin || origin !== dependencies.allowedOrigin) {
+      sendJson(response, 403, { error: "origin_not_allowed" });
+      return;
+    }
+    response.setHeader("Access-Control-Allow-Origin", origin);
+    response.setHeader("Vary", "Origin");
+  }
+
+  if (request.method === "OPTIONS" && pathname === "/api/whoami") {
+    handleWhoAmIPreflight(request, response, origin);
+    return;
+  }
 
   if (request.method === "GET" && pathname === "/health") {
     sendJson(response, 200, { status: "ok" });
@@ -38,6 +53,35 @@ async function route(
   }
 
   sendJson(response, 404, { error: "not_found" });
+}
+
+function handleWhoAmIPreflight(
+  request: IncomingMessage,
+  response: ServerResponse,
+  origin: string | undefined,
+): void {
+  const requestedHeaders = (
+    request.headers["access-control-request-headers"] ?? ""
+  )
+    .split(",")
+    .map((header) => header.trim().toLowerCase())
+    .filter(Boolean);
+  if (
+    !origin ||
+    request.headers["access-control-request-method"] !== "GET" ||
+    requestedHeaders.length !== 1 ||
+    requestedHeaders[0] !== "authorization"
+  ) {
+    sendJson(response, 403, { error: "cors_preflight_rejected" });
+    return;
+  }
+
+  response.writeHead(204, {
+    "Access-Control-Allow-Headers": "Authorization",
+    "Access-Control-Allow-Methods": "GET",
+    "Cache-Control": "no-store",
+  });
+  response.end();
 }
 
 async function whoAmI(
