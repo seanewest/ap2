@@ -5,6 +5,8 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
+  REQUIRED_APPLICATION_ROLE,
+  REQUIRED_DELEGATED_SCOPE,
   STUDENT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
   defaultCallerPolicy,
@@ -55,7 +57,7 @@ describe("local API", () => {
     const response = await protectedRequest({
       tid: STUDENT_TENANT_ID,
       oid: STUDENT_OPERATOR_OBJECT_ID,
-      scp: "access_as_user",
+      scp: REQUIRED_DELEGATED_SCOPE,
     });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -70,7 +72,7 @@ describe("local API", () => {
       tid: STUDENT_TENANT_ID,
       idtyp: "app",
       azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
-      roles: ["Api.Access"],
+      roles: [REQUIRED_APPLICATION_ROLE],
     });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -85,7 +87,27 @@ describe("local API", () => {
     ["an unknown user", { tid: STUDENT_TENANT_ID, oid: "unknown", scp: "scope" }, 403],
     [
       "an unknown app",
-      { tid: STUDENT_TENANT_ID, idtyp: "app", azp: "unknown", roles: ["Api.Access"] },
+      {
+        tid: STUDENT_TENANT_ID,
+        idtyp: "app",
+        azp: "unknown",
+        roles: [REQUIRED_APPLICATION_ROLE],
+      },
+      403,
+    ],
+    [
+      "the operator without the exact delegated scope",
+      { tid: STUDENT_TENANT_ID, oid: STUDENT_OPERATOR_OBJECT_ID, scp: "other_scope" },
+      403,
+    ],
+    [
+      "the automation app without the exact application role",
+      {
+        tid: STUDENT_TENANT_ID,
+        idtyp: "app",
+        azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+        roles: ["other_role"],
+      },
       403,
     ],
     ["missing required claims", { tid: STUDENT_TENANT_ID, oid: STUDENT_OPERATOR_OBJECT_ID }, 401],
@@ -95,7 +117,7 @@ describe("local API", () => {
         tid: STUDENT_TENANT_ID,
         idtyp: "app",
         azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
-        roles: ["Api.Access"],
+        roles: [REQUIRED_APPLICATION_ROLE],
         scp: "scope",
       },
       401,
@@ -144,7 +166,7 @@ describe("local API", () => {
         tid: STUDENT_TENANT_ID,
         idtyp: "app",
         azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
-        roles: ["Api.Access"],
+        roles: [REQUIRED_APPLICATION_ROLE],
       })),
     ).toString("base64url");
     const response = await fetch(`${baseUrl}/api/whoami`, {

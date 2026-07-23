@@ -74,7 +74,7 @@ async function main(): Promise<void> {
         tid: STUDENT_TENANT_ID,
         idtyp: "app",
         azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
-        roles: ["Api.Access"],
+        roles: ["access_as_application"],
       }),
       200,
       "app-only",

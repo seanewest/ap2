@@ -1,6 +1,8 @@
 export const STUDENT_TENANT_ID = "92563293-315c-4b6c-9b90-bcb47ee8c970";
 export const STUDENT_OPERATOR_OBJECT_ID = "ba97e987-da4c-43e1-ab79-3daa8014440e";
 export const DEVELOPMENT_AUTOMATION_CLIENT_ID = "7eb78f18-b49c-495c-a571-af03f06b58a9";
+export const REQUIRED_DELEGATED_SCOPE = "access_as_user";
+export const REQUIRED_APPLICATION_ROLE = "access_as_application";
 
 export interface CallerPolicy {
   tenantId: string;
@@ -58,10 +60,13 @@ function authorizeDelegated(
     throw new InvalidClaimsError("Delegated tokens must not contain app roles");
   }
 
-  requiredSpaceSeparatedClaim(claims, "scp");
+  const scopes = requiredSpaceSeparatedClaim(claims, "scp");
   const objectId = requiredString(claims, "oid");
   if (objectId !== policy.operatorObjectId) {
     throw new CallerNotAllowedError("Delegated caller is not allowed");
+  }
+  if (!scopes.includes(REQUIRED_DELEGATED_SCOPE)) {
+    throw new CallerNotAllowedError("Delegated token lacks the required scope");
   }
 
   return { callerType: "delegated", objectId, tenantId };
@@ -76,10 +81,13 @@ function authorizeAppOnly(
     throw new InvalidClaimsError("App-only tokens must not contain delegated scopes");
   }
 
-  requiredStringArray(claims, "roles");
+  const roles = requiredStringArray(claims, "roles");
   const clientId = requiredString(claims, "azp");
   if (clientId !== policy.automationClientId) {
     throw new CallerNotAllowedError("App-only caller is not allowed");
+  }
+  if (!roles.includes(REQUIRED_APPLICATION_ROLE)) {
+    throw new CallerNotAllowedError("App-only token lacks the required role");
   }
 
   return { callerType: "app-only", clientId, tenantId };
@@ -99,17 +107,19 @@ function requiredString(
 function requiredSpaceSeparatedClaim(
   claims: Readonly<Record<string, unknown>>,
   name: string,
-): void {
+): string[] {
   const value = requiredString(claims, name);
-  if (value.split(" ").some((part) => part.length === 0)) {
+  const values = value.split(" ");
+  if (values.some((part) => part.length === 0)) {
     throw new InvalidClaimsError(`Invalid ${name} claim`);
   }
+  return values;
 }
 
 function requiredStringArray(
   claims: Readonly<Record<string, unknown>>,
   name: string,
-): void {
+): string[] {
   const value = claims[name];
   if (
     !Array.isArray(value) ||
@@ -118,4 +128,5 @@ function requiredStringArray(
   ) {
     throw new InvalidClaimsError(`Missing or invalid ${name} claim`);
   }
+  return value;
 }

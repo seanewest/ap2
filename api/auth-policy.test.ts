@@ -3,6 +3,8 @@ import {
   CallerNotAllowedError,
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   InvalidClaimsError,
+  REQUIRED_APPLICATION_ROLE,
+  REQUIRED_DELEGATED_SCOPE,
   STUDENT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
   authorizeClaims,
@@ -16,7 +18,7 @@ describe("authorizeClaims", () => {
         {
           tid: STUDENT_TENANT_ID,
           oid: STUDENT_OPERATOR_OBJECT_ID,
-          scp: "access_as_user",
+          scp: REQUIRED_DELEGATED_SCOPE,
         },
         defaultCallerPolicy,
       ),
@@ -34,7 +36,7 @@ describe("authorizeClaims", () => {
           tid: STUDENT_TENANT_ID,
           idtyp: "app",
           azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
-          roles: ["Api.Access"],
+          roles: [REQUIRED_APPLICATION_ROLE],
         },
         defaultCallerPolicy,
       ),
@@ -50,7 +52,30 @@ describe("authorizeClaims", () => {
     ["unknown user", { tid: STUDENT_TENANT_ID, oid: "unknown", scp: "scope" }],
     [
       "unknown app",
-      { tid: STUDENT_TENANT_ID, idtyp: "app", azp: "unknown", roles: ["Api.Access"] },
+      {
+        tid: STUDENT_TENANT_ID,
+        idtyp: "app",
+        azp: "unknown",
+        roles: [REQUIRED_APPLICATION_ROLE],
+      },
+    ],
+  ])("rejects %s", (_label, claims) => {
+    expect(() => authorizeClaims(claims, defaultCallerPolicy)).toThrow(CallerNotAllowedError);
+  });
+
+  it.each([
+    [
+      "delegated caller without the exact scope",
+      { tid: STUDENT_TENANT_ID, oid: STUDENT_OPERATOR_OBJECT_ID, scp: "other_scope" },
+    ],
+    [
+      "app-only caller without the exact role",
+      {
+        tid: STUDENT_TENANT_ID,
+        idtyp: "app",
+        azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+        roles: ["other_role"],
+      },
     ],
   ])("rejects %s", (_label, claims) => {
     expect(() => authorizeClaims(claims, defaultCallerPolicy)).toThrow(CallerNotAllowedError);
