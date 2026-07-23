@@ -10,6 +10,7 @@ import {
   ApiAccessError,
   type AfterPartyApi,
   type ApiCallerIdentity,
+  type RehearsalStatus,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
 
@@ -17,6 +18,13 @@ type ApiAccessState =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "success"; caller: ApiCallerIdentity }
+  | { kind: "cancelled" }
+  | { kind: "error"; message: string };
+
+type RehearsalStatusState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "success"; status: RehearsalStatus }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
 
@@ -28,6 +36,7 @@ type ViewState =
       kind: "signed-in";
       account: AccountIdentity;
       apiAccess: ApiAccessState;
+      rehearsalStatus: RehearsalStatusState;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -81,11 +90,21 @@ export function createAfterPartyApp(
   };
 
   const checkApiAccess = async (): Promise<void> => {
-    if (state.kind !== "signed-in" || state.apiAccess.kind === "loading") {
+    if (
+      state.kind !== "signed-in" ||
+      state.apiAccess.kind === "loading" ||
+      state.rehearsalStatus.kind === "loading"
+    ) {
       return;
     }
     const account = state.account;
-    setState({ kind: "signed-in", account, apiAccess: { kind: "loading" } });
+    const rehearsalStatus = state.rehearsalStatus;
+    setState({
+      kind: "signed-in",
+      account,
+      apiAccess: { kind: "loading" },
+      rehearsalStatus,
+    });
 
     try {
       const accessToken = await authentication.acquireAccessToken(API_ACCESS_SCOPES);
@@ -95,6 +114,7 @@ export function createAfterPartyApp(
           kind: "signed-in",
           account,
           apiAccess: { kind: "success", caller },
+          rehearsalStatus,
         });
       }
     } catch (error) {
@@ -102,7 +122,12 @@ export function createAfterPartyApp(
         return;
       }
       if (error instanceof AccessTokenCancelledError) {
-        setState({ kind: "signed-in", account, apiAccess: { kind: "cancelled" } });
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess: { kind: "cancelled" },
+          rehearsalStatus,
+        });
         return;
       }
       const message =
@@ -113,6 +138,61 @@ export function createAfterPartyApp(
         kind: "signed-in",
         account,
         apiAccess: { kind: "error", message },
+        rehearsalStatus,
+      });
+    }
+  };
+
+  const checkRehearsalStatus = async (): Promise<void> => {
+    if (
+      state.kind !== "signed-in" ||
+      state.rehearsalStatus.kind === "loading" ||
+      state.apiAccess.kind === "loading"
+    ) {
+      return;
+    }
+    const account = state.account;
+    const apiAccess = state.apiAccess;
+    setState({
+      kind: "signed-in",
+      account,
+      apiAccess,
+      rehearsalStatus: { kind: "loading" },
+    });
+
+    try {
+      const accessToken = await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      const status = await api.getRehearsalStatus(accessToken);
+      if (isCurrentSignedInAccount(state, account)) {
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus: { kind: "success", status },
+        });
+      }
+    } catch (error) {
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      if (error instanceof AccessTokenCancelledError) {
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus: { kind: "cancelled" },
+        });
+        return;
+      }
+      const message =
+        error instanceof AccessTokenError || error instanceof ApiAccessError
+          ? error.message
+          : "Rehearsal status could not be checked. Try again.";
+      setState({
+        kind: "signed-in",
+        account,
+        apiAccess,
+        rehearsalStatus: { kind: "error", message },
       });
     }
   };
@@ -128,6 +208,9 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='check-api']")
       ?.addEventListener("click", () => void checkApiAccess());
+    root
+      .querySelector<HTMLButtonElement>("[data-action='check-rehearsal']")
+      ?.addEventListener("click", () => void checkRehearsalStatus());
   };
 
   const start = async (): Promise<void> => {
@@ -143,6 +226,7 @@ export function createAfterPartyApp(
               kind: "signed-in",
               account: startup.account,
               apiAccess: { kind: "idle" },
+              rehearsalStatus: { kind: "idle" },
             }
           : { kind: "signed-out" },
       );
@@ -197,10 +281,17 @@ function createStatePanel(state: ViewState): HTMLElement {
       );
       break;
     case "signed-in":
+      const apiOperationLoading =
+        state.apiAccess.kind === "loading" ||
+        state.rehearsalStatus.kind === "loading";
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
-        createApiAccessPanel(state.apiAccess),
+        createApiAccessPanel(state.apiAccess, apiOperationLoading),
+        createRehearsalStatusPanel(
+          state.rehearsalStatus,
+          apiOperationLoading,
+        ),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -230,7 +321,7 @@ function createStatus(message: string, className = "status"): HTMLElement {
 
 function createButton(
   label: string,
-  action: "sign-in" | "sign-out" | "check-api",
+  action: "sign-in" | "sign-out" | "check-api" | "check-rehearsal",
   className: string,
   disabled = false,
 ): HTMLButtonElement {
@@ -243,7 +334,47 @@ function createButton(
   return button;
 }
 
-function createApiAccessPanel(state: ApiAccessState): HTMLElement {
+function createRehearsalStatusPanel(
+  state: RehearsalStatusState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+
+  if (state.kind === "loading") {
+    panel.setAttribute("aria-busy", "true");
+    panel.append(createStatus("Checking rehearsal status…"));
+  } else if (state.kind === "success") {
+    panel.append(
+      createStatus("Rehearsal status received."),
+      createRehearsalStatusList(state.status),
+    );
+  } else if (state.kind === "cancelled") {
+    panel.append(
+      createStatus(
+        "Rehearsal status request was cancelled. Try again when ready.",
+        "notice",
+      ),
+    );
+  } else if (state.kind === "error") {
+    panel.append(createStatus(state.message, "error"));
+  }
+
+  panel.append(
+    createButton(
+      "Check rehearsal status",
+      "check-rehearsal",
+      "primary",
+      apiOperationLoading,
+    ),
+  );
+  return panel;
+}
+
+function createApiAccessPanel(
+  state: ApiAccessState,
+  apiOperationLoading: boolean,
+): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "api-access";
 
@@ -268,7 +399,7 @@ function createApiAccessPanel(state: ApiAccessState): HTMLElement {
       "Check API access",
       "check-api",
       "primary",
-      state.kind === "loading",
+      apiOperationLoading,
     ),
   );
   return panel;
@@ -290,6 +421,18 @@ function createCallerList(caller: ApiCallerIdentity): HTMLDListElement {
   list.className = "identity-list";
   appendIdentity(list, "Caller type", caller.callerType);
   appendIdentity(list, "API tenant ID", caller.tenantId);
+  return list;
+}
+
+function createRehearsalStatusList(
+  status: RehearsalStatus,
+): HTMLDListElement {
+  const list = document.createElement("dl");
+  list.className = "identity-list";
+  appendIdentity(list, "App", status.appName);
+  appendIdentity(list, "Region", status.region);
+  appendIdentity(list, "Running status", status.runningStatus);
+  appendIdentity(list, "Latest ready revision", status.latestReadyRevision);
   return list;
 }
 

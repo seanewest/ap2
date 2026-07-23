@@ -3,13 +3,16 @@ import {
   CallerNotAllowedError,
   InvalidClaimsError,
   authorizeClaims,
+  type AuthorizedCaller,
   type CallerPolicy,
 } from "./auth-policy.js";
+import type { RehearsalStatusProvider } from "./rehearsal-status.js";
 import { InvalidTokenError, type TokenVerifier } from "./token-verifier.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
   callerPolicy: CallerPolicy;
+  rehearsalStatusProvider: RehearsalStatusProvider;
   allowedOrigin?: string;
 }
 
@@ -37,8 +40,11 @@ async function route(
     response.setHeader("Vary", "Origin");
   }
 
-  if (request.method === "OPTIONS" && pathname === "/api/whoami") {
-    handleWhoAmIPreflight(request, response, origin);
+  if (
+    request.method === "OPTIONS" &&
+    (pathname === "/api/whoami" || pathname === "/api/rehearsal-status")
+  ) {
+    handleProtectedGetPreflight(request, response, origin);
     return;
   }
 
@@ -52,10 +58,15 @@ async function route(
     return;
   }
 
+  if (request.method === "GET" && pathname === "/api/rehearsal-status") {
+    await rehearsalStatus(request, response, dependencies);
+    return;
+  }
+
   sendJson(response, 404, { error: "not_found" });
 }
 
-function handleWhoAmIPreflight(
+function handleProtectedGetPreflight(
   request: IncomingMessage,
   response: ServerResponse,
   origin: string | undefined,
@@ -89,6 +100,30 @@ async function whoAmI(
   response: ServerResponse,
   dependencies: ApiDependencies,
 ): Promise<void> {
+  await handleAuthorizedRequest(
+    request,
+    response,
+    dependencies,
+    (caller) => caller,
+  );
+}
+
+async function rehearsalStatus(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, () =>
+    dependencies.rehearsalStatusProvider.getStatus(),
+  );
+}
+
+async function handleAuthorizedRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+  operation: (caller: AuthorizedCaller) => unknown | Promise<unknown>,
+): Promise<void> {
   const token = readBearerToken(request.headers.authorization);
   if (!token) {
     sendUnauthorized(response);
@@ -98,7 +133,7 @@ async function whoAmI(
   try {
     const claims = await dependencies.tokenVerifier.verify(token);
     const caller = authorizeClaims(claims, dependencies.callerPolicy);
-    sendJson(response, 200, caller);
+    sendJson(response, 200, await operation(caller));
   } catch (error) {
     if (error instanceof CallerNotAllowedError) {
       sendJson(response, 403, { error: "forbidden" });

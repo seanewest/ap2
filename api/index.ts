@@ -1,4 +1,6 @@
+import { ManagedIdentityCredential } from "@azure/identity";
 import { loadApiConfig } from "./config.js";
+import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
 import { createRemoteTokenVerifier } from "./token-verifier.js";
 
@@ -12,6 +14,9 @@ const tokenVerifier = createRemoteTokenVerifier({
 const server = createApiServer({
   tokenVerifier,
   callerPolicy: config.callerPolicy,
+  rehearsalStatusProvider: new AzureRehearsalStatusProvider(
+    new ManagedIdentityCredential(),
+  ),
   allowedOrigin: config.allowedOrigin,
 });
 

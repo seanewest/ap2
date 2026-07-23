@@ -34,9 +34,20 @@ comma-separated list. `AUTH_AUTOMATION_CLIENT_ID` can replace the app-only
 client ID. The Student tenant cannot be overridden.
 
 Browser access is disabled unless `CORS_ALLOWED_ORIGIN` names one exact
-HTTP(S) origin. The `/api/whoami` preflight accepts only that origin, `GET`, and
-the `Authorization` header. Requests without an `Origin` header remain
-available to the app-only proof and other non-browser clients.
+HTTP(S) origin. The protected endpoint preflights accept only that origin,
+`GET`, and the `Authorization` header. Requests without an `Origin` header
+remain available to the app-only proof and other non-browser clients.
+
+## Rehearsal status
+
+`GET /api/rehearsal-status` uses the same exact delegated and app-only caller
+policy. After authorization, the production API uses its runtime managed
+identity to read only Container App `ca-ap2-api` in resource group
+`rg-ap2-rehearsal` and Student subscription
+`6d8ebd0e-017f-401e-950d-e5a35de93dc6`. It returns only the app name, region,
+running status, and latest ready revision. Deployment must grant that managed
+identity read access to the target; this repository does not assign Azure
+roles.
 
 ## Identity setup and rollback
 
@@ -81,3 +92,13 @@ The CBA browser harness proves the delegated path against a rootless Podman API
 configured with the Student Microsoft issuer and JWKS, the Product app
 audience, and `CORS_ALLOWED_ORIGIN=http://localhost:5173`. It clicks the SPA
 sign-in, API-access, and sign-out buttons and exposes no token.
+
+Agents can call the deployed rehearsal-status operation with the existing Dev
+app certificate. The command obtains a token in memory and prints only the safe
+status response:
+
+```sh
+AP2_API_BASE_URL='https://ca-ap2-api.happycliff-97dcb6b8.eastus.azurecontainerapps.io' \
+AP2_AUTOMATION_CERTIFICATE_PATH='<certificate-pem-outside-git>' \
+  npm run check:rehearsal-status
+```

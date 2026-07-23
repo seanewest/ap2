@@ -68,6 +68,47 @@ describe("HTTP After Party API client", () => {
     });
   });
 
+  it("gets only safe rehearsal status from the configured API", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          appName: "ca-ap2-api",
+          region: "East US",
+          runningStatus: "Running",
+          latestReadyRevision: "ca-ap2-api--revision",
+          managedIdentity: "must-not-escape",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    );
+
+    const status = await client.getRehearsalStatus("sensitive-access-token");
+
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/rehearsal-status",
+      {
+        method: "GET",
+        credentials: "omit",
+        redirect: "error",
+        headers: {
+          Authorization: "Bearer sensitive-access-token",
+        },
+      },
+    );
+    expect(status).toEqual({
+      appName: "ca-ap2-api",
+      region: "East US",
+      runningStatus: "Running",
+      latestReadyRevision: "ca-ap2-api--revision",
+    });
+    expect(JSON.stringify(status)).not.toContain("sensitive-access-token");
+    expect(JSON.stringify(status)).not.toContain("managedIdentity");
+  });
+
   it.each([
     [401, "API access needs Microsoft authorization. Try again."],
     [403, "This account is not allowed to use the API."],
@@ -102,6 +143,27 @@ describe("HTTP After Party API client", () => {
         "https://student-api.example",
         failedRequest,
       ).checkAccess("token"),
+    ).rejects.toEqual(new ApiAccessError());
+  });
+
+  it("rejects malformed rehearsal status safely", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          appName: "ca-ap2-api",
+          region: "East US",
+          runningStatus: "Unknown",
+          latestReadyRevision: "revision",
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      ).getRehearsalStatus("token"),
     ).rejects.toEqual(new ApiAccessError());
   });
 });
