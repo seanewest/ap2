@@ -4,7 +4,7 @@ import {
   STUDENT_TENANT_ID,
 } from "./cba-settings";
 
-test("signs in, checks delegated API access, and signs out through Microsoft CBA", async ({
+test("signs in, checks delegated API and rehearsal status, and signs out through Microsoft CBA", async ({
   page,
 }) => {
   await page.goto("./");
@@ -66,6 +66,30 @@ test("signs in, checks delegated API access, and signs out through Microsoft CBA
   ).toHaveCount(2);
   await expect(page.getByText(/bearer|access token|eyJ/i)).toHaveCount(0);
 
+  const rehearsalStatusResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === "GET" &&
+      url.pathname === "/api/rehearsal-status"
+    );
+  });
+  await page
+    .getByRole("button", { name: "Check rehearsal status" })
+    .click();
+  await expect(page.getByText("Checking rehearsal status…")).toBeVisible();
+  expect((await rehearsalStatusResponse).status()).toBe(200);
+  await expect(page.getByText("Rehearsal status received.")).toBeVisible();
+  await expect(
+    page.locator("dd").getByText("ca-ap2-api", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator("dd").getByText("Running", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator("dd").getByText(/^ca-ap2-api--[a-z0-9]+$/),
+  ).toBeVisible();
+  await expect(page.getByText(/bearer|access token|eyJ/i)).toHaveCount(0);
+
   const logoutRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return (
@@ -86,11 +110,17 @@ test("signs in, checks delegated API access, and signs out through Microsoft CBA
   await expect(
     page.getByRole("button", { name: "Check API access" }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Check rehearsal status" }),
+  ).toHaveCount(0);
 
   await page.reload();
   await expect(page.getByText("You are signed out.")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Check API access" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Check rehearsal status" }),
   ).toHaveCount(0);
 });
 
