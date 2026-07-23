@@ -75,7 +75,7 @@ describe("HTTP After Party API client", () => {
           appName: "ca-ap2-api",
           region: "East US",
           runningStatus: "Running",
-          activeRevision: "ca-ap2-api--revision",
+          latestReadyRevision: "ca-ap2-api--revision",
           managedIdentity: "must-not-escape",
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -103,7 +103,7 @@ describe("HTTP After Party API client", () => {
       appName: "ca-ap2-api",
       region: "East US",
       runningStatus: "Running",
-      activeRevision: "ca-ap2-api--revision",
+      latestReadyRevision: "ca-ap2-api--revision",
     });
     expect(JSON.stringify(status)).not.toContain("sensitive-access-token");
     expect(JSON.stringify(status)).not.toContain("managedIdentity");
@@ -153,7 +153,7 @@ describe("HTTP After Party API client", () => {
           appName: "ca-ap2-api",
           region: "East US",
           runningStatus: "Unknown",
-          activeRevision: "revision",
+          latestReadyRevision: "revision",
         }),
         { status: 200 },
       ),

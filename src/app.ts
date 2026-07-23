@@ -417,7 +417,7 @@ function createRehearsalStatusList(
   appendIdentity(list, "App", status.appName);
   appendIdentity(list, "Region", status.region);
   appendIdentity(list, "Running status", status.runningStatus);
-  appendIdentity(list, "Active revision", status.activeRevision);
+  appendIdentity(list, "Latest ready revision", status.latestReadyRevision);
   return list;
 }
 

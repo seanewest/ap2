@@ -17,7 +17,7 @@ export interface RehearsalStatus {
   appName: string;
   region: string;
   runningStatus: (typeof runningStatuses)[number];
-  activeRevision: string;
+  latestReadyRevision: string;
 }
 
 export interface RehearsalStatusProvider {
@@ -93,7 +93,7 @@ function parseContainerApp(value: unknown): RehearsalStatus {
     appName: value.name,
     region: value.location,
     runningStatus,
-    activeRevision: value.properties.latestReadyRevisionName,
+    latestReadyRevision: value.properties.latestReadyRevisionName,
   };
 }
 

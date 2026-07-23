@@ -33,7 +33,7 @@ const rehearsalStatus: RehearsalStatus = {
   appName: "ca-ap2-api",
   region: "East US",
   runningStatus: "Running",
-  activeRevision: "ca-ap2-api--revision",
+  latestReadyRevision: "ca-ap2-api--revision",
 };
 const rehearsalStatusProvider = {
   getStatus: vi.fn().mockResolvedValue(rehearsalStatus),

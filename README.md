@@ -51,7 +51,7 @@ Both must be issued in immutable Student tenant
 kept distinct. Authorized callers can also use `GET /api/rehearsal-status`.
 That operation uses the API's runtime managed identity to read the fixed
 Student rehearsal Container App and returns only its name, region, running
-status, and active revision. See [API identity](docs/api-identity.md) for the
+status, and latest ready revision. See [API identity](docs/api-identity.md) for the
 fixed target and the Dev-app command.
 
 Build and start the API locally with explicit verification configuration:

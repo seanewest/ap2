@@ -268,7 +268,7 @@ describe("After Party authentication UI", () => {
       appName: "ca-ap2-api",
       region: "East US",
       runningStatus: "Running",
-      activeRevision: "ca-ap2-api--revision",
+      latestReadyRevision: "ca-ap2-api--revision",
       secret: "must-not-render",
     } as RehearsalStatus);
     const app = createAfterPartyApp(root, authentication, api);
@@ -315,7 +315,7 @@ describe("After Party authentication UI", () => {
       appName: "ca-ap2-api",
       region: "East US",
       runningStatus: "Running",
-      activeRevision: "ca-ap2-api--revision",
+      latestReadyRevision: "ca-ap2-api--revision",
     });
     await nextTask();
     expect(root.textContent).toContain("Rehearsal status received");
@@ -337,7 +337,7 @@ describe("After Party authentication UI", () => {
         appName: "ca-ap2-api",
         region: "East US",
         runningStatus: "Running",
-        activeRevision: "ca-ap2-api--revision",
+        latestReadyRevision: "ca-ap2-api--revision",
       });
     const app = createAfterPartyApp(root, authentication, api);
     await app.start();

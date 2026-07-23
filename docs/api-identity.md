@@ -45,7 +45,7 @@ policy. After authorization, the production API uses its runtime managed
 identity to read only Container App `ca-ap2-api` in resource group
 `rg-ap2-rehearsal` and Student subscription
 `6d8ebd0e-017f-401e-950d-e5a35de93dc6`. It returns only the app name, region,
-running status, and active revision. Deployment must grant that managed
+running status, and latest ready revision. Deployment must grant that managed
 identity read access to the target; this repository does not assign Azure
 roles.
 

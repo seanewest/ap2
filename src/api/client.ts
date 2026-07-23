@@ -15,7 +15,7 @@ export interface RehearsalStatus {
   appName: string;
   region: string;
   runningStatus: (typeof runningStatuses)[number];
-  activeRevision: string;
+  latestReadyRevision: string;
 }
 
 export interface AfterPartyApi {
@@ -69,7 +69,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       appName: value.appName,
       region: value.region,
       runningStatus: value.runningStatus,
-      activeRevision: value.activeRevision,
+      latestReadyRevision: value.latestReadyRevision,
     };
   }
 
@@ -134,7 +134,7 @@ function isSafeRehearsalStatus(value: unknown): value is RehearsalStatus {
     typeof status.region === "string" &&
     status.region.length > 0 &&
     runningStatuses.some((candidate) => candidate === status.runningStatus) &&
-    typeof status.activeRevision === "string" &&
-    status.activeRevision.length > 0
+    typeof status.latestReadyRevision === "string" &&
+    status.latestReadyRevision.length > 0
   );
 }

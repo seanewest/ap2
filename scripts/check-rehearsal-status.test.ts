@@ -11,7 +11,7 @@ const status: RehearsalStatus = {
   appName: "ca-ap2-api",
   region: "East US",
   runningStatus: "Running",
-  activeRevision: "ca-ap2-api--revision",
+  latestReadyRevision: "ca-ap2-api--revision",
 };
 
 describe("rehearsal status agent command", () => {

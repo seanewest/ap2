@@ -51,7 +51,7 @@ describe("Azure rehearsal status provider", () => {
       appName: "ca-ap2-api",
       region: "East US",
       runningStatus: "Running",
-      activeRevision: "ca-ap2-api--revision",
+      latestReadyRevision: "ca-ap2-api--revision",
     });
     expect(JSON.stringify(status)).not.toContain("managed-identity-token");
     expect(JSON.stringify(status)).not.toContain("must-not-escape");
