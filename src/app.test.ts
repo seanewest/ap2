@@ -10,6 +10,7 @@ import {
 } from "./auth/authentication";
 import {
   ApiAccessError,
+  OneDriveInviteFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type OneDriveProofResult,
@@ -591,6 +592,60 @@ describe("After Party authentication UI", () => {
     expect(oneDriveShareButton()?.disabled).toBe(true);
     expect(oneDriveVerifyButton()?.disabled).toBe(false);
     expect(oneDriveRemoveButton()?.disabled).toBe(false);
+  });
+
+  it("plainly reports file-created invite failure and directs cleanup", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.shareOneDriveProof.mockRejectedValue(
+      new OneDriveInviteFailureError({
+        state: "file-created-sharing-failed",
+        stage: "invite",
+        upstreamStatus: 400,
+        graphErrorCode: "invalidRequest",
+        requestId: "11111111-1111-4111-8111-111111111111",
+        clientRequestId: "22222222-2222-4222-8222-222222222222",
+        responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+        retryAfter: "30",
+        responseShape: "graph-error",
+      }),
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    oneDriveShareButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain(
+      "Homer's file was created, but sharing it with Marge failed.",
+    );
+    expect(root.textContent).toContain(
+      "Clean up the OneDrive proof before trying again.",
+    );
+    expect(root.textContent).toContain("Invite Marge with read access");
+    expect(root.textContent).toContain("Microsoft Graph status400");
+    expect(root.textContent).toContain("Microsoft Graph error codeinvalidRequest");
+    expect(root.textContent).toContain(
+      "Microsoft Graph request ID11111111-1111-4111-8111-111111111111",
+    );
+    expect(root.textContent).toContain(
+      "Client request ID22222222-2222-4222-8222-222222222222",
+    );
+    expect(root.textContent).toContain(
+      "Microsoft Graph response dateThu, 23 Jul 2026 23:00:00 GMT",
+    );
+    expect(root.textContent).toContain("Microsoft Graph retry after30");
+    expect(root.textContent).toContain("Response shapeMicrosoft Graph error");
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    expect(oneDriveRemoveButton()?.disabled).toBe(false);
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("uncertain");
+    expect(root.textContent).not.toContain("temporary-token");
   });
 
   it("preserves the prior stage when read-only verification fails", async () => {

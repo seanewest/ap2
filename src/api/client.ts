@@ -50,6 +50,23 @@ export type OneDriveProofResult =
       path: typeof ONEDRIVE_PROOF_PATH;
     };
 
+export interface OneDriveInviteFailure {
+  state: "file-created-sharing-failed";
+  stage: "invite" | "invite-reconciliation";
+  upstreamStatus: number;
+  graphErrorCode?: string;
+  requestId?: string;
+  clientRequestId: string;
+  responseDate?: string;
+  retryAfter?: string;
+  responseShape:
+    | "graph-error"
+    | "non-json"
+    | "permission-response-mismatch"
+    | "permission-reconciliation-error"
+    | "permission-reconciliation-mismatch";
+}
+
 const SIMULATED_EMAIL_SENDER =
   "homer.simpson@corywest.onmicrosoft.com";
 const SIMULATED_EMAIL_RECIPIENT =
@@ -75,6 +92,18 @@ export class ApiAccessError extends Error {
   constructor(message = "The API could not complete the access check. Try again.") {
     super(message);
     this.name = "ApiAccessError";
+  }
+}
+
+export class OneDriveInviteFailureError extends ApiAccessError {
+  readonly diagnostic: OneDriveInviteFailure;
+
+  constructor(diagnostic: OneDriveInviteFailure) {
+    super(
+      "Homer's file was created, but sharing it with Marge failed. Clean up the OneDrive proof before trying again.",
+    );
+    this.name = "OneDriveInviteFailureError";
+    this.diagnostic = diagnostic;
   }
 }
 
@@ -210,6 +239,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       accessToken,
       method,
       expectedStatus,
+      expectedState === "shared",
     );
     if (!isSafeOneDriveProofResult(value) || value.state !== expectedState) {
       throw new ApiAccessError();
@@ -222,6 +252,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
     method = "GET",
     expectedStatus?: number,
+    acceptInviteFailure = false,
   ): Promise<unknown> {
     let response: Response;
     try {
@@ -254,6 +285,13 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "The OneDrive proof file is not in the expected state. Nothing was changed.",
       );
     }
+    if (response.status === 502 && acceptInviteFailure) {
+      const failure = await readOneDriveInviteFailure(response);
+      if (failure) {
+        throw new OneDriveInviteFailureError(failure);
+      }
+      throw new ApiAccessError();
+    }
     if (expectedStatus === undefined ? !response.ok : response.status !== expectedStatus) {
       throw new ApiAccessError();
     }
@@ -265,6 +303,27 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ApiAccessError();
     }
     return value;
+  }
+}
+
+async function readOneDriveInviteFailure(
+  response: Response,
+): Promise<OneDriveInviteFailure | undefined> {
+  try {
+    const value: unknown = await response.json();
+    return isSafeOneDriveInviteFailure(value) ? {
+      state: "file-created-sharing-failed",
+      stage: value.stage,
+      upstreamStatus: value.upstreamStatus,
+      clientRequestId: value.clientRequestId,
+      responseShape: value.responseShape,
+      ...(value.graphErrorCode ? { graphErrorCode: value.graphErrorCode } : {}),
+      ...(value.requestId ? { requestId: value.requestId } : {}),
+      ...(value.responseDate ? { responseDate: value.responseDate } : {}),
+      ...(value.retryAfter ? { retryAfter: value.retryAfter } : {}),
+    } : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -280,6 +339,64 @@ async function readErrorCode(response: Response): Promise<string | undefined> {
   } catch {
     return undefined;
   }
+}
+
+function isSafeOneDriveInviteFailure(
+  value: unknown,
+): value is OneDriveInviteFailure & { error: "onedrive_invite_failed" } {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const failure = value as Record<string, unknown>;
+  return (
+    failure.error === "onedrive_invite_failed" &&
+    failure.state === "file-created-sharing-failed" &&
+    (failure.stage === "invite" ||
+      failure.stage === "invite-reconciliation") &&
+    Number.isInteger(failure.upstreamStatus) &&
+    Number(failure.upstreamStatus) >= 100 &&
+    Number(failure.upstreamStatus) <= 599 &&
+    optionalGuid(failure.clientRequestId) &&
+    failure.clientRequestId !== undefined &&
+    isInviteResponseShape(failure.responseShape) &&
+    optionalSafeCode(failure.graphErrorCode) &&
+    optionalGuid(failure.requestId) &&
+    optionalHttpDate(failure.responseDate) &&
+    optionalRetryAfter(failure.retryAfter)
+  );
+}
+
+function isInviteResponseShape(value: unknown): boolean {
+  return value === "graph-error" ||
+    value === "non-json" ||
+    value === "permission-response-mismatch" ||
+    value === "permission-reconciliation-error" ||
+    value === "permission-reconciliation-mismatch";
+}
+
+function optionalSafeCode(value: unknown): boolean {
+  return value === undefined ||
+    (typeof value === "string" &&
+      /^[A-Za-z][A-Za-z0-9._-]{0,127}$/.test(value));
+}
+
+function optionalGuid(value: unknown): boolean {
+  return value === undefined ||
+    (typeof value === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+}
+
+function optionalHttpDate(value: unknown): boolean {
+  return value === undefined ||
+    (typeof value === "string" &&
+      Number.isFinite(Date.parse(value)) &&
+      new Date(Date.parse(value)).toUTCString() === value);
+}
+
+function optionalRetryAfter(value: unknown): boolean {
+  return value === undefined ||
+    (typeof value === "string" &&
+      (/^(?:0|[1-9][0-9]{0,5})$/.test(value) || optionalHttpDate(value)));
 }
 
 function isSafeCallerIdentity(value: unknown): value is ApiCallerIdentity {

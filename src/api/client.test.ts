@@ -1,7 +1,11 @@
 // @vitest-environment node
 
 import { describe, expect, it, vi } from "vitest";
-import { ApiAccessError, HttpAfterPartyApi } from "./client";
+import {
+  ApiAccessError,
+  HttpAfterPartyApi,
+  OneDriveInviteFailureError,
+} from "./client";
 
 describe("HTTP After Party API client", () => {
   it("sends the Bearer token only to the configured whoami URL and returns safe fields", async () => {
@@ -261,6 +265,102 @@ describe("HTTP After Party API client", () => {
         "Another OneDrive proof operation is running. Try again shortly.",
       ),
     );
+  });
+
+  it("returns only safe structured invite diagnostics after the file was created", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          error: "onedrive_invite_failed",
+          state: "file-created-sharing-failed",
+          stage: "invite",
+          upstreamStatus: 400,
+          graphErrorCode: "invalidRequest",
+          requestId: "11111111-1111-4111-8111-111111111111",
+          clientRequestId: "22222222-2222-4222-8222-222222222222",
+          responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+          retryAfter: "30",
+          responseShape: "graph-error",
+          accessToken: "must-not-escape",
+          rawGraphResponse: { message: "must-not-escape" },
+        },
+        { status: 502 },
+      ),
+    );
+    const client = new HttpAfterPartyApi("https://student-api.example", request);
+
+    const error = await client
+      .shareOneDriveProof("sensitive-access-token")
+      .catch((value) => value);
+
+    expect(error).toBeInstanceOf(OneDriveInviteFailureError);
+    expect(error.diagnostic).toEqual({
+      state: "file-created-sharing-failed",
+      stage: "invite",
+      upstreamStatus: 400,
+      graphErrorCode: "invalidRequest",
+      requestId: "11111111-1111-4111-8111-111111111111",
+      clientRequestId: "22222222-2222-4222-8222-222222222222",
+      responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+      retryAfter: "30",
+      responseShape: "graph-error",
+    });
+    expect(JSON.stringify(error)).not.toContain("sensitive-access-token");
+    expect(JSON.stringify(error)).not.toContain("must-not-escape");
+    expect(JSON.stringify(error)).not.toContain("rawGraphResponse");
+  });
+
+  it("accepts missing optional invite fields and rejects malformed diagnostics", async () => {
+    const minimal = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      Response.json(
+        {
+          error: "onedrive_invite_failed",
+          state: "file-created-sharing-failed",
+          stage: "invite",
+          upstreamStatus: 503,
+          clientRequestId: "33333333-3333-4333-8333-333333333333",
+          responseShape: "graph-error",
+        },
+        { status: 502 },
+      ),
+    );
+    const minimalClient = new HttpAfterPartyApi(
+      "https://student-api.example",
+      minimal,
+    );
+    const minimalError = await minimalClient
+      .shareOneDriveProof("token")
+      .catch((value) => value);
+    expect(minimalError).toBeInstanceOf(OneDriveInviteFailureError);
+    expect(minimalError.diagnostic).toEqual({
+      state: "file-created-sharing-failed",
+      stage: "invite",
+      upstreamStatus: 503,
+      clientRequestId: "33333333-3333-4333-8333-333333333333",
+      responseShape: "graph-error",
+    });
+
+    const malformed = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      Response.json(
+        {
+          error: "onedrive_invite_failed",
+          state: "file-created-sharing-failed",
+          stage: "invite",
+          upstreamStatus: "503 and a secret",
+          clientRequestId: "33333333-3333-4333-8333-333333333333",
+          responseShape: "graph-error",
+          requestId: "not-a-guid",
+        },
+        { status: 502 },
+      ),
+    );
+    const malformedClient = new HttpAfterPartyApi(
+      "https://student-api.example",
+      malformed,
+    );
+    await expect(
+      malformedClient.shareOneDriveProof("token"),
+    ).rejects.toEqual(new ApiAccessError());
   });
 
   it.each([

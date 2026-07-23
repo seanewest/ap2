@@ -9,6 +9,7 @@ import {
 import type { RehearsalStatusProvider } from "./rehearsal-status.js";
 import type { SimulatedEmailOperation } from "./simulated-email.js";
 import {
+  OneDriveInviteFailureError,
   OneDriveProofBusyError,
   OneDriveProofConflictError,
   type OneDriveShareProofOperation,
@@ -253,6 +254,13 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof OneDriveProofBusyError) {
       sendJson(response, 409, { error: "proof_operation_busy" });
+      return;
+    }
+    if (error instanceof OneDriveInviteFailureError) {
+      sendJson(response, 502, {
+        error: "onedrive_invite_failed",
+        ...error.diagnostic,
+      });
       return;
     }
     throw error;

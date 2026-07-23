@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   HOMER_IDENTITY,
   MARGE_DISPLAY_NAME,
@@ -63,6 +64,33 @@ export class OneDriveProofBusyError extends Error {
   }
 }
 
+export interface OneDriveInviteFailure {
+  state: "file-created-sharing-failed";
+  stage: "invite" | "invite-reconciliation";
+  upstreamStatus: number;
+  graphErrorCode?: string;
+  requestId?: string;
+  clientRequestId: string;
+  responseDate?: string;
+  retryAfter?: string;
+  responseShape:
+    | "graph-error"
+    | "non-json"
+    | "permission-response-mismatch"
+    | "permission-reconciliation-error"
+    | "permission-reconciliation-mismatch";
+}
+
+export class OneDriveInviteFailureError extends Error {
+  readonly diagnostic: OneDriveInviteFailure;
+
+  constructor(diagnostic: OneDriveInviteFailure) {
+    super("Homer's proof file was created, but sharing it with Marge failed.");
+    this.name = "OneDriveInviteFailureError";
+    this.diagnostic = diagnostic;
+  }
+}
+
 export class ProcessLocalOneDriveShareProofBoundary
   implements OneDriveShareProofOperation
 {
@@ -113,12 +141,14 @@ export class DelegatedGraphOneDriveShareProof
   readonly #margeTokens: DelegatedGraphTokenProvider;
   readonly #margeIdentity: SimulatedUserIdentity;
   readonly #request: typeof fetch;
+  readonly #createClientRequestId: () => string;
 
   constructor(
     homerTokens: DelegatedGraphTokenProvider,
     margeTokens: DelegatedGraphTokenProvider,
     margeIdentity: SimulatedUserIdentity,
     request: typeof fetch = fetch,
+    createClientRequestId: () => string = randomUUID,
   ) {
     if (
       margeIdentity.userPrincipalName !== MARGE_USER_PRINCIPAL_NAME ||
@@ -130,6 +160,7 @@ export class DelegatedGraphOneDriveShareProof
     this.#margeTokens = margeTokens;
     this.#margeIdentity = margeIdentity;
     this.#request = request.bind(globalThis);
+    this.#createClientRequestId = createClientRequestId;
   }
 
   async share(): Promise<Extract<OneDriveProofResult, { state: "shared" }>> {
@@ -246,45 +277,21 @@ export class DelegatedGraphOneDriveShareProof
       graphGet(accessToken),
     );
     const value = await readJson(response);
-    if (
-      !response.ok ||
-      !isRecord(value) ||
-      !Array.isArray(value.value) ||
-      value["@odata.nextLink"] !== undefined
-    ) {
+    if (!response.ok) {
       throw new OneDriveProofConflictError(
         "Microsoft Graph returned ambiguous proof permissions.",
       );
     }
-
-    const exact: string[] = [];
-    let relatedButUnrecognized = false;
-    for (const permission of value.value) {
-      if (
-        !isRecord(permission) ||
-        !nonEmpty(permission.id) ||
-        !Array.isArray(permission.roles)
-      ) {
-        throw new OneDriveProofConflictError(
-          "Microsoft Graph returned ambiguous proof permissions.",
-        );
-      }
-      const classification = classifyMargeReadPermission(
-        permission,
-        this.#margeIdentity.objectId,
-      );
-      if (classification.kind === "exact") {
-        exact.push(classification.id);
-      } else if (classification.kind === "related-unrecognized") {
-        relatedButUnrecognized = true;
-      }
-    }
-    if (exact.length > 1 || relatedButUnrecognized) {
+    const inspection = inspectMargeReadPermissions(
+      value,
+      this.#margeIdentity.objectId,
+    );
+    if (inspection.kind === "ambiguous") {
       throw new OneDriveProofConflictError(
         "The Marge proof permission is ambiguous.",
       );
     }
-    return exact[0];
+    return inspection.kind === "exact" ? inspection.id : undefined;
   }
 
   async #revokeMargeReadPermission(
@@ -430,6 +437,10 @@ export class DelegatedGraphOneDriveShareProof
     accessToken: string,
     itemId: string,
   ): Promise<void> {
+    const clientRequestId = this.#createClientRequestId();
+    if (!safeGuid(clientRequestId)) {
+      throw new Error("The OneDrive client request ID generator is invalid.");
+    }
     const response = await this.#request(
       `${GRAPH_ROOT}/me/drive/items/${encodeURIComponent(itemId)}/invite`,
       {
@@ -438,9 +449,11 @@ export class DelegatedGraphOneDriveShareProof
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
+          "client-request-id": clientRequestId,
+          "return-client-request-id": "true",
         },
         body: JSON.stringify({
-          recipients: [{ email: MARGE_USER_PRINCIPAL_NAME }],
+          recipients: [{ objectId: this.#margeIdentity.objectId }],
           requireSignIn: true,
           sendInvitation: false,
           roles: ["read"],
@@ -448,9 +461,65 @@ export class DelegatedGraphOneDriveShareProof
       },
     );
     const value = await readJson(response);
-    if (response.status !== 200 || !isExactMargeReadPermission(value)) {
-      throw new Error(
-        `Microsoft Graph sharing returned HTTP ${response.status}.`,
+    if (response.status !== 200) {
+      throw new OneDriveInviteFailureError(
+        inviteFailureDiagnostic(
+          response,
+          value,
+          clientRequestId,
+          "invite",
+          graphResponseShape(value),
+        ),
+      );
+    }
+    if (
+      inspectMargeReadPermissions(value, this.#margeIdentity.objectId).kind ===
+      "exact"
+    ) {
+      return;
+    }
+    await this.#reconcileMargeReadAccess(
+      accessToken,
+      itemId,
+      clientRequestId,
+    );
+  }
+
+  async #reconcileMargeReadAccess(
+    accessToken: string,
+    itemId: string,
+    clientRequestId: string,
+  ): Promise<void> {
+    const response = await this.#request(
+      `${GRAPH_ROOT}/me/drive/items/${encodeURIComponent(itemId)}/permissions` +
+        "?$select=id,roles,link,invitation,grantedToV2,inheritedFrom",
+      graphGet(accessToken),
+    );
+    const value = await readJson(response);
+    if (!response.ok) {
+      throw new OneDriveInviteFailureError(
+        inviteFailureDiagnostic(
+          response,
+          value,
+          clientRequestId,
+          "invite-reconciliation",
+          "permission-reconciliation-error",
+        ),
+      );
+    }
+    const inspection = inspectMargeReadPermissions(
+      value,
+      this.#margeIdentity.objectId,
+    );
+    if (inspection.kind !== "exact") {
+      throw new OneDriveInviteFailureError(
+        inviteFailureDiagnostic(
+          response,
+          value,
+          clientRequestId,
+          "invite-reconciliation",
+          "permission-reconciliation-mismatch",
+        ),
       );
     }
   }
@@ -551,29 +620,139 @@ function parseProofItem(value: unknown): DriveItem {
   };
 }
 
-function isExactMargeReadPermission(value: unknown): boolean {
-  if (!isRecord(value) || !Array.isArray(value.value) || value.value.length !== 1) {
-    return false;
+function inviteFailureDiagnostic(
+  response: Response,
+  value: unknown,
+  clientRequestId: string,
+  stage: OneDriveInviteFailure["stage"],
+  responseShape: OneDriveInviteFailure["responseShape"],
+): OneDriveInviteFailure {
+  const graphErrors = graphErrorChain(value);
+  const graphErrorCode = graphErrors
+    .map((error) => safeGraphErrorCode(error.code))
+    .filter((code): code is string => code !== undefined)
+    .at(-1);
+  const requestId = safeGuid(response.headers.get("request-id")) ??
+    graphErrors
+      .map((error) => safeGuid(error["request-id"]))
+      .filter((id): id is string => id !== undefined)
+      .at(-1);
+  const responseDate = safeHttpDate(response.headers.get("date"));
+  const retryAfter = safeRetryAfter(response.headers.get("retry-after"));
+  return {
+    state: "file-created-sharing-failed",
+    stage,
+    upstreamStatus: response.status,
+    clientRequestId: clientRequestId.toLowerCase(),
+    responseShape,
+    ...(graphErrorCode ? { graphErrorCode } : {}),
+    ...(requestId ? { requestId } : {}),
+    ...(responseDate ? { responseDate } : {}),
+    ...(retryAfter ? { retryAfter } : {}),
+  };
+}
+
+function graphResponseShape(
+  value: unknown,
+): "graph-error" | "non-json" | "permission-response-mismatch" {
+  if (isRecord(value) && isRecord(value.error)) {
+    return "graph-error";
   }
-  const permission = value.value[0];
-  return (
-    isRecord(permission) &&
-    Array.isArray(permission.roles) &&
-    permission.roles.length === 1 &&
-    permission.roles[0] === "read" &&
-    permission.link === undefined &&
-    isRecord(permission.invitation) &&
-    typeof permission.invitation.email === "string" &&
-    permission.invitation.email.toLowerCase() ===
-      MARGE_USER_PRINCIPAL_NAME.toLowerCase() &&
-    permission.invitation.signInRequired === true
-  );
+  return value === undefined ? "non-json" : "permission-response-mismatch";
+}
+
+function graphErrorChain(value: unknown): Record<string, unknown>[] {
+  const chain: Record<string, unknown>[] = [];
+  let error = isRecord(value) && isRecord(value.error)
+    ? value.error
+    : undefined;
+  while (error && chain.length < 8) {
+    chain.push(error);
+    error = isRecord(error.innerError) ? error.innerError : undefined;
+  }
+  return chain;
+}
+
+function safeGraphErrorCode(value: unknown): string | undefined {
+  return typeof value === "string" &&
+    /^[A-Za-z][A-Za-z0-9._-]{0,127}$/.test(value)
+    ? value
+    : undefined;
+}
+
+function safeHttpDate(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toUTCString() : undefined;
+}
+
+function safeRetryAfter(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  if (/^(?:0|[1-9][0-9]{0,5})$/.test(value)) {
+    return value;
+  }
+  return safeHttpDate(value);
+}
+
+function safeGuid(value: unknown): string | undefined {
+  return typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value.toLowerCase()
+    : undefined;
 }
 
 type PermissionClassification =
   | { kind: "exact"; id: string }
   | { kind: "related-unrecognized" }
   | { kind: "other" };
+
+type PermissionInspection =
+  | { kind: "exact"; id: string }
+  | { kind: "absent" }
+  | { kind: "ambiguous" };
+
+function inspectMargeReadPermissions(
+  value: unknown,
+  margeObjectId: string,
+): PermissionInspection {
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.value) ||
+    value["@odata.nextLink"] !== undefined
+  ) {
+    return { kind: "ambiguous" };
+  }
+  const exact: string[] = [];
+  let relatedButUnrecognized = false;
+  for (const permission of value.value) {
+    if (
+      !isRecord(permission) ||
+      !nonEmpty(permission.id) ||
+      !Array.isArray(permission.roles)
+    ) {
+      return { kind: "ambiguous" };
+    }
+    const classification = classifyMargeReadPermission(
+      permission,
+      margeObjectId,
+    );
+    if (classification.kind === "exact") {
+      exact.push(classification.id);
+    } else if (classification.kind === "related-unrecognized") {
+      relatedButUnrecognized = true;
+    }
+  }
+  if (exact.length > 1 || relatedButUnrecognized) {
+    return { kind: "ambiguous" };
+  }
+  return exact.length === 1
+    ? { kind: "exact", id: exact[0]! }
+    : { kind: "absent" };
+}
 
 function classifyMargeReadPermission(
   value: unknown,
@@ -614,7 +793,7 @@ function classifyMargeReadPermission(
     Array.isArray(value.roles) &&
     value.roles.length === 1 &&
     value.roles[0] === "read" &&
-    value.link === undefined &&
+    (value.link === undefined || value.link === null) &&
     (value.inheritedFrom === undefined || value.inheritedFrom === null) &&
     invitationIsExact &&
     granteeIsExact

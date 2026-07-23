@@ -23,6 +23,7 @@ import {
 } from "./simulated-email.js";
 import {
   ONEDRIVE_PROOF_PATH,
+  OneDriveInviteFailureError,
   ProcessLocalOneDriveShareProofBoundary,
   type OneDriveProofResult,
 } from "./onedrive-share-proof.js";
@@ -468,6 +469,40 @@ describe("local API", () => {
     pending.resolve(oneDriveResults.shared);
     const operatorResponse = await operatorRequest;
     expect(operatorResponse.status).toBe(201);
+  });
+
+  it("returns only safe structured diagnostics when the invite fails after upload", async () => {
+    const diagnostic = {
+      state: "file-created-sharing-failed",
+      stage: "invite",
+      upstreamStatus: 400,
+      graphErrorCode: "invalidRequest",
+      requestId: "11111111-1111-4111-8111-111111111111",
+      clientRequestId: "22222222-2222-4222-8222-222222222222",
+      responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+      retryAfter: "30",
+      responseShape: "graph-error",
+    } as const;
+    oneDriveShareProofOperation.share.mockRejectedValueOnce(
+      new OneDriveInviteFailureError(diagnostic),
+    );
+
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/onedrive-share-proof",
+      "POST",
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "onedrive_invite_failed",
+      ...diagnostic,
+    });
   });
 
   it.each([

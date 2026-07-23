@@ -8,6 +8,7 @@ import {
   ONEDRIVE_PROOF_CONTENT,
   ONEDRIVE_PROOF_FILE_NAME,
   ONEDRIVE_PROOF_PATH,
+  OneDriveInviteFailureError,
   OneDriveProofBusyError,
   OneDriveProofConflictError,
   ProcessLocalOneDriveShareProofBoundary,
@@ -28,6 +29,7 @@ const MARGE_IDENTITY: SimulatedUserIdentity = {
   userPrincipalName: MARGE_USER_PRINCIPAL_NAME,
 };
 const PROOF_SIZE = Buffer.byteLength(ONEDRIVE_PROOF_CONTENT);
+const CLIENT_REQUEST_ID = "33333333-3333-4333-8333-333333333333";
 const ITEM = {
   id: "proof-item",
   name: ONEDRIVE_PROOF_FILE_NAME,
@@ -88,6 +90,7 @@ function operation(
       marge,
       MARGE_IDENTITY,
       request as typeof fetch,
+      () => CLIENT_REQUEST_ID,
     ),
     request,
     homer,
@@ -105,6 +108,7 @@ describe("DelegatedGraphOneDriveShareProof", () => {
       Response.json({
         value: [
           {
+            id: "marge-read-permission",
             roles: ["read"],
             invitation: {
               email: MARGE_USER_PRINCIPAL_NAME,
@@ -158,10 +162,16 @@ describe("DelegatedGraphOneDriveShareProof", () => {
       },
     ]);
     expect(JSON.parse(invite[1].body as string)).toEqual({
-      recipients: [{ email: MARGE_USER_PRINCIPAL_NAME }],
+      recipients: [{ objectId: MARGE_IDENTITY.objectId }],
       requireSignIn: true,
       sendInvitation: false,
       roles: ["read"],
+    });
+    expect(invite[1].headers).toEqual({
+      Authorization: "Bearer homer-token",
+      "Content-Type": "application/json",
+      "client-request-id": CLIENT_REQUEST_ID,
+      "return-client-request-id": "true",
     });
   });
 
@@ -200,19 +210,256 @@ describe("DelegatedGraphOneDriveShareProof", () => {
     expect(fixture.request).toHaveBeenCalledTimes(3);
   });
 
-  it("does not retry an ambiguous invitation result", async () => {
+  it("reports the exact invite failure without retaining Graph's raw body", async () => {
+    const requestId = "11111111-1111-4111-8111-111111111111";
+    const fixture = operation([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json(
+        {
+          error: {
+            code: "badRequest",
+            message: "provider detail must not escape",
+            innerError: {
+              code: "invalidRequest",
+              "request-id": requestId,
+              accessToken: "must-not-escape",
+            },
+          },
+          rawGraphResponse: "must-not-escape",
+        },
+        {
+          status: 400,
+          headers: {
+            Date: "Thu, 23 Jul 2026 23:00:00 GMT",
+            "Retry-After": "30",
+          },
+        },
+      ),
+    ]);
+
+    const error = await fixture.operation.share().catch((value) => value);
+
+    expect(error).toBeInstanceOf(OneDriveInviteFailureError);
+    expect(error.diagnostic).toEqual({
+      state: "file-created-sharing-failed",
+      stage: "invite",
+      upstreamStatus: 400,
+      graphErrorCode: "invalidRequest",
+      requestId,
+      clientRequestId: CLIENT_REQUEST_ID,
+      responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+      retryAfter: "30",
+      responseShape: "graph-error",
+    });
+    expect(fixture.request).toHaveBeenCalledTimes(5);
+    expect(JSON.stringify(error)).not.toContain("provider detail");
+    expect(JSON.stringify(error)).not.toContain("must-not-escape");
+    expect(JSON.stringify(error)).not.toContain("proof-item");
+    expect(JSON.stringify(error)).not.toContain("homer-drive");
+    expect(JSON.stringify(error)).not.toContain("marge-read-permission");
+  });
+
+  it("omits missing or malformed Graph invite diagnostics safely", async () => {
+    const fixture = operation([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json(
+        {
+          error: {
+            code: "invalid code with unsafe detail",
+            innerError: {
+              "request-id": "not-a-guid",
+              "client-request-id": 42,
+            },
+          },
+        },
+        {
+          status: 503,
+          headers: { "request-id": "Bearer must-not-escape" },
+        },
+      ),
+    ]);
+
+    const error = await fixture.operation.share().catch((value) => value);
+
+    expect(error).toBeInstanceOf(OneDriveInviteFailureError);
+    expect(error.diagnostic).toEqual({
+      state: "file-created-sharing-failed",
+      stage: "invite",
+      upstreamStatus: 503,
+      clientRequestId: CLIENT_REQUEST_ID,
+      responseShape: "graph-error",
+    });
+    expect(fixture.request).toHaveBeenCalledTimes(5);
+  });
+
+  it("does not retry an ambiguous successful invitation response", async () => {
     const fixture = operation([
       new Response(undefined, { status: 404 }),
       Response.json({ id: "root-item" }),
       Response.json({ uploadUrl: "https://upload.example/proof" }),
       Response.json(ITEM, { status: 201 }),
       Response.json({ value: [] }),
+      Response.json({ value: [] }),
     ]);
 
-    await expect(fixture.operation.share()).rejects.toThrow(
-      "sharing returned HTTP 200",
-    );
+    const error = await fixture.operation.share().catch((value) => value);
+
+    expect(error).toBeInstanceOf(OneDriveInviteFailureError);
+    expect(error.diagnostic).toEqual({
+      state: "file-created-sharing-failed",
+      stage: "invite-reconciliation",
+      upstreamStatus: 200,
+      clientRequestId: CLIENT_REQUEST_ID,
+      responseShape: "permission-reconciliation-mismatch",
+    });
+    expect(fixture.request).toHaveBeenCalledTimes(6);
+    expect(fixture.request.mock.calls[5]).toEqual([
+      "https://graph.microsoft.com/v1.0/me/drive/items/proof-item/permissions?$select=id,roles,link,invitation,grantedToV2,inheritedFrom",
+      {
+        method: "GET",
+        redirect: "error",
+        headers: { Authorization: "Bearer homer-token" },
+      },
+    ]);
+    expect(
+      fixture.request.mock.calls.filter(
+        ([url, init]) => url.endsWith("/invite") && init?.method === "POST",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("reconciles one exact direct Marge read grant after a 200 shape mismatch", async () => {
+    const directGrant = {
+      id: "marge-read-permission",
+      roles: ["read"],
+      grantedToV2: {
+        user: {
+          id: MARGE_IDENTITY.objectId,
+          displayName: MARGE_DISPLAY_NAME,
+        },
+      },
+      inheritedFrom: null,
+    };
+    const fixture = operation([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json({ value: [{ roles: ["read"] }] }),
+      Response.json({ value: [OWNER_PERMISSION, directGrant] }),
+    ]);
+
+    await expect(fixture.operation.share()).resolves.toMatchObject({
+      state: "shared",
+    });
+    expect(fixture.request).toHaveBeenCalledTimes(6);
+    expect(
+      fixture.request.mock.calls.filter(
+        ([url, init]) => url.endsWith("/invite") && init?.method === "POST",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("accepts the exact direct Marge grant without reconciliation", async () => {
+    const fixture = operation([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json({
+        value: [
+          {
+            id: "marge-read-permission",
+            roles: ["read"],
+            grantedToV2: {
+              user: { id: MARGE_IDENTITY.objectId },
+            },
+          },
+        ],
+      }),
+    ]);
+
+    await expect(fixture.operation.share()).resolves.toMatchObject({
+      state: "shared",
+    });
     expect(fixture.request).toHaveBeenCalledTimes(5);
+  });
+
+  it("rejects unknown, linked, write, inherited, or duplicate reconciled grants", async () => {
+    const exact = {
+      id: "marge-read-permission",
+      roles: ["read"],
+      grantedToV2: { user: { id: MARGE_IDENTITY.objectId } },
+    };
+    for (const permissions of [
+      [{ ...exact, grantedToV2: { user: { id: "another-user" } } }],
+      [{ ...exact, link: { type: "view" } }],
+      [{ ...exact, roles: ["write"] }],
+      [{ ...exact, inheritedFrom: { id: "parent" } }],
+      [exact, { ...exact, id: "duplicate" }],
+    ]) {
+      const fixture = operation([
+        new Response(undefined, { status: 404 }),
+        Response.json({ id: "root-item" }),
+        Response.json({ uploadUrl: "https://upload.example/proof" }),
+        Response.json(ITEM, { status: 201 }),
+        Response.json({ value: [] }),
+        Response.json({ value: permissions }),
+      ]);
+
+      const error = await fixture.operation.share().catch((value) => value);
+
+      expect(error).toBeInstanceOf(OneDriveInviteFailureError);
+      expect(error.diagnostic).toMatchObject({
+        stage: "invite-reconciliation",
+        responseShape: "permission-reconciliation-mismatch",
+      });
+      expect(
+        fixture.request.mock.calls.filter(
+          ([url, init]) => url.endsWith("/invite") && init?.method === "POST",
+        ),
+      ).toHaveLength(1);
+    }
+  });
+
+  it("reports a failed read-only reconciliation without repeating the invite", async () => {
+    const fixture = operation([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json({ value: [] }),
+      Response.json(
+        {
+          error: {
+            code: "serviceUnavailable",
+            innerError: { code: "transientError" },
+          },
+        },
+        { status: 503 },
+      ),
+    ]);
+
+    const error = await fixture.operation.share().catch((value) => value);
+
+    expect(error).toBeInstanceOf(OneDriveInviteFailureError);
+    expect(error.diagnostic).toMatchObject({
+      stage: "invite-reconciliation",
+      upstreamStatus: 503,
+      graphErrorCode: "transientError",
+      responseShape: "permission-reconciliation-error",
+    });
+    expect(
+      fixture.request.mock.calls.filter(
+        ([url, init]) => url.endsWith("/invite") && init?.method === "POST",
+      ),
+    ).toHaveLength(1);
   });
 
   it("verifies exact bytes through Marge's direct drive/item content path", async () => {

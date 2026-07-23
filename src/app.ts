@@ -8,8 +8,10 @@ import {
 } from "./auth/authentication";
 import {
   ApiAccessError,
+  OneDriveInviteFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
+  type OneDriveInviteFailure,
   type OneDriveProofResult,
   type RehearsalStatus,
   type SimulatedEmailResult,
@@ -48,6 +50,7 @@ type OneDriveProofState = {
   stage: OneDriveProofStage;
   activity: "idle" | "sharing" | "verifying" | "removing";
   message?: string;
+  inviteFailure?: OneDriveInviteFailure;
 };
 
 type ViewState =
@@ -406,6 +409,23 @@ export function createAfterPartyApp(
         });
         return;
       }
+      if (action === "share" && error instanceof OneDriveInviteFailureError) {
+        persistOneDriveStage(storage, account, "uncertain");
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus,
+          simulatedEmail,
+          oneDriveProof: {
+            stage: "uncertain",
+            activity: "idle",
+            message: error.message,
+            inviteFailure: error.diagnostic,
+          },
+        });
+        return;
+      }
       const stage = action === "verify" ? previousStage : "uncertain";
       const fallback =
         action === "verify"
@@ -684,6 +704,9 @@ function createOneDriveProofPanel(
   if (state.message) {
     panel.append(createStatus(state.message, "error"));
   }
+  if (state.inviteFailure) {
+    panel.append(createOneDriveInviteFailureList(state.inviteFailure));
+  }
 
   panel.append(
     createButton(
@@ -708,6 +731,55 @@ function createOneDriveProofPanel(
     ),
   );
   return panel;
+}
+
+function createOneDriveInviteFailureList(
+  failure: OneDriveInviteFailure,
+): HTMLDListElement {
+  const list = document.createElement("dl");
+  list.className = "identity-list";
+  appendIdentity(
+    list,
+    "Failed stage",
+    failure.stage === "invite"
+      ? "Invite Marge with read access"
+      : "Reconcile Marge read access after invite",
+  );
+  appendIdentity(list, "Microsoft Graph status", String(failure.upstreamStatus));
+  appendIdentity(
+    list,
+    "Microsoft Graph error code",
+    failure.graphErrorCode ?? "Not provided",
+  );
+  if (failure.requestId) {
+    appendIdentity(list, "Microsoft Graph request ID", failure.requestId);
+  }
+  appendIdentity(list, "Client request ID", failure.clientRequestId);
+  if (failure.responseDate) {
+    appendIdentity(list, "Microsoft Graph response date", failure.responseDate);
+  }
+  if (failure.retryAfter) {
+    appendIdentity(list, "Microsoft Graph retry after", failure.retryAfter);
+  }
+  appendIdentity(list, "Response shape", inviteResponseShape(failure.responseShape));
+  return list;
+}
+
+function inviteResponseShape(
+  value: OneDriveInviteFailure["responseShape"],
+): string {
+  switch (value) {
+    case "graph-error":
+      return "Microsoft Graph error";
+    case "non-json":
+      return "No JSON response";
+    case "permission-response-mismatch":
+      return "Invite permission shape did not match";
+    case "permission-reconciliation-error":
+      return "Permission reconciliation failed";
+    case "permission-reconciliation-mismatch":
+      return "Permission reconciliation was ambiguous";
+  }
 }
 
 function createRehearsalStatusPanel(
