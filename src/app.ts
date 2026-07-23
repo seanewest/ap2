@@ -90,7 +90,11 @@ export function createAfterPartyApp(
   };
 
   const checkApiAccess = async (): Promise<void> => {
-    if (state.kind !== "signed-in" || state.apiAccess.kind === "loading") {
+    if (
+      state.kind !== "signed-in" ||
+      state.apiAccess.kind === "loading" ||
+      state.rehearsalStatus.kind === "loading"
+    ) {
       return;
     }
     const account = state.account;
@@ -142,7 +146,8 @@ export function createAfterPartyApp(
   const checkRehearsalStatus = async (): Promise<void> => {
     if (
       state.kind !== "signed-in" ||
-      state.rehearsalStatus.kind === "loading"
+      state.rehearsalStatus.kind === "loading" ||
+      state.apiAccess.kind === "loading"
     ) {
       return;
     }
@@ -276,11 +281,17 @@ function createStatePanel(state: ViewState): HTMLElement {
       );
       break;
     case "signed-in":
+      const apiOperationLoading =
+        state.apiAccess.kind === "loading" ||
+        state.rehearsalStatus.kind === "loading";
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
-        createApiAccessPanel(state.apiAccess),
-        createRehearsalStatusPanel(state.rehearsalStatus),
+        createApiAccessPanel(state.apiAccess, apiOperationLoading),
+        createRehearsalStatusPanel(
+          state.rehearsalStatus,
+          apiOperationLoading,
+        ),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -325,6 +336,7 @@ function createButton(
 
 function createRehearsalStatusPanel(
   state: RehearsalStatusState,
+  apiOperationLoading: boolean,
 ): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "api-access";
@@ -353,13 +365,16 @@ function createRehearsalStatusPanel(
       "Check rehearsal status",
       "check-rehearsal",
       "primary",
-      state.kind === "loading",
+      apiOperationLoading,
     ),
   );
   return panel;
 }
 
-function createApiAccessPanel(state: ApiAccessState): HTMLElement {
+function createApiAccessPanel(
+  state: ApiAccessState,
+  apiOperationLoading: boolean,
+): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "api-access";
 
@@ -384,7 +399,7 @@ function createApiAccessPanel(state: ApiAccessState): HTMLElement {
       "Check API access",
       "check-api",
       "primary",
-      state.kind === "loading",
+      apiOperationLoading,
     ),
   );
   return panel;

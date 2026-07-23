@@ -210,6 +210,34 @@ describe("After Party authentication UI", () => {
     expect(apiButton()?.disabled).toBe(false);
   });
 
+  it("runs only one API operation at a time", async () => {
+    const deferred = createDeferred<ApiCallerIdentity>();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.checkAccess.mockReturnValue(deferred.promise);
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    apiButton()?.click();
+    await nextTask();
+
+    expect(apiButton()?.disabled).toBe(true);
+    expect(rehearsalButton()?.disabled).toBe(true);
+    rehearsalButton()?.click();
+    await nextTask();
+    expect(authentication.acquireAccessToken).toHaveBeenCalledTimes(1);
+    expect(api.getRehearsalStatus).not.toHaveBeenCalled();
+
+    deferred.resolve({ callerType: "delegated", tenantId: "student-tenant" });
+    await nextTask();
+    expect(apiButton()?.disabled).toBe(false);
+    expect(rehearsalButton()?.disabled).toBe(false);
+  });
+
   it("shows a safe failure and allows retry", async () => {
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",
