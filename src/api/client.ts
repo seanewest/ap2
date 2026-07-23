@@ -244,6 +244,12 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ApiAccessError("This account is not allowed to use the API.");
     }
     if (response.status === 409) {
+      const error = await readErrorCode(response);
+      if (error === "proof_operation_busy") {
+        throw new ApiAccessError(
+          "Another OneDrive proof operation is running. Try again shortly.",
+        );
+      }
       throw new ApiAccessError(
         "The OneDrive proof file is not in the expected state. Nothing was changed.",
       );
@@ -259,6 +265,20 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ApiAccessError();
     }
     return value;
+  }
+}
+
+async function readErrorCode(response: Response): Promise<string | undefined> {
+  try {
+    const value: unknown = await response.json();
+    return typeof value === "object" &&
+      value !== null &&
+      "error" in value &&
+      typeof value.error === "string"
+      ? value.error
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
 

@@ -9,6 +9,7 @@ vi.mock("playwright", () => ({
 import {
   SimulatedUserDelegatedTokenProvider,
   SimulatedUserCbaError,
+  SIMULATED_USER_REDIRECT_URI,
   type AuthorizationCodeBrowser,
 } from "./simulated-user-cba.js";
 import { STUDENT_TENANT_ID } from "./identity.js";
@@ -87,11 +88,12 @@ function createProvider(options: {
   browser?: AuthorizationCodeBrowser;
   request?: typeof fetch;
   now?: () => number;
+  allowedScopes?: readonly string[];
 }): SimulatedUserDelegatedTokenProvider {
   return new SimulatedUserDelegatedTokenProvider({
     clientId: CLIENT_ID,
     identity: HOMER_IDENTITY,
-    allowedScopes: [GRAPH_MAIL_SEND_SCOPE],
+    allowedScopes: options.allowedScopes ?? [GRAPH_MAIL_SEND_SCOPE],
     pfxPath: "/run/secrets/homer.pfx",
     pfxPassphrase: PASSPHRASE,
     browser: options.browser,
@@ -122,6 +124,15 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
     const browserRequest = browserCall[0];
     expect(browserRequest.pfxPath).toBe("/run/secrets/homer.pfx");
     expect(browserRequest.pfxPassphrase).toBe(PASSPHRASE);
+    expect(browserRequest.redirectUri).toBe(
+      "http://localhost/ap2-simulated-user-callback",
+    );
+    expect(SIMULATED_USER_REDIRECT_URI).toBe(
+      "http://localhost/ap2-simulated-user-callback",
+    );
+    expect(browserRequest.authorizeUrl.searchParams.get("redirect_uri")).toBe(
+      SIMULATED_USER_REDIRECT_URI,
+    );
     expect(browserRequest.authorizeUrl.searchParams.get("login_hint")).toBe(
       HOMER_USER_PRINCIPAL_NAME,
     );
@@ -148,6 +159,9 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
     const tokenBody = tokenCall.init?.body as URLSearchParams;
     expect(tokenBody.get("grant_type")).toBe("authorization_code");
     expect(tokenBody.get("refresh_token")).toBeNull();
+    expect(tokenBody.get("redirect_uri")).toBe(
+      SIMULATED_USER_REDIRECT_URI,
+    );
     expect(tokenBody.get("scope")).not.toContain("offline_access");
     expect(
       Buffer.from(
@@ -364,6 +378,32 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
       "profile",
       "https://graph.microsoft.com/User.Read",
       "https://graph.microsoft.com/Files.Read",
+    ]);
+  });
+
+  it("requests Homer's Files.ReadWrite scope explicitly", async () => {
+    const filesScope = "https://graph.microsoft.com/Files.ReadWrite";
+    const token = accessToken({ scp: "Files.ReadWrite User.Read" });
+    const { browser, acquire } = createBrowser();
+    const { request } = createRequest(token);
+    const provider = createProvider({
+      browser,
+      request,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, filesScope],
+    });
+
+    await expect(provider.getToken(filesScope)).resolves.toEqual(
+      delegatedToken(token),
+    );
+    expect(
+      acquire.mock.calls[0]?.[0].authorizeUrl.searchParams
+        .get("scope")
+        ?.split(" "),
+    ).toEqual([
+      "openid",
+      "profile",
+      "https://graph.microsoft.com/User.Read",
+      filesScope,
     ]);
   });
 });

@@ -248,6 +248,21 @@ describe("HTTP After Party API client", () => {
     );
   });
 
+  it("distinguishes a concurrent OneDrive operation from a state conflict", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({ error: "proof_operation_busy", detail: "must-not-escape" }, {
+        status: 409,
+      }),
+    );
+    const client = new HttpAfterPartyApi("https://student-api.example", request);
+
+    await expect(client.verifyOneDriveProof("token")).rejects.toEqual(
+      new ApiAccessError(
+        "Another OneDrive proof operation is running. Try again shortly.",
+      ),
+    );
+  });
+
   it.each([
     [401, "API access needs Microsoft authorization. Try again."],
     [403, "This account is not allowed to use the API."],

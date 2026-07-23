@@ -6,6 +6,7 @@ import {
   DelegatedGraphOneDriveShareProof,
   GRAPH_FILES_READ_SCOPE,
   GRAPH_FILES_READ_WRITE_SCOPE,
+  ProcessLocalOneDriveShareProofBoundary,
 } from "./onedrive-share-proof.js";
 import {
   DelegatedGraphSimulatedEmailOperation,
@@ -58,10 +59,12 @@ const simulatedEmailOperation = homerTokenProvider
   : undefined;
 const oneDriveShareProofOperation =
   homerTokenProvider && margeTokenProvider && margeIdentity
-    ? new DelegatedGraphOneDriveShareProof(
-        homerTokenProvider,
-        margeTokenProvider,
-        margeIdentity,
+    ? new ProcessLocalOneDriveShareProofBoundary(
+        new DelegatedGraphOneDriveShareProof(
+          homerTokenProvider,
+          margeTokenProvider,
+          margeIdentity,
+        ),
       )
     : undefined;
 const server = createApiServer({

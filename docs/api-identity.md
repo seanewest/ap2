@@ -34,9 +34,11 @@ comma-separated list. `AUTH_AUTOMATION_CLIENT_ID` can replace the app-only
 client ID. The Student tenant cannot be overridden.
 
 Browser access is disabled unless `CORS_ALLOWED_ORIGIN` names one exact
-HTTP(S) origin. The protected endpoint preflights accept only that origin,
-`GET`, and the `Authorization` header. Requests without an `Origin` header
-remain available to the app-only proof and other non-browser clients.
+HTTP(S) origin. Protected preflights accept only that origin and the
+`Authorization` header. The read endpoints allow `GET`, simulated email allows
+`POST`, and the OneDrive proof allows `GET`, `POST`, and `DELETE`. Requests
+without an `Origin` header remain available to the app-only proof and other
+non-browser clients.
 
 ## Rehearsal status
 
@@ -72,11 +74,12 @@ Homer certificate settings are present:
 - `HOMER_CBA_PFX_PATH`: absolute path to the externally mounted Homer PFX
 - `HOMER_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
 
-The public client must already allow the fixed `http://localhost` redirect and
-have consent for delegated `User.Read` and `Mail.Send`. Homer must already have
-working Student CBA. The container needs outbound access to Microsoft login,
-certificate authentication, and Graph endpoints. This application work does
-not create consent, identity, certificate, or tenant configuration.
+The public client must already allow the exact
+`http://localhost/ap2-simulated-user-callback` redirect and have consent for
+delegated `User.Read` and `Mail.Send`. Homer must already have working Student
+CBA. The container needs outbound access to Microsoft login, certificate
+authentication, and Graph endpoints. This application work does not create
+consent, identity, certificate, or tenant configuration.
 
 The disposable rehearsal assumes one controlled click against one API replica.
 It does not claim exactly-once delivery across callers, replicas, or restarts,
@@ -94,18 +97,23 @@ separate human actions:
   no invitation is sent.
 - `GET` signs in as Marge and reads the exact drive/item content path. It
   succeeds only when the metadata and bytes match.
-- `DELETE` resolves the fixed path, validates its metadata and bytes, then
-  deletes once using its eTag. OneDrive moves the item to the recycle bin.
+- `DELETE` resolves the fixed item and its permissions, revokes only the exact
+  direct Marge read permission, then re-resolves and validates the 58-byte file
+  before deleting once with its current eTag. OneDrive moves the item to the
+  recycle bin. If a prior revoke succeeded but its response was lost, a later
+  cleanup can safely continue when no Marge permission remains.
 
-The API never retries an upload-session creation, upload, invite, or delete.
+The API never retries an upload-session creation, upload, invite, permission
+revoke, or file delete.
 After an uncertain mutation response, the UI disables sharing and offers only
 explicit verification or cleanup. Its stage is stored per signed-in account in
 browser storage so a reload does not blindly repeat a mutation.
 
 Homer uses delegated `Files.ReadWrite`; Marge uses delegated `Files.Read`.
 The shared public client must already have those grants and its existing
-`http://localhost` redirect. In addition to Homer's settings, verification is
-enabled only when all three Marge settings are present:
+`http://localhost/ap2-simulated-user-callback` redirect. In addition to Homer's
+settings, verification is enabled only when all three Marge settings are
+present:
 
 - `MARGE_CBA_OBJECT_ID`: Marge's immutable Student object ID
 - `MARGE_CBA_PFX_PATH`: absolute path to the externally mounted Marge PFX
@@ -113,9 +121,17 @@ enabled only when all three Marge settings are present:
 
 Each simulated user has a separate in-memory token cache and disposable
 Playwright context. Partial per-user certificate configuration fails startup.
+Deployment verification must prove both mounted PFX files and passphrases work;
+the repository does not embed or persist either certificate.
 The operation returns only its safe stage, fixed path, identity, and access
 summary; it never returns tokens, credentials, item IDs, eTags, upload URLs, or
 raw Graph responses.
+
+One process-local boundary serializes share, verification, and cleanup across
+operator and Dev-app callers. Concurrent requests receive
+`proof_operation_busy`. This is rehearsal-only coordination: it has no durable
+lock, database, queue, or cross-replica protection. The live proof therefore
+requires Container Apps `maxReplicas=1`.
 
 ## Identity setup and rollback
 

@@ -23,6 +23,7 @@ import {
 } from "./simulated-email.js";
 import {
   ONEDRIVE_PROOF_PATH,
+  ProcessLocalOneDriveShareProofBoundary,
   type OneDriveProofResult,
 } from "./onedrive-share-proof.js";
 import { JoseTokenVerifier } from "./token-verifier.js";
@@ -78,6 +79,8 @@ const oneDriveShareProofOperation = {
   verify: vi.fn().mockResolvedValue(oneDriveResults.verified),
   remove: vi.fn().mockResolvedValue(oneDriveResults.removed),
 };
+const oneDriveOperationBoundary =
+  new ProcessLocalOneDriveShareProofBoundary(oneDriveShareProofOperation);
 const server = createApiServer({
   tokenVerifier: new JoseTokenVerifier({
     issuer: ISSUER,
@@ -88,7 +91,7 @@ const server = createApiServer({
   callerPolicy: defaultCallerPolicy,
   rehearsalStatusProvider,
   simulatedEmailOperation,
-  oneDriveShareProofOperation,
+  oneDriveShareProofOperation: oneDriveOperationBoundary,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -423,6 +426,50 @@ describe("local API", () => {
     expect(oneDriveShareProofOperation.share).not.toHaveBeenCalled();
   });
 
+  it("returns a clear busy conflict across operator and Dev callers", async () => {
+    const pending = deferred<typeof oneDriveResults.shared>();
+    oneDriveShareProofOperation.share.mockClear();
+    oneDriveShareProofOperation.verify.mockClear();
+    oneDriveShareProofOperation.share.mockImplementationOnce(
+      () => pending.promise,
+    );
+
+    const operatorRequest = protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/onedrive-share-proof",
+      "POST",
+    );
+    await vi.waitFor(() => {
+      expect(oneDriveShareProofOperation.share).toHaveBeenCalledOnce();
+    });
+
+    const devResponse = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        idtyp: "app",
+        azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+        roles: [REQUIRED_APPLICATION_ROLE],
+      },
+      undefined,
+      "/api/onedrive-share-proof",
+      "GET",
+    );
+    expect(devResponse.status).toBe(409);
+    await expect(devResponse.json()).resolves.toEqual({
+      error: "proof_operation_busy",
+    });
+    expect(oneDriveShareProofOperation.verify).not.toHaveBeenCalled();
+
+    pending.resolve(oneDriveResults.shared);
+    const operatorResponse = await operatorRequest;
+    expect(operatorResponse.status).toBe(201);
+  });
+
   it.each([
     [
       "another tenant",
@@ -589,4 +636,15 @@ function registeredClaims(claims: Record<string, unknown>): Record<string, unkno
     nbf: NOW - 10,
     ...claims,
   };
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
 }

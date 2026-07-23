@@ -56,6 +56,48 @@ export class OneDriveProofConflictError extends Error {
   }
 }
 
+export class OneDriveProofBusyError extends Error {
+  constructor() {
+    super("Another OneDrive proof operation is already running.");
+    this.name = "OneDriveProofBusyError";
+  }
+}
+
+export class ProcessLocalOneDriveShareProofBoundary
+  implements OneDriveShareProofOperation
+{
+  readonly #operation: OneDriveShareProofOperation;
+  #busy = false;
+
+  constructor(operation: OneDriveShareProofOperation) {
+    this.#operation = operation;
+  }
+
+  share(): ReturnType<OneDriveShareProofOperation["share"]> {
+    return this.#run(() => this.#operation.share());
+  }
+
+  verify(): ReturnType<OneDriveShareProofOperation["verify"]> {
+    return this.#run(() => this.#operation.verify());
+  }
+
+  remove(): ReturnType<OneDriveShareProofOperation["remove"]> {
+    return this.#run(() => this.#operation.remove());
+  }
+
+  async #run<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.#busy) {
+      throw new OneDriveProofBusyError();
+    }
+    this.#busy = true;
+    try {
+      return await operation();
+    } finally {
+      this.#busy = false;
+    }
+  }
+}
+
 interface DriveItem {
   id: string;
   name: typeof ONEDRIVE_PROOF_FILE_NAME;
@@ -141,7 +183,27 @@ export class DelegatedGraphOneDriveShareProof
     Extract<OneDriveProofResult, { state: "removed" }>
   > {
     const homer = await this.#homerToken();
+    const originalItem = await this.#resolveProof(homer.token);
+    const permissionId = await this.#findMargeReadPermission(
+      homer.token,
+      originalItem.id,
+    );
+    if (permissionId) {
+      await this.#revokeMargeReadPermission(
+        homer.token,
+        originalItem,
+        permissionId,
+      );
+    }
     const item = await this.#resolveProof(homer.token);
+    if (
+      item.id !== originalItem.id ||
+      item.driveId !== originalItem.driveId
+    ) {
+      throw new OneDriveProofConflictError(
+        "The fixed OneDrive proof changed during cleanup.",
+      );
+    }
     await this.#requireExactContent(
       `${GRAPH_ROOT}/me/drive/items/${encodeURIComponent(item.id)}/content`,
       homer.token,
@@ -168,6 +230,86 @@ export class DelegatedGraphOneDriveShareProof
       );
     }
     return { state: "removed", path: ONEDRIVE_PROOF_PATH };
+  }
+
+  async #findMargeReadPermission(
+    accessToken: string,
+    itemId: string,
+  ): Promise<string | undefined> {
+    const response = await this.#request(
+      `${GRAPH_ROOT}/me/drive/items/${encodeURIComponent(itemId)}/permissions` +
+        "?$select=id,roles,link,invitation,grantedToV2,inheritedFrom",
+      graphGet(accessToken),
+    );
+    const value = await readJson(response);
+    if (
+      !response.ok ||
+      !isRecord(value) ||
+      !Array.isArray(value.value) ||
+      value["@odata.nextLink"] !== undefined
+    ) {
+      throw new OneDriveProofConflictError(
+        "Microsoft Graph returned ambiguous proof permissions.",
+      );
+    }
+
+    const exact: string[] = [];
+    let relatedButUnrecognized = false;
+    for (const permission of value.value) {
+      if (
+        !isRecord(permission) ||
+        !nonEmpty(permission.id) ||
+        !Array.isArray(permission.roles)
+      ) {
+        throw new OneDriveProofConflictError(
+          "Microsoft Graph returned ambiguous proof permissions.",
+        );
+      }
+      const classification = classifyMargeReadPermission(
+        permission,
+        this.#margeIdentity.objectId,
+      );
+      if (classification.kind === "exact") {
+        exact.push(classification.id);
+      } else if (classification.kind === "related-unrecognized") {
+        relatedButUnrecognized = true;
+      }
+    }
+    if (exact.length > 1 || relatedButUnrecognized) {
+      throw new OneDriveProofConflictError(
+        "The Marge proof permission is ambiguous.",
+      );
+    }
+    return exact[0];
+  }
+
+  async #revokeMargeReadPermission(
+    accessToken: string,
+    item: DriveItem,
+    permissionId: string,
+  ): Promise<void> {
+    const response = await this.#request(
+      `${GRAPH_ROOT}/me/drive/items/${encodeURIComponent(item.id)}` +
+        `/permissions/${encodeURIComponent(permissionId)}`,
+      {
+        method: "DELETE",
+        redirect: "error",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "If-Match": item.eTag,
+        },
+      },
+    );
+    if (response.status === 412) {
+      throw new OneDriveProofConflictError(
+        "The OneDrive proof changed before permission cleanup.",
+      );
+    }
+    if (response.status !== 204) {
+      throw new Error(
+        `Microsoft Graph permission cleanup returned HTTP ${response.status}.`,
+      );
+    }
   }
 
   async #homerToken(): Promise<DelegatedGraphToken> {
@@ -422,6 +564,60 @@ function isExactMargeReadPermission(value: unknown): boolean {
       MARGE_USER_PRINCIPAL_NAME.toLowerCase() &&
     permission.invitation.signInRequired === true
   );
+}
+
+type PermissionClassification =
+  | { kind: "exact"; id: string }
+  | { kind: "related-unrecognized" }
+  | { kind: "other" };
+
+function classifyMargeReadPermission(
+  value: unknown,
+  margeObjectId: string,
+): PermissionClassification {
+  if (!isRecord(value)) {
+    return { kind: "related-unrecognized" };
+  }
+  const invitation = isRecord(value.invitation) ? value.invitation : undefined;
+  const invitationEmail =
+    invitation && typeof invitation.email === "string"
+      ? invitation.email.toLowerCase()
+      : undefined;
+  const grantedUser =
+    isRecord(value.grantedToV2) && isRecord(value.grantedToV2.user)
+      ? value.grantedToV2.user
+      : undefined;
+  const grantedObjectId =
+    grantedUser && typeof grantedUser.id === "string"
+      ? grantedUser.id.toLowerCase()
+      : undefined;
+  const relatesToMarge =
+    invitationEmail === MARGE_USER_PRINCIPAL_NAME.toLowerCase() ||
+    grantedObjectId === margeObjectId.toLowerCase();
+  if (!relatesToMarge) {
+    return { kind: "other" };
+  }
+
+  const invitationIsExact =
+    invitationEmail === undefined ||
+    (invitationEmail === MARGE_USER_PRINCIPAL_NAME.toLowerCase() &&
+      invitation?.signInRequired === true);
+  const granteeIsExact =
+    grantedObjectId === undefined ||
+    grantedObjectId === margeObjectId.toLowerCase();
+  if (
+    nonEmpty(value.id) &&
+    Array.isArray(value.roles) &&
+    value.roles.length === 1 &&
+    value.roles[0] === "read" &&
+    value.link === undefined &&
+    (value.inheritedFrom === undefined || value.inheritedFrom === null) &&
+    invitationIsExact &&
+    granteeIsExact
+  ) {
+    return { kind: "exact", id: value.id };
+  }
+  return { kind: "related-unrecognized" };
 }
 
 function isSafeUploadUrl(value: string): boolean {

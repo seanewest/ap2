@@ -13,7 +13,8 @@ const CERTIFICATE_AUTHENTICATION_ORIGINS = [
   "https://certauth.login.microsoftonline.com",
   `https://t${STUDENT_TENANT_ID}.certauth.login.microsoftonline.com`,
 ] as const;
-const DEFAULT_REDIRECT_URI = "http://localhost";
+export const SIMULATED_USER_REDIRECT_URI =
+  "http://localhost/ap2-simulated-user-callback";
 const CACHE_SKEW_MS = 120_000;
 const GRAPH_USER_READ_SCOPE = `${GRAPH_ORIGIN}/User.Read`;
 
@@ -40,7 +41,6 @@ export interface SimulatedUserDelegatedTokenProviderOptions {
   browser?: AuthorizationCodeBrowser;
   request?: typeof fetch;
   now?: () => number;
-  redirectUri?: string;
   timeoutMs?: number;
 }
 
@@ -67,7 +67,6 @@ export class SimulatedUserDelegatedTokenProvider
   readonly #browser: AuthorizationCodeBrowser;
   readonly #request: typeof fetch;
   readonly #now: () => number;
-  readonly #redirectUri: string;
   readonly #timeoutMs: number;
   readonly #cachedAccessTokens = new Map<string, CachedAccessToken>();
   readonly #acquisitions = new Map<string, Promise<string>>();
@@ -86,9 +85,8 @@ export class SimulatedUserDelegatedTokenProvider
       throw new TypeError("The simulated-user CBA configuration is incomplete.");
     }
 
-    const redirectUri = options.redirectUri ?? DEFAULT_REDIRECT_URI;
     const timeoutMs = options.timeoutMs ?? 90_000;
-    if (!isLoopbackRedirectUri(redirectUri) || timeoutMs <= 0) {
+    if (timeoutMs <= 0) {
       throw new TypeError("The simulated-user CBA configuration is invalid.");
     }
 
@@ -100,7 +98,6 @@ export class SimulatedUserDelegatedTokenProvider
     this.#browser = options.browser ?? new PlaywrightAuthorizationCodeBrowser();
     this.#request = (options.request ?? fetch).bind(globalThis);
     this.#now = options.now ?? Date.now;
-    this.#redirectUri = redirectUri;
     this.#timeoutMs = timeoutMs;
   }
 
@@ -148,7 +145,7 @@ export class SimulatedUserDelegatedTokenProvider
       const state = base64Url(randomBytes(32));
       const authorizeUrl = createAuthorizeUrl({
         clientId: this.#clientId,
-        redirectUri: this.#redirectUri,
+        redirectUri: SIMULATED_USER_REDIRECT_URI,
         state,
         challenge: pkce.challenge,
         scopes: authorizationScopes,
@@ -157,7 +154,7 @@ export class SimulatedUserDelegatedTokenProvider
       const code = await this.#browser.acquireAuthorizationCode({
         authorizeUrl,
         expectedState: state,
-        redirectUri: this.#redirectUri,
+        redirectUri: SIMULATED_USER_REDIRECT_URI,
         pfxPath: this.#pfxPath,
         pfxPassphrase: this.#pfxPassphrase,
         userPrincipalName: this.#identity.userPrincipalName,
@@ -203,7 +200,7 @@ export class SimulatedUserDelegatedTokenProvider
           body: new URLSearchParams({
             client_id: this.#clientId,
             code,
-            redirect_uri: this.#redirectUri,
+            redirect_uri: SIMULATED_USER_REDIRECT_URI,
             grant_type: "authorization_code",
             code_verifier: verifier,
             scope: scopes.join(" "),
@@ -613,18 +610,6 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
-}
-
-function isLoopbackRedirectUri(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "http:" &&
-      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
-    );
-  } catch {
-    return false;
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

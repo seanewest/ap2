@@ -8,7 +8,10 @@ import {
   ONEDRIVE_PROOF_CONTENT,
   ONEDRIVE_PROOF_FILE_NAME,
   ONEDRIVE_PROOF_PATH,
+  OneDriveProofBusyError,
   OneDriveProofConflictError,
+  ProcessLocalOneDriveShareProofBoundary,
+  type OneDriveShareProofOperation,
 } from "./onedrive-share-proof.js";
 import {
   HOMER_IDENTITY,
@@ -32,6 +35,27 @@ const ITEM = {
   file: { mimeType: "text/plain" },
   eTag: '"proof-etag"',
   parentReference: { driveId: "homer-drive" },
+};
+const UPDATED_ITEM = { ...ITEM, eTag: '"proof-etag-after-revoke"' };
+const MARGE_READ_PERMISSION = {
+  id: "marge-read-permission",
+  roles: ["read"],
+  invitation: {
+    email: MARGE_USER_PRINCIPAL_NAME,
+    signInRequired: true,
+  },
+  grantedToV2: {
+    user: {
+      id: MARGE_IDENTITY.objectId,
+      displayName: MARGE_DISPLAY_NAME,
+    },
+  },
+  inheritedFrom: null,
+};
+const OWNER_PERMISSION = {
+  id: "owner-permission",
+  roles: ["owner"],
+  grantedToV2: { user: { id: HOMER_IDENTITY.objectId } },
 };
 
 function tokenProvider(identity: SimulatedUserIdentity, token: string) {
@@ -233,17 +257,24 @@ describe("DelegatedGraphOneDriveShareProof", () => {
 
     const changed = operation([
       Response.json(ITEM),
+      Response.json({ value: [OWNER_PERMISSION] }),
+      Response.json(ITEM),
       new Response("changed"),
     ]);
     await expect(changed.operation.remove()).rejects.toBeInstanceOf(
       OneDriveProofConflictError,
     );
-    expect(changed.request).toHaveBeenCalledTimes(2);
+    expect(changed.request).toHaveBeenCalledTimes(4);
   });
 
-  it("validates the fixed file then deletes once with its eTag", async () => {
+  it("revokes only Marge's direct read permission, then revalidates and deletes", async () => {
     const fixture = operation([
       Response.json(ITEM),
+      Response.json({
+        value: [OWNER_PERMISSION, MARGE_READ_PERMISSION],
+      }),
+      new Response(undefined, { status: 204 }),
+      Response.json(UPDATED_ITEM),
       new Response(ONEDRIVE_PROOF_CONTENT),
       new Response(undefined, { status: 204 }),
     ]);
@@ -252,9 +283,12 @@ describe("DelegatedGraphOneDriveShareProof", () => {
       state: "removed",
       path: ONEDRIVE_PROOF_PATH,
     });
-    expect(fixture.request).toHaveBeenCalledTimes(3);
+    expect(fixture.request).toHaveBeenCalledTimes(6);
+    expect(fixture.request.mock.calls[1]?.[0]).toBe(
+      "https://graph.microsoft.com/v1.0/me/drive/items/proof-item/permissions?$select=id,roles,link,invitation,grantedToV2,inheritedFrom",
+    );
     expect(fixture.request.mock.calls[2]).toEqual([
-      "https://graph.microsoft.com/v1.0/me/drive/items/proof-item",
+      "https://graph.microsoft.com/v1.0/me/drive/items/proof-item/permissions/marge-read-permission",
       {
         method: "DELETE",
         redirect: "error",
@@ -264,11 +298,76 @@ describe("DelegatedGraphOneDriveShareProof", () => {
         },
       },
     ]);
+    expect(fixture.request.mock.calls[5]).toEqual([
+      "https://graph.microsoft.com/v1.0/me/drive/items/proof-item",
+      {
+        method: "DELETE",
+        redirect: "error",
+        headers: {
+          Authorization: "Bearer homer-token",
+          "If-Match": '"proof-etag-after-revoke"',
+        },
+      },
+    ]);
+  });
+
+  it("resumes cleanup safely when the exact permission is already absent", async () => {
+    const fixture = operation([
+      Response.json(ITEM),
+      Response.json({ value: [OWNER_PERMISSION] }),
+      Response.json(UPDATED_ITEM),
+      new Response(ONEDRIVE_PROOF_CONTENT),
+      new Response(undefined, { status: 204 }),
+    ]);
+
+    await expect(fixture.operation.remove()).resolves.toEqual({
+      state: "removed",
+      path: ONEDRIVE_PROOF_PATH,
+    });
+    expect(fixture.request).toHaveBeenCalledTimes(5);
+    expect(
+      fixture.request.mock.calls.filter(
+        ([, init]) => init?.method === "DELETE",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("refuses ambiguous or unrecognized Marge permissions without deleting", async () => {
+    for (const permissions of [
+      [MARGE_READ_PERMISSION, { ...MARGE_READ_PERMISSION, id: "duplicate" }],
+      [{ ...MARGE_READ_PERMISSION, roles: ["write"] }],
+      [{ ...MARGE_READ_PERMISSION, link: { type: "view" } }],
+      [{ ...MARGE_READ_PERMISSION, inheritedFrom: { id: "parent" } }],
+    ]) {
+      const fixture = operation([
+        Response.json(ITEM),
+        Response.json({ value: permissions }),
+      ]);
+      await expect(fixture.operation.remove()).rejects.toBeInstanceOf(
+        OneDriveProofConflictError,
+      );
+      expect(fixture.request).toHaveBeenCalledTimes(2);
+    }
+  });
+
+  it("does not retry an ambiguous permission revoke", async () => {
+    const fixture = operation([
+      Response.json(ITEM),
+      Response.json({ value: [MARGE_READ_PERMISSION] }),
+      new Response(undefined, { status: 503 }),
+    ]);
+
+    await expect(fixture.operation.remove()).rejects.toThrow(
+      "permission cleanup returned HTTP 503",
+    );
+    expect(fixture.request).toHaveBeenCalledTimes(3);
   });
 
   it("does not retry cleanup after an eTag conflict", async () => {
     const fixture = operation([
       Response.json(ITEM),
+      Response.json({ value: [OWNER_PERMISSION] }),
+      Response.json(UPDATED_ITEM),
       new Response(ONEDRIVE_PROOF_CONTENT),
       new Response(undefined, { status: 412 }),
     ]);
@@ -276,7 +375,62 @@ describe("DelegatedGraphOneDriveShareProof", () => {
     await expect(fixture.operation.remove()).rejects.toBeInstanceOf(
       OneDriveProofConflictError,
     );
-    expect(fixture.request).toHaveBeenCalledTimes(3);
+    expect(fixture.request).toHaveBeenCalledTimes(5);
+  });
+});
+
+describe("ProcessLocalOneDriveShareProofBoundary", () => {
+  it("rejects a concurrent caller and releases the lock after success", async () => {
+    const pending = deferred<
+      Awaited<ReturnType<OneDriveShareProofOperation["share"]>>
+    >();
+    const inner: OneDriveShareProofOperation = {
+      share: vi.fn(() => pending.promise),
+      verify: vi.fn(async () => ({
+        state: "verified",
+        path: ONEDRIVE_PROOF_PATH,
+        verifiedAs: MARGE_USER_PRINCIPAL_NAME,
+        contentMatches: true,
+      } as const)),
+      remove: vi.fn(),
+    };
+    const boundary = new ProcessLocalOneDriveShareProofBoundary(inner);
+
+    const first = boundary.share();
+    await expect(boundary.verify()).rejects.toBeInstanceOf(
+      OneDriveProofBusyError,
+    );
+    pending.resolve({
+      state: "shared",
+      path: ONEDRIVE_PROOF_PATH,
+      owner: HOMER_IDENTITY.userPrincipalName,
+      recipient: MARGE_USER_PRINCIPAL_NAME,
+      access: "read",
+    });
+    await expect(first).resolves.toMatchObject({ state: "shared" });
+    await expect(boundary.verify()).resolves.toMatchObject({
+      state: "verified",
+    });
+  });
+
+  it("releases the lock after an operation error", async () => {
+    const inner: OneDriveShareProofOperation = {
+      share: vi.fn(async () => {
+        throw new Error("fixture failure");
+      }),
+      verify: vi.fn(),
+      remove: vi.fn(async () => ({
+        state: "removed",
+        path: ONEDRIVE_PROOF_PATH,
+      } as const)),
+    };
+    const boundary = new ProcessLocalOneDriveShareProofBoundary(inner);
+
+    await expect(boundary.share()).rejects.toThrow("fixture failure");
+    await expect(boundary.remove()).resolves.toEqual({
+      state: "removed",
+      path: ONEDRIVE_PROOF_PATH,
+    });
   });
 });
 
@@ -289,4 +443,15 @@ function requiredCall(
     throw new Error(`Expected request ${index + 1}.`);
   }
   return call;
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
 }
