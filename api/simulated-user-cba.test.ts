@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
+
+const playwright = vi.hoisted(() => ({ launch: vi.fn() }));
+vi.mock("playwright", () => ({
+  chromium: { launch: playwright.launch },
+}));
+
 import {
   HomerDelegatedTokenProvider,
   SimulatedUserCbaError,
@@ -262,6 +268,35 @@ describe("HomerDelegatedTokenProvider", () => {
       provider.getToken("https://graph.microsoft.com/User.Read"),
     ).rejects.toThrow("simulated user token scope is not allowed");
     expect(acquire).not.toHaveBeenCalled();
+  });
+
+  it("supplies Homer certificate only to both approved CBA origins", async () => {
+    const newContext = vi.fn().mockRejectedValue(new Error("captured"));
+    const close = vi.fn();
+    playwright.launch.mockResolvedValue({ newContext, close });
+    const provider = createProvider({});
+
+    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).rejects.toThrow(
+      "Microsoft certificate sign-in could not be completed.",
+    );
+
+    expect(newContext).toHaveBeenCalledOnce();
+    expect(newContext).toHaveBeenCalledWith({
+      clientCertificates: [
+        {
+          origin: "https://certauth.login.microsoftonline.com",
+          pfxPath: "/run/secrets/homer.pfx",
+          passphrase: PASSPHRASE,
+        },
+        {
+          origin:
+            "https://t92563293-315c-4b6c-9b90-bcb47ee8c970.certauth.login.microsoftonline.com",
+          pfxPath: "/run/secrets/homer.pfx",
+          passphrase: PASSPHRASE,
+        },
+      ],
+    });
+    expect(close).toHaveBeenCalledOnce();
   });
 });
 

@@ -12,8 +12,10 @@ import {
 } from "./simulated-email.js";
 
 const GRAPH_ORIGIN = "https://graph.microsoft.com";
-const CERTIFICATE_AUTHENTICATION_ORIGIN =
-  "https://certauth.login.microsoftonline.com";
+const CERTIFICATE_AUTHENTICATION_ORIGINS = [
+  "https://certauth.login.microsoftonline.com",
+  `https://t${STUDENT_TENANT_ID}.certauth.login.microsoftonline.com`,
+] as const;
 const DEFAULT_REDIRECT_URI = "http://localhost";
 const CACHE_SKEW_MS = 120_000;
 const REQUIRED_GRAPH_SCOPES = ["User.Read", "Mail.Send"] as const;
@@ -245,13 +247,13 @@ class PlaywrightAuthorizationCodeBrowser implements AuthorizationCodeBrowser {
     try {
       browser = await chromium.launch({ headless: true });
       const context = await browser.newContext({
-        clientCertificates: [
-          {
-            origin: CERTIFICATE_AUTHENTICATION_ORIGIN,
+        clientCertificates: CERTIFICATE_AUTHENTICATION_ORIGINS.map(
+          (origin) => ({
+            origin,
             pfxPath: request.pfxPath,
             passphrase: request.pfxPassphrase,
-          },
-        ],
+          }),
+        ),
       });
       try {
         const callback = await observeCallback(
