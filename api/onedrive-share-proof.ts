@@ -184,6 +184,10 @@ export class DelegatedGraphOneDriveShareProof
   > {
     const homer = await this.#homerToken();
     const originalItem = await this.#resolveProof(homer.token);
+    await this.#requireExactContent(
+      `${GRAPH_ROOT}/me/drive/items/${encodeURIComponent(originalItem.id)}/content`,
+      homer.token,
+    );
     const permissionId = await this.#findMargeReadPermission(
       homer.token,
       originalItem.id,
