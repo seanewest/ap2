@@ -1,18 +1,23 @@
 export const STUDENT_TENANT_ID = "92563293-315c-4b6c-9b90-bcb47ee8c970";
-export const STUDENT_OPERATOR_OBJECT_ID = "ba97e987-da4c-43e1-ab79-3daa8014440e";
+export const STUDENT_PRODUCT_OPERATOR_OBJECT_ID = "5ce59710-7ea3-448c-bd7b-8e8d2b75bb1f";
+export const STUDENT_CBA_TEST_OPERATOR_OBJECT_ID = "ba97e987-da4c-43e1-ab79-3daa8014440e";
+export const STUDENT_DELEGATED_USER_OBJECT_IDS = [
+  STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+  STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+] as const;
 export const DEVELOPMENT_AUTOMATION_CLIENT_ID = "7eb78f18-b49c-495c-a571-af03f06b58a9";
 export const REQUIRED_DELEGATED_SCOPE = "access_as_user";
 export const REQUIRED_APPLICATION_ROLE = "access_as_application";
 
 export interface CallerPolicy {
   tenantId: string;
-  operatorObjectId: string;
+  delegatedUserObjectIds: readonly string[];
   automationClientId: string;
 }
 
 export const defaultCallerPolicy: CallerPolicy = {
   tenantId: STUDENT_TENANT_ID,
-  operatorObjectId: STUDENT_OPERATOR_OBJECT_ID,
+  delegatedUserObjectIds: STUDENT_DELEGATED_USER_OBJECT_IDS,
   automationClientId: DEVELOPMENT_AUTOMATION_CLIENT_ID,
 };
 
@@ -62,7 +67,7 @@ function authorizeDelegated(
 
   const scopes = requiredSpaceSeparatedClaim(claims, "scp");
   const objectId = requiredString(claims, "oid");
-  if (objectId !== policy.operatorObjectId) {
+  if (!policy.delegatedUserObjectIds.includes(objectId)) {
     throw new CallerNotAllowedError("Delegated caller is not allowed");
   }
   if (!scopes.includes(REQUIRED_DELEGATED_SCOPE)) {

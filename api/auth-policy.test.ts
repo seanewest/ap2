@@ -5,26 +5,30 @@ import {
   InvalidClaimsError,
   REQUIRED_APPLICATION_ROLE,
   REQUIRED_DELEGATED_SCOPE,
-  STUDENT_OPERATOR_OBJECT_ID,
+  STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+  STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
   authorizeClaims,
   defaultCallerPolicy,
 } from "./auth-policy.js";
 
 describe("authorizeClaims", () => {
-  it("allows only the dedicated operator as a delegated caller", () => {
+  it.each([
+    ["human product operator", STUDENT_PRODUCT_OPERATOR_OBJECT_ID],
+    ["dedicated CBA test operator", STUDENT_CBA_TEST_OPERATOR_OBJECT_ID],
+  ])("allows the %s as a delegated caller", (_label, objectId) => {
     expect(
       authorizeClaims(
         {
           tid: STUDENT_TENANT_ID,
-          oid: STUDENT_OPERATOR_OBJECT_ID,
+          oid: objectId,
           scp: REQUIRED_DELEGATED_SCOPE,
         },
         defaultCallerPolicy,
       ),
     ).toEqual({
       callerType: "delegated",
-      objectId: STUDENT_OPERATOR_OBJECT_ID,
+      objectId,
       tenantId: STUDENT_TENANT_ID,
     });
   });
@@ -48,8 +52,18 @@ describe("authorizeClaims", () => {
   });
 
   it.each([
-    ["another tenant", { tid: "another", oid: STUDENT_OPERATOR_OBJECT_ID, scp: "scope" }],
-    ["unknown user", { tid: STUDENT_TENANT_ID, oid: "unknown", scp: "scope" }],
+    [
+      "another tenant",
+      {
+        tid: "another",
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+    ],
+    [
+      "unknown user",
+      { tid: STUDENT_TENANT_ID, oid: "unknown", scp: REQUIRED_DELEGATED_SCOPE },
+    ],
     [
       "unknown app",
       {
@@ -66,7 +80,11 @@ describe("authorizeClaims", () => {
   it.each([
     [
       "delegated caller without the exact scope",
-      { tid: STUDENT_TENANT_ID, oid: STUDENT_OPERATOR_OBJECT_ID, scp: "other_scope" },
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+        scp: "other_scope",
+      },
     ],
     [
       "app-only caller without the exact role",
@@ -82,12 +100,20 @@ describe("authorizeClaims", () => {
   });
 
   it.each([
-    ["missing tenant", { oid: STUDENT_OPERATOR_OBJECT_ID, scp: "scope" }],
+    ["missing tenant", { oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID, scp: "scope" }],
     ["missing delegated object ID", { tid: STUDENT_TENANT_ID, scp: "scope" }],
-    ["missing delegated scopes", { tid: STUDENT_TENANT_ID, oid: STUDENT_OPERATOR_OBJECT_ID }],
+    [
+      "missing delegated scopes",
+      { tid: STUDENT_TENANT_ID, oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID },
+    ],
     [
       "delegated claims with app roles",
-      { tid: STUDENT_TENANT_ID, oid: STUDENT_OPERATOR_OBJECT_ID, scp: "scope", roles: ["role"] },
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+        scp: "scope",
+        roles: ["role"],
+      },
     ],
     [
       "app claims with delegated scopes",

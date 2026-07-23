@@ -14,10 +14,22 @@ The resource is requested with the Application ID URI. Its v2 access tokens use
 the API client ID as the `aud` claim.
 
 The API accepts delegated access only when the signed token contains the exact
-scope and operator object ID. App-only access requires the exact application
-role, `idtyp: app`, and development automation client ID. Both paths also
-require the Student tenant, configured issuer and audience, and a verified
-Microsoft signature.
+scope and one of these Student user object IDs:
+
+- human product operator `admin@corywest.onmicrosoft.com`:
+  `5ce59710-7ea3-448c-bd7b-8e8d2b75bb1f`
+- dedicated CBA browser-test operator
+  `after-party-operator@corywest.onmicrosoft.com`:
+  `ba97e987-da4c-43e1-ab79-3daa8014440e`
+
+App-only access requires the exact application role, `idtyp: app`, and
+development automation client ID
+`7eb78f18-b49c-495c-a571-af03f06b58a9`. Both paths also require the Student
+tenant, configured issuer and audience, and a verified Microsoft signature.
+
+`AUTH_DELEGATED_USER_OBJECT_IDS` can replace the delegated allowlist with a
+comma-separated list. `AUTH_AUTOMATION_CLIENT_ID` can replace the app-only
+client ID. The Student tenant cannot be overridden.
 
 Browser access is disabled unless `CORS_ALLOWED_ORIGIN` names one exact
 HTTP(S) origin. The `/api/whoami` preflight accepts only that origin, `GET`, and

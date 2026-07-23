@@ -7,7 +7,8 @@ import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   REQUIRED_APPLICATION_ROLE,
   REQUIRED_DELEGATED_SCOPE,
-  STUDENT_OPERATOR_OBJECT_ID,
+  STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+  STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
   defaultCallerPolicy,
 } from "./auth-policy.js";
@@ -101,7 +102,7 @@ describe("local API", () => {
     const response = await protectedRequest(
       {
         tid: STUDENT_TENANT_ID,
-        oid: STUDENT_OPERATOR_OBJECT_ID,
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
         scp: REQUIRED_DELEGATED_SCOPE,
       },
       "http://localhost:5173",
@@ -112,16 +113,19 @@ describe("local API", () => {
     );
   });
 
-  it("classifies the signed delegated operator", async () => {
+  it.each([
+    ["human product operator", STUDENT_PRODUCT_OPERATOR_OBJECT_ID],
+    ["dedicated CBA test operator", STUDENT_CBA_TEST_OPERATOR_OBJECT_ID],
+  ])("classifies the signed %s", async (_label, objectId) => {
     const response = await protectedRequest({
       tid: STUDENT_TENANT_ID,
-      oid: STUDENT_OPERATOR_OBJECT_ID,
+      oid: objectId,
       scp: REQUIRED_DELEGATED_SCOPE,
     });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       callerType: "delegated",
-      objectId: STUDENT_OPERATOR_OBJECT_ID,
+      objectId,
       tenantId: STUDENT_TENANT_ID,
     });
   });
@@ -142,8 +146,24 @@ describe("local API", () => {
   });
 
   it.each([
-    ["another tenant", { tid: "another", oid: STUDENT_OPERATOR_OBJECT_ID, scp: "scope" }, 403],
-    ["an unknown user", { tid: STUDENT_TENANT_ID, oid: "unknown", scp: "scope" }, 403],
+    [
+      "another tenant",
+      {
+        tid: "another",
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      403,
+    ],
+    [
+      "an unknown user",
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: "unknown",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      403,
+    ],
     [
       "an unknown app",
       {
@@ -156,7 +176,11 @@ describe("local API", () => {
     ],
     [
       "the operator without the exact delegated scope",
-      { tid: STUDENT_TENANT_ID, oid: STUDENT_OPERATOR_OBJECT_ID, scp: "other_scope" },
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+        scp: "other_scope",
+      },
       403,
     ],
     [
@@ -169,7 +193,11 @@ describe("local API", () => {
       },
       403,
     ],
-    ["missing required claims", { tid: STUDENT_TENANT_ID, oid: STUDENT_OPERATOR_OBJECT_ID }, 401],
+    [
+      "missing required claims",
+      { tid: STUDENT_TENANT_ID, oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID },
+      401,
+    ],
     [
       "confused delegated and app-only claims",
       {
@@ -206,7 +234,7 @@ describe("local API", () => {
   ])("rejects a correctly signed token with %s", async (_label, registeredClaim) => {
     const response = await protectedRequest({
       tid: STUDENT_TENANT_ID,
-      oid: STUDENT_OPERATOR_OBJECT_ID,
+      oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
       scp: "scope",
       ...registeredClaim,
     });
@@ -216,7 +244,7 @@ describe("local API", () => {
   it("rejects a tampered signed token", async () => {
     const token = fixtureToken({
       tid: STUDENT_TENANT_ID,
-      oid: STUDENT_OPERATOR_OBJECT_ID,
+      oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
       scp: "scope",
     });
     const [header, _claims, signature] = token.split(".");

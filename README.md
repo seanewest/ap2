@@ -40,7 +40,8 @@ The API is a separate, framework-free Node/TypeScript process. `GET /health` is
 public for container health checks. `GET /api/whoami` first verifies an RS256
 Bearer token's signature, issuer, audience, and lifetime, then permits only:
 
-- delegated tokens from Student operator object ID
+- delegated tokens with `access_as_user` from the human product operator
+  `5ce59710-7ea3-448c-bd7b-8e8d2b75bb1f` or dedicated CBA test operator
   `ba97e987-da4c-43e1-ab79-3daa8014440e`; or
 - app-only tokens from development automation client ID
   `7eb78f18-b49c-495c-a571-af03f06b58a9`.
@@ -60,11 +61,11 @@ AUTH_JWKS_URL='https://issuer.example/discovery/v2.0/keys' \
 npm run api
 ```
 
-Startup fails if any of those three settings is absent. The allowed operator
-and automation IDs can be overridden with `AUTH_OPERATOR_OBJECT_ID` and
-`AUTH_AUTOMATION_CLIENT_ID`; the Student tenant cannot be overridden. Plain
-HTTP JWKS is disabled unless `AUTH_ALLOW_INSECURE_JWKS=true`, which exists only
-for isolated local tests.
+Startup fails if any of those three settings is absent. The delegated-user
+allowlist and automation ID can be overridden with the comma-separated
+`AUTH_DELEGATED_USER_OBJECT_IDS` and `AUTH_AUTOMATION_CLIENT_ID`; the Student
+tenant cannot be overridden. Plain HTTP JWKS is disabled unless
+`AUTH_ALLOW_INSECURE_JWKS=true`, which exists only for isolated local tests.
 
 `npm test` includes claims-policy unit tests and signed-JWT tests through a real
 local HTTP server. With rootless Podman available, the following also builds and
@@ -76,7 +77,7 @@ npm run test:container
 ```
 
 The real browser CBA check is intentionally separate because it signs the
-Student operator in and out against Microsoft Entra. See the
+dedicated test operator in and out against Microsoft Entra. See the
 [CBA browser test guide](docs/cba-browser-test.md).
 
 Run an Azure CLI command only after asserting the exact tenant selected by the

@@ -1,6 +1,6 @@
 import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
-  STUDENT_OPERATOR_OBJECT_ID,
+  STUDENT_DELEGATED_USER_OBJECT_IDS,
   STUDENT_TENANT_ID,
   type CallerPolicy,
 } from "./auth-policy.js";
@@ -27,11 +27,29 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): Api
     allowedOrigin: parseAllowedOrigin(environment.CORS_ALLOWED_ORIGIN),
     callerPolicy: {
       tenantId: STUDENT_TENANT_ID,
-      operatorObjectId: environment.AUTH_OPERATOR_OBJECT_ID ?? STUDENT_OPERATOR_OBJECT_ID,
+      delegatedUserObjectIds: parseDelegatedUserObjectIds(
+        environment.AUTH_DELEGATED_USER_OBJECT_IDS,
+      ),
       automationClientId:
         environment.AUTH_AUTOMATION_CLIENT_ID ?? DEVELOPMENT_AUTOMATION_CLIENT_ID,
     },
   };
+}
+
+function parseDelegatedUserObjectIds(value: string | undefined): readonly string[] {
+  if (value === undefined) {
+    return [...STUDENT_DELEGATED_USER_OBJECT_IDS];
+  }
+  const objectIds = value.split(",").map((objectId) => objectId.trim());
+  if (
+    objectIds.some((objectId) => objectId.length === 0) ||
+    new Set(objectIds).size !== objectIds.length
+  ) {
+    throw new Error(
+      "AUTH_DELEGATED_USER_OBJECT_IDS must be a comma-separated list of unique non-empty object IDs",
+    );
+  }
+  return objectIds;
 }
 
 function parseAllowedOrigin(value: string | undefined): string | undefined {

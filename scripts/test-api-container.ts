@@ -10,7 +10,8 @@ const ISSUER = "https://container-fixture.example/student/v2.0";
 const AUDIENCE = "api://ap2-container-fixture";
 const KEY_ID = "container-fixture-key";
 const STUDENT_TENANT_ID = "92563293-315c-4b6c-9b90-bcb47ee8c970";
-const STUDENT_OPERATOR_OBJECT_ID = "ba97e987-da4c-43e1-ab79-3daa8014440e";
+const STUDENT_PRODUCT_OPERATOR_OBJECT_ID = "5ce59710-7ea3-448c-bd7b-8e8d2b75bb1f";
+const STUDENT_CBA_TEST_OPERATOR_OBJECT_ID = "ba97e987-da4c-43e1-ab79-3daa8014440e";
 const DEVELOPMENT_AUTOMATION_CLIENT_ID = "7eb78f18-b49c-495c-a571-af03f06b58a9";
 const image = `ap2-api-container-test:${process.pid}`;
 const container = `ap2-api-container-test-${process.pid}`;
@@ -62,7 +63,17 @@ async function main(): Promise<void> {
       `${baseUrl}/api/whoami`,
       fixtureToken(privateKey, {
         tid: STUDENT_TENANT_ID,
-        oid: STUDENT_OPERATOR_OBJECT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: "access_as_user",
+      }),
+      200,
+      "delegated",
+    );
+    await expectStatus(
+      `${baseUrl}/api/whoami`,
+      fixtureToken(privateKey, {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
         scp: "access_as_user",
       }),
       200,
@@ -83,7 +94,16 @@ async function main(): Promise<void> {
       `${baseUrl}/api/whoami`,
       fixtureToken(privateKey, {
         tid: "another-tenant",
-        oid: STUDENT_OPERATOR_OBJECT_ID,
+        oid: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+        scp: "access_as_user",
+      }),
+      403,
+    );
+    await expectStatus(
+      `${baseUrl}/api/whoami`,
+      fixtureToken(privateKey, {
+        tid: STUDENT_TENANT_ID,
+        oid: "unknown-user",
         scp: "access_as_user",
       }),
       403,
