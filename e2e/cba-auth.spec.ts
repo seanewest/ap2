@@ -30,6 +30,11 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
   await expect(
     page.locator("dd").getByText(STUDENT_TENANT_ID, { exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: "Send one internal email: Homer → Marge",
+    }),
+  ).toBeVisible();
 
   const whoAmIResponse = page.waitForResponse((response) => {
     const url = new URL(response.url());
@@ -113,6 +118,11 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
   await expect(
     page.getByRole("button", { name: "Check rehearsal status" }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Send one internal email: Homer → Marge",
+    }),
+  ).toHaveCount(0);
 
   await page.reload();
   await expect(page.getByText("You are signed out.")).toBeVisible();
@@ -121,6 +131,11 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Check rehearsal status" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Send one internal email: Homer → Marge",
+    }),
   ).toHaveCount(0);
 });
 
