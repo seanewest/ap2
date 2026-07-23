@@ -12,6 +12,7 @@ import {
   ApiAccessError,
   type AfterPartyApi,
   type ApiCallerIdentity,
+  type RehearsalStatus,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
 
@@ -32,6 +33,8 @@ class FakeAuthentication implements Authentication {
 
 class FakeApi implements AfterPartyApi {
   checkAccess = vi.fn<(accessToken: string) => Promise<ApiCallerIdentity>>();
+  getRehearsalStatus =
+    vi.fn<(accessToken: string) => Promise<RehearsalStatus>>();
 }
 
 describe("After Party authentication UI", () => {
@@ -60,6 +63,7 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain("You are signed out");
     expect(signInButton().textContent).toBe("Sign in with Microsoft");
     expect(apiButton()).toBeNull();
+    expect(rehearsalButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -148,6 +152,7 @@ describe("After Party authentication UI", () => {
     expect(authentication.signOut).toHaveBeenCalledOnce();
     expect(root.textContent).toContain("You are signed out");
     expect(apiButton()).toBeNull();
+    expect(rehearsalButton()).toBeNull();
   });
 
   it("requests the exact scope and renders only safe API identity fields", async () => {
@@ -252,12 +257,115 @@ describe("After Party authentication UI", () => {
     expect(apiButton()?.textContent).toBe("Check API access");
   });
 
+  it("requests the exact scope and renders only safe rehearsal status", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("sensitive-access-token");
+    api.getRehearsalStatus.mockResolvedValue({
+      appName: "ca-ap2-api",
+      region: "East US",
+      runningStatus: "Running",
+      activeRevision: "ca-ap2-api--revision",
+      secret: "must-not-render",
+    } as RehearsalStatus);
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    rehearsalButton()?.click();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.getRehearsalStatus).toHaveBeenCalledWith(
+      "sensitive-access-token",
+    );
+    expect(root.textContent).toContain("Rehearsal status received");
+    expect(root.textContent).toContain("ca-ap2-api");
+    expect(root.textContent).toContain("East US");
+    expect(root.textContent).toContain("Running");
+    expect(root.textContent).toContain("ca-ap2-api--revision");
+    expect(root.textContent).not.toContain("sensitive-access-token");
+    expect(root.textContent).not.toContain("must-not-render");
+  });
+
+  it("shows rehearsal loading without exposing the token", async () => {
+    const deferred = createDeferred<RehearsalStatus>();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.getRehearsalStatus.mockReturnValue(deferred.promise);
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    rehearsalButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain("Checking rehearsal status");
+    expect(rehearsalButton()?.disabled).toBe(true);
+    expect(root.textContent).not.toContain("temporary-token");
+
+    deferred.resolve({
+      appName: "ca-ap2-api",
+      region: "East US",
+      runningStatus: "Running",
+      activeRevision: "ca-ap2-api--revision",
+    });
+    await nextTask();
+    expect(root.textContent).toContain("Rehearsal status received");
+    expect(rehearsalButton()?.disabled).toBe(false);
+  });
+
+  it("shows a safe rehearsal failure and allows retry", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.getRehearsalStatus
+      .mockRejectedValueOnce(
+        new ApiAccessError("Rehearsal status is unavailable. Try again."),
+      )
+      .mockResolvedValueOnce({
+        appName: "ca-ap2-api",
+        region: "East US",
+        runningStatus: "Running",
+        activeRevision: "ca-ap2-api--revision",
+      });
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    rehearsalButton()?.click();
+    await nextTask();
+    expect(root.textContent).toContain(
+      "Rehearsal status is unavailable. Try again.",
+    );
+
+    rehearsalButton()?.click();
+    await nextTask();
+    expect(api.getRehearsalStatus).toHaveBeenCalledTimes(2);
+    expect(root.textContent).toContain("Rehearsal status received");
+  });
+
   function signInButton(): HTMLButtonElement {
     return root.querySelector<HTMLButtonElement>("[data-action='sign-in']")!;
   }
 
   function apiButton(): HTMLButtonElement | null {
     return root.querySelector<HTMLButtonElement>("[data-action='check-api']");
+  }
+
+  function rehearsalButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='check-rehearsal']",
+    );
   }
 });
 

@@ -3,8 +3,24 @@ export interface ApiCallerIdentity {
   tenantId: string;
 }
 
+const runningStatuses = [
+  "Progressing",
+  "Running",
+  "Stopped",
+  "Suspended",
+  "Ready",
+] as const;
+
+export interface RehearsalStatus {
+  appName: string;
+  region: string;
+  runningStatus: (typeof runningStatuses)[number];
+  activeRevision: string;
+}
+
 export interface AfterPartyApi {
   checkAccess(accessToken: string): Promise<ApiCallerIdentity>;
+  getRehearsalStatus(accessToken: string): Promise<RehearsalStatus>;
 }
 
 export class ApiAccessError extends Error {
@@ -16,17 +32,54 @@ export class ApiAccessError extends Error {
 
 export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly whoAmIUrl: string;
+  private readonly rehearsalStatusUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
     this.whoAmIUrl = new URL("api/whoami", `${baseUrl}/`).toString();
+    this.rehearsalStatusUrl = new URL(
+      "api/rehearsal-status",
+      `${baseUrl}/`,
+    ).toString();
     this.request = request.bind(globalThis);
   }
 
   async checkAccess(accessToken: string): Promise<ApiCallerIdentity> {
+    const value = await this.getAuthorizedJson(this.whoAmIUrl, accessToken);
+    if (!isSafeCallerIdentity(value)) {
+      throw new ApiAccessError();
+    }
+
+    return {
+      callerType: value.callerType,
+      tenantId: value.tenantId,
+    };
+  }
+
+  async getRehearsalStatus(accessToken: string): Promise<RehearsalStatus> {
+    const value = await this.getAuthorizedJson(
+      this.rehearsalStatusUrl,
+      accessToken,
+    );
+    if (!isSafeRehearsalStatus(value)) {
+      throw new ApiAccessError();
+    }
+
+    return {
+      appName: value.appName,
+      region: value.region,
+      runningStatus: value.runningStatus,
+      activeRevision: value.activeRevision,
+    };
+  }
+
+  private async getAuthorizedJson(
+    url: string,
+    accessToken: string,
+  ): Promise<unknown> {
     let response: Response;
     try {
-      response = await this.request(this.whoAmIUrl, {
+      response = await this.request(url, {
         method: "GET",
         credentials: "omit",
         redirect: "error",
@@ -54,14 +107,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new ApiAccessError();
     }
-    if (!isSafeCallerIdentity(value)) {
-      throw new ApiAccessError();
-    }
-
-    return {
-      callerType: value.callerType,
-      tenantId: value.tenantId,
-    };
+    return value;
   }
 }
 
@@ -74,5 +120,21 @@ function isSafeCallerIdentity(value: unknown): value is ApiCallerIdentity {
     (caller.callerType === "delegated" || caller.callerType === "app-only") &&
     typeof caller.tenantId === "string" &&
     caller.tenantId.length > 0
+  );
+}
+
+function isSafeRehearsalStatus(value: unknown): value is RehearsalStatus {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const status = value as Record<string, unknown>;
+  return (
+    typeof status.appName === "string" &&
+    status.appName.length > 0 &&
+    typeof status.region === "string" &&
+    status.region.length > 0 &&
+    runningStatuses.some((candidate) => candidate === status.runningStatus) &&
+    typeof status.activeRevision === "string" &&
+    status.activeRevision.length > 0
   );
 }

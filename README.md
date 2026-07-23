@@ -48,7 +48,11 @@ Bearer token's signature, issuer, audience, and lifetime, then permits only:
 
 Both must be issued in immutable Student tenant
 `92563293-315c-4b6c-9b90-bcb47ee8c970`. Delegated and app-only claim shapes are
-kept distinct. Azure and Microsoft Graph calls are not implemented.
+kept distinct. Authorized callers can also use `GET /api/rehearsal-status`.
+That operation uses the API's runtime managed identity to read the fixed
+Student rehearsal Container App and returns only its name, region, running
+status, and active revision. See [API identity](docs/api-identity.md) for the
+fixed target and the Dev-app command.
 
 Build and start the API locally with explicit verification configuration:
 

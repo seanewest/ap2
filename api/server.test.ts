@@ -3,7 +3,7 @@
 import { generateKeyPairSync, sign } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createLocalJWKSet, type JWK } from "jose";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { defaultCallerPolicy } from "./auth-policy.js";
 import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
@@ -13,6 +13,7 @@ import {
   STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
 } from "./identity.js";
+import type { RehearsalStatus } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
 import { JoseTokenVerifier } from "./token-verifier.js";
 
@@ -28,6 +29,15 @@ const publicJwk = {
   alg: "RS256",
   use: "sig",
 } as JWK;
+const rehearsalStatus: RehearsalStatus = {
+  appName: "ca-ap2-api",
+  region: "East US",
+  runningStatus: "Running",
+  activeRevision: "ca-ap2-api--revision",
+};
+const rehearsalStatusProvider = {
+  getStatus: vi.fn().mockResolvedValue(rehearsalStatus),
+};
 const server = createApiServer({
   tokenVerifier: new JoseTokenVerifier({
     issuer: ISSUER,
@@ -36,6 +46,7 @@ const server = createApiServer({
     now: () => NOW,
   }),
   callerPolicy: defaultCallerPolicy,
+  rehearsalStatusProvider,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -59,25 +70,28 @@ describe("local API", () => {
     await expect(response.json()).resolves.toEqual({ status: "ok" });
   });
 
-  it("allows only the configured origin to preflight the protected route", async () => {
-    const response = await fetch(`${baseUrl}/api/whoami`, {
-      method: "OPTIONS",
-      headers: {
-        Origin: "http://localhost:5173",
-        "Access-Control-Request-Method": "GET",
-        "Access-Control-Request-Headers": "Authorization",
-      },
-    });
+  it.each(["/api/whoami", "/api/rehearsal-status"])(
+    "allows only the configured origin to preflight %s",
+    async (path) => {
+      const response = await fetch(`${baseUrl}${path}`, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "http://localhost:5173",
+          "Access-Control-Request-Method": "GET",
+          "Access-Control-Request-Headers": "Authorization",
+        },
+      });
 
-    expect(response.status).toBe(204);
-    expect(response.headers.get("access-control-allow-origin")).toBe(
-      "http://localhost:5173",
-    );
-    expect(response.headers.get("access-control-allow-methods")).toBe("GET");
-    expect(response.headers.get("access-control-allow-headers")).toBe(
-      "Authorization",
-    );
-  });
+      expect(response.status).toBe(204);
+      expect(response.headers.get("access-control-allow-origin")).toBe(
+        "http://localhost:5173",
+      );
+      expect(response.headers.get("access-control-allow-methods")).toBe("GET");
+      expect(response.headers.get("access-control-allow-headers")).toBe(
+        "Authorization",
+      );
+    },
+  );
 
   it("rejects another origin and broader preflight requests", async () => {
     const otherOrigin = await fetch(`${baseUrl}/api/whoami`, {
@@ -147,6 +161,52 @@ describe("local API", () => {
       clientId: DEVELOPMENT_AUTOMATION_CLIENT_ID,
       tenantId: STUDENT_TENANT_ID,
     });
+  });
+
+  it.each([
+    [
+      "delegated operator",
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+    ],
+    [
+      "development automation app",
+      {
+        tid: STUDENT_TENANT_ID,
+        idtyp: "app",
+        azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+        roles: [REQUIRED_APPLICATION_ROLE],
+      },
+    ],
+  ])("returns rehearsal status to the authorized %s", async (_label, claims) => {
+    const response = await protectedRequest(
+      claims,
+      undefined,
+      "/api/rehearsal-status",
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(rehearsalStatus);
+  });
+
+  it("does not read Azure for an unknown delegated caller", async () => {
+    rehearsalStatusProvider.getStatus.mockClear();
+
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: "unknown-user",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/rehearsal-status",
+    );
+
+    expect(response.status).toBe(403);
+    expect(rehearsalStatusProvider.getStatus).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -271,8 +331,9 @@ describe("local API", () => {
 async function protectedRequest(
   claims: Record<string, unknown>,
   origin?: string,
+  path = "/api/whoami",
 ): Promise<Response> {
-  return fetch(`${baseUrl}/api/whoami`, {
+  return fetch(`${baseUrl}${path}`, {
     headers: {
       Authorization: `Bearer ${fixtureToken(claims)}`,
       ...(origin ? { Origin: origin } : {}),
