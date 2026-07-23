@@ -16,11 +16,11 @@ const image = `ap2-api-container-test:${process.pid}`;
 const container = `ap2-api-container-test-${process.pid}`;
 
 async function main(): Promise<void> {
-  const availability = spawnSync("docker", ["info", "--format", "{{.ServerVersion}}"], {
+  const availability = spawnSync("podman", ["info", "--format", "{{.Version.Version}}"], {
     encoding: "utf8",
   });
   if (availability.status !== 0) {
-    const detail = (availability.stderr || availability.stdout || "Docker is unavailable").trim();
+    const detail = (availability.stderr || availability.stdout || "Podman is unavailable").trim();
     console.log(`Container test skipped: ${detail}`);
     return;
   }
@@ -32,8 +32,8 @@ async function main(): Promise<void> {
   let containerCreated = false;
 
   try {
-    runDocker(["build", "--tag", image, "."], "inherit");
-    runDocker([
+    runPodman(["build", "--format", "docker", "--tag", image, "."], "inherit");
+    runPodman([
       "run",
       "--detach",
       "--name",
@@ -41,8 +41,6 @@ async function main(): Promise<void> {
       "--read-only",
       "--cap-drop",
       "ALL",
-      "--add-host",
-      "host.docker.internal:host-gateway",
       "--publish",
       `127.0.0.1:${apiPort}:3000`,
       "--env",
@@ -50,7 +48,7 @@ async function main(): Promise<void> {
       "--env",
       `AUTH_AUDIENCE=${AUDIENCE}`,
       "--env",
-      `AUTH_JWKS_URL=http://host.docker.internal:${jwksPort}/jwks`,
+      `AUTH_JWKS_URL=http://host.containers.internal:${jwksPort}/jwks`,
       "--env",
       "AUTH_ALLOW_INSECURE_JWKS=true",
       image,
@@ -91,20 +89,20 @@ async function main(): Promise<void> {
       403,
     );
 
-    runDocker(["stop", "--time", "5", container]);
-    const exitCode = runDocker(["inspect", "--format", "{{.State.ExitCode}}", container]);
-    const logs = runDocker(["logs", container]);
+    runPodman(["stop", "--time", "5", container]);
+    const exitCode = runPodman(["inspect", "--format", "{{.State.ExitCode}}", container]);
+    const logs = runPodman(["logs", container]);
     if (exitCode.trim() !== "0" || !logs.includes("Received SIGTERM; shutting down")) {
       throw new Error(`Container did not shut down cleanly (exit ${exitCode.trim()})`);
     }
-    runDocker(["rm", container]);
+    runPodman(["rm", container]);
     containerCreated = false;
     console.log("Container build, health, authorization, and clean shutdown passed");
   } finally {
     if (containerCreated) {
-      spawnSync("docker", ["rm", "--force", container], { encoding: "utf8" });
+      spawnSync("podman", ["rm", "--force", container], { encoding: "utf8" });
     }
-    spawnSync("docker", ["image", "rm", "--force", image], { encoding: "utf8" });
+    spawnSync("podman", ["image", "rm", "--force", image], { encoding: "utf8" });
     await close(jwksServer);
   }
 }
@@ -125,7 +123,7 @@ async function waitForHealthy(baseUrl: string): Promise<void> {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
       const response = await fetch(`${baseUrl}/health`);
-      const health = runDocker(["inspect", "--format", "{{.State.Health.Status}}", container]);
+      const health = runPodman(["inspect", "--format", "{{.State.Health.Status}}", container]);
       if (response.ok && health.trim() === "healthy") {
         return;
       }
@@ -134,7 +132,7 @@ async function waitForHealthy(baseUrl: string): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error(`Container did not become healthy:\n${runDocker(["logs", container])}`);
+  throw new Error(`Container did not become healthy:\n${runPodman(["logs", container])}`);
 }
 
 async function expectStatus(
@@ -169,12 +167,12 @@ function fixtureToken(privateKey: KeyObject, claims: Record<string, unknown>): s
   return `${header}.${payload}.${signature}`;
 }
 
-function runDocker(args: string[], stdio: "pipe" | "inherit" = "pipe"): string {
+function runPodman(args: string[], stdio: "pipe" | "inherit" = "pipe"): string {
   if (stdio === "inherit") {
-    execFileSync("docker", args, { stdio: "inherit" });
+    execFileSync("podman", args, { stdio: "inherit" });
     return "";
   }
-  return execFileSync("docker", args, { encoding: "utf8" });
+  return execFileSync("podman", args, { encoding: "utf8" });
 }
 
 async function listen(server: Server): Promise<number> {

@@ -67,8 +67,8 @@ HTTP JWKS is disabled unless `AUTH_ALLOW_INSECURE_JWKS=true`, which exists only
 for isolated local tests.
 
 `npm test` includes claims-policy unit tests and signed-JWT tests through a real
-local HTTP server. With a running Docker daemon, the following also builds and
-starts the image, waits for Docker health, sends signed delegated and app-only
+local HTTP server. With rootless Podman available, the following also builds and
+starts the image, waits for container health, sends signed delegated and app-only
 Bearer requests, checks a rejection, and verifies SIGTERM shutdown:
 
 ```sh
