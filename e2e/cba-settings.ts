@@ -1,7 +1,8 @@
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { STUDENT_TENANT_ID } from "../api/identity";
 
-export const STUDENT_TENANT_ID = "92563293-315c-4b6c-9b90-bcb47ee8c970";
+export { STUDENT_TENANT_ID };
 export const STUDENT_OPERATOR =
   "after-party-operator@corywest.onmicrosoft.com";
 export const LOCAL_APP_URL = "http://localhost:5173/";

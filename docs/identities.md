@@ -21,7 +21,10 @@ Student tenant
 │   └── has broad development permissions
 │
 ├── Student-owned Container App / API
-│   ├── only called by the student operator and development automation app
+│   ├── delegated callers
+│   │   ├── human product operator: admin@corywest.onmicrosoft.com
+│   │   └── CBA browser-test operator: after-party-operator@corywest.onmicrosoft.com
+│   ├── app-only caller: development automation app
 │   │
 │   └── Runtime managed identity
 │       ├── calls Azure as the runtime
@@ -44,8 +47,8 @@ Prefer fast tests that minimize human intervention.
 
 Use the development automation app for backend and infrastructure tests.
 
-Use a CBA-enabled student operator for SPA tests, reusing saved browser sessions
-when possible.
+Use the dedicated CBA-enabled test operator for SPA browser tests. The human
+admin remains the real product operator.
 
 The [SPA CBA browser test](cba-browser-test.md) uses a fresh Playwright context
 instead of a human browser profile or shared browser session.

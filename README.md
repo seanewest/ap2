@@ -34,8 +34,49 @@ npm run typecheck
 npm run build
 ```
 
+## Student-owned API
+
+The API is a separate, framework-free Node/TypeScript process. `GET /health` is
+public for container health checks. `GET /api/whoami` first verifies an RS256
+Bearer token's signature, issuer, audience, and lifetime, then permits only:
+
+- delegated tokens with `access_as_user` from the human product operator
+  `5ce59710-7ea3-448c-bd7b-8e8d2b75bb1f` or dedicated CBA test operator
+  `ba97e987-da4c-43e1-ab79-3daa8014440e`; or
+- app-only tokens from development automation client ID
+  `7eb78f18-b49c-495c-a571-af03f06b58a9`.
+
+Both must be issued in immutable Student tenant
+`92563293-315c-4b6c-9b90-bcb47ee8c970`. Delegated and app-only claim shapes are
+kept distinct. Azure and Microsoft Graph calls are not implemented.
+
+Build and start the API locally with explicit verification configuration:
+
+```sh
+npm run build:api
+AUTH_ISSUER='https://issuer.example/tenant/v2.0' \
+AUTH_AUDIENCE='api://audience' \
+AUTH_JWKS_URL='https://issuer.example/discovery/v2.0/keys' \
+npm run api
+```
+
+Startup fails if any of those three settings is absent. The delegated-user
+allowlist and automation ID can be overridden with the comma-separated
+`AUTH_DELEGATED_USER_OBJECT_IDS` and `AUTH_AUTOMATION_CLIENT_ID`; the Student
+tenant cannot be overridden. Plain HTTP JWKS is disabled unless
+`AUTH_ALLOW_INSECURE_JWKS=true`, which exists only for isolated local tests.
+
+`npm test` includes claims-policy unit tests and signed-JWT tests through a real
+local HTTP server. With rootless Podman available, the following also builds and
+starts the image, waits for container health, sends signed delegated and app-only
+Bearer requests, checks a rejection, and verifies SIGTERM shutdown:
+
+```sh
+npm run test:container
+```
+
 The real browser CBA check is intentionally separate because it signs the
-Student operator in and out against Microsoft Entra. See the
+dedicated test operator in and out against Microsoft Entra. See the
 [CBA browser test guide](docs/cba-browser-test.md).
 
 Run an Azure CLI command only after asserting the exact tenant selected by the
@@ -45,19 +86,25 @@ CLI and its access token:
 scripts/az-in-tenant.sh '<tenant-id>' -- account show
 ```
 
-Summarize the most recently modified local Codex transcript, including elapsed
-turn time, measured tool time, token use, and automatic goal retries:
+Summarize a local Codex transcript, including wall and Codex-reported active
+time, slow tool calls, likely stalls, token use, and automatic goal retries.
+Select the worker explicitly when several agents share `CODEX_HOME`:
 
 ```sh
-npm run report:codex
+npm run report:codex -- --name Lebron
+npm run report:codex -- --name Durant
 ```
 
-Pass a transcript path to report on a specific session. For clean
-machine-readable output, invoke the script directly:
+You can also select with `--thread-id` or `--path`. For valid JSON with no npm
+banner, use npm's silent mode or invoke the script directly:
 
 ```sh
-node scripts/codex-session-report.ts '<session.jsonl>' --json
+npm run --silent report:codex -- --name Lebron --json
+node scripts/codex-session-report.ts --name Lebron --json
 ```
+
+See the [Codex session report guide](docs/codex-session-report.md) for timing
+semantics and selection fallbacks.
 
 ## Deploy
 

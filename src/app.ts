@@ -1,15 +1,34 @@
 import {
+  AccessTokenCancelledError,
+  AccessTokenError,
   AuthenticationCancelledError,
   AuthenticationError,
   type AccountIdentity,
   type Authentication,
 } from "./auth/authentication";
+import {
+  ApiAccessError,
+  type AfterPartyApi,
+  type ApiCallerIdentity,
+} from "./api/client";
+import { API_ACCESS_SCOPES } from "./api/config";
+
+type ApiAccessState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "success"; caller: ApiCallerIdentity }
+  | { kind: "cancelled" }
+  | { kind: "error"; message: string };
 
 type ViewState =
   | { kind: "initial" }
   | { kind: "processing"; message: string }
   | { kind: "signed-out" }
-  | { kind: "signed-in"; account: AccountIdentity }
+  | {
+      kind: "signed-in";
+      account: AccountIdentity;
+      apiAccess: ApiAccessState;
+    }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
 
@@ -20,6 +39,7 @@ export interface AfterPartyApp {
 export function createAfterPartyApp(
   root: HTMLElement,
   authentication: Authentication,
+  api: AfterPartyApi,
 ): AfterPartyApp {
   let state: ViewState = { kind: "initial" };
 
@@ -60,6 +80,43 @@ export function createAfterPartyApp(
     }
   };
 
+  const checkApiAccess = async (): Promise<void> => {
+    if (state.kind !== "signed-in" || state.apiAccess.kind === "loading") {
+      return;
+    }
+    const account = state.account;
+    setState({ kind: "signed-in", account, apiAccess: { kind: "loading" } });
+
+    try {
+      const accessToken = await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      const caller = await api.checkAccess(accessToken);
+      if (isCurrentSignedInAccount(state, account)) {
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess: { kind: "success", caller },
+        });
+      }
+    } catch (error) {
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      if (error instanceof AccessTokenCancelledError) {
+        setState({ kind: "signed-in", account, apiAccess: { kind: "cancelled" } });
+        return;
+      }
+      const message =
+        error instanceof AccessTokenError || error instanceof ApiAccessError
+          ? error.message
+          : "API access could not be checked. Try again.";
+      setState({
+        kind: "signed-in",
+        account,
+        apiAccess: { kind: "error", message },
+      });
+    }
+  };
+
   const render = (): void => {
     root.replaceChildren(createShell(state));
     root
@@ -68,6 +125,9 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='sign-out']")
       ?.addEventListener("click", () => void signOut());
+    root
+      .querySelector<HTMLButtonElement>("[data-action='check-api']")
+      ?.addEventListener("click", () => void checkApiAccess());
   };
 
   const start = async (): Promise<void> => {
@@ -79,7 +139,11 @@ export function createAfterPartyApp(
       const startup = await authentication.initialize();
       setState(
         startup.kind === "signed-in"
-          ? { kind: "signed-in", account: startup.account }
+          ? {
+              kind: "signed-in",
+              account: startup.account,
+              apiAccess: { kind: "idle" },
+            }
           : { kind: "signed-out" },
       );
     } catch (error) {
@@ -136,6 +200,7 @@ function createStatePanel(state: ViewState): HTMLElement {
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
+        createApiAccessPanel(state.apiAccess),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -165,15 +230,48 @@ function createStatus(message: string, className = "status"): HTMLElement {
 
 function createButton(
   label: string,
-  action: "sign-in" | "sign-out",
+  action: "sign-in" | "sign-out" | "check-api",
   className: string,
+  disabled = false,
 ): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.className = className;
   button.dataset.action = action;
   button.textContent = label;
+  button.disabled = disabled;
   return button;
+}
+
+function createApiAccessPanel(state: ApiAccessState): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+
+  if (state.kind === "loading") {
+    panel.setAttribute("aria-busy", "true");
+    panel.append(createStatus("Checking API access…"));
+  } else if (state.kind === "success") {
+    panel.append(
+      createStatus("API access confirmed."),
+      createCallerList(state.caller),
+    );
+  } else if (state.kind === "cancelled") {
+    panel.append(
+      createStatus("API access request was cancelled. Try again when ready.", "notice"),
+    );
+  } else if (state.kind === "error") {
+    panel.append(createStatus(state.message, "error"));
+  }
+
+  panel.append(
+    createButton(
+      "Check API access",
+      "check-api",
+      "primary",
+      state.kind === "loading",
+    ),
+  );
+  return panel;
 }
 
 function createIdentityList(account: AccountIdentity): HTMLDListElement {
@@ -185,6 +283,21 @@ function createIdentityList(account: AccountIdentity): HTMLDListElement {
   appendIdentity(list, "Account ID", account.accountId);
 
   return list;
+}
+
+function createCallerList(caller: ApiCallerIdentity): HTMLDListElement {
+  const list = document.createElement("dl");
+  list.className = "identity-list";
+  appendIdentity(list, "Caller type", caller.callerType);
+  appendIdentity(list, "API tenant ID", caller.tenantId);
+  return list;
+}
+
+function isCurrentSignedInAccount(
+  state: ViewState,
+  account: AccountIdentity,
+): state is Extract<ViewState, { kind: "signed-in" }> {
+  return state.kind === "signed-in" && state.account.accountId === account.accountId;
 }
 
 function appendIdentity(
