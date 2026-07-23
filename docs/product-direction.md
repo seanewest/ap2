@@ -45,3 +45,13 @@ Pass 3 has two purposes:
 2. Improve Sean's workflow for directing and collaborating with LLM agents.
 
 The implementation may eventually be thrown away and rebuilt in another pass. That is expected, not a failure.
+
+## Pass 3 identity and permission posture
+
+The Dev app is a development and test identity for Pass 3. It will never be installed, consented, or present in a real student's tenant. It may directly query or manipulate Microsoft services for development and diagnostics.
+
+During this exploratory pass, the human operator, backend/API automation identity, Dev app, and shared simulated-user client should receive broad permissions appropriate to exploration so work is not repeatedly blocked by least-privilege decisions. Production hardening and least-privilege review are deferred to a later pass.
+
+Broad permissions do not erase actor boundaries. The operator uses the SPA/API, backend administrative operations use the API/backend identity, and activity intended to appear as a simulated user uses that user's delegated identity.
+
+Pass 3 should minimize app identities and registrations. Reuse one identity where the actor and authentication model are the same, and create another only for a genuinely distinct actor or authentication flow. The current shared simulated-user client is an Entra OAuth client used to acquire delegated tokens for simulated users; it is not a process, worker, or long-running job, and it is shared rather than created per user.
