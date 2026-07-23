@@ -17,6 +17,7 @@ export interface Authentication {
   initialize(): Promise<AuthenticationStartup>;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
+  acquireAccessToken(scopes: readonly string[]): Promise<string>;
 }
 
 export class AuthenticationCancelledError extends Error {
@@ -30,5 +31,19 @@ export class AuthenticationError extends Error {
   constructor(message = "Microsoft sign-in could not be completed. Try again.") {
     super(message);
     this.name = "AuthenticationError";
+  }
+}
+
+export class AccessTokenCancelledError extends Error {
+  constructor() {
+    super("API access request was cancelled.");
+    this.name = "AccessTokenCancelledError";
+  }
+}
+
+export class AccessTokenError extends Error {
+  constructor(message = "Microsoft could not provide API access. Try again.") {
+    super(message);
+    this.name = "AccessTokenError";
   }
 }

@@ -1,11 +1,18 @@
 import {
   BrowserAuthErrorCodes,
+  InteractionRequiredAuthError,
   PublicClientApplication,
   type AccountInfo,
   type AuthenticationResult,
   type Configuration,
+  type HandleRedirectPromiseOptions,
+  type PopupRequest,
+  type RedirectRequest,
+  type SilentRequest,
 } from "@azure/msal-browser";
 import {
+  AccessTokenCancelledError,
+  AccessTokenError,
   AuthenticationCancelledError,
   AuthenticationError,
   type AccountIdentity,
@@ -31,9 +38,27 @@ const configuration: Configuration = {
   },
 };
 
+export interface MsalClient {
+  initialize(): Promise<void>;
+  handleRedirectPromise(
+    options?: HandleRedirectPromiseOptions,
+  ): Promise<AuthenticationResult | null>;
+  getActiveAccount(): AccountInfo | null;
+  getAllAccounts(): AccountInfo[];
+  setActiveAccount(account: AccountInfo | null): void;
+  loginRedirect(request: RedirectRequest): Promise<void>;
+  logoutRedirect(request: { account?: AccountInfo; postLogoutRedirectUri?: string }): Promise<void>;
+  acquireTokenSilent(request: SilentRequest): Promise<AuthenticationResult>;
+  acquireTokenPopup(request: PopupRequest): Promise<AuthenticationResult>;
+}
+
 export class MsalAuthentication implements Authentication {
-  private readonly client = new PublicClientApplication(configuration);
+  private readonly client: MsalClient;
   private activeAccount: AccountInfo | null = null;
+
+  constructor(client: MsalClient = new PublicClientApplication(configuration)) {
+    this.client = client;
+  }
 
   async initialize(): Promise<AuthenticationStartup> {
     try {
@@ -82,6 +107,37 @@ export class MsalAuthentication implements Authentication {
     }
   }
 
+  async acquireAccessToken(scopes: readonly string[]): Promise<string> {
+    if (!this.activeAccount) {
+      throw new AccessTokenError("Sign in before checking API access.");
+    }
+
+    try {
+      let result: AuthenticationResult;
+      try {
+        result = await this.client.acquireTokenSilent({
+          account: this.activeAccount,
+          scopes: [...scopes],
+        });
+      } catch (error) {
+        if (!(error instanceof InteractionRequiredAuthError)) {
+          throw error;
+        }
+        result = await this.client.acquireTokenPopup({
+          account: this.activeAccount,
+          scopes: [...scopes],
+        });
+      }
+
+      if (!result.accessToken) {
+        throw new AccessTokenError();
+      }
+      return result.accessToken;
+    } catch (error) {
+      throw normalizeAccessTokenError(error);
+    }
+  }
+
   private findAccount(result: AuthenticationResult | null): AccountInfo | null {
     if (result?.account) {
       return result.account;
@@ -125,6 +181,27 @@ export function normalizeAuthenticationError(error: unknown): Error {
   }
 
   return new AuthenticationError();
+}
+
+export function normalizeAccessTokenError(error: unknown): Error {
+  if (
+    error instanceof AccessTokenCancelledError ||
+    error instanceof AccessTokenError
+  ) {
+    return error;
+  }
+
+  const errorCode = readStringProperty(error, "errorCode");
+  const subError = readStringProperty(error, "subError");
+  if (
+    errorCode === BrowserAuthErrorCodes.userCancelled ||
+    errorCode === "access_denied" ||
+    subError === "user_cancelled"
+  ) {
+    return new AccessTokenCancelledError();
+  }
+
+  return new AccessTokenError();
 }
 
 function readStringProperty(value: unknown, property: string): string | undefined {
