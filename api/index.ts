@@ -13,6 +13,10 @@ import {
   DelegatedGraphInboxRuleProof,
   GRAPH_MAILBOX_SETTINGS_READ_WRITE_SCOPE,
 } from "./inbox-rule-proof.js";
+import {
+  DelegatedGraphDraftProof,
+  GRAPH_MAIL_READ_WRITE_SCOPE,
+} from "./draft-proof.js";
 import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { GraphSharePointFileProof } from "./sharepoint-file-proof.js";
@@ -72,6 +76,7 @@ const coryTokenProvider =
           GRAPH_CALENDARS_READ_WRITE_SCOPE,
           GRAPH_CONTACTS_READ_WRITE_SCOPE,
           GRAPH_MAILBOX_SETTINGS_READ_WRITE_SCOPE,
+          GRAPH_MAIL_READ_WRITE_SCOPE,
         ],
       })
     : undefined;
@@ -93,6 +98,10 @@ const categoryProofOperation =
   coryTokenProvider && cory
     ? new DelegatedGraphCategoryProof(coryTokenProvider, cory)
     : undefined;
+const draftProofOperation =
+  coryTokenProvider && cory
+    ? new DelegatedGraphDraftProof(coryTokenProvider, cory)
+    : undefined;
 const managedIdentity = new ManagedIdentityCredential();
 const server = createApiServer({
   tokenVerifier,
@@ -104,6 +113,7 @@ const server = createApiServer({
   contactProofOperation,
   inboxRuleProofOperation,
   categoryProofOperation,
+  draftProofOperation,
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
   allowedOrigin: config.allowedOrigin,
 });

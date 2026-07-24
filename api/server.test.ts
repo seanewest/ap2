@@ -26,6 +26,11 @@ import {
   type ContactProofResult,
 } from "./contact-proof.js";
 import {
+  DRAFT_SUBJECT,
+  DraftProofConflictError,
+  type DraftProofResult,
+} from "./draft-proof.js";
+import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   REQUIRED_APPLICATION_ROLE,
   REQUIRED_DELEGATED_SCOPE,
@@ -147,6 +152,14 @@ const sharePointFileProofOperation = {
   create: vi.fn().mockResolvedValue(sharePointFileResults.configured),
   remove: vi.fn().mockResolvedValue(sharePointFileResults.removed),
 };
+const draftResults = {
+  configured: { state: "configured", subject: DRAFT_SUBJECT },
+  removed: { state: "removed", subject: DRAFT_SUBJECT },
+} as const satisfies Record<string, DraftProofResult>;
+const draftProofOperation = {
+  create: vi.fn().mockResolvedValue(draftResults.configured),
+  remove: vi.fn().mockResolvedValue(draftResults.removed),
+};
 const oneDriveResults = {
   configured: {
     state: "configured",
@@ -179,6 +192,7 @@ const server = createApiServer({
   inboxRuleProofOperation,
   categoryProofOperation,
   sharePointFileProofOperation,
+  draftProofOperation,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -207,6 +221,7 @@ describe("local API", () => {
     "/api/inbox-rule-proof",
     "/api/category-proof",
     "/api/sharepoint-file-proof",
+    "/api/draft-proof",
   ])(
     "preflights only explicit mutation methods and Authorization for %s",
     async (path) => {
@@ -825,6 +840,80 @@ describe("local API", () => {
     await expect(response.json()).resolves.toEqual({
       error: "sharepoint_file_state_conflict",
     });
+  });
+
+  it.each([
+    ["POST", "create", draftResults.configured, 201],
+    ["DELETE", "remove", draftResults.removed, 200],
+  ] as const)(
+    "%s runs the unsent-draft proof for both authorized caller shapes",
+    async (method, operation, expected, status) => {
+      const mock = draftProofOperation[operation];
+      mock.mockClear();
+      for (const claims of [
+        {
+          tid: STUDENT_TENANT_ID,
+          oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+          scp: REQUIRED_DELEGATED_SCOPE,
+        },
+        {
+          tid: STUDENT_TENANT_ID,
+          idtyp: "app",
+          azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+          roles: [REQUIRED_APPLICATION_ROLE],
+        },
+      ]) {
+        const response = await protectedRequest(
+          claims,
+          "http://localhost:5173",
+          "/api/draft-proof",
+          method,
+        );
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toEqual(expected);
+      }
+      expect(mock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("fails closed on draft conflict without exposing identifiers", async () => {
+    draftProofOperation.create.mockRejectedValueOnce(
+      new DraftProofConflictError(),
+    );
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/draft-proof",
+      "POST",
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "draft_state_conflict",
+    });
+  });
+
+  it("exposes no draft send, reply, or forward route", async () => {
+    draftProofOperation.create.mockClear();
+    draftProofOperation.remove.mockClear();
+    for (const suffix of ["send", "reply", "forward"]) {
+      const response = await protectedRequest(
+        {
+          tid: STUDENT_TENANT_ID,
+          oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+          scp: REQUIRED_DELEGATED_SCOPE,
+        },
+        undefined,
+        `/api/draft-proof/${suffix}`,
+        "POST",
+      );
+      expect(response.status).toBe(404);
+    }
+    expect(draftProofOperation.create).not.toHaveBeenCalled();
+    expect(draftProofOperation.remove).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -16,6 +16,7 @@ import {
   type CalendarMeetingResult,
   type CategoryProofResult,
   type ContactProofResult,
+  type DraftProofResult,
   type InboxRuleProofResult,
   type OneDriveProofResult,
   type RehearsalStatus,
@@ -40,6 +41,8 @@ const categoryStorageKey =
   "ap2.category-proof.ap2-category-20260725-001.student-tenant-id.student-object-id";
 const sharePointFileStorageKey =
   "ap2.sharepoint-file-proof.ap2-sharepoint-file-20260725-001.student-tenant-id.student-object-id";
+const draftStorageKey =
+  "ap2.draft-proof.ap2-draft-20260725-001.student-tenant-id.student-object-id";
 
 class FakeAuthentication implements Authentication {
   initialize = vi.fn<() => Promise<AuthenticationStartup>>();
@@ -131,6 +134,18 @@ class FakeApi implements AfterPartyApi {
         accessToken: string,
       ) => Promise<Extract<SharePointFileProofResult, { state: "removed" }>>
     >();
+  createDraftProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<DraftProofResult, { state: "configured" }>>
+    >();
+  removeDraftProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<DraftProofResult, { state: "removed" }>>
+    >();
 }
 
 describe("After Party authentication UI", () => {
@@ -175,6 +190,8 @@ describe("After Party authentication UI", () => {
     expect(categoryRemoveButton()).toBeNull();
     expect(sharePointFileCreateButton()).toBeNull();
     expect(sharePointFileRemoveButton()).toBeNull();
+    expect(draftCreateButton()).toBeNull();
+    expect(draftRemoveButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -1020,6 +1037,77 @@ describe("After Party authentication UI", () => {
     },
   );
 
+  it("creates and removes the fixed unsent draft through explicit clicks", async () => {
+    const create = createDeferred<
+      Extract<DraftProofResult, { state: "configured" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.createDraftProof.mockReturnValue(create.promise);
+    api.removeDraftProof.mockResolvedValue({
+      state: "removed",
+      subject: "AP2 Pass 3 harmless draft — ap2-draft-20260725-001",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+
+    expect(root.textContent).toContain("This operation never sends mail.");
+    expect(root.textContent).toContain(
+      "Harmless AP2 draft. This message must not be sent.",
+    );
+    expect(root.textContent).toContain("kobe@corywest.onmicrosoft.com");
+    expect(root.textContent).toContain("marge.simpson@corywest.onmicrosoft.com");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+
+    draftCreateButton()?.click();
+    await nextTask();
+    expect(localStorage.getItem(draftStorageKey)).toBe("uncertain");
+    expect(api.createDraftProof).toHaveBeenCalledOnce();
+    draftCreateButton()?.click();
+    expect(api.createDraftProof).toHaveBeenCalledOnce();
+    create.resolve({
+      state: "configured",
+      subject: "AP2 Pass 3 harmless draft — ap2-draft-20260725-001",
+    });
+    await nextTask();
+    expect(root.textContent).toContain(
+      "Draft rehearsal: Configured as an unsent draft.",
+    );
+    expect(draftRemoveButton()?.disabled).toBe(false);
+
+    draftRemoveButton()?.click();
+    await nextTask();
+    expect(api.removeDraftProof).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(draftStorageKey)).toBe("removed");
+    expect(root.textContent).toContain("Draft rehearsal: Removed.");
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it.each([
+    ["uncertain", true, false],
+    ["configured", true, false],
+    ["removal-uncertain", true, true],
+  ] as const)(
+    "restores draft stage %s without an automatic call",
+    async (stage, createDisabled, removeDisabled) => {
+      localStorage.setItem(draftStorageKey, stage);
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      await createAfterPartyApp(root, authentication, api).start();
+      expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+      expect(api.createDraftProof).not.toHaveBeenCalled();
+      expect(api.removeDraftProof).not.toHaveBeenCalled();
+      expect(draftCreateButton()?.disabled).toBe(createDisabled);
+      expect(draftRemoveButton()?.disabled).toBe(removeDisabled);
+    },
+  );
+
   it("creates and removes the fixed SharePoint file through explicit clicks", async () => {
     const create = createDeferred<
       Extract<SharePointFileProofResult, { state: "configured" }>
@@ -1408,6 +1496,14 @@ describe("After Party authentication UI", () => {
 
   function sharePointFileRemoveButton(): HTMLButtonElement | null {
     return root.querySelector("[data-action='remove-sharepoint-file-proof']");
+  }
+
+  function draftCreateButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='create-draft-proof']");
+  }
+
+  function draftRemoveButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='remove-draft-proof']");
   }
 });
 

@@ -17,6 +17,10 @@ import {
   InboxRuleProofConflictError,
   type InboxRuleProofOperation,
 } from "./inbox-rule-proof.js";
+import {
+  DraftProofConflictError,
+  type DraftProofOperation,
+} from "./draft-proof.js";
 import type { RehearsalStatusProvider } from "./rehearsal-status.js";
 import {
   SharePointFileProofConflictError,
@@ -42,6 +46,7 @@ export interface ApiDependencies {
   inboxRuleProofOperation?: InboxRuleProofOperation;
   categoryProofOperation?: CategoryProofOperation;
   sharePointFileProofOperation?: SharePointFileProofOperation;
+  draftProofOperation?: DraftProofOperation;
   allowedOrigin?: string;
 }
 
@@ -82,7 +87,8 @@ async function route(
     (pathname === "/api/contact-proof" ||
       pathname === "/api/inbox-rule-proof" ||
       pathname === "/api/category-proof" ||
-      pathname === "/api/sharepoint-file-proof")
+      pathname === "/api/sharepoint-file-proof" ||
+      pathname === "/api/draft-proof")
   ) {
     handleProtectedPreflight(request, response, origin, ["POST", "DELETE"]);
     return;
@@ -149,7 +155,8 @@ async function route(
     (pathname === "/api/contact-proof" ||
       pathname === "/api/inbox-rule-proof" ||
       pathname === "/api/category-proof" ||
-      pathname === "/api/sharepoint-file-proof")
+      pathname === "/api/sharepoint-file-proof" ||
+      pathname === "/api/draft-proof")
   ) {
     const action = request.method === "POST" ? "create" : "remove";
     const operation = {
@@ -157,6 +164,7 @@ async function route(
       "/api/inbox-rule-proof": dependencies.inboxRuleProofOperation,
       "/api/category-proof": dependencies.categoryProofOperation,
       "/api/sharepoint-file-proof": dependencies.sharePointFileProofOperation,
+      "/api/draft-proof": dependencies.draftProofOperation,
     }[pathname];
     await handleAuthorizedRequest(
       request,
@@ -379,6 +387,10 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof SharePointFileProofConflictError) {
       sendJson(response, 409, { error: "sharepoint_file_state_conflict" });
+      return;
+    }
+    if (error instanceof DraftProofConflictError) {
+      sendJson(response, 409, { error: "draft_state_conflict" });
       return;
     }
     throw error;
