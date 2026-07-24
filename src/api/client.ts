@@ -39,6 +39,18 @@ type RemovedContact = {
 };
 export type ContactProofResult = ConfiguredContact | RemovedContact;
 
+export const INBOX_RULE_PROOF_DISPLAY_NAME =
+  "AP2 harmless disabled rule — ap2-rule-20260725-001";
+export const INBOX_RULE_PROOF_RUN_ID = "ap2-rule-20260725-001";
+export const INBOX_RULE_PROOF_SUBJECT =
+  "AP2-NEVER-MATCH-ap2-rule-20260725-001";
+export type InboxRuleProofResult =
+  | {
+      state: "configured";
+      displayName: typeof INBOX_RULE_PROOF_DISPLAY_NAME;
+    }
+  | { state: "removed"; displayName: typeof INBOX_RULE_PROOF_DISPLAY_NAME };
+
 export const CALENDAR_MEETING_ORGANIZER =
   "cory@corywest.onmicrosoft.com";
 export const CALENDAR_MEETING_ATTENDEES = [
@@ -132,6 +144,12 @@ export interface AfterPartyApi {
   removeContactProof(
     accessToken: string,
   ): Promise<Extract<ContactProofResult, { state: "removed" }>>;
+  createInboxRuleProof(accessToken: string): Promise<
+    Extract<InboxRuleProofResult, { state: "configured" }>
+  >;
+  removeInboxRuleProof(accessToken: string): Promise<
+    Extract<InboxRuleProofResult, { state: "removed" }>
+  >;
 }
 
 export class ApiAccessError extends Error {
@@ -161,6 +179,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly calendarMeetingUrl: string;
   private readonly calendarMeetingCancelUrl: string;
   private readonly contactProofUrl: string;
+  private readonly inboxRuleProofUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
@@ -189,6 +208,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       "api/contact-proof",
       `${baseUrl}/`,
     ).toString();
+    this.inboxRuleProofUrl = new URL("api/inbox-rule-proof", `${baseUrl}/`)
+      .toString();
     this.request = request.bind(globalThis);
   }
 
@@ -323,31 +344,67 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   async createContactProof(
     accessToken: string,
   ): Promise<Extract<ContactProofResult, { state: "configured" }>> {
-    return this.contactProofRequest(accessToken, "POST", 201, "configured");
+    return this.fixedProofRequest(
+      this.contactProofUrl,
+      accessToken,
+      "POST",
+      201,
+      "configured",
+      isSafeContactProofResult,
+    );
   }
 
   async removeContactProof(
     accessToken: string,
   ): Promise<Extract<ContactProofResult, { state: "removed" }>> {
-    return this.contactProofRequest(accessToken, "DELETE", 200, "removed");
+    return this.fixedProofRequest(
+      this.contactProofUrl,
+      accessToken,
+      "DELETE",
+      200,
+      "removed",
+      isSafeContactProofResult,
+    );
   }
 
-  private async contactProofRequest<T extends ContactProofResult["state"]>(
+  private async fixedProofRequest<
+    R extends { state: string },
+    S extends R["state"],
+  >(
+    url: string,
     accessToken: string,
     method: "POST" | "DELETE",
     status: number,
-    state: T,
-  ): Promise<Extract<ContactProofResult, { state: T }>> {
-    const value = await this.getAuthorizedJson(
-      this.contactProofUrl,
-      accessToken,
-      method,
-      status,
-    );
-    if (!isSafeContactProofResult(value) || value.state !== state) {
+    state: S,
+    validate: (value: unknown) => value is R,
+  ): Promise<Extract<R, { state: S }>> {
+    const value = await this.getAuthorizedJson(url, accessToken, method, status);
+    if (!validate(value) || value.state !== state) {
       throw new ApiAccessError();
     }
-    return value as Extract<ContactProofResult, { state: T }>;
+    return value as Extract<R, { state: S }>;
+  }
+
+  async createInboxRuleProof(accessToken: string) {
+    return this.fixedProofRequest(
+      this.inboxRuleProofUrl,
+      accessToken,
+      "POST",
+      201,
+      "configured",
+      isSafeInboxRuleProofResult,
+    );
+  }
+
+  async removeInboxRuleProof(accessToken: string) {
+    return this.fixedProofRequest(
+      this.inboxRuleProofUrl,
+      accessToken,
+      "DELETE",
+      200,
+      "removed",
+      isSafeInboxRuleProofResult,
+    );
   }
 
   private async oneDriveProofRequest<T extends OneDriveProofResult["state"]>(
@@ -403,6 +460,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       if (error === "contact_state_conflict") {
         throw new ApiAccessError(
           "The contact proof is not in the expected state. Nothing was changed.",
+        );
+      }
+      if (error === "inbox_rule_state_conflict") {
+        throw new ApiAccessError(
+          "The inbox-rule proof is not in the expected state. Nothing was changed.",
         );
       }
       if (failureContext === "calendar") {
@@ -592,6 +654,17 @@ function isSafeContactProofResult(value: unknown): value is ContactProofResult {
     result.displayName === CONTACT_PROOF_DISPLAY_NAME &&
     (result.state === "removed" ||
       (result.state === "configured" && result.email === CONTACT_PROOF_EMAIL))
+  );
+}
+
+function isSafeInboxRuleProofResult(value: unknown): value is InboxRuleProofResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  return (
+    result.displayName === INBOX_RULE_PROOF_DISPLAY_NAME &&
+    (result.state === "removed" || result.state === "configured")
   );
 }
 

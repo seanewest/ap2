@@ -268,3 +268,19 @@ exact marker and full-contact match; absence is already removed. Duplicate,
 paginated, malformed, or mismatched results cause no mutation. Graph mutations
 are never retried. Browser state only explains an explicit attempt and blocks
 duplicate clicks; it is not API correctness state.
+
+## One disabled Inbox-rule rehearsal
+
+`POST` and `DELETE /api/inbox-rule-proof` are separate explicit actions. They
+use Cory's existing CBA settings and delegated `MailboxSettings.ReadWrite`;
+signing in does not call either route or read mail.
+
+Each action lists a bounded set of Cory's Inbox rules once. Create accepts one
+exact existing disabled rule or creates `AP2 harmless disabled rule —
+ap2-rule-20260725-001` with only the never-match subject condition and
+mark-as-read action. Remove deletes that one exact rule; absence is already
+removed. A safe sequence is selected from the bounded list. Duplicate,
+paginated, malformed, or mismatched state causes no mutation. Graph mutations
+are never retried, and omission of `stopProcessingRules` is accepted as its
+requested false default. Browser state records an uncertain attempt before
+mutation; exact-name Graph reconciliation owns correctness.

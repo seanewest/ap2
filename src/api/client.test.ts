@@ -11,10 +11,56 @@ import {
   CONTACT_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_EMAIL,
   HttpAfterPartyApi,
+  INBOX_RULE_PROOF_DISPLAY_NAME,
   OneDriveInviteFailureError,
 } from "./client";
 
 describe("HTTP After Party API client", () => {
+  it.each([
+    ["createInboxRuleProof", "POST", 201, {
+      state: "configured",
+      displayName: INBOX_RULE_PROOF_DISPLAY_NAME,
+    }],
+    ["removeInboxRuleProof", "DELETE", 200, {
+      state: "removed",
+      displayName: INBOX_RULE_PROOF_DISPLAY_NAME,
+    }],
+  ] as const)("safely invokes %s", async (method, verb, status, result) => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(result, { status }),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    );
+
+    await expect(client[method]("rule-token")).resolves.toEqual(result);
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/inbox-rule-proof",
+      {
+        method: verb,
+        credentials: "omit",
+        redirect: "error",
+        headers: { Authorization: "Bearer rule-token" },
+      },
+    );
+  });
+
+  it("rejects malformed Inbox-rule results", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        state: "configured",
+        displayName: "wrong rule",
+      }, { status: 201 }),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      ).createInboxRuleProof("token"),
+    ).rejects.toEqual(new ApiAccessError());
+  });
+
   it.each([
     ["createContactProof", "POST", 201, {
       state: "configured",

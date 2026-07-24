@@ -15,6 +15,7 @@ import {
   type ApiCallerIdentity,
   type CalendarMeetingResult,
   type ContactProofResult,
+  type InboxRuleProofResult,
   type OneDriveProofResult,
   type RehearsalStatus,
   type SimulatedEmailResult,
@@ -31,6 +32,8 @@ const calendarStorageKey =
   "ap2.calendar-meeting.ap2-calendar-20260724-002.student-tenant-id.student-object-id";
 const contactStorageKey =
   "ap2.contact-proof.ap2-contact-20260724-001.student-tenant-id.student-object-id";
+const inboxRuleStorageKey =
+  "ap2.inbox-rule-proof.ap2-rule-20260725-001.student-tenant-id.student-object-id";
 
 class FakeAuthentication implements Authentication {
   initialize = vi.fn<() => Promise<AuthenticationStartup>>();
@@ -84,6 +87,18 @@ class FakeApi implements AfterPartyApi {
         accessToken: string,
       ) => Promise<Extract<ContactProofResult, { state: "removed" }>>
     >();
+  createInboxRuleProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<InboxRuleProofResult, { state: "configured" }>>
+    >();
+  removeInboxRuleProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<InboxRuleProofResult, { state: "removed" }>>
+    >();
 }
 
 describe("After Party authentication UI", () => {
@@ -122,6 +137,8 @@ describe("After Party authentication UI", () => {
     expect(calendarCancelButton()).toBeNull();
     expect(contactCreateButton()).toBeNull();
     expect(contactRemoveButton()).toBeNull();
+    expect(inboxRuleCreateButton()).toBeNull();
+    expect(inboxRuleRemoveButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -967,6 +984,87 @@ describe("After Party authentication UI", () => {
     },
   );
 
+  it("creates and removes the fixed disabled Inbox rule through explicit clicks", async () => {
+    const create = createDeferred<
+      Extract<InboxRuleProofResult, { state: "configured" }>
+    >();
+    const remove = createDeferred<
+      Extract<InboxRuleProofResult, { state: "removed" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.createInboxRuleProof.mockReturnValue(create.promise);
+    api.removeInboxRuleProof.mockReturnValue(remove.promise);
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+    expect(api.createInboxRuleProof).not.toHaveBeenCalled();
+    expect(root.textContent).toContain("AP2-NEVER-MATCH-ap2-rule-20260725-001");
+    expect(inboxRuleCreateButton()?.disabled).toBe(false);
+    expect(inboxRuleRemoveButton()?.disabled).toBe(true);
+
+    inboxRuleCreateButton()?.click();
+    await nextTask();
+    expect(localStorage.getItem(inboxRuleStorageKey)).toBe("uncertain");
+    expect(api.createInboxRuleProof).toHaveBeenCalledOnce();
+    inboxRuleCreateButton()?.click();
+    expect(api.createInboxRuleProof).toHaveBeenCalledOnce();
+
+    create.resolve({
+      state: "configured",
+      displayName: "AP2 harmless disabled rule — ap2-rule-20260725-001",
+    });
+    await nextTask();
+    expect(root.textContent).toContain("Configured and disabled");
+    expect(inboxRuleRemoveButton()?.disabled).toBe(false);
+
+    inboxRuleRemoveButton()?.click();
+    await nextTask();
+    expect(api.removeInboxRuleProof).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(inboxRuleStorageKey)).toBe(
+      "removal-uncertain",
+    );
+    inboxRuleRemoveButton()?.click();
+    expect(api.removeInboxRuleProof).toHaveBeenCalledOnce();
+    remove.resolve({
+      state: "removed",
+      displayName: "AP2 harmless disabled rule — ap2-rule-20260725-001",
+    });
+    await nextTask();
+    expect(localStorage.getItem(inboxRuleStorageKey)).toBe("removed");
+    expect(root.textContent).toContain("Inbox-rule rehearsal: Removed");
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it.each([
+    ["uncertain", true, false],
+    ["configured", true, false],
+    ["removal-uncertain", true, true],
+    ["removed", true, true],
+  ] as const)(
+    "restores Inbox-rule stage %s without an automatic call",
+    async (stage, createDisabled, removeDisabled) => {
+      localStorage.setItem(inboxRuleStorageKey, stage);
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      const app = createAfterPartyApp(root, authentication, api);
+
+      await app.start();
+      expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+      expect(api.createInboxRuleProof).not.toHaveBeenCalled();
+      expect(api.removeInboxRuleProof).not.toHaveBeenCalled();
+      expect(inboxRuleCreateButton()?.disabled).toBe(createDisabled);
+      expect(inboxRuleRemoveButton()?.disabled).toBe(removeDisabled);
+    },
+  );
+
   it("creates and removes the fixed contact through separate explicit clicks", async () => {
     const create = createDeferred<
       Extract<ContactProofResult, { state: "configured" }>
@@ -1102,6 +1200,14 @@ describe("After Party authentication UI", () => {
 
   function contactRemoveButton(): HTMLButtonElement | null {
     return root.querySelector("[data-action='remove-contact-proof']");
+  }
+
+  function inboxRuleCreateButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='create-inbox-rule']");
+  }
+
+  function inboxRuleRemoveButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='remove-inbox-rule']");
   }
 });
 

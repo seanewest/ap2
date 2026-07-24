@@ -17,6 +17,9 @@ import {
   CONTACT_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
+  INBOX_RULE_PROOF_DISPLAY_NAME,
+  INBOX_RULE_PROOF_RUN_ID,
+  INBOX_RULE_PROOF_SUBJECT,
   OneDriveInviteFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
@@ -81,6 +84,17 @@ type ContactProofState = {
   message?: string;
 };
 
+type InboxRuleProofStage =
+  | "not-started"
+  | "uncertain"
+  | "configured"
+  | "removal-uncertain"
+  | "removed";
+type InboxRuleProofState = {
+  stage: InboxRuleProofStage;
+  activity: "idle" | "creating" | "removing";
+  message?: string;
+};
 type ViewState =
   | { kind: "initial" }
   | { kind: "processing"; message: string }
@@ -93,9 +107,13 @@ type ViewState =
       simulatedEmail: SimulatedEmailState;
       oneDriveProof: OneDriveProofState;
       calendarMeeting: CalendarMeetingState;
+      inboxRuleProof: InboxRuleProofState;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
+
+type SignedInState = Extract<ViewState, { kind: "signed-in" }>;
+type SignedInPatch = Partial<Omit<SignedInState, "kind" | "account">>;
 
 export interface AfterPartyApp {
   start(): Promise<void>;
@@ -126,6 +144,17 @@ export function createAfterPartyApp(
   const setState = (nextState: ViewState): void => {
     state = nextState;
     render();
+  };
+
+  const setSignedInPatch = (
+    account: AccountIdentity,
+    patch: SignedInPatch,
+  ): boolean => {
+    if (!isCurrentSignedInAccount(state, account)) {
+      return false;
+    }
+    setState({ ...state, ...patch });
+    return true;
   };
 
   const handleAuthenticationFailure = (error: unknown): void => {
@@ -163,56 +192,25 @@ export function createAfterPartyApp(
   const checkApiAccess = async (): Promise<void> => {
     if (
       state.kind !== "signed-in" ||
-      state.apiAccess.kind === "loading" ||
-      state.rehearsalStatus.kind === "loading" ||
-      state.simulatedEmail.kind === "loading" ||
-      state.oneDriveProof.activity !== "idle" ||
-      state.calendarMeeting.activity !== "idle"
+      isApiOperationBusy(state, contactProof)
     ) {
       return;
     }
     const account = state.account;
-    const rehearsalStatus = state.rehearsalStatus;
-    const simulatedEmail = state.simulatedEmail;
-    const oneDriveProof = state.oneDriveProof;
-    const calendarMeeting = state.calendarMeeting;
-    setState({
-      kind: "signed-in",
-      account,
+    setSignedInPatch(account, {
       apiAccess: { kind: "loading" },
-      rehearsalStatus,
-      simulatedEmail,
-      oneDriveProof,
-      calendarMeeting,
     });
 
     try {
       const accessToken = await authentication.acquireAccessToken(API_ACCESS_SCOPES);
       const caller = await api.checkAccess(accessToken);
-      if (isCurrentSignedInAccount(state, account)) {
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess: { kind: "success", caller },
-          rehearsalStatus,
-          simulatedEmail,
-          oneDriveProof,
-          calendarMeeting,
-        });
-      }
+      setSignedInPatch(account, {
+        apiAccess: { kind: "success", caller },
+      });
     } catch (error) {
-      if (!isCurrentSignedInAccount(state, account)) {
-        return;
-      }
       if (error instanceof AccessTokenCancelledError) {
-        setState({
-          kind: "signed-in",
-          account,
+        setSignedInPatch(account, {
           apiAccess: { kind: "cancelled" },
-          rehearsalStatus,
-          simulatedEmail,
-          oneDriveProof,
-          calendarMeeting,
         });
         return;
       }
@@ -220,14 +218,8 @@ export function createAfterPartyApp(
         error instanceof AccessTokenError || error instanceof ApiAccessError
           ? error.message
           : "API access could not be checked. Try again.";
-      setState({
-        kind: "signed-in",
-        account,
+      setSignedInPatch(account, {
         apiAccess: { kind: "error", message },
-        rehearsalStatus,
-        simulatedEmail,
-        oneDriveProof,
-        calendarMeeting,
       });
     }
   };
@@ -235,56 +227,25 @@ export function createAfterPartyApp(
   const checkRehearsalStatus = async (): Promise<void> => {
     if (
       state.kind !== "signed-in" ||
-      state.rehearsalStatus.kind === "loading" ||
-      state.apiAccess.kind === "loading" ||
-      state.simulatedEmail.kind === "loading" ||
-      state.oneDriveProof.activity !== "idle" ||
-      state.calendarMeeting.activity !== "idle"
+      isApiOperationBusy(state, contactProof)
     ) {
       return;
     }
     const account = state.account;
-    const apiAccess = state.apiAccess;
-    const simulatedEmail = state.simulatedEmail;
-    const oneDriveProof = state.oneDriveProof;
-    const calendarMeeting = state.calendarMeeting;
-    setState({
-      kind: "signed-in",
-      account,
-      apiAccess,
+    setSignedInPatch(account, {
       rehearsalStatus: { kind: "loading" },
-      simulatedEmail,
-      oneDriveProof,
-      calendarMeeting,
     });
 
     try {
       const accessToken = await authentication.acquireAccessToken(API_ACCESS_SCOPES);
       const status = await api.getRehearsalStatus(accessToken);
-      if (isCurrentSignedInAccount(state, account)) {
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus: { kind: "success", status },
-          simulatedEmail,
-          oneDriveProof,
-          calendarMeeting,
-        });
-      }
+      setSignedInPatch(account, {
+        rehearsalStatus: { kind: "success", status },
+      });
     } catch (error) {
-      if (!isCurrentSignedInAccount(state, account)) {
-        return;
-      }
       if (error instanceof AccessTokenCancelledError) {
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
+        setSignedInPatch(account, {
           rehearsalStatus: { kind: "cancelled" },
-          simulatedEmail,
-          oneDriveProof,
-          calendarMeeting,
         });
         return;
       }
@@ -292,14 +253,8 @@ export function createAfterPartyApp(
         error instanceof AccessTokenError || error instanceof ApiAccessError
           ? error.message
           : "Rehearsal status could not be checked. Try again.";
-      setState({
-        kind: "signed-in",
-        account,
-        apiAccess,
+      setSignedInPatch(account, {
         rehearsalStatus: { kind: "error", message },
-        simulatedEmail,
-        oneDriveProof,
-        calendarMeeting,
       });
     }
   };
@@ -307,58 +262,27 @@ export function createAfterPartyApp(
   const sendSimulatedEmail = async (): Promise<void> => {
     if (
       state.kind !== "signed-in" ||
-      state.apiAccess.kind === "loading" ||
-      state.rehearsalStatus.kind === "loading" ||
-      state.simulatedEmail.kind === "loading" ||
       state.simulatedEmail.kind === "success" ||
-      state.oneDriveProof.activity !== "idle" ||
-      state.calendarMeeting.activity !== "idle"
+      isApiOperationBusy(state, contactProof)
     ) {
       return;
     }
     const account = state.account;
-    const apiAccess = state.apiAccess;
-    const rehearsalStatus = state.rehearsalStatus;
-    const oneDriveProof = state.oneDriveProof;
-    const calendarMeeting = state.calendarMeeting;
-    setState({
-      kind: "signed-in",
-      account,
-      apiAccess,
-      rehearsalStatus,
+    setSignedInPatch(account, {
       simulatedEmail: { kind: "loading" },
-      oneDriveProof,
-      calendarMeeting,
     });
 
     try {
       const accessToken =
         await authentication.acquireAccessToken(API_ACCESS_SCOPES);
       const result = await api.sendSimulatedEmail(accessToken);
-      if (isCurrentSignedInAccount(state, account)) {
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus,
-          simulatedEmail: { kind: "success", result },
-          oneDriveProof,
-          calendarMeeting,
-        });
-      }
+      setSignedInPatch(account, {
+        simulatedEmail: { kind: "success", result },
+      });
     } catch (error) {
-      if (!isCurrentSignedInAccount(state, account)) {
-        return;
-      }
       if (error instanceof AccessTokenCancelledError) {
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus,
+        setSignedInPatch(account, {
           simulatedEmail: { kind: "cancelled" },
-          oneDriveProof,
-          calendarMeeting,
         });
         return;
       }
@@ -366,14 +290,8 @@ export function createAfterPartyApp(
         error instanceof AccessTokenError || error instanceof ApiAccessError
           ? error.message
           : "The internal email could not be submitted. Try again.";
-      setState({
-        kind: "signed-in",
-        account,
-        apiAccess,
-        rehearsalStatus,
+      setSignedInPatch(account, {
         simulatedEmail: { kind: "error", message },
-        oneDriveProof,
-        calendarMeeting,
       });
     }
   };
@@ -383,32 +301,18 @@ export function createAfterPartyApp(
   ): Promise<void> => {
     if (
       state.kind !== "signed-in" ||
-      state.apiAccess.kind === "loading" ||
-      state.rehearsalStatus.kind === "loading" ||
-      state.simulatedEmail.kind === "loading" ||
-      state.calendarMeeting.activity !== "idle" ||
-      state.oneDriveProof.activity !== "idle" ||
+      isApiOperationBusy(state, contactProof) ||
       !isAllowedOneDriveAction(state.oneDriveProof.stage, action)
     ) {
       return;
     }
     const account = state.account;
-    const apiAccess = state.apiAccess;
-    const rehearsalStatus = state.rehearsalStatus;
-    const simulatedEmail = state.simulatedEmail;
-    const calendarMeeting = state.calendarMeeting;
     const previousStage = state.oneDriveProof.stage;
-    setState({
-      kind: "signed-in",
-      account,
-      apiAccess,
-      rehearsalStatus,
-      simulatedEmail,
+    setSignedInPatch(account, {
       oneDriveProof: {
         stage: previousStage,
         activity: action === "share" ? "sharing" : "removing",
       },
-      calendarMeeting,
     });
 
     try {
@@ -418,17 +322,11 @@ export function createAfterPartyApp(
         return;
       }
       persistOneDriveStage(storage, account, "uncertain");
-      setState({
-        kind: "signed-in",
-        account,
-        apiAccess,
-        rehearsalStatus,
-        simulatedEmail,
+      setSignedInPatch(account, {
         oneDriveProof: {
           stage: "uncertain",
           activity: action === "share" ? "sharing" : "removing",
         },
-        calendarMeeting,
       });
       const result =
         action === "share"
@@ -437,17 +335,11 @@ export function createAfterPartyApp(
       if (isCurrentSignedInAccount(state, account)) {
         const nextStage = oneDriveStage(result);
         persistOneDriveStage(storage, account, nextStage);
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus,
-          simulatedEmail,
+        setSignedInPatch(account, {
           oneDriveProof: {
             stage: nextStage,
             activity: "idle",
           },
-          calendarMeeting,
         });
       }
     } catch (error) {
@@ -455,36 +347,24 @@ export function createAfterPartyApp(
         return;
       }
       if (error instanceof AccessTokenCancelledError) {
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus,
-          simulatedEmail,
+        setSignedInPatch(account, {
           oneDriveProof: {
             stage: previousStage,
             activity: "idle",
             message: "The OneDrive action was cancelled before it started.",
           },
-          calendarMeeting,
         });
         return;
       }
       if (action === "share" && error instanceof OneDriveInviteFailureError) {
         persistOneDriveStage(storage, account, "uncertain");
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus,
-          simulatedEmail,
+        setSignedInPatch(account, {
           oneDriveProof: {
             stage: "uncertain",
             activity: "idle",
             message: error.message,
             inviteFailure: error.diagnostic,
           },
-          calendarMeeting,
         });
         return;
       }
@@ -494,14 +374,8 @@ export function createAfterPartyApp(
         error instanceof AccessTokenError || error instanceof ApiAccessError
           ? error.message
           : fallback;
-      setState({
-        kind: "signed-in",
-        account,
-        apiAccess,
-        rehearsalStatus,
-        simulatedEmail,
+      setSignedInPatch(account, {
         oneDriveProof: { stage: "uncertain", activity: "idle", message },
-        calendarMeeting,
       });
     }
   };
@@ -511,30 +385,16 @@ export function createAfterPartyApp(
   ): Promise<void> => {
     if (
       state.kind !== "signed-in" ||
-      state.apiAccess.kind === "loading" ||
-      state.rehearsalStatus.kind === "loading" ||
-      state.simulatedEmail.kind === "loading" ||
-      state.oneDriveProof.activity !== "idle" ||
-      state.calendarMeeting.activity !== "idle" ||
+      isApiOperationBusy(state, contactProof) ||
       !isAllowedCalendarMeetingAction(state.calendarMeeting.stage, action)
     ) {
       return;
     }
     const account = state.account;
-    const apiAccess = state.apiAccess;
-    const rehearsalStatus = state.rehearsalStatus;
-    const simulatedEmail = state.simulatedEmail;
-    const oneDriveProof = state.oneDriveProof;
     const previousStage = state.calendarMeeting.stage;
     const attemptedStage =
       action === "create" ? "uncertain" : "cancellation-uncertain";
-    setState({
-      kind: "signed-in",
-      account,
-      apiAccess,
-      rehearsalStatus,
-      simulatedEmail,
-      oneDriveProof,
+    setSignedInPatch(account, {
       calendarMeeting: {
         stage: previousStage,
         activity: action === "create" ? "creating" : "cancelling",
@@ -548,13 +408,7 @@ export function createAfterPartyApp(
         return;
       }
       persistCalendarMeetingStage(storage, account, attemptedStage);
-      setState({
-        kind: "signed-in",
-        account,
-        apiAccess,
-        rehearsalStatus,
-        simulatedEmail,
-        oneDriveProof,
+      setSignedInPatch(account, {
         calendarMeeting: {
           stage: attemptedStage,
           activity: action === "create" ? "creating" : "cancelling",
@@ -567,13 +421,7 @@ export function createAfterPartyApp(
       if (isCurrentSignedInAccount(state, account)) {
         const nextStage = calendarMeetingStage(result);
         persistCalendarMeetingStage(storage, account, nextStage);
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus,
-          simulatedEmail,
-          oneDriveProof,
+        setSignedInPatch(account, {
           calendarMeeting: {
             stage: nextStage,
             activity: "idle",
@@ -585,13 +433,7 @@ export function createAfterPartyApp(
         return;
       }
       if (error instanceof AccessTokenCancelledError) {
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus,
-          simulatedEmail,
-          oneDriveProof,
+        setSignedInPatch(account, {
           calendarMeeting: {
             stage: previousStage,
             activity: "idle",
@@ -605,13 +447,7 @@ export function createAfterPartyApp(
           ? error.message
           : "The calendar change was not confirmed. Do not repeat it.";
       persistCalendarMeetingStage(storage, account, attemptedStage);
-      setState({
-        kind: "signed-in",
-        account,
-        apiAccess,
-        rehearsalStatus,
-        simulatedEmail,
-        oneDriveProof,
+      setSignedInPatch(account, {
         calendarMeeting: {
           stage: attemptedStage,
           activity: "idle",
@@ -626,7 +462,7 @@ export function createAfterPartyApp(
   ): Promise<void> => {
     if (
       state.kind !== "signed-in" ||
-      contactProof.activity !== "idle" ||
+      isApiOperationBusy(state, contactProof) ||
       !isAllowedContactAction(contactProof.stage, action)
     ) {
       return;
@@ -671,6 +507,68 @@ export function createAfterPartyApp(
     }
   };
 
+  const runInboxRuleProofAction = async (
+    action: "create" | "remove",
+  ): Promise<void> => {
+    if (
+      state.kind !== "signed-in" ||
+      isApiOperationBusy(state, contactProof) ||
+      !isAllowedInboxRuleAction(state.inboxRuleProof.stage, action)
+    ) {
+      return;
+    }
+    const account = state.account;
+    const previousStage = state.inboxRuleProof.stage;
+    const attemptedStage =
+      action === "create" ? "uncertain" : "removal-uncertain";
+    const activity = action === "create" ? "creating" : "removing";
+    setSignedInPatch(account, {
+      inboxRuleProof: { stage: previousStage, activity },
+    });
+    try {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      persistInboxRuleStage(storage, account, attemptedStage);
+      setSignedInPatch(account, {
+        inboxRuleProof: { stage: attemptedStage, activity },
+      });
+      const result =
+        action === "create"
+          ? await api.createInboxRuleProof(accessToken)
+          : await api.removeInboxRuleProof(accessToken);
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      persistInboxRuleStage(storage, account, result.state);
+      setSignedInPatch(account, {
+        inboxRuleProof: { stage: result.state, activity: "idle" },
+      });
+    } catch (error) {
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      const cancelled = error instanceof AccessTokenCancelledError;
+      const failureStage = cancelled ? previousStage : attemptedStage;
+      if (!cancelled) {
+        persistInboxRuleStage(storage, account, failureStage);
+      }
+      setSignedInPatch(account, {
+        inboxRuleProof: {
+          stage: failureStage,
+          activity: "idle",
+          message: cancelled
+            ? "The inbox-rule action was cancelled before it started."
+            : error instanceof AccessTokenError || error instanceof ApiAccessError
+              ? error.message
+              : "The inbox-rule change was not confirmed. Do not repeat it.",
+        },
+      });
+    }
+  };
+
   const render = (): void => {
     root.replaceChildren(createShell(state, contactProof));
     root
@@ -706,6 +604,12 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='remove-contact-proof']")
       ?.addEventListener("click", () => void runContactProofAction("remove"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='create-inbox-rule']")
+      ?.addEventListener("click", () => void runInboxRuleProofAction("create"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='remove-inbox-rule']")
+      ?.addEventListener("click", () => void runInboxRuleProofAction("remove"));
   };
 
   const start = async (): Promise<void> => {
@@ -735,6 +639,10 @@ export function createAfterPartyApp(
               },
               calendarMeeting: {
                 stage: readCalendarMeetingStage(storage, startup.account),
+                activity: "idle",
+              },
+              inboxRuleProof: {
+                stage: readInboxRuleStage(storage, startup.account),
                 activity: "idle",
               },
             }
@@ -797,13 +705,7 @@ function createStatePanel(
       );
       break;
     case "signed-in":
-      const apiOperationLoading =
-        state.apiAccess.kind === "loading" ||
-        state.rehearsalStatus.kind === "loading" ||
-        state.simulatedEmail.kind === "loading" ||
-        state.oneDriveProof.activity !== "idle" ||
-        state.calendarMeeting.activity !== "idle" ||
-        contactProof.activity !== "idle";
+      const apiOperationLoading = isApiOperationBusy(state, contactProof);
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
@@ -825,6 +727,10 @@ function createStatePanel(
           apiOperationLoading,
         ),
         createContactProofPanel(contactProof, apiOperationLoading),
+        createInboxRuleProofPanel(
+          state.inboxRuleProof,
+          apiOperationLoading,
+        ),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -865,7 +771,9 @@ function createButton(
     | "create-calendar-meeting"
     | "cancel-calendar-meeting"
     | "create-contact-proof"
-    | "remove-contact-proof",
+    | "remove-contact-proof"
+    | "create-inbox-rule"
+    | "remove-inbox-rule",
   className: string,
   disabled = false,
 ): HTMLButtonElement {
@@ -1195,6 +1103,61 @@ function createContactProofPanel(
   return panel;
 }
 
+function createInboxRuleProofPanel(
+  state: InboxRuleProofState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+  panel.append(createStatus(
+    "Real tenant activity: Cory creates one fixed harmless disabled Inbox rule, then explicitly removes it.",
+    "notice",
+  ));
+  const messages: Record<InboxRuleProofStage, string> = {
+    "not-started": "Inbox-rule rehearsal: not started in this browser.",
+    uncertain:
+      "Inbox-rule rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
+    configured: "Inbox-rule rehearsal: Configured and disabled.",
+    "removal-uncertain":
+      "Inbox-rule rehearsal: Remove is uncertain. Do not repeat it.",
+    removed: "Inbox-rule rehearsal: Removed.",
+  };
+  const message = state.activity === "idle"
+    ? messages[state.stage]
+    : `${state.activity === "creating" ? "Creating" : "Removing"} the fixed disabled Inbox rule…`;
+  if (state.activity !== "idle") {
+    panel.setAttribute("aria-busy", "true");
+  }
+  panel.append(createStatus(message));
+  if (state.message) {
+    panel.append(createStatus(state.message, "error"));
+  }
+  const details = document.createElement("dl");
+  details.className = "identity-list";
+  appendIdentity(details, "Owner", "cory@corywest.onmicrosoft.com");
+  appendIdentity(details, "Rule", INBOX_RULE_PROOF_DISPLAY_NAME);
+  appendIdentity(details, "Enabled", "No");
+  appendIdentity(details, "Subject contains", INBOX_RULE_PROOF_SUBJECT);
+  appendIdentity(details, "Action", "Mark as read");
+  panel.append(
+    details,
+    createButton(
+      "Create disabled Inbox rule",
+      "create-inbox-rule",
+      "primary",
+      apiOperationLoading || state.stage !== "not-started",
+    ),
+    createButton(
+      "Remove disabled Inbox rule",
+      "remove-inbox-rule",
+      "secondary",
+      apiOperationLoading ||
+        !["configured", "uncertain"].includes(state.stage),
+    ),
+  );
+  return panel;
+}
+
 function createRehearsalStatusPanel(
   state: RehearsalStatusState,
   apiOperationLoading: boolean,
@@ -1316,6 +1279,21 @@ function isCurrentSignedInAccount(
   return state.kind === "signed-in" && state.account.accountId === account.accountId;
 }
 
+function isApiOperationBusy(
+  state: SignedInState,
+  contactProof: ContactProofState,
+): boolean {
+  return (
+    state.apiAccess.kind === "loading" ||
+    state.rehearsalStatus.kind === "loading" ||
+    state.simulatedEmail.kind === "loading" ||
+    state.oneDriveProof.activity !== "idle" ||
+    state.calendarMeeting.activity !== "idle" ||
+    state.inboxRuleProof.activity !== "idle" ||
+    contactProof.activity !== "idle"
+  );
+}
+
 function isAllowedOneDriveAction(
   stage: OneDriveProofStage,
   action: "share" | "remove",
@@ -1378,6 +1356,39 @@ function calendarMeetingStorageKey(account: AccountIdentity): string {
 
 function contactStorageKey(account: AccountIdentity): string {
   return `ap2.contact-proof.${CONTACT_PROOF_RUN_ID}.${account.tenantId}.${account.accountId}`;
+}
+
+function inboxRuleStorageKey(account: AccountIdentity): string {
+  return `ap2.inbox-rule-proof.${INBOX_RULE_PROOF_RUN_ID}.${account.tenantId}.${account.accountId}`;
+}
+
+function readInboxRuleStage(
+  storage: Pick<Storage, "getItem">,
+  account: AccountIdentity,
+): InboxRuleProofStage {
+  const value = storage.getItem(inboxRuleStorageKey(account));
+  return ["uncertain", "configured", "removal-uncertain", "removed"].includes(
+    value ?? "",
+  )
+    ? value as InboxRuleProofStage
+    : "not-started";
+}
+
+function persistInboxRuleStage(
+  storage: Pick<Storage, "setItem">,
+  account: AccountIdentity,
+  stage: InboxRuleProofStage,
+): void {
+  storage.setItem(inboxRuleStorageKey(account), stage);
+}
+
+function isAllowedInboxRuleAction(
+  stage: InboxRuleProofStage,
+  action: "create" | "remove",
+): boolean {
+  return action === "create"
+    ? stage === "not-started"
+    : stage === "configured" || stage === "uncertain";
 }
 
 function readContactStage(

@@ -28,6 +28,11 @@ import {
   STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
 } from "./identity.js";
+import {
+  INBOX_RULE_DISPLAY_NAME,
+  InboxRuleProofConflictError,
+  type InboxRuleProofResult,
+} from "./inbox-rule-proof.js";
 import type { RehearsalStatus } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
 import {
@@ -105,6 +110,17 @@ const contactProofOperation = {
   create: vi.fn().mockResolvedValue(contactResults.configured),
   remove: vi.fn().mockResolvedValue(contactResults.removed),
 };
+const inboxRuleResults = {
+  configured: {
+    state: "configured",
+    displayName: INBOX_RULE_DISPLAY_NAME,
+  },
+  removed: { state: "removed", displayName: INBOX_RULE_DISPLAY_NAME },
+} as const satisfies Record<string, InboxRuleProofResult>;
+const inboxRuleProofOperation = {
+  create: vi.fn().mockResolvedValue(inboxRuleResults.configured),
+  remove: vi.fn().mockResolvedValue(inboxRuleResults.removed),
+};
 const oneDriveResults = {
   configured: {
     state: "configured",
@@ -134,6 +150,7 @@ const server = createApiServer({
   oneDriveShareProofOperation: oneDriveOperationBoundary,
   calendarMeetingOperation,
   contactProofOperation,
+  inboxRuleProofOperation,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -157,8 +174,10 @@ describe("local API", () => {
     await expect(response.json()).resolves.toEqual({ status: "ok" });
   });
 
-  it("preflights only explicit contact methods and Authorization", async () => {
-    const response = await fetch(`${baseUrl}/api/contact-proof`, {
+  it.each(["/api/contact-proof", "/api/inbox-rule-proof"])(
+    "preflights only explicit mutation methods and Authorization for %s",
+    async (path) => {
+    const response = await fetch(`${baseUrl}${path}`, {
       method: "OPTIONS",
       headers: {
         Origin: "http://localhost:5173",
@@ -170,7 +189,8 @@ describe("local API", () => {
     expect(response.headers.get("access-control-allow-methods")).toBe(
       "POST, DELETE",
     );
-  });
+    },
+  );
 
   it.each(["/api/whoami", "/api/rehearsal-status"])(
     "allows only the configured origin to preflight %s",
@@ -609,6 +629,60 @@ describe("local API", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
       error: "contact_state_conflict",
+    });
+  });
+
+  it.each([
+    ["POST", "create", inboxRuleResults.configured, 201],
+    ["DELETE", "remove", inboxRuleResults.removed, 200],
+  ] as const)(
+    "%s runs the exact Inbox-rule operation for both authorized caller shapes",
+    async (method, operation, expected, status) => {
+      const mock = inboxRuleProofOperation[operation];
+      mock.mockClear();
+      for (const claims of [
+        {
+          tid: STUDENT_TENANT_ID,
+          oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+          scp: REQUIRED_DELEGATED_SCOPE,
+        },
+        {
+          tid: STUDENT_TENANT_ID,
+          idtyp: "app",
+          azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+          roles: [REQUIRED_APPLICATION_ROLE],
+        },
+      ]) {
+        const response = await protectedRequest(
+          claims,
+          "http://localhost:5173",
+          "/api/inbox-rule-proof",
+          method,
+        );
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toEqual(expected);
+      }
+      expect(mock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("fails closed on Inbox-rule conflict without exposing details", async () => {
+    inboxRuleProofOperation.create.mockRejectedValueOnce(
+      new InboxRuleProofConflictError(),
+    );
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/inbox-rule-proof",
+      "POST",
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "inbox_rule_state_conflict",
     });
   });
 
