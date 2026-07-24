@@ -37,8 +37,8 @@ Browser access is disabled unless `CORS_ALLOWED_ORIGIN` names one exact
 HTTP(S) origin. Protected preflights accept only that origin and the
 `Authorization` header. The read endpoints allow `GET`, simulated email allows
 `POST`, the OneDrive proof allows `POST` and `DELETE`, and both calendar routes
-allow `POST`. Requests without an `Origin` header remain available to the
-app-only proof and other non-browser clients.
+allow `POST`. The contact proof allows `POST` and `DELETE`. Requests without an
+`Origin` header remain available to app-only and other non-browser clients.
 
 ## Rehearsal status
 
@@ -253,3 +253,18 @@ AP2_API_BASE_URL='https://ca-ap2-api.happycliff-97dcb6b8.eastus.azurecontainerap
 AP2_AUTOMATION_CERTIFICATE_PATH='<certificate-pem-outside-git>' \
   npm run check:rehearsal-status
 ```
+
+## One contact rehearsal
+
+`POST` and `DELETE /api/contact-proof` are separate explicit actions. They use
+Cory's existing CBA settings and delegated `Contacts.ReadWrite`; signing in
+does not call either route.
+
+Both actions first filter Cory's contacts by the exact hidden `AP2RunId` marker
+with value `ap2-contact-20260724-001`. Create accepts one exact existing contact
+or submits one containing only `AP2 Kobe Contact Proof`, the names `AP2` and
+`Kobe Contact Proof`, and `kobe@corywest.onmicrosoft.com`. Remove deletes one
+exact marker and full-contact match; absence is already removed. Duplicate,
+paginated, malformed, or mismatched results cause no mutation. Graph mutations
+are never retried. Browser state only explains an explicit attempt and blocks
+duplicate clicks; it is not API correctness state.

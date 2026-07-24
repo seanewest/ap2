@@ -15,6 +15,12 @@ import {
   type CalendarMeetingResult,
 } from "./calendar-meeting.js";
 import {
+  CONTACT_DISPLAY_NAME,
+  CONTACT_EMAIL,
+  ContactProofConflictError,
+  type ContactProofResult,
+} from "./contact-proof.js";
+import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   REQUIRED_APPLICATION_ROLE,
   REQUIRED_DELEGATED_SCOPE,
@@ -87,6 +93,18 @@ const calendarMeetingOperation = {
   create: vi.fn().mockResolvedValue(calendarMeetingResults.configured),
   cancel: vi.fn().mockResolvedValue(calendarMeetingResults.cancelled),
 };
+const contactResults = {
+  configured: {
+    state: "configured",
+    displayName: CONTACT_DISPLAY_NAME,
+    email: CONTACT_EMAIL,
+  },
+  removed: { state: "removed", displayName: CONTACT_DISPLAY_NAME },
+} as const satisfies Record<string, ContactProofResult>;
+const contactProofOperation = {
+  create: vi.fn().mockResolvedValue(contactResults.configured),
+  remove: vi.fn().mockResolvedValue(contactResults.removed),
+};
 const oneDriveResults = {
   configured: {
     state: "configured",
@@ -115,6 +133,7 @@ const server = createApiServer({
   simulatedEmailOperation,
   oneDriveShareProofOperation: oneDriveOperationBoundary,
   calendarMeetingOperation,
+  contactProofOperation,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -136,6 +155,21 @@ describe("local API", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: "ok" });
+  });
+
+  it("preflights only explicit contact methods and Authorization", async () => {
+    const response = await fetch(`${baseUrl}/api/contact-proof`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:5173",
+        "Access-Control-Request-Method": "DELETE",
+        "Access-Control-Request-Headers": "Authorization",
+      },
+    });
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-methods")).toBe(
+      "POST, DELETE",
+    );
   });
 
   it.each(["/api/whoami", "/api/rehearsal-status"])(
@@ -522,6 +556,60 @@ describe("local API", () => {
     );
     expect(response.status).toBe(403);
     expect(calendarMeetingOperation.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["POST", "create", contactResults.configured, 201],
+    ["DELETE", "remove", contactResults.removed, 200],
+  ] as const)(
+    "%s runs the exact contact operation for authorized callers",
+    async (method, operation, expected, status) => {
+      const mock = contactProofOperation[operation];
+      mock.mockClear();
+      for (const claims of [
+        {
+          tid: STUDENT_TENANT_ID,
+          oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+          scp: REQUIRED_DELEGATED_SCOPE,
+        },
+        {
+          tid: STUDENT_TENANT_ID,
+          idtyp: "app",
+          azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+          roles: [REQUIRED_APPLICATION_ROLE],
+        },
+      ]) {
+        const response = await protectedRequest(
+          claims,
+          "http://localhost:5173",
+          "/api/contact-proof",
+          method,
+        );
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toEqual(expected);
+      }
+      expect(mock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("fails closed on contact conflict without exposing details", async () => {
+    contactProofOperation.create.mockRejectedValueOnce(
+      new ContactProofConflictError(),
+    );
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/contact-proof",
+      "POST",
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "contact_state_conflict",
+    });
   });
 
   it.each([

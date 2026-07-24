@@ -25,6 +25,20 @@ export interface SimulatedEmailResult {
   subject: string;
 }
 
+export const CONTACT_PROOF_DISPLAY_NAME = "AP2 Kobe Contact Proof";
+export const CONTACT_PROOF_EMAIL = "kobe@corywest.onmicrosoft.com";
+export const CONTACT_PROOF_RUN_ID = "ap2-contact-20260724-001";
+type ConfiguredContact = {
+  state: "configured";
+  displayName: typeof CONTACT_PROOF_DISPLAY_NAME;
+  email: typeof CONTACT_PROOF_EMAIL;
+};
+type RemovedContact = {
+  state: "removed";
+  displayName: typeof CONTACT_PROOF_DISPLAY_NAME;
+};
+export type ContactProofResult = ConfiguredContact | RemovedContact;
+
 export const CALENDAR_MEETING_ORGANIZER =
   "cory@corywest.onmicrosoft.com";
 export const CALENDAR_MEETING_ATTENDEES = [
@@ -112,6 +126,12 @@ export interface AfterPartyApi {
   ): Promise<
     Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
   >;
+  createContactProof(
+    accessToken: string,
+  ): Promise<Extract<ContactProofResult, { state: "configured" }>>;
+  removeContactProof(
+    accessToken: string,
+  ): Promise<Extract<ContactProofResult, { state: "removed" }>>;
 }
 
 export class ApiAccessError extends Error {
@@ -140,6 +160,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly oneDriveProofUrl: string;
   private readonly calendarMeetingUrl: string;
   private readonly calendarMeetingCancelUrl: string;
+  private readonly contactProofUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
@@ -162,6 +183,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ).toString();
     this.calendarMeetingCancelUrl = new URL(
       "api/calendar-meeting/cancel",
+      `${baseUrl}/`,
+    ).toString();
+    this.contactProofUrl = new URL(
+      "api/contact-proof",
       `${baseUrl}/`,
     ).toString();
     this.request = request.bind(globalThis);
@@ -295,6 +320,36 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     };
   }
 
+  async createContactProof(
+    accessToken: string,
+  ): Promise<Extract<ContactProofResult, { state: "configured" }>> {
+    return this.contactProofRequest(accessToken, "POST", 201, "configured");
+  }
+
+  async removeContactProof(
+    accessToken: string,
+  ): Promise<Extract<ContactProofResult, { state: "removed" }>> {
+    return this.contactProofRequest(accessToken, "DELETE", 200, "removed");
+  }
+
+  private async contactProofRequest<T extends ContactProofResult["state"]>(
+    accessToken: string,
+    method: "POST" | "DELETE",
+    status: number,
+    state: T,
+  ): Promise<Extract<ContactProofResult, { state: T }>> {
+    const value = await this.getAuthorizedJson(
+      this.contactProofUrl,
+      accessToken,
+      method,
+      status,
+    );
+    if (!isSafeContactProofResult(value) || value.state !== state) {
+      throw new ApiAccessError();
+    }
+    return value as Extract<ContactProofResult, { state: T }>;
+  }
+
   private async oneDriveProofRequest<T extends OneDriveProofResult["state"]>(
     accessToken: string,
     method: "POST" | "DELETE",
@@ -345,6 +400,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     }
     if (response.status === 409) {
       const error = await readErrorCode(response);
+      if (error === "contact_state_conflict") {
+        throw new ApiAccessError(
+          "The contact proof is not in the expected state. Nothing was changed.",
+        );
+      }
       if (failureContext === "calendar") {
         if (error === "calendar_operation_busy") {
           throw new ApiAccessError(
@@ -520,6 +580,18 @@ function isSafeSimulatedEmailResult(
     result.sender === SIMULATED_EMAIL_SENDER &&
     result.recipient === SIMULATED_EMAIL_RECIPIENT &&
     result.subject === SIMULATED_EMAIL_SUBJECT
+  );
+}
+
+function isSafeContactProofResult(value: unknown): value is ContactProofResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  return (
+    result.displayName === CONTACT_PROOF_DISPLAY_NAME &&
+    (result.state === "removed" ||
+      (result.state === "configured" && result.email === CONTACT_PROOF_EMAIL))
   );
 }
 

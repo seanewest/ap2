@@ -4,6 +4,10 @@ import {
   GRAPH_CALENDARS_READ_WRITE_SCOPE,
   ProcessLocalCalendarMeetingBoundary,
 } from "./calendar-meeting.js";
+import {
+  DelegatedGraphContactProof,
+  GRAPH_CONTACTS_READ_WRITE_SCOPE,
+} from "./contact-proof.js";
 import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
@@ -58,7 +62,10 @@ const coryTokenProvider =
         pfxPath: coryConfig.pfxPath,
         pfxPassphrase: coryConfig.pfxPassphrase,
         identity: cory,
-        allowedScopes: [GRAPH_CALENDARS_READ_WRITE_SCOPE],
+        allowedScopes: [
+          GRAPH_CALENDARS_READ_WRITE_SCOPE,
+          GRAPH_CONTACTS_READ_WRITE_SCOPE,
+        ],
       })
     : undefined;
 const calendarMeetingOperation =
@@ -66,6 +73,10 @@ const calendarMeetingOperation =
     ? new ProcessLocalCalendarMeetingBoundary(
         new DelegatedGraphCalendarMeetingOperation(coryTokenProvider, cory),
       )
+    : undefined;
+const contactProofOperation =
+  coryTokenProvider && cory
+    ? new DelegatedGraphContactProof(coryTokenProvider, cory)
     : undefined;
 const server = createApiServer({
   tokenVerifier,
@@ -76,6 +87,7 @@ const server = createApiServer({
   simulatedEmailOperation,
   oneDriveShareProofOperation,
   calendarMeetingOperation,
+  contactProofOperation,
   allowedOrigin: config.allowedOrigin,
 });
 

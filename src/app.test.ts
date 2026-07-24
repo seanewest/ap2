@@ -14,6 +14,7 @@ import {
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
+  type ContactProofResult,
   type OneDriveProofResult,
   type RehearsalStatus,
   type SimulatedEmailResult,
@@ -28,6 +29,8 @@ const account: AccountIdentity = {
 };
 const calendarStorageKey =
   "ap2.calendar-meeting.ap2-calendar-20260724-002.student-tenant-id.student-object-id";
+const contactStorageKey =
+  "ap2.contact-proof.ap2-contact-20260724-001.student-tenant-id.student-object-id";
 
 class FakeAuthentication implements Authentication {
   initialize = vi.fn<() => Promise<AuthenticationStartup>>();
@@ -69,6 +72,18 @@ class FakeApi implements AfterPartyApi {
         Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
       >
     >();
+  createContactProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<ContactProofResult, { state: "configured" }>>
+    >();
+  removeContactProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<ContactProofResult, { state: "removed" }>>
+    >();
 }
 
 describe("After Party authentication UI", () => {
@@ -105,6 +120,8 @@ describe("After Party authentication UI", () => {
     expect(oneDriveRemoveButton()).toBeNull();
     expect(calendarCreateButton()).toBeNull();
     expect(calendarCancelButton()).toBeNull();
+    expect(contactCreateButton()).toBeNull();
+    expect(contactRemoveButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -950,6 +967,85 @@ describe("After Party authentication UI", () => {
     },
   );
 
+  it("creates and removes the fixed contact through separate explicit clicks", async () => {
+    const create = createDeferred<
+      Extract<ContactProofResult, { state: "configured" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.createContactProof.mockReturnValue(create.promise);
+    api.removeContactProof.mockResolvedValue({
+      state: "removed",
+      displayName: "AP2 Kobe Contact Proof",
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.createContactProof).not.toHaveBeenCalled();
+    expect(api.removeContactProof).not.toHaveBeenCalled();
+    expect(root.textContent).toContain("AP2 Kobe Contact Proof");
+    expect(root.textContent).toContain("kobe@corywest.onmicrosoft.com");
+    expect(contactCreateButton()?.disabled).toBe(false);
+    expect(contactRemoveButton()?.disabled).toBe(true);
+
+    contactCreateButton()?.click();
+    await nextTask();
+    expect(localStorage.getItem(contactStorageKey)).toBe("uncertain");
+    expect(api.createContactProof).toHaveBeenCalledOnce();
+    expect(api.createContactProof).toHaveBeenCalledWith("temporary-token");
+    contactCreateButton()?.click();
+    expect(api.createContactProof).toHaveBeenCalledOnce();
+
+    create.resolve({
+      state: "configured",
+      displayName: "AP2 Kobe Contact Proof",
+      email: "kobe@corywest.onmicrosoft.com",
+    });
+    await nextTask();
+    expect(localStorage.getItem(contactStorageKey)).toBe("configured");
+    expect(root.textContent).toContain("Contact rehearsal: Configured");
+    expect(contactCreateButton()?.disabled).toBe(true);
+    expect(contactRemoveButton()?.disabled).toBe(false);
+
+    contactRemoveButton()?.click();
+    await nextTask();
+    expect(api.removeContactProof).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(contactStorageKey)).toBe("removed");
+    expect(root.textContent).toContain("Contact rehearsal: Removed");
+    expect(contactCreateButton()?.disabled).toBe(true);
+    expect(contactRemoveButton()?.disabled).toBe(true);
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it.each([
+    ["uncertain", true, false],
+    ["configured", true, false],
+    ["removed", true, true],
+  ] as const)(
+    "restores contact stage %s without an automatic call",
+    async (stage, createDisabled, removeDisabled) => {
+      localStorage.setItem(contactStorageKey, stage);
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      const app = createAfterPartyApp(root, authentication, api);
+
+      await app.start();
+      expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+      expect(api.createContactProof).not.toHaveBeenCalled();
+      expect(api.removeContactProof).not.toHaveBeenCalled();
+      expect(contactCreateButton()?.disabled).toBe(createDisabled);
+      expect(contactRemoveButton()?.disabled).toBe(removeDisabled);
+    },
+  );
+
   function signInButton(): HTMLButtonElement {
     return root.querySelector<HTMLButtonElement>("[data-action='sign-in']")!;
   }
@@ -998,6 +1094,14 @@ describe("After Party authentication UI", () => {
     return root.querySelector<HTMLButtonElement>(
       "[data-action='cancel-calendar-meeting']",
     );
+  }
+
+  function contactCreateButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='create-contact-proof']");
+  }
+
+  function contactRemoveButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='remove-contact-proof']");
   }
 });
 

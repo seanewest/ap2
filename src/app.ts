@@ -14,6 +14,9 @@ import {
   CALENDAR_MEETING_RUN_ID,
   CALENDAR_MEETING_START,
   CALENDAR_MEETING_SUBJECT,
+  CONTACT_PROOF_DISPLAY_NAME,
+  CONTACT_PROOF_EMAIL,
+  CONTACT_PROOF_RUN_ID,
   OneDriveInviteFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
@@ -72,6 +75,12 @@ type CalendarMeetingState = {
   message?: string;
 };
 
+type ContactProofState = {
+  stage: "not-started" | "uncertain" | "configured" | "removed";
+  activity: "idle" | "creating" | "removing";
+  message?: string;
+};
+
 type ViewState =
   | { kind: "initial" }
   | { kind: "processing"; message: string }
@@ -99,6 +108,20 @@ export function createAfterPartyApp(
   storage: Pick<Storage, "getItem" | "setItem"> = window.localStorage,
 ): AfterPartyApp {
   let state: ViewState = { kind: "initial" };
+  let contactProof: ContactProofState = {
+    stage: "not-started",
+    activity: "idle",
+  };
+  const setContactProof = (
+    next: ContactProofState,
+    account?: AccountIdentity,
+  ): void => {
+    contactProof = next;
+    if (account) {
+      storage.setItem(contactStorageKey(account), next.stage);
+    }
+    render();
+  };
 
   const setState = (nextState: ViewState): void => {
     state = nextState;
@@ -598,8 +621,58 @@ export function createAfterPartyApp(
     }
   };
 
+  const runContactProofAction = async (
+    action: "create" | "remove",
+  ): Promise<void> => {
+    if (
+      state.kind !== "signed-in" ||
+      contactProof.activity !== "idle" ||
+      !isAllowedContactAction(contactProof.stage, action)
+    ) {
+      return;
+    }
+    const account = state.account;
+    const previousStage = contactProof.stage;
+    setContactProof({
+      stage: previousStage,
+      activity: action === "create" ? "creating" : "removing",
+    });
+    try {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      setContactProof({
+        stage: "uncertain",
+        activity: action === "create" ? "creating" : "removing",
+      }, account);
+      const result =
+        action === "create"
+          ? await api.createContactProof(accessToken)
+          : await api.removeContactProof(accessToken);
+      if (isCurrentSignedInAccount(state, account)) {
+        setContactProof({ stage: result.state, activity: "idle" }, account);
+      }
+    } catch (error) {
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      const cancelled = error instanceof AccessTokenCancelledError;
+      setContactProof({
+        stage: cancelled ? previousStage : "uncertain",
+        activity: "idle",
+        message: cancelled
+          ? "The contact action was cancelled before it started."
+          : error instanceof AccessTokenError || error instanceof ApiAccessError
+            ? error.message
+            : "The contact change was not confirmed. Remove it explicitly; do not create again.",
+      }, cancelled ? undefined : account);
+    }
+  };
+
   const render = (): void => {
-    root.replaceChildren(createShell(state));
+    root.replaceChildren(createShell(state, contactProof));
     root
       .querySelector<HTMLButtonElement>("[data-action='sign-in']")
       ?.addEventListener("click", () => void signIn());
@@ -627,6 +700,12 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='cancel-calendar-meeting']")
       ?.addEventListener("click", () => void runCalendarMeetingAction("cancel"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='create-contact-proof']")
+      ?.addEventListener("click", () => void runContactProofAction("create"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='remove-contact-proof']")
+      ?.addEventListener("click", () => void runContactProofAction("remove"));
   };
 
   const start = async (): Promise<void> => {
@@ -636,6 +715,12 @@ export function createAfterPartyApp(
     });
     try {
       const startup = await authentication.initialize();
+      if (startup.kind === "signed-in") {
+        contactProof = {
+          stage: readContactStage(storage, startup.account),
+          activity: "idle",
+        };
+      }
       setState(
         startup.kind === "signed-in"
           ? {
@@ -664,7 +749,10 @@ export function createAfterPartyApp(
   return { start };
 }
 
-function createShell(state: ViewState): HTMLElement {
+function createShell(
+  state: ViewState,
+  contactProof: ContactProofState,
+): HTMLElement {
   const shell = document.createElement("main");
   shell.className = "shell";
 
@@ -681,12 +769,15 @@ function createShell(state: ViewState): HTMLElement {
   introduction.className = "introduction";
   introduction.textContent =
     "Sign in with your Microsoft work or school account to continue.";
-  shell.append(introduction, createStatePanel(state));
+  shell.append(introduction, createStatePanel(state, contactProof));
 
   return shell;
 }
 
-function createStatePanel(state: ViewState): HTMLElement {
+function createStatePanel(
+  state: ViewState,
+  contactProof: ContactProofState,
+): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "auth-panel";
   panel.setAttribute("aria-live", "polite");
@@ -711,7 +802,8 @@ function createStatePanel(state: ViewState): HTMLElement {
         state.rehearsalStatus.kind === "loading" ||
         state.simulatedEmail.kind === "loading" ||
         state.oneDriveProof.activity !== "idle" ||
-        state.calendarMeeting.activity !== "idle";
+        state.calendarMeeting.activity !== "idle" ||
+        contactProof.activity !== "idle";
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
@@ -732,6 +824,7 @@ function createStatePanel(state: ViewState): HTMLElement {
           state.calendarMeeting,
           apiOperationLoading,
         ),
+        createContactProofPanel(contactProof, apiOperationLoading),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -770,7 +863,9 @@ function createButton(
     | "share-onedrive-proof"
     | "remove-onedrive-proof"
     | "create-calendar-meeting"
-    | "cancel-calendar-meeting",
+    | "cancel-calendar-meeting"
+    | "create-contact-proof"
+    | "remove-contact-proof",
   className: string,
   disabled = false,
 ): HTMLButtonElement {
@@ -1044,6 +1139,62 @@ function createOneDriveHumanVerificationInstructions(): HTMLOListElement {
   return list;
 }
 
+function createContactProofPanel(
+  state: ContactProofState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+  panel.append(
+    createStatus(
+      "Real tenant activity: Cory creates one fixed harmless Outlook contact for Kobe, then explicitly removes it.",
+      "notice",
+    ),
+  );
+  const message =
+    state.activity === "creating"
+      ? "Creating the fixed contact…"
+      : state.activity === "removing"
+        ? "Removing the fixed contact…"
+        : state.stage === "configured"
+          ? "Contact rehearsal: Configured."
+          : state.stage === "removed"
+            ? "Contact rehearsal: Removed."
+            : state.stage === "uncertain"
+              ? "Contact rehearsal: the last change is uncertain. Do not create again; Remove can reconcile it safely."
+              : "Contact rehearsal: not started in this browser.";
+  if (state.activity !== "idle") {
+    panel.setAttribute("aria-busy", "true");
+  }
+  panel.append(createStatus(message));
+  if (state.message) {
+    panel.append(createStatus(state.message, "error"));
+  }
+  const details = document.createElement("dl");
+  details.className = "identity-list";
+  appendIdentity(details, "Owner", "cory@corywest.onmicrosoft.com");
+  appendIdentity(details, "Display name", CONTACT_PROOF_DISPLAY_NAME);
+  appendIdentity(details, "Email", CONTACT_PROOF_EMAIL);
+  appendIdentity(details, "Other details", "None");
+  panel.append(
+    details,
+    createButton(
+      "Create contact proof",
+      "create-contact-proof",
+      "primary",
+      apiOperationLoading || state.stage !== "not-started",
+    ),
+    createButton(
+      "Remove contact proof",
+      "remove-contact-proof",
+      "secondary",
+      apiOperationLoading ||
+        !["configured", "uncertain"].includes(state.stage),
+    ),
+  );
+  return panel;
+}
+
 function createRehearsalStatusPanel(
   state: RehearsalStatusState,
   apiOperationLoading: boolean,
@@ -1223,6 +1374,29 @@ function persistOneDriveStage(
 
 function calendarMeetingStorageKey(account: AccountIdentity): string {
   return `ap2.calendar-meeting.${CALENDAR_MEETING_RUN_ID}.${account.tenantId}.${account.accountId}`;
+}
+
+function contactStorageKey(account: AccountIdentity): string {
+  return `ap2.contact-proof.${CONTACT_PROOF_RUN_ID}.${account.tenantId}.${account.accountId}`;
+}
+
+function readContactStage(
+  storage: Pick<Storage, "getItem">,
+  account: AccountIdentity,
+): ContactProofState["stage"] {
+  const value = storage.getItem(contactStorageKey(account));
+  return value === "uncertain" || value === "configured" || value === "removed"
+    ? value
+    : "not-started";
+}
+
+function isAllowedContactAction(
+  stage: ContactProofState["stage"],
+  action: "create" | "remove",
+): boolean {
+  return action === "create"
+    ? stage === "not-started"
+    : stage === "configured" || stage === "uncertain";
 }
 
 function readCalendarMeetingStage(
