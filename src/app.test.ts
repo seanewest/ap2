@@ -543,7 +543,9 @@ describe("After Party authentication UI", () => {
     await app.start();
 
     expect(root.textContent).toContain("not started in this browser");
-    expect(root.textContent).toContain("Real tenant activity");
+    expect(root.textContent).toContain(
+      "Real tenant activity: Cory creates one fixed harmless 15-minute meeting inviting only Kobe and Marge, then explicitly cancels it.",
+    );
     oneDriveShareButton()?.click();
     await nextTask();
     expect(api.shareOneDriveProof).toHaveBeenCalledWith("temporary-token");
@@ -743,6 +745,17 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain(
       "AP2 Pass 3 calendar rehearsal — no action required",
     );
+    expect(root.textContent).toContain(
+      "Harmless AP2 calendar rehearsal. No action or response is required. The organizer will cancel it after observation.",
+    );
+    expect(root.textContent).toContain("Real tenant activity");
+    expect(root.textContent).toContain("15 minutes");
+    expect(root.textContent).toContain("Show asFree");
+    expect(root.textContent).toContain("ReminderOff");
+    expect(root.textContent).toContain("Teams / online meetingOff");
+    expect(root.textContent).toContain("ResponsesNot requested");
+    expect(root.textContent).toContain("2026-07-24T18:00:00Z");
+    expect(root.textContent).toContain("2026-07-24T18:15:00Z");
     expect(root.textContent).toContain("2:00–2:15 PM EDT");
 
     calendarCreateButton()?.click();

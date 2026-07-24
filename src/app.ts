@@ -955,9 +955,19 @@ function createCalendarMeetingDetails(): HTMLDListElement {
   appendIdentity(list, "Subject", CALENDAR_MEETING_SUBJECT);
   appendIdentity(
     list,
+    "Body",
+    "Harmless AP2 calendar rehearsal. No action or response is required. The organizer will cancel it after observation.",
+  );
+  appendIdentity(
+    list,
     "Time",
     `${CALENDAR_MEETING_START} to ${CALENDAR_MEETING_END} (2:00–2:15 PM EDT)`,
   );
+  appendIdentity(list, "Duration", "15 minutes");
+  appendIdentity(list, "Show as", "Free");
+  appendIdentity(list, "Reminder", "Off");
+  appendIdentity(list, "Teams / online meeting", "Off");
+  appendIdentity(list, "Responses", "Not requested");
   return list;
 }
 
