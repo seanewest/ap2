@@ -519,29 +519,11 @@ export class DelegatedGraphOneDriveShareProof
   }
 }
 
-function graphGet(
-  accessToken: string,
-  clientRequestId?: string,
-): RequestInit {
+function graphGet(accessToken: string): RequestInit {
   return {
     method: "GET",
     redirect: "error",
-    headers: graphHeaders(accessToken, clientRequestId),
-  };
-}
-
-function graphHeaders(
-  accessToken: string,
-  clientRequestId?: string,
-): Record<string, string> {
-  return {
-    Authorization: `Bearer ${accessToken}`,
-    ...(clientRequestId
-      ? {
-          "client-request-id": clientRequestId,
-          "return-client-request-id": "true",
-        }
-      : {}),
+    headers: { Authorization: `Bearer ${accessToken}` },
   };
 }
 
