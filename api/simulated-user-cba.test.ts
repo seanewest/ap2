@@ -20,11 +20,6 @@ import {
   HOMER_USER_PRINCIPAL_NAME,
 } from "./simulated-email.js";
 import { HOMER_IDENTITY } from "./simulated-user.js";
-import {
-  MARGE_DISPLAY_NAME,
-  MARGE_USER_PRINCIPAL_NAME,
-} from "./simulated-user.js";
-import type { SimulatedUserIdentity } from "./simulated-user.js";
 
 const CLIENT_ID = "11111111-1111-4111-8111-111111111111";
 const NOW = Date.UTC(2026, 6, 23, 12);
@@ -319,66 +314,6 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
       ],
     });
     expect(close).toHaveBeenCalledOnce();
-  });
-
-  it("uses Marge's exact identity, scope, certificate, and separate cache", async () => {
-    const margeIdentity: SimulatedUserIdentity = {
-      tenantId: STUDENT_TENANT_ID,
-      objectId: "22222222-2222-4222-8222-222222222222",
-      displayName: MARGE_DISPLAY_NAME,
-      userPrincipalName: MARGE_USER_PRINCIPAL_NAME,
-    };
-    const margeToken = accessToken({
-      oid: margeIdentity.objectId,
-      scp: "Files.Read User.Read",
-    });
-    const { browser, acquire } = createBrowser();
-    const request = vi.fn(
-      async (input: string | URL | Request): Promise<Response> => {
-        if (input.toString().includes("/oauth2/v2.0/token")) {
-          return Response.json({ access_token: margeToken });
-        }
-        return Response.json({
-          id: margeIdentity.objectId,
-          displayName: MARGE_DISPLAY_NAME,
-          userPrincipalName: MARGE_USER_PRINCIPAL_NAME,
-        });
-      },
-    ) as unknown as typeof fetch;
-    const provider = new SimulatedUserDelegatedTokenProvider({
-      clientId: CLIENT_ID,
-      identity: margeIdentity,
-      allowedScopes: ["https://graph.microsoft.com/Files.Read"],
-      pfxPath: "/run/secrets/marge.pfx",
-      pfxPassphrase: "marge-passphrase",
-      browser,
-      request,
-      now: () => NOW,
-    });
-
-    await expect(
-      provider.getToken("https://graph.microsoft.com/Files.Read"),
-    ).resolves.toEqual({
-      token: margeToken,
-      identity: {
-        tenantId: STUDENT_TENANT_ID,
-        objectId: margeIdentity.objectId,
-        userPrincipalName: MARGE_USER_PRINCIPAL_NAME,
-      },
-    });
-    const authorization = acquire.mock.calls[0]?.[0];
-    expect(authorization?.pfxPath).toBe("/run/secrets/marge.pfx");
-    expect(authorization?.authorizeUrl.searchParams.get("login_hint")).toBe(
-      MARGE_USER_PRINCIPAL_NAME,
-    );
-    expect(
-      authorization?.authorizeUrl.searchParams.get("scope")?.split(" "),
-    ).toEqual([
-      "openid",
-      "profile",
-      "https://graph.microsoft.com/User.Read",
-      "https://graph.microsoft.com/Files.Read",
-    ]);
   });
 
   it("requests Homer's Files.ReadWrite scope explicitly", async () => {

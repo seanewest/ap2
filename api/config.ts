@@ -13,8 +13,7 @@ export interface SimulatedUserCertificateConfig {
 
 export interface SimulatedUsersCbaConfig {
   clientId: string;
-  homer?: SimulatedUserCertificateConfig;
-  marge?: SimulatedUserCertificateConfig & { objectId: string };
+  homer: SimulatedUserCertificateConfig;
 }
 
 export interface ApiConfig {
@@ -59,43 +58,19 @@ function parseSimulatedUsersCbaConfig(
     "HOMER_CBA_PFX_PATH",
     "HOMER_CBA_PFX_PASSPHRASE",
   );
-  const marge = parseMargeCertificate(environment);
 
-  if (clientId === undefined && !homer && !marge) {
+  if (clientId === undefined && !homer) {
     return undefined;
   }
-  if (!clientId || (!homer && !marge)) {
+  if (!clientId || !homer) {
     throw new Error(
-      "SIMULATED_USER_CLIENT_ID and at least one complete simulated-user certificate must be configured together",
+      "SIMULATED_USER_CLIENT_ID and Homer's complete certificate must be configured together",
     );
   }
   if (!isUuid(clientId)) {
     throw new Error("SIMULATED_USER_CLIENT_ID must be a UUID");
   }
-  return { clientId, homer, marge };
-}
-
-function parseMargeCertificate(
-  environment: NodeJS.ProcessEnv,
-): SimulatedUsersCbaConfig["marge"] {
-  const certificate = parseCertificate(
-    environment,
-    "MARGE_CBA_PFX_PATH",
-    "MARGE_CBA_PFX_PASSPHRASE",
-  );
-  const objectId = environment.MARGE_CBA_OBJECT_ID;
-  if (!certificate && objectId === undefined) {
-    return undefined;
-  }
-  if (!certificate || !objectId) {
-    throw new Error(
-      "MARGE_CBA_OBJECT_ID, MARGE_CBA_PFX_PATH, and MARGE_CBA_PFX_PASSPHRASE must be configured together",
-    );
-  }
-  if (!isUuid(objectId)) {
-    throw new Error("MARGE_CBA_OBJECT_ID must be a UUID");
-  }
-  return { ...certificate, objectId };
+  return { clientId, homer };
 }
 
 function parseCertificate(

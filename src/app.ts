@@ -9,12 +9,10 @@ import {
 import {
   ApiAccessError,
   OneDriveInviteFailureError,
-  OneDriveVerifyFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type OneDriveInviteFailure,
   type OneDriveProofResult,
-  type OneDriveVerifyFailure,
   type RehearsalStatus,
   type SimulatedEmailResult,
 } from "./api/client";
@@ -44,17 +42,14 @@ type SimulatedEmailState =
 type OneDriveProofStage =
   | "not-started"
   | "uncertain"
-  | "shared"
-  | "verified"
+  | "configured"
   | "removed";
 
 type OneDriveProofState = {
   stage: OneDriveProofStage;
-  activity: "idle" | "sharing" | "verifying" | "removing";
+  activity: "idle" | "sharing" | "removing";
   message?: string;
-  notice?: string;
   inviteFailure?: OneDriveInviteFailure;
-  verifyFailure?: OneDriveVerifyFailure;
 };
 
 type ViewState =
@@ -322,7 +317,7 @@ export function createAfterPartyApp(
   };
 
   const runOneDriveProofAction = async (
-    action: "share" | "verify" | "remove",
+    action: "share" | "remove",
   ): Promise<void> => {
     if (
       state.kind !== "signed-in" ||
@@ -347,12 +342,7 @@ export function createAfterPartyApp(
       simulatedEmail,
       oneDriveProof: {
         stage: previousStage,
-        activity:
-          action === "share"
-            ? "sharing"
-            : action === "verify"
-              ? "verifying"
-              : "removing",
+        activity: action === "share" ? "sharing" : "removing",
       },
     });
 
@@ -362,26 +352,22 @@ export function createAfterPartyApp(
       if (!isCurrentSignedInAccount(state, account)) {
         return;
       }
-      if (action !== "verify") {
-        persistOneDriveStage(storage, account, "uncertain");
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus,
-          simulatedEmail,
-          oneDriveProof: {
-            stage: "uncertain",
-            activity: action === "share" ? "sharing" : "removing",
-          },
-        });
-      }
+      persistOneDriveStage(storage, account, "uncertain");
+      setState({
+        kind: "signed-in",
+        account,
+        apiAccess,
+        rehearsalStatus,
+        simulatedEmail,
+        oneDriveProof: {
+          stage: "uncertain",
+          activity: action === "share" ? "sharing" : "removing",
+        },
+      });
       const result =
         action === "share"
           ? await api.shareOneDriveProof(accessToken)
-          : action === "verify"
-            ? await api.verifyOneDriveProof(accessToken)
-            : await api.removeOneDriveProof(accessToken);
+          : await api.removeOneDriveProof(accessToken);
       if (isCurrentSignedInAccount(state, account)) {
         const nextStage = oneDriveStage(result);
         persistOneDriveStage(storage, account, nextStage);
@@ -394,12 +380,6 @@ export function createAfterPartyApp(
           oneDriveProof: {
             stage: nextStage,
             activity: "idle",
-            ...(result.state === "pending"
-              ? {
-                  notice:
-                    "Marge access is still being confirmed. Try Verify again later. The proof file was not changed.",
-                }
-              : {}),
           },
         });
       }
@@ -439,27 +419,8 @@ export function createAfterPartyApp(
         });
         return;
       }
-      if (action === "verify" && error instanceof OneDriveVerifyFailureError) {
-        setState({
-          kind: "signed-in",
-          account,
-          apiAccess,
-          rehearsalStatus,
-          simulatedEmail,
-          oneDriveProof: {
-            stage: previousStage,
-            activity: "idle",
-            message: error.message,
-            verifyFailure: error.diagnostic,
-          },
-        });
-        return;
-      }
-      const stage = action === "verify" ? previousStage : "uncertain";
       const fallback =
-        action === "verify"
-          ? "Marge access could not be verified. No file was changed."
-          : "The OneDrive change was not confirmed. Do not repeat sharing; verify or clean up explicitly.";
+        "The OneDrive change was not confirmed. Do not repeat sharing; clean up explicitly.";
       const message =
         error instanceof AccessTokenError || error instanceof ApiAccessError
           ? error.message
@@ -470,7 +431,7 @@ export function createAfterPartyApp(
         apiAccess,
         rehearsalStatus,
         simulatedEmail,
-        oneDriveProof: { stage, activity: "idle", message },
+        oneDriveProof: { stage: "uncertain", activity: "idle", message },
       });
     }
   };
@@ -495,9 +456,6 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='share-onedrive-proof']")
       ?.addEventListener("click", () => void runOneDriveProofAction("share"));
-    root
-      .querySelector<HTMLButtonElement>("[data-action='verify-onedrive-proof']")
-      ?.addEventListener("click", () => void runOneDriveProofAction("verify"));
     root
       .querySelector<HTMLButtonElement>("[data-action='remove-onedrive-proof']")
       ?.addEventListener("click", () => void runOneDriveProofAction("remove"));
@@ -633,7 +591,6 @@ function createButton(
     | "check-rehearsal"
     | "send-simulated-email"
     | "share-onedrive-proof"
-    | "verify-onedrive-proof"
     | "remove-onedrive-proof",
   className: string,
   disabled = false,
@@ -712,35 +669,28 @@ function createOneDriveProofPanel(
       createStatus(
         state.activity === "sharing"
           ? "Creating and sharing the fixed OneDrive proof…"
-          : state.activity === "verifying"
-            ? "Signing in as Marge and verifying the exact file bytes…"
-            : "Validating and removing the fixed OneDrive proof…",
+          : "Validating and removing the fixed OneDrive proof…",
       ),
     );
   } else {
     const message =
       state.stage === "not-started"
         ? "OneDrive proof: not started in this browser."
-        : state.stage === "shared"
-          ? "OneDrive proof: shared read-only with Marge. Access is not yet verified."
-          : state.stage === "verified"
-            ? "OneDrive proof: Marge access and exact file bytes verified."
+        : state.stage === "configured"
+          ? "OneDrive proof: read-only access is configured for Marge."
             : state.stage === "removed"
               ? "OneDrive proof: removed to Homer's recycle bin."
-              : "OneDrive proof: the last change outcome is uncertain. Do not share again; verify or clean up explicitly.";
+              : "OneDrive proof: the last change outcome is uncertain. Do not share again; clean up explicitly.";
     panel.append(createStatus(message, state.stage === "uncertain" ? "notice" : "status"));
   }
   if (state.message) {
     panel.append(createStatus(state.message, "error"));
   }
-  if (state.notice) {
-    panel.append(createStatus(state.notice, "notice"));
-  }
   if (state.inviteFailure) {
     panel.append(createOneDriveInviteFailureList(state.inviteFailure));
   }
-  if (state.verifyFailure) {
-    panel.append(createOneDriveVerifyFailureList(state.verifyFailure));
+  if (state.stage === "configured" && state.activity === "idle") {
+    panel.append(createOneDriveHumanVerificationInstructions());
   }
 
   panel.append(
@@ -751,18 +701,11 @@ function createOneDriveProofPanel(
       apiOperationLoading || state.stage !== "not-started",
     ),
     createButton(
-      "Verify as Marge",
-      "verify-onedrive-proof",
-      "secondary",
-      apiOperationLoading ||
-        (state.stage !== "shared" && state.stage !== "uncertain"),
-    ),
-    createButton(
       "Clean up OneDrive proof",
       "remove-onedrive-proof",
       "secondary",
       apiOperationLoading ||
-        !["shared", "verified", "uncertain"].includes(state.stage),
+        !["configured", "uncertain"].includes(state.stage),
     ),
   );
   return panel;
@@ -817,53 +760,19 @@ function inviteResponseShape(
   }
 }
 
-function createOneDriveVerifyFailureList(
-  failure: OneDriveVerifyFailure,
-): HTMLDListElement {
-  const list = document.createElement("dl");
-  list.className = "identity-list";
-  appendIdentity(
-    list,
-    "Failed stage",
-    "Read the exact file bytes as Marge",
-  );
-  appendIdentity(list, "Microsoft Graph status", String(failure.upstreamStatus));
-  appendIdentity(
-    list,
-    "Microsoft Graph error code",
-    failure.graphErrorCode ?? "Not provided",
-  );
-  if (failure.requestId) {
-    appendIdentity(list, "Microsoft Graph request ID", failure.requestId);
+function createOneDriveHumanVerificationInstructions(): HTMLOListElement {
+  const list = document.createElement("ol");
+  for (const instruction of [
+    "In a separate browser or profile, sign in to OneDrive as marge.simpson@corywest.onmicrosoft.com.",
+    "Open Shared, then Shared with you.",
+    "Find AP2-OneDrive-share-proof.txt.",
+    "Return here and click Clean up OneDrive proof when finished.",
+  ]) {
+    const item = document.createElement("li");
+    item.textContent = instruction;
+    list.append(item);
   }
-  appendIdentity(list, "Client request ID", failure.clientRequestId);
-  if (failure.responseDate) {
-    appendIdentity(list, "Microsoft Graph response date", failure.responseDate);
-  }
-  if (failure.retryAfter) {
-    appendIdentity(list, "Microsoft Graph retry after", failure.retryAfter);
-  }
-  appendIdentity(list, "Response shape", verifyResponseShape(failure.responseShape));
   return list;
-}
-
-function verifyResponseShape(
-  value: OneDriveVerifyFailure["responseShape"],
-): string {
-  switch (value) {
-    case "graph-error":
-      return "Microsoft Graph error";
-    case "non-json":
-      return "No JSON response";
-    case "malformed-response":
-      return "Unexpected Microsoft Graph response";
-    case "invalid-download-redirect":
-      return "Download redirect was not accepted";
-    case "content-response-error":
-      return "File content response could not be used";
-    case "content-mismatch":
-      return "File bytes did not match";
-  }
 }
 
 function createRehearsalStatusPanel(
@@ -989,19 +898,16 @@ function isCurrentSignedInAccount(
 
 function isAllowedOneDriveAction(
   stage: OneDriveProofStage,
-  action: "share" | "verify" | "remove",
+  action: "share" | "remove",
 ): boolean {
   if (action === "share") {
     return stage === "not-started";
   }
-  if (action === "verify") {
-    return stage === "shared" || stage === "uncertain";
-  }
-  return stage === "shared" || stage === "verified" || stage === "uncertain";
+  return stage === "configured" || stage === "uncertain";
 }
 
 function oneDriveStage(result: OneDriveProofResult): OneDriveProofStage {
-  return result.state === "pending" ? "shared" : result.state;
+  return result.state;
 }
 
 function oneDriveStorageKey(account: AccountIdentity): string {
@@ -1013,10 +919,12 @@ function readOneDriveStage(
   account: AccountIdentity,
 ): OneDriveProofStage {
   const value = storage.getItem(oneDriveStorageKey(account));
+  if (value === "shared" || value === "verified") {
+    return "configured";
+  }
   return value === "uncertain" ||
-    value === "shared" ||
-    value === "verified" ||
-    value === "removed"
+      value === "configured" ||
+      value === "removed"
     ? value
     : "not-started";
 }

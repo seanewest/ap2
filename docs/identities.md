@@ -31,9 +31,8 @@ Student tenant
 │   │
 │   └── Shared simulated-user client
 │       ├── Homer: sends email and owns the fixed OneDrive proof
-│       ├── Marge: verifies read-only access to the proof
-│       ├── signs each user in with CBA in a fresh headless browser context
-│       └── keeps a separate in-memory token cache per user
+│       ├── signs Homer in with CBA in a fresh headless browser context
+│       └── keeps his delegated token only in process memory
 ```
 
 ## Backend identities

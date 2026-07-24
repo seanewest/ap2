@@ -17,6 +17,12 @@ export const HOMER_IDENTITY: SimulatedUserIdentity = {
 export const MARGE_DISPLAY_NAME = "Marge Simpson";
 export const MARGE_USER_PRINCIPAL_NAME =
   "marge.simpson@corywest.onmicrosoft.com";
+export const MARGE_IDENTITY: SimulatedUserIdentity = {
+  tenantId: STUDENT_TENANT_ID,
+  objectId: "9b7fc1a3-58a0-4440-8d09-796e4d405acd",
+  displayName: MARGE_DISPLAY_NAME,
+  userPrincipalName: MARGE_USER_PRINCIPAL_NAME,
+};
 
 export interface DelegatedGraphToken {
   token: string;

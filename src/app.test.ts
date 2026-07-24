@@ -11,7 +11,6 @@ import {
 import {
   ApiAccessError,
   OneDriveInviteFailureError,
-  OneDriveVerifyFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type OneDriveProofResult,
@@ -45,15 +44,7 @@ class FakeApi implements AfterPartyApi {
     vi.fn<
       (
         accessToken: string,
-      ) => Promise<Extract<OneDriveProofResult, { state: "shared" }>>
-    >();
-  verifyOneDriveProof =
-    vi.fn<
-      (
-        accessToken: string,
-      ) => Promise<
-        Extract<OneDriveProofResult, { state: "verified" | "pending" }>
-      >
+      ) => Promise<Extract<OneDriveProofResult, { state: "configured" }>>
     >();
   removeOneDriveProof =
     vi.fn<
@@ -513,7 +504,7 @@ describe("After Party authentication UI", () => {
     expect(simulatedEmailButton()?.disabled).toBe(true);
   });
 
-  it("runs share, Marge verification, and cleanup only on separate clicks", async () => {
+  it("configures access and cleans up only on separate clicks", async () => {
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",
       account,
@@ -521,17 +512,11 @@ describe("After Party authentication UI", () => {
     });
     authentication.acquireAccessToken.mockResolvedValue("temporary-token");
     api.shareOneDriveProof.mockResolvedValue({
-      state: "shared",
+      state: "configured",
       path: "/AP2-OneDrive-share-proof.txt",
       owner: "homer.simpson@corywest.onmicrosoft.com",
       recipient: "marge.simpson@corywest.onmicrosoft.com",
       access: "read",
-    });
-    api.verifyOneDriveProof.mockResolvedValue({
-      state: "verified",
-      path: "/AP2-OneDrive-share-proof.txt",
-      verifiedAs: "marge.simpson@corywest.onmicrosoft.com",
-      contentMatches: true,
     });
     api.removeOneDriveProof.mockResolvedValue({
       state: "removed",
@@ -545,29 +530,32 @@ describe("After Party authentication UI", () => {
     oneDriveShareButton()?.click();
     await nextTask();
     expect(api.shareOneDriveProof).toHaveBeenCalledWith("temporary-token");
-    expect(api.verifyOneDriveProof).not.toHaveBeenCalled();
     expect(api.removeOneDriveProof).not.toHaveBeenCalled();
-    expect(root.textContent).toContain("shared read-only with Marge");
-
-    oneDriveVerifyButton()?.click();
-    await nextTask();
-    expect(api.verifyOneDriveProof).toHaveBeenCalledWith("temporary-token");
-    expect(api.removeOneDriveProof).not.toHaveBeenCalled();
-    expect(root.textContent).toContain("exact file bytes verified");
+    expect(root.textContent).toContain(
+      "read-only access is configured for Marge",
+    );
+    expect(root.textContent).toContain(
+      "sign in to OneDrive as marge.simpson@corywest.onmicrosoft.com",
+    );
+    expect(root.textContent).toContain("Open Shared, then Shared with you");
+    expect(root.textContent).toContain("AP2-OneDrive-share-proof.txt");
+    expect(root.textContent).toContain(
+      "Return here and click Clean up OneDrive proof when finished",
+    );
+    expect(oneDriveVerifyButton()).toBeNull();
 
     oneDriveRemoveButton()?.click();
     await nextTask();
     expect(api.removeOneDriveProof).toHaveBeenCalledWith("temporary-token");
     expect(root.textContent).toContain("removed to Homer's recycle bin");
     expect(oneDriveShareButton()?.disabled).toBe(true);
-    expect(oneDriveVerifyButton()?.disabled).toBe(true);
     expect(oneDriveRemoveButton()?.disabled).toBe(true);
     expect(root.textContent).not.toContain("temporary-token");
   });
 
   it("records an uncertain mutation before the request and restores it after reload", async () => {
     const deferred = createDeferred<
-      Extract<OneDriveProofResult, { state: "shared" }>
+      Extract<OneDriveProofResult, { state: "configured" }>
     >();
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",
@@ -593,7 +581,7 @@ describe("After Party authentication UI", () => {
     await app.start();
     expect(root.textContent).toContain("last change outcome is uncertain");
     expect(oneDriveShareButton()?.disabled).toBe(true);
-    expect(oneDriveVerifyButton()?.disabled).toBe(false);
+    expect(oneDriveVerifyButton()).toBeNull();
     expect(oneDriveRemoveButton()?.disabled).toBe(false);
   });
 
@@ -651,7 +639,7 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).not.toContain("temporary-token");
   });
 
-  it("preserves the prior stage when read-only verification fails", async () => {
+  it("interprets the old shared stage as configured without claiming verification", async () => {
     localStorage.setItem(
       "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
       "shared",
@@ -661,102 +649,14 @@ describe("After Party authentication UI", () => {
       account,
       source: "cache",
     });
-    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
-    api.verifyOneDriveProof.mockRejectedValue(
-      new ApiAccessError("Marge access could not be verified."),
-    );
     const app = createAfterPartyApp(root, authentication, api);
     await app.start();
 
-    oneDriveVerifyButton()?.click();
-    await nextTask();
-    expect(root.textContent).toContain("Marge access could not be verified.");
-    expect(oneDriveVerifyButton()?.disabled).toBe(false);
-    expect(oneDriveRemoveButton()?.disabled).toBe(false);
-    expect(localStorage.getItem(
-      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
-    )).toBe("shared");
-  });
-
-  it("shows structured Marge diagnostics without changing the shared stage", async () => {
-    localStorage.setItem(
-      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
-      "shared",
-    );
-    authentication.initialize.mockResolvedValue({
-      kind: "signed-in",
-      account,
-      source: "cache",
-    });
-    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
-    api.verifyOneDriveProof.mockRejectedValue(
-      new OneDriveVerifyFailureError({
-        state: "marge-access-not-confirmed",
-        stage: "verify-content",
-        upstreamStatus: 401,
-        graphErrorCode: "invalidAuthenticationToken",
-        requestId: "11111111-1111-4111-8111-111111111111",
-        clientRequestId: "22222222-2222-4222-8222-222222222222",
-        responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
-        retryAfter: "5",
-        responseShape: "graph-error",
-      }),
-    );
-    const app = createAfterPartyApp(root, authentication, api);
-    await app.start();
-
-    oneDriveVerifyButton()?.click();
-    await nextTask();
-
-    expect(root.textContent).toContain("Marge access is not yet confirmed.");
-    expect(root.textContent).toContain("The proof file was not changed.");
-    expect(root.textContent).toContain("Read the exact file bytes as Marge");
-    expect(root.textContent).toContain("Microsoft Graph status401");
     expect(root.textContent).toContain(
-      "Microsoft Graph error codeinvalidAuthenticationToken",
+      "read-only access is configured for Marge",
     );
-    expect(root.textContent).toContain(
-      "Microsoft Graph request ID11111111-1111-4111-8111-111111111111",
-    );
-    expect(root.textContent).toContain(
-      "Client request ID22222222-2222-4222-8222-222222222222",
-    );
-    expect(root.textContent).not.toContain("temporary-token");
-    expect(oneDriveVerifyButton()?.disabled).toBe(false);
-    expect(oneDriveRemoveButton()?.disabled).toBe(false);
-    expect(localStorage.getItem(
-      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
-    )).toBe("shared");
-  });
-
-  it("shows pending propagation and permits explicit later Verify", async () => {
-    localStorage.setItem(
-      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
-      "shared",
-    );
-    authentication.initialize.mockResolvedValue({
-      kind: "signed-in",
-      account,
-      source: "cache",
-    });
-    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
-    api.verifyOneDriveProof.mockResolvedValue({
-      state: "pending",
-      path: "/AP2-OneDrive-share-proof.txt",
-      verifiedAs: "marge.simpson@corywest.onmicrosoft.com",
-      reason: "access-propagation",
-    });
-    const app = createAfterPartyApp(root, authentication, api);
-    await app.start();
-
-    oneDriveVerifyButton()?.click();
-    await nextTask();
-
-    expect(root.textContent).toContain(
-      "Marge access is still being confirmed. Try Verify again later.",
-    );
-    expect(root.textContent).not.toContain("API could not complete");
-    expect(oneDriveVerifyButton()?.disabled).toBe(false);
+    expect(root.textContent).not.toContain("verified");
+    expect(oneDriveVerifyButton()).toBeNull();
     expect(oneDriveRemoveButton()?.disabled).toBe(false);
     expect(localStorage.getItem(
       "ap2.onedrive-share-proof.student-tenant-id.student-object-id",

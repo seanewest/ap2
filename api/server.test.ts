@@ -24,7 +24,6 @@ import {
 import {
   ONEDRIVE_PROOF_PATH,
   OneDriveInviteFailureError,
-  OneDriveVerifyFailureError,
   ProcessLocalOneDriveShareProofBoundary,
   type OneDriveProofResult,
 } from "./onedrive-share-proof.js";
@@ -61,24 +60,17 @@ const simulatedEmailOperation = {
   send: vi.fn().mockResolvedValue(simulatedEmailResult),
 };
 const oneDriveResults = {
-  shared: {
-    state: "shared",
+  configured: {
+    state: "configured",
     path: ONEDRIVE_PROOF_PATH,
     owner: HOMER_USER_PRINCIPAL_NAME,
     recipient: MARGE_USER_PRINCIPAL_NAME,
     access: "read",
   },
-  verified: {
-    state: "verified",
-    path: ONEDRIVE_PROOF_PATH,
-    verifiedAs: MARGE_USER_PRINCIPAL_NAME,
-    contentMatches: true,
-  },
   removed: { state: "removed", path: ONEDRIVE_PROOF_PATH },
 } as const satisfies Record<string, OneDriveProofResult>;
 const oneDriveShareProofOperation = {
-  share: vi.fn().mockResolvedValue(oneDriveResults.shared),
-  verify: vi.fn().mockResolvedValue(oneDriveResults.verified),
+  share: vi.fn().mockResolvedValue(oneDriveResults.configured),
   remove: vi.fn().mockResolvedValue(oneDriveResults.removed),
 };
 const oneDriveOperationBoundary =
@@ -179,7 +171,7 @@ describe("local API", () => {
     },
   );
 
-  it.each(["GET", "POST", "DELETE"])(
+  it.each(["POST", "DELETE"])(
     "allows only the exact OneDrive method/header preflight for %s",
     async (method) => {
       const response = await fetch(`${baseUrl}/api/onedrive-share-proof`, {
@@ -192,10 +184,34 @@ describe("local API", () => {
       });
       expect(response.status).toBe(204);
       expect(response.headers.get("access-control-allow-methods")).toBe(
-        "GET, POST, DELETE",
+        "POST, DELETE",
       );
     },
   );
+
+  it("rejects the removed OneDrive verification method", async () => {
+    const preflight = await fetch(`${baseUrl}/api/onedrive-share-proof`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:5173",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "Authorization",
+      },
+    });
+    expect(preflight.status).toBe(403);
+
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/onedrive-share-proof",
+      "GET",
+    );
+    expect(response.status).toBe(404);
+  });
 
   it("rejects another origin and broader preflight requests", async () => {
     const otherOrigin = await fetch(`${baseUrl}/api/whoami`, {
@@ -378,8 +394,7 @@ describe("local API", () => {
   });
 
   it.each([
-    ["POST", "share", oneDriveResults.shared, 201],
-    ["GET", "verify", oneDriveResults.verified, 200],
+    ["POST", "share", oneDriveResults.configured, 201],
     ["DELETE", "remove", oneDriveResults.removed, 200],
   ] as const)(
     "%s runs the exact OneDrive operation for both authorized caller shapes",
@@ -429,9 +444,9 @@ describe("local API", () => {
   });
 
   it("returns a clear busy conflict across operator and Dev callers", async () => {
-    const pending = deferred<typeof oneDriveResults.shared>();
+    const pending = deferred<typeof oneDriveResults.configured>();
     oneDriveShareProofOperation.share.mockClear();
-    oneDriveShareProofOperation.verify.mockClear();
+    oneDriveShareProofOperation.remove.mockClear();
     oneDriveShareProofOperation.share.mockImplementationOnce(
       () => pending.promise,
     );
@@ -459,15 +474,15 @@ describe("local API", () => {
       },
       undefined,
       "/api/onedrive-share-proof",
-      "GET",
+      "DELETE",
     );
     expect(devResponse.status).toBe(409);
     await expect(devResponse.json()).resolves.toEqual({
       error: "proof_operation_busy",
     });
-    expect(oneDriveShareProofOperation.verify).not.toHaveBeenCalled();
+    expect(oneDriveShareProofOperation.remove).not.toHaveBeenCalled();
 
-    pending.resolve(oneDriveResults.shared);
+    pending.resolve(oneDriveResults.configured);
     const operatorResponse = await operatorRequest;
     expect(operatorResponse.status).toBe(201);
   });
@@ -502,40 +517,6 @@ describe("local API", () => {
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toEqual({
       error: "onedrive_invite_failed",
-      ...diagnostic,
-    });
-  });
-
-  it("returns only safe structured diagnostics when Marge verification fails", async () => {
-    const diagnostic = {
-      state: "marge-access-not-confirmed",
-      stage: "verify-content",
-      upstreamStatus: 401,
-      graphErrorCode: "invalidAuthenticationToken",
-      requestId: "11111111-1111-4111-8111-111111111111",
-      clientRequestId: "22222222-2222-4222-8222-222222222222",
-      responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
-      retryAfter: "5",
-      responseShape: "graph-error",
-    } as const;
-    oneDriveShareProofOperation.verify.mockRejectedValueOnce(
-      new OneDriveVerifyFailureError(diagnostic),
-    );
-
-    const response = await protectedRequest(
-      {
-        tid: STUDENT_TENANT_ID,
-        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
-        scp: REQUIRED_DELEGATED_SCOPE,
-      },
-      undefined,
-      "/api/onedrive-share-proof",
-      "GET",
-    );
-
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toEqual({
-      error: "onedrive_verify_failed",
       ...diagnostic,
     });
   });

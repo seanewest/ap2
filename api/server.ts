@@ -12,7 +12,6 @@ import {
   OneDriveInviteFailureError,
   OneDriveProofBusyError,
   OneDriveProofConflictError,
-  OneDriveVerifyFailureError,
   type OneDriveShareProofOperation,
 } from "./onedrive-share-proof.js";
 import { InvalidTokenError, type TokenVerifier } from "./token-verifier.js";
@@ -71,7 +70,6 @@ async function route(
     pathname === "/api/onedrive-share-proof"
   ) {
     handleProtectedPreflight(request, response, origin, [
-      "GET",
       "POST",
       "DELETE",
     ]);
@@ -103,14 +101,6 @@ async function route(
     pathname === "/api/onedrive-share-proof"
   ) {
     await oneDriveShareProof(request, response, dependencies, "share");
-    return;
-  }
-
-  if (
-    request.method === "GET" &&
-    pathname === "/api/onedrive-share-proof"
-  ) {
-    await oneDriveShareProof(request, response, dependencies, "verify");
     return;
   }
 
@@ -206,7 +196,7 @@ async function oneDriveShareProof(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
-  action: "share" | "verify" | "remove",
+  action: "share" | "remove",
 ): Promise<void> {
   await handleAuthorizedRequest(
     request,
@@ -260,13 +250,6 @@ async function handleAuthorizedRequest(
     if (error instanceof OneDriveInviteFailureError) {
       sendJson(response, 502, {
         error: "onedrive_invite_failed",
-        ...error.diagnostic,
-      });
-      return;
-    }
-    if (error instanceof OneDriveVerifyFailureError) {
-      sendJson(response, 502, {
-        error: "onedrive_verify_failed",
         ...error.diagnostic,
       });
       return;

@@ -33,23 +33,11 @@ const ONEDRIVE_PROOF_RECIPIENT =
 
 export type OneDriveProofResult =
   | {
-      state: "shared";
+      state: "configured";
       path: typeof ONEDRIVE_PROOF_PATH;
       owner: typeof ONEDRIVE_PROOF_OWNER;
       recipient: typeof ONEDRIVE_PROOF_RECIPIENT;
       access: "read";
-    }
-  | {
-      state: "verified";
-      path: typeof ONEDRIVE_PROOF_PATH;
-      verifiedAs: typeof ONEDRIVE_PROOF_RECIPIENT;
-      contentMatches: true;
-    }
-  | {
-      state: "pending";
-      path: typeof ONEDRIVE_PROOF_PATH;
-      verifiedAs: typeof ONEDRIVE_PROOF_RECIPIENT;
-      reason: "access-propagation";
     }
   | {
       state: "removed";
@@ -73,24 +61,6 @@ export interface OneDriveInviteFailure {
     | "permission-reconciliation-mismatch";
 }
 
-export interface OneDriveVerifyFailure {
-  state: "marge-access-not-confirmed";
-  stage: "verify-content";
-  upstreamStatus: number;
-  graphErrorCode?: string;
-  requestId?: string;
-  clientRequestId: string;
-  responseDate?: string;
-  retryAfter?: string;
-  responseShape:
-    | "graph-error"
-    | "non-json"
-    | "malformed-response"
-    | "invalid-download-redirect"
-    | "content-response-error"
-    | "content-mismatch";
-}
-
 const SIMULATED_EMAIL_SENDER =
   "homer.simpson@corywest.onmicrosoft.com";
 const SIMULATED_EMAIL_RECIPIENT =
@@ -103,10 +73,7 @@ export interface AfterPartyApi {
   sendSimulatedEmail(accessToken: string): Promise<SimulatedEmailResult>;
   shareOneDriveProof(
     accessToken: string,
-  ): Promise<Extract<OneDriveProofResult, { state: "shared" }>>;
-  verifyOneDriveProof(
-    accessToken: string,
-  ): Promise<Extract<OneDriveProofResult, { state: "verified" | "pending" }>>;
+  ): Promise<Extract<OneDriveProofResult, { state: "configured" }>>;
   removeOneDriveProof(
     accessToken: string,
   ): Promise<Extract<OneDriveProofResult, { state: "removed" }>>;
@@ -127,18 +94,6 @@ export class OneDriveInviteFailureError extends ApiAccessError {
       "Homer's file was created, but sharing it with Marge failed. Clean up the OneDrive proof before trying again.",
     );
     this.name = "OneDriveInviteFailureError";
-    this.diagnostic = diagnostic;
-  }
-}
-
-export class OneDriveVerifyFailureError extends ApiAccessError {
-  readonly diagnostic: OneDriveVerifyFailure;
-
-  constructor(diagnostic: OneDriveVerifyFailure) {
-    super(
-      "Marge access is not yet confirmed. The proof file was not changed. Clean up or try Verify again later.",
-    );
-    this.name = "OneDriveVerifyFailureError";
     this.diagnostic = diagnostic;
   }
 }
@@ -219,57 +174,19 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async shareOneDriveProof(
     accessToken: string,
-  ): Promise<Extract<OneDriveProofResult, { state: "shared" }>> {
+  ): Promise<Extract<OneDriveProofResult, { state: "configured" }>> {
     const result = await this.oneDriveProofRequest(
       accessToken,
       "POST",
       201,
-      "shared",
+      "configured",
     );
     return {
-      state: "shared",
+      state: "configured",
       path: result.path,
       owner: result.owner,
       recipient: result.recipient,
       access: result.access,
-    };
-  }
-
-  async verifyOneDriveProof(
-    accessToken: string,
-  ): Promise<
-    Extract<OneDriveProofResult, { state: "verified" | "pending" }>
-  > {
-    const value = await this.getAuthorizedJson(
-      this.oneDriveProofUrl,
-      accessToken,
-      "GET",
-      200,
-      "verify",
-    );
-    if (
-      !isSafeOneDriveProofResult(value) ||
-      (value.state !== "verified" && value.state !== "pending")
-    ) {
-      throw new ApiAccessError();
-    }
-    const result = value as Extract<
-      OneDriveProofResult,
-      { state: "verified" | "pending" }
-    >;
-    if (result.state === "pending") {
-      return {
-        state: "pending",
-        path: result.path,
-        verifiedAs: result.verifiedAs,
-        reason: "access-propagation",
-      };
-    }
-    return {
-      state: "verified",
-      path: result.path,
-      verifiedAs: result.verifiedAs,
-      contentMatches: true,
     };
   }
 
@@ -287,7 +204,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   private async oneDriveProofRequest<T extends OneDriveProofResult["state"]>(
     accessToken: string,
-    method: "GET" | "POST" | "DELETE",
+    method: "POST" | "DELETE",
     expectedStatus: number,
     expectedState: T,
   ): Promise<Extract<OneDriveProofResult, { state: T }>> {
@@ -296,11 +213,9 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       accessToken,
       method,
       expectedStatus,
-      expectedState === "shared"
+      expectedState === "configured"
         ? "invite"
-        : expectedState === "verified"
-          ? "verify"
-          : undefined,
+        : undefined,
     );
     if (!isSafeOneDriveProofResult(value) || value.state !== expectedState) {
       throw new ApiAccessError();
@@ -313,7 +228,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
     method = "GET",
     expectedStatus?: number,
-    oneDriveFailure?: "invite" | "verify",
+    oneDriveFailure?: "invite",
   ): Promise<unknown> {
     let response: Response;
     try {
@@ -352,20 +267,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         if (failure) {
           throw new OneDriveInviteFailureError(failure);
         }
-      } else {
-        const failure = await readOneDriveVerifyFailure(response);
-        if (failure) {
-          throw new OneDriveVerifyFailureError(failure);
-        }
       }
-      throw oneDriveFailure === "verify"
-        ? new ApiAccessError("Marge access is not yet confirmed. The proof file was not changed.")
-        : new ApiAccessError();
-    }
-    if (response.status === 500 && oneDriveFailure === "verify") {
-      throw new ApiAccessError(
-        "Marge access is not yet confirmed. The proof file was not changed.",
-      );
+      throw new ApiAccessError();
     }
     if (expectedStatus === undefined ? !response.ok : response.status !== expectedStatus) {
       throw new ApiAccessError();
@@ -378,27 +281,6 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ApiAccessError();
     }
     return value;
-  }
-}
-
-async function readOneDriveVerifyFailure(
-  response: Response,
-): Promise<OneDriveVerifyFailure | undefined> {
-  try {
-    const value: unknown = await response.json();
-    return isSafeOneDriveVerifyFailure(value) ? {
-      state: "marge-access-not-confirmed",
-      stage: value.stage,
-      upstreamStatus: value.upstreamStatus,
-      clientRequestId: value.clientRequestId,
-      responseShape: value.responseShape,
-      ...(value.graphErrorCode ? { graphErrorCode: value.graphErrorCode } : {}),
-      ...(value.requestId ? { requestId: value.requestId } : {}),
-      ...(value.responseDate ? { responseDate: value.responseDate } : {}),
-      ...(value.retryAfter ? { retryAfter: value.retryAfter } : {}),
-    } : undefined;
-  } catch {
-    return undefined;
   }
 }
 
@@ -468,39 +350,6 @@ function isInviteResponseShape(value: unknown): boolean {
     value === "permission-response-mismatch" ||
     value === "permission-reconciliation-error" ||
     value === "permission-reconciliation-mismatch";
-}
-
-function isSafeOneDriveVerifyFailure(
-  value: unknown,
-): value is OneDriveVerifyFailure & { error: "onedrive_verify_failed" } {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  const failure = value as Record<string, unknown>;
-  return (
-    failure.error === "onedrive_verify_failed" &&
-    failure.state === "marge-access-not-confirmed" &&
-    failure.stage === "verify-content" &&
-    Number.isInteger(failure.upstreamStatus) &&
-    Number(failure.upstreamStatus) >= 100 &&
-    Number(failure.upstreamStatus) <= 599 &&
-    optionalGuid(failure.clientRequestId) &&
-    failure.clientRequestId !== undefined &&
-    isVerifyResponseShape(failure.responseShape) &&
-    optionalSafeCode(failure.graphErrorCode) &&
-    optionalGuid(failure.requestId) &&
-    optionalHttpDate(failure.responseDate) &&
-    optionalRetryAfter(failure.retryAfter)
-  );
-}
-
-function isVerifyResponseShape(value: unknown): boolean {
-  return value === "graph-error" ||
-    value === "non-json" ||
-    value === "malformed-response" ||
-    value === "invalid-download-redirect" ||
-    value === "content-response-error" ||
-    value === "content-mismatch";
 }
 
 function optionalSafeCode(value: unknown): boolean {
@@ -581,23 +430,11 @@ function isSafeOneDriveProofResult(
   if (result.path !== ONEDRIVE_PROOF_PATH) {
     return false;
   }
-  if (result.state === "shared") {
+  if (result.state === "configured") {
     return (
       result.owner === ONEDRIVE_PROOF_OWNER &&
       result.recipient === ONEDRIVE_PROOF_RECIPIENT &&
       result.access === "read"
-    );
-  }
-  if (result.state === "verified") {
-    return (
-      result.verifiedAs === ONEDRIVE_PROOF_RECIPIENT &&
-      result.contentMatches === true
-    );
-  }
-  if (result.state === "pending") {
-    return (
-      result.verifiedAs === ONEDRIVE_PROOF_RECIPIENT &&
-      result.reason === "access-propagation"
     );
   }
   return result.state === "removed";

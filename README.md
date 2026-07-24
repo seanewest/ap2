@@ -61,11 +61,12 @@ control and reports only Graph acceptance—not delivery. This path is disabled
 until the shared client and Homer CBA settings are configured; see
 [API identity](docs/api-identity.md).
 
-`/api/onedrive-share-proof` adds three explicit controls for one fixed
-Homer-to-Marge view-only share rehearsal: create/share, verify exact bytes as
-Marge, and validate/remove to Homer's recycle bin. Mutations are never retried,
-and partial Homer or Marge CBA configuration fails closed. The exact
-configuration and boundaries are in [API identity](docs/api-identity.md).
+`/api/onedrive-share-proof` adds two explicit controls for one fixed
+Homer-to-Marge view-only share rehearsal: create/configure read access and
+validate/remove to Homer's recycle bin. After configuration, the SPA gives
+simple instructions for Marge to inspect the file in OneDrive from a separate
+browser or profile. Mutations are never retried. The exact configuration and
+boundaries are in [API identity](docs/api-identity.md).
 
 Build and start the API locally with explicit verification configuration:
 

@@ -4,7 +4,6 @@ import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
 import {
   DelegatedGraphOneDriveShareProof,
-  GRAPH_FILES_READ_SCOPE,
   GRAPH_FILES_READ_WRITE_SCOPE,
   ProcessLocalOneDriveShareProofBoundary,
 } from "./onedrive-share-proof.js";
@@ -14,9 +13,6 @@ import {
 } from "./simulated-email.js";
 import {
   HOMER_IDENTITY,
-  MARGE_DISPLAY_NAME,
-  MARGE_USER_PRINCIPAL_NAME,
-  type SimulatedUserIdentity,
 } from "./simulated-user.js";
 import { SimulatedUserDelegatedTokenProvider } from "./simulated-user-cba.js";
 import { createRemoteTokenVerifier } from "./token-verifier.js";
@@ -28,7 +24,7 @@ const tokenVerifier = createRemoteTokenVerifier({
   jwksUrl: config.jwksUrl,
   allowInsecureHttp: config.allowInsecureJwks,
 });
-const homerTokenProvider = config.simulatedUsersCba?.homer
+const homerTokenProvider = config.simulatedUsersCba
   ? new SimulatedUserDelegatedTokenProvider({
       clientId: config.simulatedUsersCba.clientId,
       ...config.simulatedUsersCba.homer,
@@ -36,35 +32,13 @@ const homerTokenProvider = config.simulatedUsersCba?.homer
       allowedScopes: [GRAPH_MAIL_SEND_SCOPE, GRAPH_FILES_READ_WRITE_SCOPE],
     })
   : undefined;
-const margeIdentity: SimulatedUserIdentity | undefined =
-  config.simulatedUsersCba?.marge
-    ? {
-        tenantId: HOMER_IDENTITY.tenantId,
-        objectId: config.simulatedUsersCba.marge.objectId,
-        displayName: MARGE_DISPLAY_NAME,
-        userPrincipalName: MARGE_USER_PRINCIPAL_NAME,
-      }
-    : undefined;
-const margeTokenProvider =
-  config.simulatedUsersCba?.marge && margeIdentity
-    ? new SimulatedUserDelegatedTokenProvider({
-        clientId: config.simulatedUsersCba.clientId,
-        ...config.simulatedUsersCba.marge,
-        identity: margeIdentity,
-        allowedScopes: [GRAPH_FILES_READ_SCOPE],
-      })
-    : undefined;
 const simulatedEmailOperation = homerTokenProvider
   ? new DelegatedGraphSimulatedEmailOperation(homerTokenProvider)
   : undefined;
 const oneDriveShareProofOperation =
-  homerTokenProvider && margeTokenProvider && margeIdentity
+  homerTokenProvider
     ? new ProcessLocalOneDriveShareProofBoundary(
-        new DelegatedGraphOneDriveShareProof(
-          homerTokenProvider,
-          margeTokenProvider,
-          margeIdentity,
-        ),
+        new DelegatedGraphOneDriveShareProof(homerTokenProvider),
       )
     : undefined;
 const server = createApiServer({

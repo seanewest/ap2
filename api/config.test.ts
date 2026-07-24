@@ -52,7 +52,7 @@ describe("loadApiConfig", () => {
     expect(config.simulatedUsersCba).toBeUndefined();
   });
 
-  it("accepts complete per-user CBA configuration under one client", () => {
+  it("accepts complete Homer CBA configuration under one client", () => {
     const config = loadApiConfig({
       AUTH_ISSUER: "https://issuer.example/",
       AUTH_AUDIENCE: "api://audience",
@@ -60,9 +60,6 @@ describe("loadApiConfig", () => {
       SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
       HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
       HOMER_CBA_PFX_PASSPHRASE: "secret-passphrase",
-      MARGE_CBA_OBJECT_ID: "22222222-2222-4222-8222-222222222222",
-      MARGE_CBA_PFX_PATH: "/run/secrets/marge.pfx",
-      MARGE_CBA_PFX_PASSPHRASE: "another-secret",
     });
 
     expect(config.simulatedUsersCba).toEqual({
@@ -70,11 +67,6 @@ describe("loadApiConfig", () => {
       homer: {
         pfxPath: "/run/secrets/homer.pfx",
         pfxPassphrase: "secret-passphrase",
-      },
-      marge: {
-        objectId: "22222222-2222-4222-8222-222222222222",
-        pfxPath: "/run/secrets/marge.pfx",
-        pfxPassphrase: "another-secret",
       },
     });
   });
@@ -113,31 +105,6 @@ describe("loadApiConfig", () => {
         HOMER_CBA_PFX_PATH: "homer.pfx",
       }),
     ).toThrow("HOMER_CBA_PFX_PATH must be an absolute path");
-  });
-
-  it("rejects partial or invalid Marge configuration independently", () => {
-    const base = {
-      AUTH_ISSUER: "https://issuer.example/",
-      AUTH_AUDIENCE: "api://audience",
-      AUTH_JWKS_URL: "https://issuer.example/keys",
-      SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
-    };
-    expect(() =>
-      loadApiConfig({
-        ...base,
-        MARGE_CBA_PFX_PATH: "/run/secrets/marge.pfx",
-      }),
-    ).toThrow(
-      "MARGE_CBA_PFX_PATH and MARGE_CBA_PFX_PASSPHRASE must be configured together",
-    );
-    expect(() =>
-      loadApiConfig({
-        ...base,
-        MARGE_CBA_OBJECT_ID: "not-a-uuid",
-        MARGE_CBA_PFX_PATH: "/run/secrets/marge.pfx",
-        MARGE_CBA_PFX_PASSPHRASE: "secret",
-      }),
-    ).toThrow("MARGE_CBA_OBJECT_ID must be a UUID");
   });
 
   it.each(["", "user-one,", "user-one,user-one"])(

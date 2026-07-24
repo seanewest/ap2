@@ -36,7 +36,7 @@ client ID. The Student tenant cannot be overridden.
 Browser access is disabled unless `CORS_ALLOWED_ORIGIN` names one exact
 HTTP(S) origin. Protected preflights accept only that origin and the
 `Authorization` header. The read endpoints allow `GET`, simulated email allows
-`POST`, and the OneDrive proof allows `GET`, `POST`, and `DELETE`. Requests
+`POST`, and the OneDrive proof allows `POST` and `DELETE`. Requests
 without an `Origin` header remain available to the app-only proof and other
 non-browser clients.
 
@@ -87,62 +87,47 @@ and intentionally adds no job or durable idempotency system.
 
 ## OneDrive share proof
 
-`POST`, `GET`, and `DELETE /api/onedrive-share-proof` use the same exact
-delegated and app-only caller policy. The three methods are deliberately
-separate human actions:
+`POST` and `DELETE /api/onedrive-share-proof` use the same exact delegated and
+app-only caller policy. The two methods are deliberately separate human
+actions:
 
 - `POST` refuses an existing `/AP2-OneDrive-share-proof.txt`, creates that
   fixed file with the exact rehearsal sentence, and grants only
   `marge.simpson@corywest.onmicrosoft.com` read access. Sign-in is required and
-  no invitation is sent.
-- `GET` has Homer resolve and validate the fixed item, then signs in as Marge
-  and reads only that exact drive/item content path. Marge succeeds only when
-  the bytes match exactly; her access does not depend on a second metadata
-  response.
+  no invitation is sent. Configured success requires exactly one no-link
+  permission with role `read` and `grantedToV2.user.id` equal to Marge's
+  immutable object ID. If Graph's `200` response does not contain that shape,
+  AP2 performs one owner-side permissions read and accepts only one matching
+  effective permission. It never repeats the invite.
 - `DELETE` resolves the fixed item and its permissions, revokes only the exact
-  direct Marge read permission, then re-resolves and validates the 58-byte file
-  before deleting once with its current eTag. OneDrive moves the item to the
-  recycle bin. If a prior revoke succeeded but its response was lost, a later
-  cleanup can safely continue when no Marge permission remains.
+  Marge read permission, then re-resolves and validates the 58-byte file before
+  deleting once with its current eTag. OneDrive moves the item to the recycle
+  bin. If a prior revoke succeeded but its response was lost, a later cleanup
+  can safely continue when no Marge permission remains.
 
 The API never retries an upload-session creation, upload, invite, permission
-revoke, or file delete.
-Immediately after a confirmed share, Marge's read-only content request may
-retry only safely formed Microsoft Graph `403`, `404`, `429`, or `503` errors
-within one hard 55-second deadline. A deadline returns confirmation pending;
-the SPA never polls and a later Verify is an explicit human action.
-
-Microsoft Graph may return an HTTPS preauthenticated `Location` for file
-content. AP2 consumes it only from the authenticated Graph content response,
-rejects non-HTTPS URLs and URLs containing credentials, and never forwards the
-Graph or AP2 Authorization header to that download URL. Pass 3 deliberately
-does not guess at a hostname allowlist because Microsoft controls the
-preauthenticated download host.
+revoke, or file delete. “Configured” means Microsoft Graph confirmed the exact
+Marge read permission; it does not claim that Marge opened the file or that
+OneDrive has exposed every inheritance detail.
 
 After an uncertain mutation response, the UI disables sharing and offers only
-explicit verification or cleanup. Its stage is stored per signed-in account in
-browser storage so a reload does not blindly repeat a mutation.
+cleanup. Its stage is stored per signed-in account in browser storage so a
+reload does not blindly repeat a mutation. After configured success, a human
+can sign in to OneDrive as Marge in a separate browser or profile, open
+**Shared > Shared with you**, find `AP2-OneDrive-share-proof.txt`, then return
+to the SPA and click Cleanup.
 
-Homer uses delegated `Files.ReadWrite`; Marge uses delegated `Files.Read`.
-The shared public client must already have those grants and its existing
-`http://localhost/ap2-simulated-user-callback` redirect. In addition to Homer's
-settings, verification is enabled only when all three Marge settings are
-present:
-
-- `MARGE_CBA_OBJECT_ID`: Marge's immutable Student object ID
-- `MARGE_CBA_PFX_PATH`: absolute path to the externally mounted Marge PFX
-- `MARGE_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
-
-Each simulated user has a separate in-memory token cache and disposable
-Playwright context. Partial per-user certificate configuration fails startup.
-Deployment verification must prove both mounted PFX files and passphrases work;
-the repository does not embed or persist either certificate.
+Homer uses delegated `Files.ReadWrite` through the same shared public client
+and exact callback used by the email operation. The OneDrive runtime requires
+only Homer's existing certificate settings. Its in-memory token cache and
+disposable Playwright context are not shared with a browser profile. The
+repository does not embed or persist the certificate.
 The operation returns only its safe stage, fixed path, identity, and access
 summary; it never returns tokens, credentials, item IDs, eTags, upload URLs, or
 raw Graph responses.
 
-One process-local boundary serializes share, verification, and cleanup across
-operator and Dev-app callers. Concurrent requests receive
+One process-local boundary serializes share and cleanup across operator and
+Dev-app callers. Concurrent requests receive
 `proof_operation_busy`. This is rehearsal-only coordination: it has no durable
 lock, database, queue, or cross-replica protection. The live proof therefore
 requires Container Apps `maxReplicas=1`.

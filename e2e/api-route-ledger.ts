@@ -49,9 +49,6 @@ const SAFE_BODY_FIELDS = new Set([
   "owner",
   "recipient",
   "access",
-  "verifiedAs",
-  "contentMatches",
-  "reason",
 ]);
 const SAFE_BODY_TIMEOUT_MS = 1_000;
 
