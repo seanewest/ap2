@@ -45,6 +45,12 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
       name: "Send one internal email: Homer → Marge",
     }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Create calendar meeting" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Cancel calendar meeting" }),
+  ).toBeVisible();
 
   const whoAmIResponse = page.waitForResponse(
     (response) => {
@@ -139,6 +145,12 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
       name: "Send one internal email: Homer → Marge",
     }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Create calendar meeting" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Cancel calendar meeting" }),
+  ).toHaveCount(0);
 
   await page.reload();
   await expect(page.getByText("You are signed out.")).toBeVisible();
@@ -152,6 +164,12 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
     page.getByRole("button", {
       name: "Send one internal email: Homer → Marge",
     }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Create calendar meeting" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Cancel calendar meeting" }),
   ).toHaveCount(0);
   } finally {
     await testInfo.attach("api-route-ledger.json", {

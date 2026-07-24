@@ -19,7 +19,13 @@ import {
   HOMER_OBJECT_ID,
   HOMER_USER_PRINCIPAL_NAME,
 } from "./simulated-email.js";
-import { HOMER_IDENTITY } from "./simulated-user.js";
+import {
+  CORY_DISPLAY_NAME,
+  CORY_USER_PRINCIPAL_NAME,
+  HOMER_IDENTITY,
+  coryIdentity,
+} from "./simulated-user.js";
+import { GRAPH_CALENDARS_READ_WRITE_SCOPE } from "./calendar-meeting.js";
 
 const CLIENT_ID = "11111111-1111-4111-8111-111111111111";
 const NOW = Date.UTC(2026, 6, 23, 12);
@@ -339,6 +345,61 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
       "profile",
       "https://graph.microsoft.com/User.Read",
       filesScope,
+    ]);
+  });
+
+  it("uses an isolated Cory identity and requests Calendars.ReadWrite explicitly", async () => {
+    const coryObjectId = "22222222-2222-4222-8222-222222222222";
+    const token = accessToken({
+      oid: coryObjectId,
+      scp: "Calendars.ReadWrite User.Read",
+    });
+    const { browser, acquire } = createBrowser();
+    const request = vi.fn(
+      async (input: string | URL | Request): Promise<Response> => {
+        if (input.toString().includes("/oauth2/v2.0/token")) {
+          return Response.json({ access_token: token });
+        }
+        return Response.json({
+          id: coryObjectId,
+          displayName: CORY_DISPLAY_NAME,
+          userPrincipalName: CORY_USER_PRINCIPAL_NAME,
+        });
+      },
+    ) as unknown as typeof fetch;
+    const provider = new SimulatedUserDelegatedTokenProvider({
+      clientId: CLIENT_ID,
+      identity: coryIdentity(coryObjectId),
+      allowedScopes: [GRAPH_CALENDARS_READ_WRITE_SCOPE],
+      pfxPath: "/run/secrets/cory.pfx",
+      pfxPassphrase: PASSPHRASE,
+      browser,
+      request,
+      now: () => NOW,
+    });
+
+    await expect(
+      provider.getToken(GRAPH_CALENDARS_READ_WRITE_SCOPE),
+    ).resolves.toEqual({
+      token,
+      identity: {
+        tenantId: STUDENT_TENANT_ID,
+        objectId: coryObjectId,
+        userPrincipalName: CORY_USER_PRINCIPAL_NAME,
+      },
+    });
+    expect(acquire.mock.calls[0]?.[0].pfxPath).toBe(
+      "/run/secrets/cory.pfx",
+    );
+    expect(
+      acquire.mock.calls[0]?.[0].authorizeUrl.searchParams
+        .get("scope")
+        ?.split(" "),
+    ).toEqual([
+      "openid",
+      "profile",
+      "https://graph.microsoft.com/User.Read",
+      GRAPH_CALENDARS_READ_WRITE_SCOPE,
     ]);
   });
 });

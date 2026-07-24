@@ -13,6 +13,7 @@ import {
   OneDriveInviteFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
+  type CalendarMeetingResult,
   type OneDriveProofResult,
   type RehearsalStatus,
   type SimulatedEmailResult,
@@ -52,6 +53,20 @@ class FakeApi implements AfterPartyApi {
         accessToken: string,
       ) => Promise<Extract<OneDriveProofResult, { state: "removed" }>>
     >();
+  createCalendarMeeting =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<CalendarMeetingResult, { state: "configured" }>>
+    >();
+  cancelCalendarMeeting =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<
+        Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
+      >
+    >();
 }
 
 describe("After Party authentication UI", () => {
@@ -86,6 +101,8 @@ describe("After Party authentication UI", () => {
     expect(oneDriveShareButton()).toBeNull();
     expect(oneDriveVerifyButton()).toBeNull();
     expect(oneDriveRemoveButton()).toBeNull();
+    expect(calendarCreateButton()).toBeNull();
+    expect(calendarCancelButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -694,6 +711,128 @@ describe("After Party authentication UI", () => {
     )).toBe("shared");
   });
 
+  it("creates and cancels the fixed meeting only through separate explicit clicks", async () => {
+    const create = createDeferred<
+      Extract<CalendarMeetingResult, { state: "configured" }>
+    >();
+    const cancel = createDeferred<
+      Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.createCalendarMeeting.mockReturnValue(create.promise);
+    api.cancelCalendarMeeting.mockReturnValue(cancel.promise);
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+
+    expect(api.createCalendarMeeting).not.toHaveBeenCalled();
+    expect(api.cancelCalendarMeeting).not.toHaveBeenCalled();
+    expect(calendarCreateButton()?.disabled).toBe(false);
+    expect(calendarCancelButton()?.disabled).toBe(true);
+    expect(root.textContent).toContain("not started in this browser");
+    expect(root.textContent).toContain("cory@corywest.onmicrosoft.com");
+    expect(root.textContent).toContain("kobe@corywest.onmicrosoft.com");
+    expect(root.textContent).toContain(
+      "marge.simpson@corywest.onmicrosoft.com",
+    );
+    expect(root.textContent).toContain(
+      "AP2 Pass 3 calendar rehearsal — no action required",
+    );
+    expect(root.textContent).toContain("2:00–2:15 PM EDT");
+
+    calendarCreateButton()?.click();
+    await nextTask();
+    expect(api.createCalendarMeeting).toHaveBeenCalledOnce();
+    expect(api.createCalendarMeeting).toHaveBeenCalledWith("temporary-token");
+    expect(localStorage.getItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+    )).toBe("uncertain");
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(true);
+    calendarCreateButton()?.click();
+    expect(api.createCalendarMeeting).toHaveBeenCalledOnce();
+
+    create.resolve({
+      state: "configured",
+      organizer: "cory@corywest.onmicrosoft.com",
+      attendees: [
+        "kobe@corywest.onmicrosoft.com",
+        "marge.simpson@corywest.onmicrosoft.com",
+      ],
+      subject: "AP2 Pass 3 calendar rehearsal — no action required",
+      start: "2026-07-24T18:00:00Z",
+      end: "2026-07-24T18:15:00Z",
+    });
+    await nextTask();
+    expect(root.textContent).toContain("Calendar rehearsal: Configured");
+    expect(root.textContent).toContain(
+      "attendee receipt or response is not confirmed",
+    );
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(false);
+    calendarCreateButton()?.click();
+    expect(api.createCalendarMeeting).toHaveBeenCalledOnce();
+
+    calendarCancelButton()?.click();
+    await nextTask();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledWith("temporary-token");
+    expect(localStorage.getItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+    )).toBe("uncertain");
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(true);
+    calendarCancelButton()?.click();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+
+    cancel.resolve({
+      state: "cancellation-accepted",
+      organizer: "cory@corywest.onmicrosoft.com",
+      subject: "AP2 Pass 3 calendar rehearsal — no action required",
+    });
+    await nextTask();
+    expect(root.textContent).toContain(
+      "Calendar rehearsal: Cancellation accepted",
+    );
+    expect(root.textContent).toContain("Attendee receipt is not confirmed");
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(true);
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it.each([
+    ["uncertain", true, true],
+    ["configured", true, false],
+    ["cancellation-accepted", true, true],
+  ] as const)(
+    "restores calendar stage %s without an automatic call",
+    async (stage, createDisabled, cancelDisabled) => {
+      localStorage.setItem(
+        "ap2.calendar-meeting.student-tenant-id.student-object-id",
+        stage,
+      );
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      const app = createAfterPartyApp(root, authentication, api);
+
+      await app.start();
+
+      expect(api.createCalendarMeeting).not.toHaveBeenCalled();
+      expect(api.cancelCalendarMeeting).not.toHaveBeenCalled();
+      expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+      expect(calendarCreateButton()?.disabled).toBe(createDisabled);
+      expect(calendarCancelButton()?.disabled).toBe(cancelDisabled);
+    },
+  );
+
   function signInButton(): HTMLButtonElement {
     return root.querySelector<HTMLButtonElement>("[data-action='sign-in']")!;
   }
@@ -729,6 +868,18 @@ describe("After Party authentication UI", () => {
   function oneDriveRemoveButton(): HTMLButtonElement | null {
     return root.querySelector<HTMLButtonElement>(
       "[data-action='remove-onedrive-proof']",
+    );
+  }
+
+  function calendarCreateButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='create-calendar-meeting']",
+    );
+  }
+
+  function calendarCancelButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='cancel-calendar-meeting']",
     );
   }
 });

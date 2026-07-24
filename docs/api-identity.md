@@ -36,9 +36,9 @@ client ID. The Student tenant cannot be overridden.
 Browser access is disabled unless `CORS_ALLOWED_ORIGIN` names one exact
 HTTP(S) origin. Protected preflights accept only that origin and the
 `Authorization` header. The read endpoints allow `GET`, simulated email allows
-`POST`, and the OneDrive proof allows `POST` and `DELETE`. Requests
-without an `Origin` header remain available to the app-only proof and other
-non-browser clients.
+`POST`, the OneDrive proof allows `POST` and `DELETE`, and both calendar routes
+allow `POST`. Requests without an `Origin` header remain available to the
+app-only proof and other non-browser clients.
 
 ## Rehearsal status
 
@@ -131,6 +131,57 @@ Dev-app callers. Concurrent requests receive
 `proof_operation_busy`. This is rehearsal-only coordination: it has no durable
 lock, database, queue, or cross-replica protection. The live proof therefore
 requires Container Apps `maxReplicas=1`.
+
+## One calendar rehearsal
+
+`POST /api/calendar-meeting` and
+`POST /api/calendar-meeting/cancel` use the same exact delegated and app-only
+caller policy. They are separate explicit human actions. Signing in does not
+call either route.
+
+Create signs in only `cory@corywest.onmicrosoft.com` through the existing
+shared simulated-user client and requests delegated `User.Read` and
+`Calendars.ReadWrite`. It submits one Graph create request with the fixed
+transaction ID `c61d88a4-92bf-4f16-aa5b-efa6dbb16e92` and:
+
+- subject `AP2 Pass 3 calendar rehearsal — no action required`
+- plain body `Harmless AP2 calendar rehearsal. No action or response is
+  required. The organizer will cancel it after observation.`
+- July 24, 2026, 18:00–18:15 UTC (2:00–2:15 PM EDT)
+- required attendees only `kobe@corywest.onmicrosoft.com` and
+  `marge.simpson@corywest.onmicrosoft.com`
+- free availability, no reminder or response request, no new-time proposals,
+  low importance, normal sensitivity, and no online meeting, location,
+  recurrence, attachment, or link
+
+Only a strict `201` response matching the fixed meeting becomes `Configured`.
+That means Graph accepted the meeting and invitations; it does not claim
+attendee receipt or response. The validated event ID remains private in the
+operation's process memory.
+
+Cancel uses only that retained validated ID and submits one Graph
+`POST /me/events/{id}/cancel` request with the fixed harmless cleanup comment.
+Only `202` becomes `Cancellation accepted`. Neither mutation is retried.
+Before either API mutation, the SPA stores an `uncertain` stage for the signed-in
+operator. Uncertain, configured, and cancellation-accepted stages block a
+second create.
+
+A process-local busy/completed boundary permits one create attempt followed by
+one cancel attempt across operator and Dev-app callers. It has no database,
+queue, durable lock, or recovery after a replica restart. The live proof
+therefore requires `maxReplicas=1` and the same running replica through create,
+observation, and cancellation.
+
+Production enables the calendar operation only when the existing Homer/shared
+client configuration and all three Cory settings are present:
+
+- `CORY_CBA_OBJECT_ID`: Cory's immutable Student user object ID
+- `CORY_CBA_PFX_PATH`: absolute path to the externally mounted Cory PFX
+- `CORY_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
+
+The shared public client must already have delegated
+`Calendars.ReadWrite` consent. Cory must already have working Student CBA.
+Certificates and tokens remain outside repository and response output.
 
 ## Identity setup and rollback
 

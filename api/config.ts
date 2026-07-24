@@ -14,6 +14,7 @@ export interface SimulatedUserCertificateConfig {
 export interface SimulatedUsersCbaConfig {
   clientId: string;
   homer: SimulatedUserCertificateConfig;
+  cory?: SimulatedUserCertificateConfig & { objectId: string };
 }
 
 export interface ApiConfig {
@@ -58,8 +59,19 @@ function parseSimulatedUsersCbaConfig(
     "HOMER_CBA_PFX_PATH",
     "HOMER_CBA_PFX_PASSPHRASE",
   );
+  const cory = parseCertificate(
+    environment,
+    "CORY_CBA_PFX_PATH",
+    "CORY_CBA_PFX_PASSPHRASE",
+  );
+  const coryObjectId = environment.CORY_CBA_OBJECT_ID;
 
-  if (clientId === undefined && !homer) {
+  if (
+    clientId === undefined &&
+    !homer &&
+    !cory &&
+    coryObjectId === undefined
+  ) {
     return undefined;
   }
   if (!clientId || !homer) {
@@ -70,7 +82,21 @@ function parseSimulatedUsersCbaConfig(
   if (!isUuid(clientId)) {
     throw new Error("SIMULATED_USER_CLIENT_ID must be a UUID");
   }
-  return { clientId, homer };
+  if ((cory && !coryObjectId) || (!cory && coryObjectId !== undefined)) {
+    throw new Error(
+      "CORY_CBA_OBJECT_ID and Cory's complete certificate must be configured together",
+    );
+  }
+  if (coryObjectId && !isUuid(coryObjectId)) {
+    throw new Error("CORY_CBA_OBJECT_ID must be a UUID");
+  }
+  return {
+    clientId,
+    homer,
+    ...(cory && coryObjectId
+      ? { cory: { ...cory, objectId: coryObjectId } }
+      : {}),
+  };
 }
 
 function parseCertificate(

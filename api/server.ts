@@ -6,6 +6,11 @@ import {
   type AuthorizedCaller,
   type CallerPolicy,
 } from "./auth-policy.js";
+import {
+  CalendarMeetingBusyError,
+  CalendarMeetingConflictError,
+  type CalendarMeetingOperation,
+} from "./calendar-meeting.js";
 import type { RehearsalStatusProvider } from "./rehearsal-status.js";
 import type { SimulatedEmailOperation } from "./simulated-email.js";
 import {
@@ -22,6 +27,7 @@ export interface ApiDependencies {
   rehearsalStatusProvider: RehearsalStatusProvider;
   simulatedEmailOperation?: SimulatedEmailOperation;
   oneDriveShareProofOperation?: OneDriveShareProofOperation;
+  calendarMeetingOperation?: CalendarMeetingOperation;
   allowedOrigin?: string;
 }
 
@@ -76,6 +82,15 @@ async function route(
     return;
   }
 
+  if (
+    request.method === "OPTIONS" &&
+    (pathname === "/api/calendar-meeting" ||
+      pathname === "/api/calendar-meeting/cancel")
+  ) {
+    handleProtectedPreflight(request, response, origin, ["POST"]);
+    return;
+  }
+
   if (request.method === "GET" && pathname === "/health") {
     sendJson(response, 200, { status: "ok" });
     return;
@@ -109,6 +124,19 @@ async function route(
     pathname === "/api/onedrive-share-proof"
   ) {
     await oneDriveShareProof(request, response, dependencies, "remove");
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/calendar-meeting") {
+    await calendarMeeting(request, response, dependencies, "create");
+    return;
+  }
+
+  if (
+    request.method === "POST" &&
+    pathname === "/api/calendar-meeting/cancel"
+  ) {
+    await calendarMeeting(request, response, dependencies, "cancel");
     return;
   }
 
@@ -213,6 +241,27 @@ async function oneDriveShareProof(
   );
 }
 
+async function calendarMeeting(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+  action: "create" | "cancel",
+): Promise<void> {
+  await handleAuthorizedRequest(
+    request,
+    response,
+    dependencies,
+    () => {
+      const operation = dependencies.calendarMeetingOperation;
+      if (!operation) {
+        throw new Error("Calendar meeting operation is not configured");
+      }
+      return operation[action]();
+    },
+    action === "create" ? 201 : 202,
+  );
+}
+
 async function handleAuthorizedRequest(
   request: IncomingMessage,
   response: ServerResponse,
@@ -252,6 +301,14 @@ async function handleAuthorizedRequest(
         error: "onedrive_invite_failed",
         ...error.diagnostic,
       });
+      return;
+    }
+    if (error instanceof CalendarMeetingConflictError) {
+      sendJson(response, 409, { error: "calendar_state_conflict" });
+      return;
+    }
+    if (error instanceof CalendarMeetingBusyError) {
+      sendJson(response, 409, { error: "calendar_operation_busy" });
       return;
     }
     throw error;

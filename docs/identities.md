@@ -31,8 +31,10 @@ Student tenant
 │   │
 │   └── Shared simulated-user client
 │       ├── Homer: sends email and owns the fixed OneDrive proof
-│       ├── signs Homer in with CBA in a fresh headless browser context
-│       └── keeps his delegated token only in process memory
+│       ├── Cory: creates and cancels the fixed calendar rehearsal
+│       ├── signs each simulated user in with their own CBA certificate
+│       │   in a fresh headless browser context
+│       └── keeps delegated tokens only in isolated process-memory caches
 ```
 
 ## Backend identities

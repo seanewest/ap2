@@ -1,4 +1,9 @@
 import { ManagedIdentityCredential } from "@azure/identity";
+import {
+  DelegatedGraphCalendarMeetingOperation,
+  GRAPH_CALENDARS_READ_WRITE_SCOPE,
+  ProcessLocalCalendarMeetingBoundary,
+} from "./calendar-meeting.js";
 import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
@@ -12,6 +17,7 @@ import {
   GRAPH_MAIL_SEND_SCOPE,
 } from "./simulated-email.js";
 import {
+  coryIdentity,
   HOMER_IDENTITY,
 } from "./simulated-user.js";
 import { SimulatedUserDelegatedTokenProvider } from "./simulated-user-cba.js";
@@ -41,6 +47,26 @@ const oneDriveShareProofOperation =
         new DelegatedGraphOneDriveShareProof(homerTokenProvider),
       )
     : undefined;
+const coryConfig = config.simulatedUsersCba?.cory;
+const cory = coryConfig
+  ? coryIdentity(coryConfig.objectId)
+  : undefined;
+const coryTokenProvider =
+  config.simulatedUsersCba && coryConfig && cory
+    ? new SimulatedUserDelegatedTokenProvider({
+        clientId: config.simulatedUsersCba.clientId,
+        pfxPath: coryConfig.pfxPath,
+        pfxPassphrase: coryConfig.pfxPassphrase,
+        identity: cory,
+        allowedScopes: [GRAPH_CALENDARS_READ_WRITE_SCOPE],
+      })
+    : undefined;
+const calendarMeetingOperation =
+  coryTokenProvider && cory
+    ? new ProcessLocalCalendarMeetingBoundary(
+        new DelegatedGraphCalendarMeetingOperation(coryTokenProvider, cory),
+      )
+    : undefined;
 const server = createApiServer({
   tokenVerifier,
   callerPolicy: config.callerPolicy,
@@ -49,6 +75,7 @@ const server = createApiServer({
   ),
   simulatedEmailOperation,
   oneDriveShareProofOperation,
+  calendarMeetingOperation,
   allowedOrigin: config.allowedOrigin,
 });
 

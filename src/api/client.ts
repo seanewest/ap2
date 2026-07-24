@@ -25,6 +25,32 @@ export interface SimulatedEmailResult {
   subject: string;
 }
 
+export const CALENDAR_MEETING_ORGANIZER =
+  "cory@corywest.onmicrosoft.com";
+export const CALENDAR_MEETING_ATTENDEES = [
+  "kobe@corywest.onmicrosoft.com",
+  "marge.simpson@corywest.onmicrosoft.com",
+] as const;
+export const CALENDAR_MEETING_SUBJECT =
+  "AP2 Pass 3 calendar rehearsal — no action required";
+export const CALENDAR_MEETING_START = "2026-07-24T18:00:00Z";
+export const CALENDAR_MEETING_END = "2026-07-24T18:15:00Z";
+
+export type CalendarMeetingResult =
+  | {
+      state: "configured";
+      organizer: typeof CALENDAR_MEETING_ORGANIZER;
+      attendees: typeof CALENDAR_MEETING_ATTENDEES;
+      subject: typeof CALENDAR_MEETING_SUBJECT;
+      start: typeof CALENDAR_MEETING_START;
+      end: typeof CALENDAR_MEETING_END;
+    }
+  | {
+      state: "cancellation-accepted";
+      organizer: typeof CALENDAR_MEETING_ORGANIZER;
+      subject: typeof CALENDAR_MEETING_SUBJECT;
+    };
+
 export const ONEDRIVE_PROOF_PATH = "/AP2-OneDrive-share-proof.txt";
 const ONEDRIVE_PROOF_OWNER =
   "homer.simpson@corywest.onmicrosoft.com";
@@ -77,6 +103,14 @@ export interface AfterPartyApi {
   removeOneDriveProof(
     accessToken: string,
   ): Promise<Extract<OneDriveProofResult, { state: "removed" }>>;
+  createCalendarMeeting(
+    accessToken: string,
+  ): Promise<Extract<CalendarMeetingResult, { state: "configured" }>>;
+  cancelCalendarMeeting(
+    accessToken: string,
+  ): Promise<
+    Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
+  >;
 }
 
 export class ApiAccessError extends Error {
@@ -103,6 +137,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly rehearsalStatusUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly oneDriveProofUrl: string;
+  private readonly calendarMeetingUrl: string;
+  private readonly calendarMeetingCancelUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
@@ -117,6 +153,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ).toString();
     this.oneDriveProofUrl = new URL(
       "api/onedrive-share-proof",
+      `${baseUrl}/`,
+    ).toString();
+    this.calendarMeetingUrl = new URL(
+      "api/calendar-meeting",
+      `${baseUrl}/`,
+    ).toString();
+    this.calendarMeetingCancelUrl = new URL(
+      "api/calendar-meeting/cancel",
       `${baseUrl}/`,
     ).toString();
     this.request = request.bind(globalThis);
@@ -202,6 +246,54 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     return { state: "removed", path: result.path };
   }
 
+  async createCalendarMeeting(
+    accessToken: string,
+  ): Promise<Extract<CalendarMeetingResult, { state: "configured" }>> {
+    const value = await this.getAuthorizedJson(
+      this.calendarMeetingUrl,
+      accessToken,
+      "POST",
+      201,
+      "calendar",
+    );
+    if (!isSafeCalendarMeetingResult(value) || value.state !== "configured") {
+      throw new ApiAccessError();
+    }
+    return {
+      state: "configured",
+      organizer: CALENDAR_MEETING_ORGANIZER,
+      attendees: CALENDAR_MEETING_ATTENDEES,
+      subject: CALENDAR_MEETING_SUBJECT,
+      start: CALENDAR_MEETING_START,
+      end: CALENDAR_MEETING_END,
+    };
+  }
+
+  async cancelCalendarMeeting(
+    accessToken: string,
+  ): Promise<
+    Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
+  > {
+    const value = await this.getAuthorizedJson(
+      this.calendarMeetingCancelUrl,
+      accessToken,
+      "POST",
+      202,
+      "calendar",
+    );
+    if (
+      !isSafeCalendarMeetingResult(value) ||
+      value.state !== "cancellation-accepted"
+    ) {
+      throw new ApiAccessError();
+    }
+    return {
+      state: "cancellation-accepted",
+      organizer: CALENDAR_MEETING_ORGANIZER,
+      subject: CALENDAR_MEETING_SUBJECT,
+    };
+  }
+
   private async oneDriveProofRequest<T extends OneDriveProofResult["state"]>(
     accessToken: string,
     method: "POST" | "DELETE",
@@ -214,7 +306,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       method,
       expectedStatus,
       expectedState === "configured"
-        ? "invite"
+        ? "onedrive-invite"
         : undefined,
     );
     if (!isSafeOneDriveProofResult(value) || value.state !== expectedState) {
@@ -228,7 +320,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
     method = "GET",
     expectedStatus?: number,
-    oneDriveFailure?: "invite",
+    failureContext?: "onedrive-invite" | "calendar",
   ): Promise<unknown> {
     let response: Response;
     try {
@@ -252,6 +344,16 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     }
     if (response.status === 409) {
       const error = await readErrorCode(response);
+      if (failureContext === "calendar") {
+        if (error === "calendar_operation_busy") {
+          throw new ApiAccessError(
+            "Another calendar operation is running. Try again shortly.",
+          );
+        }
+        throw new ApiAccessError(
+          "The calendar rehearsal is not in the expected state. Nothing was repeated.",
+        );
+      }
       if (error === "proof_operation_busy") {
         throw new ApiAccessError(
           "Another OneDrive proof operation is running. Try again shortly.",
@@ -261,8 +363,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "The OneDrive proof file is not in the expected state. Nothing was changed.",
       );
     }
-    if (response.status === 502 && oneDriveFailure) {
-      if (oneDriveFailure === "invite") {
+    if (response.status === 502 && failureContext) {
+      if (failureContext === "onedrive-invite") {
         const failure = await readOneDriveInviteFailure(response);
         if (failure) {
           throw new OneDriveInviteFailureError(failure);
@@ -438,4 +540,36 @@ function isSafeOneDriveProofResult(
     );
   }
   return result.state === "removed";
+}
+
+function isSafeCalendarMeetingResult(
+  value: unknown,
+): value is CalendarMeetingResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  if (
+    result.organizer !== CALENDAR_MEETING_ORGANIZER ||
+    result.subject !== CALENDAR_MEETING_SUBJECT
+  ) {
+    return false;
+  }
+  if (result.state === "cancellation-accepted") {
+    return (
+      !("attendees" in result) &&
+      !("start" in result) &&
+      !("end" in result)
+    );
+  }
+  return (
+    result.state === "configured" &&
+    result.start === CALENDAR_MEETING_START &&
+    result.end === CALENDAR_MEETING_END &&
+    Array.isArray(result.attendees) &&
+    result.attendees.length === CALENDAR_MEETING_ATTENDEES.length &&
+    result.attendees.every(
+      (attendee, index) => attendee === CALENDAR_MEETING_ATTENDEES[index],
+    )
+  );
 }

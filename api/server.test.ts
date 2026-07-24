@@ -6,6 +6,15 @@ import { createLocalJWKSet, type JWK } from "jose";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { defaultCallerPolicy } from "./auth-policy.js";
 import {
+  CALENDAR_MEETING_ATTENDEES,
+  CALENDAR_MEETING_END,
+  CALENDAR_MEETING_START,
+  CALENDAR_MEETING_SUBJECT,
+  CalendarMeetingBusyError,
+  CalendarMeetingConflictError,
+  type CalendarMeetingResult,
+} from "./calendar-meeting.js";
+import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   REQUIRED_APPLICATION_ROLE,
   REQUIRED_DELEGATED_SCOPE,
@@ -59,6 +68,25 @@ const simulatedEmailResult: SimulatedEmailResult = {
 const simulatedEmailOperation = {
   send: vi.fn().mockResolvedValue(simulatedEmailResult),
 };
+const calendarMeetingResults = {
+  configured: {
+    state: "configured",
+    organizer: "cory@corywest.onmicrosoft.com",
+    attendees: CALENDAR_MEETING_ATTENDEES,
+    subject: CALENDAR_MEETING_SUBJECT,
+    start: CALENDAR_MEETING_START,
+    end: CALENDAR_MEETING_END,
+  },
+  cancelled: {
+    state: "cancellation-accepted",
+    organizer: "cory@corywest.onmicrosoft.com",
+    subject: CALENDAR_MEETING_SUBJECT,
+  },
+} as const satisfies Record<string, CalendarMeetingResult>;
+const calendarMeetingOperation = {
+  create: vi.fn().mockResolvedValue(calendarMeetingResults.configured),
+  cancel: vi.fn().mockResolvedValue(calendarMeetingResults.cancelled),
+};
 const oneDriveResults = {
   configured: {
     state: "configured",
@@ -86,6 +114,7 @@ const server = createApiServer({
   rehearsalStatusProvider,
   simulatedEmailOperation,
   oneDriveShareProofOperation: oneDriveOperationBoundary,
+  calendarMeetingOperation,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -188,6 +217,48 @@ describe("local API", () => {
       );
     },
   );
+
+  it.each(["/api/calendar-meeting", "/api/calendar-meeting/cancel"])(
+    "allows only POST with Authorization to preflight %s",
+    async (path) => {
+      const response = await fetch(`${baseUrl}${path}`, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "http://localhost:5173",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "Authorization",
+        },
+      });
+      expect(response.status).toBe(204);
+      expect(response.headers.get("access-control-allow-methods")).toBe(
+        "POST",
+      );
+    },
+  );
+
+  it("rejects non-POST calendar methods and preflights", async () => {
+    const preflight = await fetch(`${baseUrl}/api/calendar-meeting`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:5173",
+        "Access-Control-Request-Method": "DELETE",
+        "Access-Control-Request-Headers": "Authorization",
+      },
+    });
+    expect(preflight.status).toBe(403);
+
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/calendar-meeting",
+      "GET",
+    );
+    expect(response.status).toBe(404);
+  });
 
   it("rejects the removed OneDrive verification method", async () => {
     const preflight = await fetch(`${baseUrl}/api/onedrive-share-proof`, {
@@ -391,6 +462,92 @@ describe("local API", () => {
 
     expect(response.status).toBe(403);
     expect(simulatedEmailOperation.send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "/api/calendar-meeting",
+      "create",
+      calendarMeetingResults.configured,
+      201,
+    ],
+    [
+      "/api/calendar-meeting/cancel",
+      "cancel",
+      calendarMeetingResults.cancelled,
+      202,
+    ],
+  ] as const)(
+    "%s runs the fixed calendar operation for both authorized caller shapes",
+    async (path, operation, expected, status) => {
+      const mock = calendarMeetingOperation[operation];
+      mock.mockClear();
+      for (const claims of [
+        {
+          tid: STUDENT_TENANT_ID,
+          oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+          scp: REQUIRED_DELEGATED_SCOPE,
+        },
+        {
+          tid: STUDENT_TENANT_ID,
+          idtyp: "app",
+          azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+          roles: [REQUIRED_APPLICATION_ROLE],
+        },
+      ]) {
+        const response = await protectedRequest(
+          claims,
+          undefined,
+          path,
+          "POST",
+        );
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toEqual(expected);
+      }
+      expect(mock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("does not run a calendar operation for an unauthorized caller", async () => {
+    calendarMeetingOperation.create.mockClear();
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: "unknown",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/calendar-meeting",
+      "POST",
+    );
+    expect(response.status).toBe(403);
+    expect(calendarMeetingOperation.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new CalendarMeetingBusyError(),
+      "calendar_operation_busy",
+    ],
+    [
+      new CalendarMeetingConflictError(),
+      "calendar_state_conflict",
+    ],
+  ])("returns a safe calendar conflict", async (error, code) => {
+    calendarMeetingOperation.create.mockRejectedValueOnce(error);
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/calendar-meeting",
+      "POST",
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: code });
   });
 
   it.each([

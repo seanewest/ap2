@@ -3,6 +3,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiAccessError,
+  CALENDAR_MEETING_ATTENDEES,
+  CALENDAR_MEETING_END,
+  CALENDAR_MEETING_ORGANIZER,
+  CALENDAR_MEETING_START,
+  CALENDAR_MEETING_SUBJECT,
   HttpAfterPartyApi,
   OneDriveInviteFailureError,
 } from "./client";
@@ -226,6 +231,108 @@ describe("HTTP After Party API client", () => {
 
     await expect(client.shareOneDriveProof("token")).rejects.toEqual(
       new ApiAccessError(),
+    );
+  });
+
+  it.each([
+    [
+      "createCalendarMeeting",
+      "https://student-api.example/base/api/calendar-meeting",
+      201,
+      {
+        state: "configured",
+        organizer: CALENDAR_MEETING_ORGANIZER,
+        attendees: CALENDAR_MEETING_ATTENDEES,
+        subject: CALENDAR_MEETING_SUBJECT,
+        start: CALENDAR_MEETING_START,
+        end: CALENDAR_MEETING_END,
+      },
+    ],
+    [
+      "cancelCalendarMeeting",
+      "https://student-api.example/base/api/calendar-meeting/cancel",
+      202,
+      {
+        state: "cancellation-accepted",
+        organizer: CALENDAR_MEETING_ORGANIZER,
+        subject: CALENDAR_MEETING_SUBJECT,
+      },
+    ],
+  ] as const)(
+    "%s posts only to its fixed route and returns safe fields",
+    async (methodName, url, status, body) => {
+      const request = vi.fn<typeof fetch>().mockResolvedValue(
+        Response.json(
+          {
+            ...body,
+            eventId: "must-not-escape",
+            token: "must-not-escape",
+          },
+          { status },
+        ),
+      );
+      const client = new HttpAfterPartyApi(
+        "https://student-api.example/base",
+        request,
+      );
+
+      const result = await client[methodName]("sensitive-access-token");
+
+      expect(request).toHaveBeenCalledWith(url, {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        headers: { Authorization: "Bearer sensitive-access-token" },
+      });
+      expect(result).toEqual(body);
+      expect(JSON.stringify(result)).not.toContain("eventId");
+      expect(JSON.stringify(result)).not.toContain("token");
+    },
+  );
+
+  it("rejects a malformed or mismatched calendar response", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          state: "configured",
+          organizer: CALENDAR_MEETING_ORGANIZER,
+          attendees: [
+            "someone-else@corywest.onmicrosoft.com",
+            "marge.simpson@corywest.onmicrosoft.com",
+          ],
+          subject: CALENDAR_MEETING_SUBJECT,
+          start: CALENDAR_MEETING_START,
+          end: CALENDAR_MEETING_END,
+        },
+        { status: 201 },
+      ),
+    );
+    const client = new HttpAfterPartyApi("https://student-api.example", request);
+
+    await expect(client.createCalendarMeeting("token")).rejects.toEqual(
+      new ApiAccessError(),
+    );
+  });
+
+  it.each([
+    [
+      "calendar_operation_busy",
+      "Another calendar operation is running. Try again shortly.",
+    ],
+    [
+      "calendar_state_conflict",
+      "The calendar rehearsal is not in the expected state. Nothing was repeated.",
+    ],
+  ])("returns a safe calendar conflict for %s", async (code, message) => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json({ error: code, detail: "must-not-escape" }, { status: 409 }),
+      );
+    const client = new HttpAfterPartyApi("https://student-api.example", request);
+
+    await expect(client.createCalendarMeeting("token")).rejects.toEqual(
+      new ApiAccessError(message),
     );
   });
 

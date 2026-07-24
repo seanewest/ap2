@@ -8,9 +8,15 @@ import {
 } from "./auth/authentication";
 import {
   ApiAccessError,
+  CALENDAR_MEETING_ATTENDEES,
+  CALENDAR_MEETING_END,
+  CALENDAR_MEETING_ORGANIZER,
+  CALENDAR_MEETING_START,
+  CALENDAR_MEETING_SUBJECT,
   OneDriveInviteFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
+  type CalendarMeetingResult,
   type OneDriveInviteFailure,
   type OneDriveProofResult,
   type RehearsalStatus,
@@ -52,6 +58,18 @@ type OneDriveProofState = {
   inviteFailure?: OneDriveInviteFailure;
 };
 
+type CalendarMeetingStage =
+  | "not-started"
+  | "uncertain"
+  | "configured"
+  | "cancellation-accepted";
+
+type CalendarMeetingState = {
+  stage: CalendarMeetingStage;
+  activity: "idle" | "creating" | "cancelling";
+  message?: string;
+};
+
 type ViewState =
   | { kind: "initial" }
   | { kind: "processing"; message: string }
@@ -63,6 +81,7 @@ type ViewState =
       rehearsalStatus: RehearsalStatusState;
       simulatedEmail: SimulatedEmailState;
       oneDriveProof: OneDriveProofState;
+      calendarMeeting: CalendarMeetingState;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -122,7 +141,8 @@ export function createAfterPartyApp(
       state.apiAccess.kind === "loading" ||
       state.rehearsalStatus.kind === "loading" ||
       state.simulatedEmail.kind === "loading" ||
-      state.oneDriveProof.activity !== "idle"
+      state.oneDriveProof.activity !== "idle" ||
+      state.calendarMeeting.activity !== "idle"
     ) {
       return;
     }
@@ -130,6 +150,7 @@ export function createAfterPartyApp(
     const rehearsalStatus = state.rehearsalStatus;
     const simulatedEmail = state.simulatedEmail;
     const oneDriveProof = state.oneDriveProof;
+    const calendarMeeting = state.calendarMeeting;
     setState({
       kind: "signed-in",
       account,
@@ -137,6 +158,7 @@ export function createAfterPartyApp(
       rehearsalStatus,
       simulatedEmail,
       oneDriveProof,
+      calendarMeeting,
     });
 
     try {
@@ -150,6 +172,7 @@ export function createAfterPartyApp(
           rehearsalStatus,
           simulatedEmail,
           oneDriveProof,
+          calendarMeeting,
         });
       }
     } catch (error) {
@@ -164,6 +187,7 @@ export function createAfterPartyApp(
           rehearsalStatus,
           simulatedEmail,
           oneDriveProof,
+          calendarMeeting,
         });
         return;
       }
@@ -178,6 +202,7 @@ export function createAfterPartyApp(
         rehearsalStatus,
         simulatedEmail,
         oneDriveProof,
+        calendarMeeting,
       });
     }
   };
@@ -188,7 +213,8 @@ export function createAfterPartyApp(
       state.rehearsalStatus.kind === "loading" ||
       state.apiAccess.kind === "loading" ||
       state.simulatedEmail.kind === "loading" ||
-      state.oneDriveProof.activity !== "idle"
+      state.oneDriveProof.activity !== "idle" ||
+      state.calendarMeeting.activity !== "idle"
     ) {
       return;
     }
@@ -196,6 +222,7 @@ export function createAfterPartyApp(
     const apiAccess = state.apiAccess;
     const simulatedEmail = state.simulatedEmail;
     const oneDriveProof = state.oneDriveProof;
+    const calendarMeeting = state.calendarMeeting;
     setState({
       kind: "signed-in",
       account,
@@ -203,6 +230,7 @@ export function createAfterPartyApp(
       rehearsalStatus: { kind: "loading" },
       simulatedEmail,
       oneDriveProof,
+      calendarMeeting,
     });
 
     try {
@@ -216,6 +244,7 @@ export function createAfterPartyApp(
           rehearsalStatus: { kind: "success", status },
           simulatedEmail,
           oneDriveProof,
+          calendarMeeting,
         });
       }
     } catch (error) {
@@ -230,6 +259,7 @@ export function createAfterPartyApp(
           rehearsalStatus: { kind: "cancelled" },
           simulatedEmail,
           oneDriveProof,
+          calendarMeeting,
         });
         return;
       }
@@ -244,6 +274,7 @@ export function createAfterPartyApp(
         rehearsalStatus: { kind: "error", message },
         simulatedEmail,
         oneDriveProof,
+        calendarMeeting,
       });
     }
   };
@@ -255,7 +286,8 @@ export function createAfterPartyApp(
       state.rehearsalStatus.kind === "loading" ||
       state.simulatedEmail.kind === "loading" ||
       state.simulatedEmail.kind === "success" ||
-      state.oneDriveProof.activity !== "idle"
+      state.oneDriveProof.activity !== "idle" ||
+      state.calendarMeeting.activity !== "idle"
     ) {
       return;
     }
@@ -263,6 +295,7 @@ export function createAfterPartyApp(
     const apiAccess = state.apiAccess;
     const rehearsalStatus = state.rehearsalStatus;
     const oneDriveProof = state.oneDriveProof;
+    const calendarMeeting = state.calendarMeeting;
     setState({
       kind: "signed-in",
       account,
@@ -270,6 +303,7 @@ export function createAfterPartyApp(
       rehearsalStatus,
       simulatedEmail: { kind: "loading" },
       oneDriveProof,
+      calendarMeeting,
     });
 
     try {
@@ -284,6 +318,7 @@ export function createAfterPartyApp(
           rehearsalStatus,
           simulatedEmail: { kind: "success", result },
           oneDriveProof,
+          calendarMeeting,
         });
       }
     } catch (error) {
@@ -298,6 +333,7 @@ export function createAfterPartyApp(
           rehearsalStatus,
           simulatedEmail: { kind: "cancelled" },
           oneDriveProof,
+          calendarMeeting,
         });
         return;
       }
@@ -312,6 +348,7 @@ export function createAfterPartyApp(
         rehearsalStatus,
         simulatedEmail: { kind: "error", message },
         oneDriveProof,
+        calendarMeeting,
       });
     }
   };
@@ -324,6 +361,7 @@ export function createAfterPartyApp(
       state.apiAccess.kind === "loading" ||
       state.rehearsalStatus.kind === "loading" ||
       state.simulatedEmail.kind === "loading" ||
+      state.calendarMeeting.activity !== "idle" ||
       state.oneDriveProof.activity !== "idle" ||
       !isAllowedOneDriveAction(state.oneDriveProof.stage, action)
     ) {
@@ -333,6 +371,7 @@ export function createAfterPartyApp(
     const apiAccess = state.apiAccess;
     const rehearsalStatus = state.rehearsalStatus;
     const simulatedEmail = state.simulatedEmail;
+    const calendarMeeting = state.calendarMeeting;
     const previousStage = state.oneDriveProof.stage;
     setState({
       kind: "signed-in",
@@ -344,6 +383,7 @@ export function createAfterPartyApp(
         stage: previousStage,
         activity: action === "share" ? "sharing" : "removing",
       },
+      calendarMeeting,
     });
 
     try {
@@ -363,6 +403,7 @@ export function createAfterPartyApp(
           stage: "uncertain",
           activity: action === "share" ? "sharing" : "removing",
         },
+        calendarMeeting,
       });
       const result =
         action === "share"
@@ -381,6 +422,7 @@ export function createAfterPartyApp(
             stage: nextStage,
             activity: "idle",
           },
+          calendarMeeting,
         });
       }
     } catch (error) {
@@ -399,6 +441,7 @@ export function createAfterPartyApp(
             activity: "idle",
             message: "The OneDrive action was cancelled before it started.",
           },
+          calendarMeeting,
         });
         return;
       }
@@ -416,6 +459,7 @@ export function createAfterPartyApp(
             message: error.message,
             inviteFailure: error.diagnostic,
           },
+          calendarMeeting,
         });
         return;
       }
@@ -432,6 +476,120 @@ export function createAfterPartyApp(
         rehearsalStatus,
         simulatedEmail,
         oneDriveProof: { stage: "uncertain", activity: "idle", message },
+        calendarMeeting,
+      });
+    }
+  };
+
+  const runCalendarMeetingAction = async (
+    action: "create" | "cancel",
+  ): Promise<void> => {
+    if (
+      state.kind !== "signed-in" ||
+      state.apiAccess.kind === "loading" ||
+      state.rehearsalStatus.kind === "loading" ||
+      state.simulatedEmail.kind === "loading" ||
+      state.oneDriveProof.activity !== "idle" ||
+      state.calendarMeeting.activity !== "idle" ||
+      !isAllowedCalendarMeetingAction(state.calendarMeeting.stage, action)
+    ) {
+      return;
+    }
+    const account = state.account;
+    const apiAccess = state.apiAccess;
+    const rehearsalStatus = state.rehearsalStatus;
+    const simulatedEmail = state.simulatedEmail;
+    const oneDriveProof = state.oneDriveProof;
+    const previousStage = state.calendarMeeting.stage;
+    setState({
+      kind: "signed-in",
+      account,
+      apiAccess,
+      rehearsalStatus,
+      simulatedEmail,
+      oneDriveProof,
+      calendarMeeting: {
+        stage: previousStage,
+        activity: action === "create" ? "creating" : "cancelling",
+      },
+    });
+
+    try {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      persistCalendarMeetingStage(storage, account, "uncertain");
+      setState({
+        kind: "signed-in",
+        account,
+        apiAccess,
+        rehearsalStatus,
+        simulatedEmail,
+        oneDriveProof,
+        calendarMeeting: {
+          stage: "uncertain",
+          activity: action === "create" ? "creating" : "cancelling",
+        },
+      });
+      const result =
+        action === "create"
+          ? await api.createCalendarMeeting(accessToken)
+          : await api.cancelCalendarMeeting(accessToken);
+      if (isCurrentSignedInAccount(state, account)) {
+        const nextStage = calendarMeetingStage(result);
+        persistCalendarMeetingStage(storage, account, nextStage);
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus,
+          simulatedEmail,
+          oneDriveProof,
+          calendarMeeting: {
+            stage: nextStage,
+            activity: "idle",
+          },
+        });
+      }
+    } catch (error) {
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      if (error instanceof AccessTokenCancelledError) {
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus,
+          simulatedEmail,
+          oneDriveProof,
+          calendarMeeting: {
+            stage: previousStage,
+            activity: "idle",
+            message: "The calendar action was cancelled before it started.",
+          },
+        });
+        return;
+      }
+      const message =
+        error instanceof AccessTokenError || error instanceof ApiAccessError
+          ? error.message
+          : "The calendar change was not confirmed. Do not repeat it.";
+      persistCalendarMeetingStage(storage, account, "uncertain");
+      setState({
+        kind: "signed-in",
+        account,
+        apiAccess,
+        rehearsalStatus,
+        simulatedEmail,
+        oneDriveProof,
+        calendarMeeting: {
+          stage: "uncertain",
+          activity: "idle",
+          message,
+        },
       });
     }
   };
@@ -459,6 +617,12 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='remove-onedrive-proof']")
       ?.addEventListener("click", () => void runOneDriveProofAction("remove"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='create-calendar-meeting']")
+      ?.addEventListener("click", () => void runCalendarMeetingAction("create"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='cancel-calendar-meeting']")
+      ?.addEventListener("click", () => void runCalendarMeetingAction("cancel"));
   };
 
   const start = async (): Promise<void> => {
@@ -478,6 +642,10 @@ export function createAfterPartyApp(
               simulatedEmail: { kind: "idle" },
               oneDriveProof: {
                 stage: readOneDriveStage(storage, startup.account),
+                activity: "idle",
+              },
+              calendarMeeting: {
+                stage: readCalendarMeetingStage(storage, startup.account),
                 activity: "idle",
               },
             }
@@ -538,7 +706,8 @@ function createStatePanel(state: ViewState): HTMLElement {
         state.apiAccess.kind === "loading" ||
         state.rehearsalStatus.kind === "loading" ||
         state.simulatedEmail.kind === "loading" ||
-        state.oneDriveProof.activity !== "idle";
+        state.oneDriveProof.activity !== "idle" ||
+        state.calendarMeeting.activity !== "idle";
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
@@ -553,6 +722,10 @@ function createStatePanel(state: ViewState): HTMLElement {
         ),
         createOneDriveProofPanel(
           state.oneDriveProof,
+          apiOperationLoading,
+        ),
+        createCalendarMeetingPanel(
+          state.calendarMeeting,
           apiOperationLoading,
         ),
         createButton("Sign out", "sign-out", "secondary"),
@@ -591,7 +764,9 @@ function createButton(
     | "check-rehearsal"
     | "send-simulated-email"
     | "share-onedrive-proof"
-    | "remove-onedrive-proof",
+    | "remove-onedrive-proof"
+    | "create-calendar-meeting"
+    | "cancel-calendar-meeting",
   className: string,
   disabled = false,
 ): HTMLButtonElement {
@@ -710,6 +885,80 @@ function createOneDriveProofPanel(
     ),
   );
   return panel;
+}
+
+function createCalendarMeetingPanel(
+  state: CalendarMeetingState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+  panel.append(
+    createStatus(
+      "Real tenant activity: Cory creates one fixed harmless 15-minute meeting inviting only Kobe and Marge, then explicitly cancels it.",
+      "notice",
+    ),
+    createCalendarMeetingDetails(),
+  );
+
+  if (state.activity !== "idle") {
+    panel.setAttribute("aria-busy", "true");
+    panel.append(
+      createStatus(
+        state.activity === "creating"
+          ? "Creating the fixed calendar meeting…"
+          : "Cancelling the fixed calendar meeting…",
+      ),
+    );
+  } else {
+    const message =
+      state.stage === "not-started"
+        ? "Calendar rehearsal: not started in this browser."
+        : state.stage === "configured"
+          ? "Calendar rehearsal: Configured. Microsoft accepted the meeting and invitations; attendee receipt or response is not confirmed."
+          : state.stage === "cancellation-accepted"
+            ? "Calendar rehearsal: Cancellation accepted. Attendee receipt is not confirmed."
+            : "Calendar rehearsal: the last change outcome is uncertain. Do not repeat either action.";
+    panel.append(
+      createStatus(
+        message,
+        state.stage === "uncertain" ? "notice" : "status",
+      ),
+    );
+  }
+  if (state.message) {
+    panel.append(createStatus(state.message, "error"));
+  }
+
+  panel.append(
+    createButton(
+      "Create calendar meeting",
+      "create-calendar-meeting",
+      "primary",
+      apiOperationLoading || state.stage !== "not-started",
+    ),
+    createButton(
+      "Cancel calendar meeting",
+      "cancel-calendar-meeting",
+      "secondary",
+      apiOperationLoading || state.stage !== "configured",
+    ),
+  );
+  return panel;
+}
+
+function createCalendarMeetingDetails(): HTMLDListElement {
+  const list = document.createElement("dl");
+  list.className = "identity-list";
+  appendIdentity(list, "Organizer", CALENDAR_MEETING_ORGANIZER);
+  appendIdentity(list, "Required attendees", CALENDAR_MEETING_ATTENDEES.join(", "));
+  appendIdentity(list, "Subject", CALENDAR_MEETING_SUBJECT);
+  appendIdentity(
+    list,
+    "Time",
+    `${CALENDAR_MEETING_START} to ${CALENDAR_MEETING_END} (2:00–2:15 PM EDT)`,
+  );
+  return list;
 }
 
 function createOneDriveInviteFailureList(
@@ -911,6 +1160,21 @@ function oneDriveStage(result: OneDriveProofResult): OneDriveProofStage {
   return result.state;
 }
 
+function isAllowedCalendarMeetingAction(
+  stage: CalendarMeetingStage,
+  action: "create" | "cancel",
+): boolean {
+  return action === "create"
+    ? stage === "not-started"
+    : stage === "configured";
+}
+
+function calendarMeetingStage(
+  result: CalendarMeetingResult,
+): CalendarMeetingStage {
+  return result.state;
+}
+
 function oneDriveStorageKey(account: AccountIdentity): string {
   return `ap2.onedrive-share-proof.${account.tenantId}.${account.accountId}`;
 }
@@ -936,6 +1200,30 @@ function persistOneDriveStage(
   stage: OneDriveProofStage,
 ): void {
   storage.setItem(oneDriveStorageKey(account), stage);
+}
+
+function calendarMeetingStorageKey(account: AccountIdentity): string {
+  return `ap2.calendar-meeting.${account.tenantId}.${account.accountId}`;
+}
+
+function readCalendarMeetingStage(
+  storage: Pick<Storage, "getItem">,
+  account: AccountIdentity,
+): CalendarMeetingStage {
+  const value = storage.getItem(calendarMeetingStorageKey(account));
+  return value === "uncertain" ||
+      value === "configured" ||
+      value === "cancellation-accepted"
+    ? value
+    : "not-started";
+}
+
+function persistCalendarMeetingStage(
+  storage: Pick<Storage, "setItem">,
+  account: AccountIdentity,
+  stage: CalendarMeetingStage,
+): void {
+  storage.setItem(calendarMeetingStorageKey(account), stage);
 }
 
 function appendIdentity(

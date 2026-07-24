@@ -14,6 +14,21 @@ export const HOMER_IDENTITY: SimulatedUserIdentity = {
   userPrincipalName: "homer.simpson@corywest.onmicrosoft.com",
 };
 
+export const CORY_DISPLAY_NAME = "Cory West";
+export const CORY_USER_PRINCIPAL_NAME =
+  "cory@corywest.onmicrosoft.com";
+export const KOBE_USER_PRINCIPAL_NAME =
+  "kobe@corywest.onmicrosoft.com";
+
+export function coryIdentity(objectId: string): SimulatedUserIdentity {
+  return {
+    tenantId: STUDENT_TENANT_ID,
+    objectId,
+    displayName: CORY_DISPLAY_NAME,
+    userPrincipalName: CORY_USER_PRINCIPAL_NAME,
+  };
+}
+
 export const MARGE_DISPLAY_NAME = "Marge Simpson";
 export const MARGE_USER_PRINCIPAL_NAME =
   "marge.simpson@corywest.onmicrosoft.com";
