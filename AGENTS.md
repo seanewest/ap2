@@ -32,6 +32,10 @@ Do not create unconventional workarounds or add new complexity simply to avoid a
 
 Ask for input when a decision meaningfully affects the mental model or overall architecture.
 
+Agents should perform all testing and QA they can perform themselves, including operating the SPA in a browser. Involve Sean only when human judgment, a meaningful product or architecture decision, credentials or access only he has, or deliberate evaluation of the human experience is needed.
+
+Agent QA does not replace intentionally requested human-experience testing.
+
 ### Human comprehension
 
 When communicating with a human, write like a person, not an agent status report. Keep it simple and understandable
