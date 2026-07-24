@@ -14,24 +14,10 @@ import {
   CALENDAR_MEETING_RUN_ID,
   CALENDAR_MEETING_START,
   CALENDAR_MEETING_SUBJECT,
-  CATEGORY_PROOF_COLOR,
-  CATEGORY_PROOF_DISPLAY_NAME,
-  CATEGORY_PROOF_RUN_ID,
   CONTACT_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
-  DRAFT_PROOF_BODY,
-  DRAFT_PROOF_RECIPIENTS,
-  DRAFT_PROOF_RUN_ID,
-  DRAFT_PROOF_SUBJECT,
-  INBOX_RULE_PROOF_DISPLAY_NAME,
-  INBOX_RULE_PROOF_RUN_ID,
-  INBOX_RULE_PROOF_SUBJECT,
   OneDriveInviteFailureError,
-  SHAREPOINT_FILE_PROOF_NAME,
-  SHAREPOINT_FILE_PROOF_RUN_ID,
-  TODO_TASK_PROOF_RUN_ID,
-  TODO_TASK_PROOF_TITLE,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
@@ -41,6 +27,23 @@ import {
   type SimulatedEmailResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
+import {
+  FIXED_PROOF_BY_ID,
+  bindFixedProofActions,
+  createFixedProofPanels,
+  fixedProofStorageKey,
+  hasBusyFixedProof,
+  isAllowedFixedProofAction,
+  persistFixedProofStage,
+  readFixedProofStates,
+  type FixedProofId,
+  type FixedProofStates,
+} from "./operations/fixed-proofs";
+import {
+  appendIdentity,
+  createButton,
+  createStatus,
+} from "./ui/elements";
 
 type ApiAccessState =
   | { kind: "idle" }
@@ -95,17 +98,6 @@ type ContactProofState = {
   message?: string;
 };
 
-type FixedProofStage =
-  | "not-started"
-  | "uncertain"
-  | "configured"
-  | "removal-uncertain"
-  | "removed";
-type FixedProofState = {
-  stage: FixedProofStage;
-  activity: "idle" | "creating" | "removing";
-  message?: string;
-};
 type ViewState =
   | { kind: "initial" }
   | { kind: "processing"; message: string }
@@ -118,11 +110,7 @@ type ViewState =
       simulatedEmail: SimulatedEmailState;
       oneDriveProof: OneDriveProofState;
       calendarMeeting: CalendarMeetingState;
-      inboxRuleProof: FixedProofState;
-      categoryProof: FixedProofState;
-      sharePointFileProof: FixedProofState;
-      draftProof: FixedProofState;
-      todoTaskProof: FixedProofState;
+      fixedProofs: FixedProofStates;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -523,33 +511,27 @@ export function createAfterPartyApp(
   };
 
   const runFixedProofAction = async (
-    proof: "inboxRuleProof" | "categoryProof" | "sharePointFileProof" |
-      "draftProof" | "todoTaskProof",
+    proof: FixedProofId,
     action: "create" | "remove",
   ): Promise<void> => {
+    const definition = FIXED_PROOF_BY_ID[proof];
     if (
       state.kind !== "signed-in" ||
       isApiOperationBusy(state, contactProof) ||
-      !isAllowedFixedProofAction(state[proof].stage, action)
+      !isAllowedFixedProofAction(state.fixedProofs[proof].stage, action)
     ) {
       return;
     }
     const account = state.account;
-    const previousStage = state[proof].stage;
+    const previousStage = state.fixedProofs[proof].stage;
     const attemptedStage =
       action === "create" ? "uncertain" : "removal-uncertain";
     const activity = action === "create" ? "creating" : "removing";
-    const label = proof === "inboxRuleProof"
-      ? "inbox-rule"
-      : proof === "categoryProof"
-        ? "category"
-          : proof === "sharePointFileProof"
-            ? "SharePoint file"
-            : proof === "draftProof"
-              ? "unsent draft"
-              : "To Do task";
     setSignedInPatch(account, {
-      [proof]: { stage: previousStage, activity },
+      fixedProofs: {
+        ...state.fixedProofs,
+        [proof]: { stage: previousStage, activity },
+      },
     });
     try {
       const accessToken =
@@ -559,41 +541,29 @@ export function createAfterPartyApp(
       }
       persistFixedProofStage(
         storage,
-        fixedProofStorageKey(account, proof),
+        fixedProofStorageKey(account, definition),
         attemptedStage,
       );
       setSignedInPatch(account, {
-        [proof]: { stage: attemptedStage, activity },
+        fixedProofs: {
+          ...state.fixedProofs,
+          [proof]: { stage: attemptedStage, activity },
+        },
       });
-      const result = proof === "inboxRuleProof"
-        ? action === "create"
-          ? await api.createInboxRuleProof(accessToken)
-          : await api.removeInboxRuleProof(accessToken)
-        : proof === "categoryProof"
-          ? action === "create"
-            ? await api.createCategoryProof(accessToken)
-            : await api.removeCategoryProof(accessToken)
-          : proof === "sharePointFileProof"
-            ? action === "create"
-              ? await api.createSharePointFileProof(accessToken)
-              : await api.removeSharePointFileProof(accessToken)
-            : proof === "draftProof"
-              ? action === "create"
-                ? await api.createDraftProof(accessToken)
-                : await api.removeDraftProof(accessToken)
-              : action === "create"
-                ? await api.createTodoTaskProof(accessToken)
-                : await api.removeTodoTaskProof(accessToken);
+      const result = await definition[action](api, accessToken);
       if (!isCurrentSignedInAccount(state, account)) {
         return;
       }
       persistFixedProofStage(
         storage,
-        fixedProofStorageKey(account, proof),
+        fixedProofStorageKey(account, definition),
         result.state,
       );
       setSignedInPatch(account, {
-        [proof]: { stage: result.state, activity: "idle" },
+        fixedProofs: {
+          ...state.fixedProofs,
+          [proof]: { stage: result.state, activity: "idle" },
+        },
       });
     } catch (error) {
       if (!isCurrentSignedInAccount(state, account)) {
@@ -604,19 +574,23 @@ export function createAfterPartyApp(
       if (!cancelled) {
         persistFixedProofStage(
           storage,
-          fixedProofStorageKey(account, proof),
+          fixedProofStorageKey(account, definition),
           failureStage,
         );
       }
       setSignedInPatch(account, {
-        [proof]: {
-          stage: failureStage,
-          activity: "idle",
-          message: cancelled
-            ? `The ${label} action was cancelled before it started.`
-            : error instanceof AccessTokenError || error instanceof ApiAccessError
-              ? error.message
-              : `The ${label} change was not confirmed. Do not repeat it.`,
+        fixedProofs: {
+          ...state.fixedProofs,
+          [proof]: {
+            stage: failureStage,
+            activity: "idle",
+            message: cancelled
+              ? `The ${definition.label} action was cancelled before it started.`
+              : error instanceof AccessTokenError ||
+                  error instanceof ApiAccessError
+                ? error.message
+                : `The ${definition.label} change was not confirmed. Do not repeat it.`,
+          },
         },
       });
     }
@@ -657,50 +631,9 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='remove-contact-proof']")
       ?.addEventListener("click", () => void runContactProofAction("remove"));
-    root
-      .querySelector<HTMLButtonElement>("[data-action='create-inbox-rule']")
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("inboxRuleProof", "create"));
-    root
-      .querySelector<HTMLButtonElement>("[data-action='remove-inbox-rule']")
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("inboxRuleProof", "remove"));
-    root
-      .querySelector<HTMLButtonElement>("[data-action='create-category-proof']")
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("categoryProof", "create"));
-    root
-      .querySelector<HTMLButtonElement>("[data-action='remove-category-proof']")
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("categoryProof", "remove"));
-    root
-      .querySelector<HTMLButtonElement>(
-        "[data-action='create-sharepoint-file-proof']",
-      )
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("sharePointFileProof", "create"));
-    root
-      .querySelector<HTMLButtonElement>(
-        "[data-action='remove-sharepoint-file-proof']",
-      )
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("sharePointFileProof", "remove"));
-    root
-      .querySelector<HTMLButtonElement>("[data-action='create-draft-proof']")
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("draftProof", "create"));
-    root
-      .querySelector<HTMLButtonElement>("[data-action='remove-draft-proof']")
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("draftProof", "remove"));
-    root
-      .querySelector<HTMLButtonElement>("[data-action='create-todo-task-proof']")
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("todoTaskProof", "create"));
-    root
-      .querySelector<HTMLButtonElement>("[data-action='remove-todo-task-proof']")
-      ?.addEventListener("click", () =>
-        void runFixedProofAction("todoTaskProof", "remove"));
+    bindFixedProofActions(root, (proof, action) => {
+      void runFixedProofAction(proof, action);
+    });
   };
 
   const start = async (): Promise<void> => {
@@ -732,44 +665,7 @@ export function createAfterPartyApp(
                 stage: readCalendarMeetingStage(storage, startup.account),
                 activity: "idle",
               },
-              inboxRuleProof: {
-                stage: readFixedProofStage(
-                  storage,
-                  fixedProofStorageKey(startup.account, "inboxRuleProof"),
-                ),
-                activity: "idle",
-              },
-              categoryProof: {
-                stage: readFixedProofStage(
-                  storage,
-                  fixedProofStorageKey(startup.account, "categoryProof"),
-                ),
-                activity: "idle",
-              },
-              sharePointFileProof: {
-                stage: readFixedProofStage(
-                  storage,
-                  fixedProofStorageKey(
-                    startup.account,
-                    "sharePointFileProof",
-                  ),
-                ),
-                activity: "idle",
-              },
-              draftProof: {
-                stage: readFixedProofStage(
-                  storage,
-                  fixedProofStorageKey(startup.account, "draftProof"),
-                ),
-                activity: "idle",
-              },
-              todoTaskProof: {
-                stage: readFixedProofStage(
-                  storage,
-                  fixedProofStorageKey(startup.account, "todoTaskProof"),
-                ),
-                activity: "idle",
-              },
+              fixedProofs: readFixedProofStates(storage, startup.account),
             }
           : { kind: "signed-out" },
       );
@@ -852,17 +748,7 @@ function createStatePanel(
           apiOperationLoading,
         ),
         createContactProofPanel(contactProof, apiOperationLoading),
-        createInboxRuleProofPanel(
-          state.inboxRuleProof,
-          apiOperationLoading,
-        ),
-        createCategoryProofPanel(state.categoryProof, apiOperationLoading),
-        createSharePointFileProofPanel(
-          state.sharePointFileProof,
-          apiOperationLoading,
-        ),
-        createDraftProofPanel(state.draftProof, apiOperationLoading),
-        createTodoTaskProofPanel(state.todoTaskProof, apiOperationLoading),
+        ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -881,49 +767,6 @@ function createStatePanel(
   }
 
   return panel;
-}
-
-function createStatus(message: string, className = "status"): HTMLElement {
-  const status = document.createElement("p");
-  status.className = className;
-  status.textContent = message;
-  return status;
-}
-
-function createButton(
-  label: string,
-  action:
-    | "sign-in"
-    | "sign-out"
-    | "check-api"
-    | "check-rehearsal"
-    | "send-simulated-email"
-    | "share-onedrive-proof"
-    | "remove-onedrive-proof"
-    | "create-calendar-meeting"
-    | "cancel-calendar-meeting"
-    | "create-contact-proof"
-    | "remove-contact-proof"
-    | "create-inbox-rule"
-    | "remove-inbox-rule"
-    | "create-category-proof"
-    | "remove-category-proof"
-    | "create-sharepoint-file-proof"
-    | "remove-sharepoint-file-proof"
-    | "create-draft-proof"
-    | "remove-draft-proof"
-    | "create-todo-task-proof"
-    | "remove-todo-task-proof",
-  className: string,
-  disabled = false,
-): HTMLButtonElement {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = className;
-  button.dataset.action = action;
-  button.textContent = label;
-  button.disabled = disabled;
-  return button;
 }
 
 function createSimulatedEmailPanel(
@@ -1243,271 +1086,6 @@ function createContactProofPanel(
   return panel;
 }
 
-function createInboxRuleProofPanel(
-  state: FixedProofState,
-  apiOperationLoading: boolean,
-): HTMLElement {
-  const panel = document.createElement("div");
-  panel.className = "api-access";
-  panel.append(createStatus(
-    "Real tenant activity: Cory creates one fixed harmless disabled Inbox rule, then explicitly removes it.",
-    "notice",
-  ));
-  const messages: Record<FixedProofStage, string> = {
-    "not-started": "Inbox-rule rehearsal: not started in this browser.",
-    uncertain:
-      "Inbox-rule rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "Inbox-rule rehearsal: Configured and disabled.",
-    "removal-uncertain":
-      "Inbox-rule rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "Inbox-rule rehearsal: Removed.",
-  };
-  const message = state.activity === "idle"
-    ? messages[state.stage]
-    : `${state.activity === "creating" ? "Creating" : "Removing"} the fixed disabled Inbox rule…`;
-  if (state.activity !== "idle") {
-    panel.setAttribute("aria-busy", "true");
-  }
-  panel.append(createStatus(message));
-  if (state.message) {
-    panel.append(createStatus(state.message, "error"));
-  }
-  const details = document.createElement("dl");
-  details.className = "identity-list";
-  appendIdentity(details, "Owner", "cory@corywest.onmicrosoft.com");
-  appendIdentity(details, "Rule", INBOX_RULE_PROOF_DISPLAY_NAME);
-  appendIdentity(details, "Enabled", "No");
-  appendIdentity(details, "Subject contains", INBOX_RULE_PROOF_SUBJECT);
-  appendIdentity(details, "Action", "Mark as read");
-  panel.append(
-    details,
-    createButton(
-      "Create disabled Inbox rule",
-      "create-inbox-rule",
-      "primary",
-      apiOperationLoading || state.stage !== "not-started",
-    ),
-    createButton(
-      "Remove disabled Inbox rule",
-      "remove-inbox-rule",
-      "secondary",
-      apiOperationLoading ||
-        !["configured", "uncertain"].includes(state.stage),
-    ),
-  );
-  return panel;
-}
-
-function createCategoryProofPanel(
-  state: FixedProofState,
-  apiOperationLoading: boolean,
-): HTMLElement {
-  const panel = document.createElement("div");
-  panel.className = "api-access";
-  panel.append(createStatus(
-    "Real tenant activity: Cory creates one fixed harmless Outlook category, then explicitly removes it.",
-    "notice",
-  ));
-  const messages: Record<FixedProofStage, string> = {
-    "not-started": "Category rehearsal: not started in this browser.",
-    uncertain:
-      "Category rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "Category rehearsal: Configured.",
-    "removal-uncertain":
-      "Category rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "Category rehearsal: Removed.",
-  };
-  panel.append(createStatus(state.activity === "idle"
-    ? messages[state.stage]
-    : `${state.activity === "creating" ? "Creating" : "Removing"} the fixed Outlook category…`));
-  if (state.activity !== "idle") {
-    panel.setAttribute("aria-busy", "true");
-  }
-  if (state.message) {
-    panel.append(createStatus(state.message, "error"));
-  }
-  const details = document.createElement("dl");
-  details.className = "identity-list";
-  appendIdentity(details, "Owner", "cory@corywest.onmicrosoft.com");
-  appendIdentity(details, "Category", CATEGORY_PROOF_DISPLAY_NAME);
-  appendIdentity(details, "Color preset", CATEGORY_PROOF_COLOR);
-  panel.append(
-    details,
-    createButton(
-      "Create Outlook category proof",
-      "create-category-proof",
-      "primary",
-      apiOperationLoading || state.stage !== "not-started",
-    ),
-    createButton(
-      "Remove Outlook category proof",
-      "remove-category-proof",
-      "secondary",
-      apiOperationLoading ||
-        !["configured", "uncertain"].includes(state.stage),
-    ),
-  );
-  return panel;
-}
-
-function createSharePointFileProofPanel(
-  state: FixedProofState,
-  apiOperationLoading: boolean,
-): HTMLElement {
-  const panel = document.createElement("div");
-  panel.className = "api-access";
-  panel.append(createStatus(
-    "Real tenant activity: the API managed identity creates one fixed harmless file in SharePoint root Documents, then explicitly removes it to the recycle bin.",
-    "notice",
-  ));
-  const messages: Record<FixedProofStage, string> = {
-    "not-started": "SharePoint file rehearsal: not started in this browser.",
-    uncertain:
-      "SharePoint file rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "SharePoint file rehearsal: Configured.",
-    "removal-uncertain":
-      "SharePoint file rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "SharePoint file rehearsal: Removed to SharePoint recycle bin.",
-  };
-  panel.append(createStatus(state.activity === "idle"
-    ? messages[state.stage]
-    : `${state.activity === "creating" ? "Creating" : "Removing"} the fixed SharePoint file…`));
-  if (state.activity !== "idle") {
-    panel.setAttribute("aria-busy", "true");
-  }
-  if (state.message) {
-    panel.append(createStatus(state.message, "error"));
-  }
-  const details = document.createElement("dl");
-  details.className = "identity-list";
-  appendIdentity(details, "Actor", "API system managed identity");
-  appendIdentity(details, "Location", "SharePoint root Documents");
-  appendIdentity(details, "File", SHAREPOINT_FILE_PROOF_NAME);
-  appendIdentity(details, "Content size", "78 ASCII bytes");
-  panel.append(
-    details,
-    createButton(
-      "Create SharePoint file proof",
-      "create-sharepoint-file-proof",
-      "primary",
-      apiOperationLoading || state.stage !== "not-started",
-    ),
-    createButton(
-      "Remove SharePoint file proof",
-      "remove-sharepoint-file-proof",
-      "secondary",
-      apiOperationLoading ||
-        !["configured", "uncertain"].includes(state.stage),
-    ),
-  );
-  return panel;
-}
-
-function createDraftProofPanel(
-  state: FixedProofState,
-  apiOperationLoading: boolean,
-): HTMLElement {
-  const panel = document.createElement("div");
-  panel.className = "api-access";
-  panel.append(createStatus(
-    "Real tenant activity: Cory creates one fixed harmless unsent Outlook draft, then explicitly removes it. This operation never sends mail.",
-    "notice",
-  ));
-  const messages: Record<FixedProofStage, string> = {
-    "not-started": "Draft rehearsal: not started in this browser.",
-    uncertain:
-      "Draft rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "Draft rehearsal: Configured as an unsent draft.",
-    "removal-uncertain":
-      "Draft rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "Draft rehearsal: Removed.",
-  };
-  panel.append(createStatus(state.activity === "idle"
-    ? messages[state.stage]
-    : `${state.activity === "creating" ? "Creating" : "Removing"} the fixed unsent draft…`));
-  if (state.activity !== "idle") panel.setAttribute("aria-busy", "true");
-  if (state.message) panel.append(createStatus(state.message, "error"));
-  const details = document.createElement("dl");
-  details.className = "identity-list";
-  appendIdentity(details, "Owner", "cory@corywest.onmicrosoft.com");
-  appendIdentity(details, "State", "Unsent draft");
-  appendIdentity(details, "Subject", DRAFT_PROOF_SUBJECT);
-  appendIdentity(details, "Body", DRAFT_PROOF_BODY);
-  appendIdentity(details, "To", DRAFT_PROOF_RECIPIENTS.join(", "));
-  appendIdentity(details, "Cc / Bcc", "None");
-  appendIdentity(details, "Importance", "Low");
-  appendIdentity(details, "Attachments", "None");
-  panel.append(
-    details,
-    createButton(
-      "Create unsent draft proof",
-      "create-draft-proof",
-      "primary",
-      apiOperationLoading || state.stage !== "not-started",
-    ),
-    createButton(
-      "Remove unsent draft proof",
-      "remove-draft-proof",
-      "secondary",
-      apiOperationLoading ||
-        !["configured", "uncertain"].includes(state.stage),
-    ),
-  );
-  return panel;
-}
-
-function createTodoTaskProofPanel(
-  state: FixedProofState,
-  apiOperationLoading: boolean,
-): HTMLElement {
-  const panel = document.createElement("div");
-  panel.className = "api-access";
-  panel.append(createStatus(
-    "Real tenant activity: Cory creates one fixed harmless Microsoft To Do task, then explicitly removes it. The task is never completed or shared.",
-    "notice",
-  ));
-  const messages: Record<FixedProofStage, string> = {
-    "not-started": "To Do task rehearsal: not started in this browser.",
-    uncertain:
-      "To Do task rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "To Do task rehearsal: Configured.",
-    "removal-uncertain":
-      "To Do task rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "To Do task rehearsal: Removed.",
-  };
-  panel.append(createStatus(state.activity === "idle"
-    ? messages[state.stage]
-    : `${state.activity === "creating" ? "Creating" : "Removing"} the fixed To Do task…`));
-  if (state.activity !== "idle") panel.setAttribute("aria-busy", "true");
-  if (state.message) panel.append(createStatus(state.message, "error"));
-  const details = document.createElement("dl");
-  details.className = "identity-list";
-  appendIdentity(details, "Owner", "cory@corywest.onmicrosoft.com");
-  appendIdentity(details, "List", "Default To Do list");
-  appendIdentity(details, "Title", TODO_TASK_PROOF_TITLE);
-  appendIdentity(details, "Status", "Not started");
-  appendIdentity(details, "Importance", "Low");
-  appendIdentity(details, "Reminder", "Off");
-  appendIdentity(details, "Categories", "None");
-  panel.append(
-    details,
-    createButton(
-      "Create To Do task proof",
-      "create-todo-task-proof",
-      "primary",
-      apiOperationLoading || state.stage !== "not-started",
-    ),
-    createButton(
-      "Remove To Do task proof",
-      "remove-todo-task-proof",
-      "secondary",
-      apiOperationLoading ||
-        !["configured", "uncertain"].includes(state.stage),
-    ),
-  );
-  return panel;
-}
-
 function createRehearsalStatusPanel(
   state: RehearsalStatusState,
   apiOperationLoading: boolean,
@@ -1639,11 +1217,7 @@ function isApiOperationBusy(
     state.simulatedEmail.kind === "loading" ||
     state.oneDriveProof.activity !== "idle" ||
     state.calendarMeeting.activity !== "idle" ||
-    state.inboxRuleProof.activity !== "idle" ||
-    state.categoryProof.activity !== "idle" ||
-    state.sharePointFileProof.activity !== "idle" ||
-    state.draftProof.activity !== "idle" ||
-    state.todoTaskProof.activity !== "idle" ||
+    hasBusyFixedProof(state.fixedProofs) ||
     contactProof.activity !== "idle"
   );
 }
@@ -1712,52 +1286,6 @@ function contactStorageKey(account: AccountIdentity): string {
   return `ap2.contact-proof.${CONTACT_PROOF_RUN_ID}.${account.tenantId}.${account.accountId}`;
 }
 
-function fixedProofStorageKey(
-  account: AccountIdentity,
-  proof: "inboxRuleProof" | "categoryProof" | "sharePointFileProof" |
-    "draftProof" | "todoTaskProof",
-): string {
-  const [name, runId] = proof === "inboxRuleProof"
-    ? ["inbox-rule-proof", INBOX_RULE_PROOF_RUN_ID]
-    : proof === "categoryProof"
-      ? ["category-proof", CATEGORY_PROOF_RUN_ID]
-      : proof === "sharePointFileProof"
-        ? ["sharepoint-file-proof", SHAREPOINT_FILE_PROOF_RUN_ID]
-        : proof === "draftProof"
-          ? ["draft-proof", DRAFT_PROOF_RUN_ID]
-          : ["todo-task-proof", TODO_TASK_PROOF_RUN_ID];
-  return `ap2.${name}.${runId}.${account.tenantId}.${account.accountId}`;
-}
-
-function readFixedProofStage(
-  storage: Pick<Storage, "getItem">,
-  key: string,
-): FixedProofStage {
-  const value = storage.getItem(key);
-  return ["uncertain", "configured", "removal-uncertain", "removed"].includes(
-    value ?? "",
-  )
-    ? value as FixedProofStage
-    : "not-started";
-}
-
-function persistFixedProofStage(
-  storage: Pick<Storage, "setItem">,
-  key: string,
-  stage: FixedProofStage,
-): void {
-  storage.setItem(key, stage);
-}
-
-function isAllowedFixedProofAction(
-  stage: FixedProofStage,
-  action: "create" | "remove",
-): boolean {
-  return action === "create"
-    ? stage === "not-started"
-    : stage === "configured" || stage === "uncertain";
-}
-
 function readContactStage(
   storage: Pick<Storage, "getItem">,
   account: AccountIdentity,
@@ -1796,16 +1324,4 @@ function persistCalendarMeetingStage(
   stage: CalendarMeetingStage,
 ): void {
   storage.setItem(calendarMeetingStorageKey(account), stage);
-}
-
-function appendIdentity(
-  list: HTMLDListElement,
-  label: string,
-  value: string,
-): void {
-  const term = document.createElement("dt");
-  term.textContent = label;
-  const description = document.createElement("dd");
-  description.textContent = value;
-  list.append(term, description);
 }
