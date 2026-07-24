@@ -299,3 +299,22 @@ removed. Duplicate, paginated, malformed, or mismatched results cause no
 mutation. Graph mutations are never retried. Browser state records an uncertain
 attempt before mutation, while the exact-name Graph reconciliation owns
 correctness.
+
+## One SharePoint file rehearsal
+
+`POST` and `DELETE /api/sharepoint-file-proof` are separate explicit actions.
+The existing caller policy still admits only an authorized operator or the Dev
+app. The operation itself uses the API system managed identity, its existing
+Graph `Sites.ReadWrite.All` application permission, and the fixed SharePoint
+Documents drive. Signing in does not inspect or change SharePoint.
+
+Create requires the exact root path to be absent, then makes one small-file PUT
+with conflict behavior `fail`. The fixed file is `AP2 SharePoint File Proof
+[ap2-sharepoint-file-20260725-001].txt` and contains exactly 78 ASCII bytes.
+Remove re-resolves that exact marked path, validates its file and drive identity,
+and makes one ID-based DELETE with the current eTag in `If-Match`. The filename
+owns this rehearsal artifact even if its content changes later; `If-Match`
+prevents deleting across a concurrent change. A successful delete moves the
+file to the SharePoint recycle bin. The experiment never lists, shares, retries,
+polls, or permanently purges content. Browser state records an uncertain attempt
+before mutation, while exact-path Graph reconciliation owns correctness.

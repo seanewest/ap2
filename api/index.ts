@@ -15,6 +15,7 @@ import {
 } from "./inbox-rule-proof.js";
 import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
+import { GraphSharePointFileProof } from "./sharepoint-file-proof.js";
 import { createApiServer } from "./server.js";
 import {
   DelegatedGraphOneDriveShareProof,
@@ -92,18 +93,18 @@ const categoryProofOperation =
   coryTokenProvider && cory
     ? new DelegatedGraphCategoryProof(coryTokenProvider, cory)
     : undefined;
+const managedIdentity = new ManagedIdentityCredential();
 const server = createApiServer({
   tokenVerifier,
   callerPolicy: config.callerPolicy,
-  rehearsalStatusProvider: new AzureRehearsalStatusProvider(
-    new ManagedIdentityCredential(),
-  ),
+  rehearsalStatusProvider: new AzureRehearsalStatusProvider(managedIdentity),
   simulatedEmailOperation,
   oneDriveShareProofOperation,
   calendarMeetingOperation,
   contactProofOperation,
   inboxRuleProofOperation,
   categoryProofOperation,
+  sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
   allowedOrigin: config.allowedOrigin,
 });
 

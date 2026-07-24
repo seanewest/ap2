@@ -57,6 +57,13 @@ export const CATEGORY_PROOF_COLOR = "preset7";
 export type CategoryProofResult =
   | { state: "configured"; displayName: typeof CATEGORY_PROOF_DISPLAY_NAME }
   | { state: "removed"; displayName: typeof CATEGORY_PROOF_DISPLAY_NAME };
+export const SHAREPOINT_FILE_PROOF_NAME =
+  "AP2 SharePoint File Proof [ap2-sharepoint-file-20260725-001].txt";
+export const SHAREPOINT_FILE_PROOF_RUN_ID =
+  "ap2-sharepoint-file-20260725-001";
+export type SharePointFileProofResult =
+  | { state: "configured"; name: typeof SHAREPOINT_FILE_PROOF_NAME }
+  | { state: "removed"; name: typeof SHAREPOINT_FILE_PROOF_NAME };
 
 export const CALENDAR_MEETING_ORGANIZER =
   "cory@corywest.onmicrosoft.com";
@@ -163,6 +170,12 @@ export interface AfterPartyApi {
   removeCategoryProof(accessToken: string): Promise<
     Extract<CategoryProofResult, { state: "removed" }>
   >;
+  createSharePointFileProof(accessToken: string): Promise<
+    Extract<SharePointFileProofResult, { state: "configured" }>
+  >;
+  removeSharePointFileProof(accessToken: string): Promise<
+    Extract<SharePointFileProofResult, { state: "removed" }>
+  >;
 }
 
 export class ApiAccessError extends Error {
@@ -194,6 +207,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly contactProofUrl: string;
   private readonly inboxRuleProofUrl: string;
   private readonly categoryProofUrl: string;
+  private readonly sharePointFileProofUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
@@ -226,6 +240,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       .toString();
     this.categoryProofUrl = new URL("api/category-proof", `${baseUrl}/`)
       .toString();
+    this.sharePointFileProofUrl = new URL(
+      "api/sharepoint-file-proof",
+      `${baseUrl}/`,
+    ).toString();
     this.request = request.bind(globalThis);
   }
 
@@ -445,6 +463,30 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     );
   }
 
+  async createSharePointFileProof(accessToken: string) {
+    await this.fixedProofRequest(
+      this.sharePointFileProofUrl,
+      accessToken,
+      "POST",
+      201,
+      "configured",
+      isSafeSharePointFileProofResult,
+    );
+    return { state: "configured", name: SHAREPOINT_FILE_PROOF_NAME } as const;
+  }
+
+  async removeSharePointFileProof(accessToken: string) {
+    await this.fixedProofRequest(
+      this.sharePointFileProofUrl,
+      accessToken,
+      "DELETE",
+      200,
+      "removed",
+      isSafeSharePointFileProofResult,
+    );
+    return { state: "removed", name: SHAREPOINT_FILE_PROOF_NAME } as const;
+  }
+
   private async oneDriveProofRequest<T extends OneDriveProofResult["state"]>(
     accessToken: string,
     method: "POST" | "DELETE",
@@ -508,6 +550,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       if (error === "category_state_conflict") {
         throw new ApiAccessError(
           "The category proof is not in the expected state. Nothing was changed.",
+        );
+      }
+      if (error === "sharepoint_file_state_conflict") {
+        throw new ApiAccessError(
+          "The SharePoint file proof is not in the expected state. Nothing was changed.",
         );
       }
       if (failureContext === "calendar") {
@@ -717,6 +764,17 @@ function isSafeCategoryProofResult(value: unknown): value is CategoryProofResult
   }
   const result = value as Record<string, unknown>;
   return result.displayName === CATEGORY_PROOF_DISPLAY_NAME &&
+    (result.state === "removed" || result.state === "configured");
+}
+
+function isSafeSharePointFileProofResult(
+  value: unknown,
+): value is SharePointFileProofResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  return result.name === SHAREPOINT_FILE_PROOF_NAME &&
     (result.state === "removed" || result.state === "configured");
 }
 

@@ -39,6 +39,11 @@ import {
   type InboxRuleProofResult,
 } from "./inbox-rule-proof.js";
 import type { RehearsalStatus } from "./rehearsal-status.js";
+import {
+  SHAREPOINT_FILE_NAME,
+  SharePointFileProofConflictError,
+  type SharePointFileProofResult,
+} from "./sharepoint-file-proof.js";
 import { createApiServer } from "./server.js";
 import {
   HOMER_USER_PRINCIPAL_NAME,
@@ -134,6 +139,14 @@ const categoryProofOperation = {
   create: vi.fn().mockResolvedValue(categoryResults.configured),
   remove: vi.fn().mockResolvedValue(categoryResults.removed),
 };
+const sharePointFileResults = {
+  configured: { state: "configured", name: SHAREPOINT_FILE_NAME },
+  removed: { state: "removed", name: SHAREPOINT_FILE_NAME },
+} as const satisfies Record<string, SharePointFileProofResult>;
+const sharePointFileProofOperation = {
+  create: vi.fn().mockResolvedValue(sharePointFileResults.configured),
+  remove: vi.fn().mockResolvedValue(sharePointFileResults.removed),
+};
 const oneDriveResults = {
   configured: {
     state: "configured",
@@ -165,6 +178,7 @@ const server = createApiServer({
   contactProofOperation,
   inboxRuleProofOperation,
   categoryProofOperation,
+  sharePointFileProofOperation,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -192,6 +206,7 @@ describe("local API", () => {
     "/api/contact-proof",
     "/api/inbox-rule-proof",
     "/api/category-proof",
+    "/api/sharepoint-file-proof",
   ])(
     "preflights only explicit mutation methods and Authorization for %s",
     async (path) => {
@@ -755,6 +770,60 @@ describe("local API", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
       error: "category_state_conflict",
+    });
+  });
+
+  it.each([
+    ["POST", "create", sharePointFileResults.configured, 201],
+    ["DELETE", "remove", sharePointFileResults.removed, 200],
+  ] as const)(
+    "%s runs SharePoint file proof for both authorized caller shapes",
+    async (method, operation, expected, status) => {
+      const mock = sharePointFileProofOperation[operation];
+      mock.mockClear();
+      for (const claims of [
+        {
+          tid: STUDENT_TENANT_ID,
+          oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+          scp: REQUIRED_DELEGATED_SCOPE,
+        },
+        {
+          tid: STUDENT_TENANT_ID,
+          idtyp: "app",
+          azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+          roles: [REQUIRED_APPLICATION_ROLE],
+        },
+      ]) {
+        const response = await protectedRequest(
+          claims,
+          "http://localhost:5173",
+          "/api/sharepoint-file-proof",
+          method,
+        );
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toEqual(expected);
+      }
+      expect(mock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("fails closed on SharePoint file conflict without exposing details", async () => {
+    sharePointFileProofOperation.remove.mockRejectedValueOnce(
+      new SharePointFileProofConflictError(),
+    );
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/sharepoint-file-proof",
+      "DELETE",
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "sharepoint_file_state_conflict",
     });
   });
 
