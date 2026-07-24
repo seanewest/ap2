@@ -8,6 +8,10 @@ import {
   DelegatedGraphContactProof,
   GRAPH_CONTACTS_READ_WRITE_SCOPE,
 } from "./contact-proof.js";
+import {
+  DelegatedGraphInboxRuleProof,
+  GRAPH_MAILBOX_SETTINGS_READ_WRITE_SCOPE,
+} from "./inbox-rule-proof.js";
 import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { createApiServer } from "./server.js";
@@ -65,6 +69,7 @@ const coryTokenProvider =
         allowedScopes: [
           GRAPH_CALENDARS_READ_WRITE_SCOPE,
           GRAPH_CONTACTS_READ_WRITE_SCOPE,
+          GRAPH_MAILBOX_SETTINGS_READ_WRITE_SCOPE,
         ],
       })
     : undefined;
@@ -78,6 +83,10 @@ const contactProofOperation =
   coryTokenProvider && cory
     ? new DelegatedGraphContactProof(coryTokenProvider, cory)
     : undefined;
+const inboxRuleProofOperation =
+  coryTokenProvider && cory
+    ? new DelegatedGraphInboxRuleProof(coryTokenProvider, cory)
+    : undefined;
 const server = createApiServer({
   tokenVerifier,
   callerPolicy: config.callerPolicy,
@@ -88,6 +97,7 @@ const server = createApiServer({
   oneDriveShareProofOperation,
   calendarMeetingOperation,
   contactProofOperation,
+  inboxRuleProofOperation,
   allowedOrigin: config.allowedOrigin,
 });
 

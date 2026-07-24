@@ -17,6 +17,9 @@ import {
   CONTACT_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
+  INBOX_RULE_PROOF_DISPLAY_NAME,
+  INBOX_RULE_PROOF_RUN_ID,
+  INBOX_RULE_PROOF_SUBJECT,
   OneDriveInviteFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
@@ -81,6 +84,17 @@ type ContactProofState = {
   message?: string;
 };
 
+type InboxRuleProofStage =
+  | "not-started"
+  | "uncertain"
+  | "configured"
+  | "removal-uncertain"
+  | "removed";
+type InboxRuleProofState = {
+  stage: InboxRuleProofStage;
+  activity: "idle" | "creating" | "removing";
+  message?: string;
+};
 type ViewState =
   | { kind: "initial" }
   | { kind: "processing"; message: string }
@@ -93,6 +107,7 @@ type ViewState =
       simulatedEmail: SimulatedEmailState;
       oneDriveProof: OneDriveProofState;
       calendarMeeting: CalendarMeetingState;
+      inboxRuleProof: InboxRuleProofState;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -492,6 +507,68 @@ export function createAfterPartyApp(
     }
   };
 
+  const runInboxRuleProofAction = async (
+    action: "create" | "remove",
+  ): Promise<void> => {
+    if (
+      state.kind !== "signed-in" ||
+      isApiOperationBusy(state, contactProof) ||
+      !isAllowedInboxRuleAction(state.inboxRuleProof.stage, action)
+    ) {
+      return;
+    }
+    const account = state.account;
+    const previousStage = state.inboxRuleProof.stage;
+    const attemptedStage =
+      action === "create" ? "uncertain" : "removal-uncertain";
+    const activity = action === "create" ? "creating" : "removing";
+    setSignedInPatch(account, {
+      inboxRuleProof: { stage: previousStage, activity },
+    });
+    try {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      persistInboxRuleStage(storage, account, attemptedStage);
+      setSignedInPatch(account, {
+        inboxRuleProof: { stage: attemptedStage, activity },
+      });
+      const result =
+        action === "create"
+          ? await api.createInboxRuleProof(accessToken)
+          : await api.removeInboxRuleProof(accessToken);
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      persistInboxRuleStage(storage, account, result.state);
+      setSignedInPatch(account, {
+        inboxRuleProof: { stage: result.state, activity: "idle" },
+      });
+    } catch (error) {
+      if (!isCurrentSignedInAccount(state, account)) {
+        return;
+      }
+      const cancelled = error instanceof AccessTokenCancelledError;
+      const failureStage = cancelled ? previousStage : attemptedStage;
+      if (!cancelled) {
+        persistInboxRuleStage(storage, account, failureStage);
+      }
+      setSignedInPatch(account, {
+        inboxRuleProof: {
+          stage: failureStage,
+          activity: "idle",
+          message: cancelled
+            ? "The inbox-rule action was cancelled before it started."
+            : error instanceof AccessTokenError || error instanceof ApiAccessError
+              ? error.message
+              : "The inbox-rule change was not confirmed. Do not repeat it.",
+        },
+      });
+    }
+  };
+
   const render = (): void => {
     root.replaceChildren(createShell(state, contactProof));
     root
@@ -527,6 +604,12 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='remove-contact-proof']")
       ?.addEventListener("click", () => void runContactProofAction("remove"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='create-inbox-rule']")
+      ?.addEventListener("click", () => void runInboxRuleProofAction("create"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='remove-inbox-rule']")
+      ?.addEventListener("click", () => void runInboxRuleProofAction("remove"));
   };
 
   const start = async (): Promise<void> => {
@@ -556,6 +639,10 @@ export function createAfterPartyApp(
               },
               calendarMeeting: {
                 stage: readCalendarMeetingStage(storage, startup.account),
+                activity: "idle",
+              },
+              inboxRuleProof: {
+                stage: readInboxRuleStage(storage, startup.account),
                 activity: "idle",
               },
             }
@@ -640,6 +727,10 @@ function createStatePanel(
           apiOperationLoading,
         ),
         createContactProofPanel(contactProof, apiOperationLoading),
+        createInboxRuleProofPanel(
+          state.inboxRuleProof,
+          apiOperationLoading,
+        ),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -680,7 +771,9 @@ function createButton(
     | "create-calendar-meeting"
     | "cancel-calendar-meeting"
     | "create-contact-proof"
-    | "remove-contact-proof",
+    | "remove-contact-proof"
+    | "create-inbox-rule"
+    | "remove-inbox-rule",
   className: string,
   disabled = false,
 ): HTMLButtonElement {
@@ -1010,6 +1103,61 @@ function createContactProofPanel(
   return panel;
 }
 
+function createInboxRuleProofPanel(
+  state: InboxRuleProofState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+  panel.append(createStatus(
+    "Real tenant activity: Cory creates one fixed harmless disabled Inbox rule, then explicitly removes it.",
+    "notice",
+  ));
+  const messages: Record<InboxRuleProofStage, string> = {
+    "not-started": "Inbox-rule rehearsal: not started in this browser.",
+    uncertain:
+      "Inbox-rule rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
+    configured: "Inbox-rule rehearsal: Configured and disabled.",
+    "removal-uncertain":
+      "Inbox-rule rehearsal: Remove is uncertain. Do not repeat it.",
+    removed: "Inbox-rule rehearsal: Removed.",
+  };
+  const message = state.activity === "idle"
+    ? messages[state.stage]
+    : `${state.activity === "creating" ? "Creating" : "Removing"} the fixed disabled Inbox rule…`;
+  if (state.activity !== "idle") {
+    panel.setAttribute("aria-busy", "true");
+  }
+  panel.append(createStatus(message));
+  if (state.message) {
+    panel.append(createStatus(state.message, "error"));
+  }
+  const details = document.createElement("dl");
+  details.className = "identity-list";
+  appendIdentity(details, "Owner", "cory@corywest.onmicrosoft.com");
+  appendIdentity(details, "Rule", INBOX_RULE_PROOF_DISPLAY_NAME);
+  appendIdentity(details, "Enabled", "No");
+  appendIdentity(details, "Subject contains", INBOX_RULE_PROOF_SUBJECT);
+  appendIdentity(details, "Action", "Mark as read");
+  panel.append(
+    details,
+    createButton(
+      "Create disabled Inbox rule",
+      "create-inbox-rule",
+      "primary",
+      apiOperationLoading || state.stage !== "not-started",
+    ),
+    createButton(
+      "Remove disabled Inbox rule",
+      "remove-inbox-rule",
+      "secondary",
+      apiOperationLoading ||
+        !["configured", "uncertain"].includes(state.stage),
+    ),
+  );
+  return panel;
+}
+
 function createRehearsalStatusPanel(
   state: RehearsalStatusState,
   apiOperationLoading: boolean,
@@ -1141,6 +1289,7 @@ function isApiOperationBusy(
     state.simulatedEmail.kind === "loading" ||
     state.oneDriveProof.activity !== "idle" ||
     state.calendarMeeting.activity !== "idle" ||
+    state.inboxRuleProof.activity !== "idle" ||
     contactProof.activity !== "idle"
   );
 }
@@ -1207,6 +1356,39 @@ function calendarMeetingStorageKey(account: AccountIdentity): string {
 
 function contactStorageKey(account: AccountIdentity): string {
   return `ap2.contact-proof.${CONTACT_PROOF_RUN_ID}.${account.tenantId}.${account.accountId}`;
+}
+
+function inboxRuleStorageKey(account: AccountIdentity): string {
+  return `ap2.inbox-rule-proof.${INBOX_RULE_PROOF_RUN_ID}.${account.tenantId}.${account.accountId}`;
+}
+
+function readInboxRuleStage(
+  storage: Pick<Storage, "getItem">,
+  account: AccountIdentity,
+): InboxRuleProofStage {
+  const value = storage.getItem(inboxRuleStorageKey(account));
+  return ["uncertain", "configured", "removal-uncertain", "removed"].includes(
+    value ?? "",
+  )
+    ? value as InboxRuleProofStage
+    : "not-started";
+}
+
+function persistInboxRuleStage(
+  storage: Pick<Storage, "setItem">,
+  account: AccountIdentity,
+  stage: InboxRuleProofStage,
+): void {
+  storage.setItem(inboxRuleStorageKey(account), stage);
+}
+
+function isAllowedInboxRuleAction(
+  stage: InboxRuleProofStage,
+  action: "create" | "remove",
+): boolean {
+  return action === "create"
+    ? stage === "not-started"
+    : stage === "configured" || stage === "uncertain";
 }
 
 function readContactStage(

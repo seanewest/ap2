@@ -12,6 +12,10 @@ import {
   type CalendarMeetingOperation,
 } from "./calendar-meeting.js";
 import { ContactProofConflictError, type ContactProofOperation } from "./contact-proof.js";
+import {
+  InboxRuleProofConflictError,
+  type InboxRuleProofOperation,
+} from "./inbox-rule-proof.js";
 import type { RehearsalStatusProvider } from "./rehearsal-status.js";
 import type { SimulatedEmailOperation } from "./simulated-email.js";
 import {
@@ -30,6 +34,7 @@ export interface ApiDependencies {
   oneDriveShareProofOperation?: OneDriveShareProofOperation;
   calendarMeetingOperation?: CalendarMeetingOperation;
   contactProofOperation?: ContactProofOperation;
+  inboxRuleProofOperation?: InboxRuleProofOperation;
   allowedOrigin?: string;
 }
 
@@ -65,7 +70,11 @@ async function route(
     return;
   }
 
-  if (request.method === "OPTIONS" && pathname === "/api/contact-proof") {
+  if (
+    request.method === "OPTIONS" &&
+    (pathname === "/api/contact-proof" ||
+      pathname === "/api/inbox-rule-proof")
+  ) {
     handleProtectedPreflight(request, response, origin, ["POST", "DELETE"]);
     return;
   }
@@ -128,18 +137,23 @@ async function route(
 
   if (
     (request.method === "POST" || request.method === "DELETE") &&
-    pathname === "/api/contact-proof"
+    (pathname === "/api/contact-proof" ||
+      pathname === "/api/inbox-rule-proof")
   ) {
     const action = request.method === "POST" ? "create" : "remove";
+    const operation =
+      pathname === "/api/contact-proof"
+        ? dependencies.contactProofOperation
+        : dependencies.inboxRuleProofOperation;
     await handleAuthorizedRequest(
       request,
       response,
       dependencies,
       () => {
-        if (!dependencies.contactProofOperation) {
-          throw new Error("Contact proof operation is not configured");
+        if (!operation) {
+          throw new Error("Fixed proof operation is not configured");
         }
-        return dependencies.contactProofOperation[action]();
+        return operation[action]();
       },
       action === "create" ? 201 : 200,
     );
@@ -340,6 +354,10 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof ContactProofConflictError) {
       sendJson(response, 409, { error: "contact_state_conflict" });
+      return;
+    }
+    if (error instanceof InboxRuleProofConflictError) {
+      sendJson(response, 409, { error: "inbox_rule_state_conflict" });
       return;
     }
     throw error;
