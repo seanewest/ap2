@@ -26,6 +26,8 @@ const account: AccountIdentity = {
   username: "student@example.com",
   tenantId: "student-tenant-id",
 };
+const calendarStorageKey =
+  "ap2.calendar-meeting.ap2-calendar-20260724-002.student-tenant-id.student-object-id";
 
 class FakeAuthentication implements Authentication {
   initialize = vi.fn<() => Promise<AuthenticationStartup>>();
@@ -754,16 +756,16 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain("ReminderOff");
     expect(root.textContent).toContain("Teams / online meetingOff");
     expect(root.textContent).toContain("ResponsesNot requested");
-    expect(root.textContent).toContain("2026-07-24T18:00:00Z");
-    expect(root.textContent).toContain("2026-07-24T18:15:00Z");
-    expect(root.textContent).toContain("2:00–2:15 PM EDT");
+    expect(root.textContent).toContain("2026-07-24T19:00:00Z");
+    expect(root.textContent).toContain("2026-07-24T19:15:00Z");
+    expect(root.textContent).toContain("3:00–3:15 PM EDT");
 
     calendarCreateButton()?.click();
     await nextTask();
     expect(api.createCalendarMeeting).toHaveBeenCalledOnce();
     expect(api.createCalendarMeeting).toHaveBeenCalledWith("temporary-token");
     expect(localStorage.getItem(
-      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      calendarStorageKey,
     )).toBe("uncertain");
     expect(calendarCreateButton()?.disabled).toBe(true);
     expect(calendarCancelButton()?.disabled).toBe(true);
@@ -778,8 +780,8 @@ describe("After Party authentication UI", () => {
         "marge.simpson@corywest.onmicrosoft.com",
       ],
       subject: "AP2 Pass 3 calendar rehearsal — no action required",
-      start: "2026-07-24T18:00:00Z",
-      end: "2026-07-24T18:15:00Z",
+      start: "2026-07-24T19:00:00Z",
+      end: "2026-07-24T19:15:00Z",
     });
     await nextTask();
     expect(root.textContent).toContain("Calendar rehearsal: Configured");
@@ -796,7 +798,7 @@ describe("After Party authentication UI", () => {
     expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
     expect(api.cancelCalendarMeeting).toHaveBeenCalledWith("temporary-token");
     expect(localStorage.getItem(
-      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      calendarStorageKey,
     )).toBe("cancellation-uncertain");
     expect(calendarCreateButton()?.disabled).toBe(true);
     expect(calendarCancelButton()?.disabled).toBe(true);
@@ -820,7 +822,7 @@ describe("After Party authentication UI", () => {
 
   it("offers explicit cancellation recovery from an uncertain calendar state", async () => {
     localStorage.setItem(
-      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      calendarStorageKey,
       "uncertain",
     );
     authentication.initialize.mockResolvedValue({
@@ -853,7 +855,7 @@ describe("After Party authentication UI", () => {
     expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
     expect(api.cancelCalendarMeeting).toHaveBeenCalledWith("temporary-token");
     expect(localStorage.getItem(
-      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      calendarStorageKey,
     )).toBe("cancellation-accepted");
     expect(root.textContent).toContain(
       "Calendar rehearsal: Cancellation accepted",
@@ -863,7 +865,7 @@ describe("After Party authentication UI", () => {
 
   it("does not offer a second cancellation after an uncertain response", async () => {
     localStorage.setItem(
-      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      calendarStorageKey,
       "uncertain",
     );
     authentication.initialize.mockResolvedValue({
@@ -883,7 +885,7 @@ describe("After Party authentication UI", () => {
 
     expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
     expect(localStorage.getItem(
-      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      calendarStorageKey,
     )).toBe("cancellation-uncertain");
     expect(root.textContent).toContain(
       "Calendar rehearsal: cancellation is uncertain. Do not repeat it.",
@@ -892,6 +894,31 @@ describe("After Party authentication UI", () => {
 
     calendarCancelButton()?.click();
     expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+  });
+
+  it("starts the new run fresh when only the prior run cache exists", async () => {
+    localStorage.setItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      "cancellation-accepted",
+    );
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+
+    expect(root.textContent).toContain(
+      "Calendar rehearsal: not started in this browser.",
+    );
+    expect(calendarCreateButton()?.disabled).toBe(false);
+    expect(calendarCancelButton()?.disabled).toBe(true);
+    expect(localStorage.getItem(calendarStorageKey)).toBeNull();
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.createCalendarMeeting).not.toHaveBeenCalled();
+    expect(api.cancelCalendarMeeting).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -903,7 +930,7 @@ describe("After Party authentication UI", () => {
     "restores calendar stage %s without an automatic call",
     async (stage, createDisabled, cancelDisabled) => {
       localStorage.setItem(
-        "ap2.calendar-meeting.student-tenant-id.student-object-id",
+        calendarStorageKey,
         stage,
       );
       authentication.initialize.mockResolvedValue({

@@ -7,6 +7,8 @@ import {
   CALENDAR_MEETING_BODY,
   CALENDAR_MEETING_CANCEL_COMMENT,
   CALENDAR_MEETING_END,
+  CALENDAR_MEETING_RUN_ID,
+  CALENDAR_MEETING_RUN_PROPERTY_ID,
   CALENDAR_MEETING_START,
   CALENDAR_MEETING_SUBJECT,
   CALENDAR_MEETING_TRANSACTION_ID,
@@ -61,11 +63,11 @@ function createdMeeting(
       content: CALENDAR_MEETING_BODY,
     },
     start: {
-      dateTime: "2026-07-24T18:00:00.0000000",
+      dateTime: "2026-07-24T19:00:00.0000000",
       timeZone: "UTC",
     },
     end: {
-      dateTime: "2026-07-24T18:15:00.0000000",
+      dateTime: "2026-07-24T19:15:00.0000000",
       timeZone: "UTC",
     },
     attendees: CALENDAR_MEETING_ATTENDEES.map((address) => ({
@@ -90,6 +92,21 @@ function createdMeeting(
     transactionId: CALENDAR_MEETING_TRANSACTION_ID,
     ...overrides,
   };
+}
+
+function recoverableMeeting(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return createdMeeting({
+    isCancelled: false,
+    singleValueExtendedProperties: [
+      {
+        id: CALENDAR_MEETING_RUN_PROPERTY_ID,
+        value: CALENDAR_MEETING_RUN_ID,
+      },
+    ],
+    ...overrides,
+  });
 }
 
 function graphNormalizedHtml(
@@ -122,7 +139,7 @@ function broaderGraphHtml(): string {
 }
 
 describe("delegated Graph calendar meeting operation", () => {
-  it("creates the exact harmless meeting once and returns only safe fields", async () => {
+  it("creates the exact harmless meeting and accepts a 201 without the run marker echoed", async () => {
     const tokenProvider = {
       getToken: vi.fn().mockResolvedValue(coryToken),
     };
@@ -161,8 +178,8 @@ describe("delegated Graph calendar meeting operation", () => {
         contentType: "text",
         content: CALENDAR_MEETING_BODY,
       },
-      start: { dateTime: "2026-07-24T18:00:00", timeZone: "UTC" },
-      end: { dateTime: "2026-07-24T18:15:00", timeZone: "UTC" },
+      start: { dateTime: "2026-07-24T19:00:00", timeZone: "UTC" },
+      end: { dateTime: "2026-07-24T19:15:00", timeZone: "UTC" },
       attendees: [
         {
           emailAddress: { address: "kobe@corywest.onmicrosoft.com" },
@@ -183,6 +200,12 @@ describe("delegated Graph calendar meeting operation", () => {
       sensitivity: "normal",
       isOnlineMeeting: false,
       transactionId: CALENDAR_MEETING_TRANSACTION_ID,
+      singleValueExtendedProperties: [
+        {
+          id: CALENDAR_MEETING_RUN_PROPERTY_ID,
+          value: CALENDAR_MEETING_RUN_ID,
+        },
+      ],
     });
     expect(body).not.toHaveProperty("location");
     expect(body).not.toHaveProperty("recurrence");
@@ -426,13 +449,12 @@ describe("delegated Graph calendar meeting operation", () => {
       .mockResolvedValueOnce(
         Response.json({
           value: [
-            createdMeeting({
+            recoverableMeeting({
               body: {
                 contentType: "html",
                 content: broaderGraphHtml(),
               },
               bodyPreview: CALENDAR_MEETING_BODY,
-              isCancelled: false,
             }),
           ],
         }),
@@ -455,15 +477,26 @@ describe("delegated Graph calendar meeting operation", () => {
     expect(recoveryUrl).toBeInstanceOf(URL);
     const url = recoveryUrl as URL;
     expect(url.origin + url.pathname).toBe(
-      "https://graph.microsoft.com/v1.0/me/calendarView",
+      "https://graph.microsoft.com/v1.0/me/events",
     );
-    expect(url.searchParams.get("startDateTime")).toBe(
-      CALENDAR_MEETING_START,
+    expect([...url.searchParams.keys()]).toEqual([
+      "$filter",
+      "$select",
+      "$expand",
+      "$top",
+    ]);
+    expect(url.searchParams.get("$filter")).toBe(
+      `singleValueExtendedProperties/Any(ep: ep/id eq '${CALENDAR_MEETING_RUN_PROPERTY_ID}' and ep/value eq '${CALENDAR_MEETING_RUN_ID}')`,
     );
-    expect(url.searchParams.get("endDateTime")).toBe(CALENDAR_MEETING_END);
+    expect(url.searchParams.get("$expand")).toBe(
+      `singleValueExtendedProperties($filter=id eq '${CALENDAR_MEETING_RUN_PROPERTY_ID}')`,
+    );
     expect(url.searchParams.get("$top")).toBe("2");
     expect(url.searchParams.get("$select")).toContain("transactionId");
     expect(url.searchParams.get("$select")).toContain("isCancelled");
+    expect(url.toString()).toContain(
+      "%24filter=singleValueExtendedProperties%2FAny%28ep%3A+ep%2Fid+eq+%27String+%7Bc352ae90-352e-4c3f-8f7c-ab63d2ca32cc%7D+Name+AP2RunId%27+and+ep%2Fvalue+eq+%27ap2-calendar-20260724-002%27%29",
+    );
     expect(recoveryInit).toEqual({
       method: "GET",
       redirect: "error",
@@ -493,22 +526,42 @@ describe("delegated Graph calendar meeting operation", () => {
     [
       "duplicate exact events",
       [
-        createdMeeting({ id: "event-one", isCancelled: false }),
-        createdMeeting({ id: "event-two", isCancelled: false }),
+        recoverableMeeting({ id: "event-one" }),
+        recoverableMeeting({ id: "event-two" }),
       ],
     ],
     [
       "one mismatched event",
       [
-        createdMeeting({
+        recoverableMeeting({
           subject: "Another meeting",
-          isCancelled: false,
+        }),
+      ],
+    ],
+    [
+      "one event from a different transaction",
+      [
+        recoverableMeeting({
+          transactionId: "c61d88a4-92bf-4f16-aa5b-efa6dbb16e92",
         }),
       ],
     ],
     [
       "one cancelled event",
-      [createdMeeting({ isCancelled: true })],
+      [recoverableMeeting({ isCancelled: true })],
+    ],
+    [
+      "one event with a wrong run marker",
+      [
+        recoverableMeeting({
+          singleValueExtendedProperties: [
+            {
+              id: CALENDAR_MEETING_RUN_PROPERTY_ID,
+              value: "ap2-calendar-20260724-wrong",
+            },
+          ],
+        }),
+      ],
     ],
   ])("does not mutate when recovery finds %s", async (_label, events) => {
     const request = vi
@@ -532,10 +585,30 @@ describe("delegated Graph calendar meeting operation", () => {
       .fn<typeof fetch>()
       .mockResolvedValue(
         Response.json({
-          value: [createdMeeting({ isCancelled: false })],
+          value: [recoverableMeeting()],
           "@odata.nextLink": "https://graph.microsoft.com/next",
         }),
       );
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+    );
+
+    await expect(operation.cancel()).rejects.toBeInstanceOf(
+      CalendarMeetingConflictError,
+    );
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["missing collection", {}],
+    ["non-array collection", { value: "not-an-array" }],
+    ["malformed event", { value: [{ id: "event/id" }] }],
+  ])("does not mutate for a recovery response with %s", async (_label, value) => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json(value));
     const operation = new DelegatedGraphCalendarMeetingOperation(
       { getToken: vi.fn().mockResolvedValue(coryToken) },
       cory,

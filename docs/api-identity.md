@@ -142,17 +142,20 @@ call either route.
 Create signs in only `cory@corywest.onmicrosoft.com` through the existing
 shared simulated-user client and requests delegated `User.Read` and
 `Calendars.ReadWrite`. It submits one Graph create request with the fixed
-transaction ID `c61d88a4-92bf-4f16-aa5b-efa6dbb16e92` and:
+transaction ID `cfc3b7d3-2ab8-4ec0-b93a-9ea24fcb5ba4` and:
 
 - subject `AP2 Pass 3 calendar rehearsal — no action required`
 - plain body `Harmless AP2 calendar rehearsal. No action or response is
   required. The organizer will cancel it after observation.`
-- July 24, 2026, 18:00–18:15 UTC (2:00–2:15 PM EDT)
+- July 24, 2026, 19:00–19:15 UTC (3:00–3:15 PM EDT)
 - required attendees only `kobe@corywest.onmicrosoft.com` and
   `marge.simpson@corywest.onmicrosoft.com`
 - free availability, no reminder or response request, no new-time proposals,
   low importance, normal sensitivity, and no online meeting, location,
   recurrence, attachment, or link
+- one hidden string marker with ID
+  `String {c352ae90-352e-4c3f-8f7c-ab63d2ca32cc} Name AP2RunId` and value
+  `ap2-calendar-20260724-002`
 
 Only a strict `201` response matching the fixed meeting becomes `Configured`.
 For Graph's documented HTML normalization, the response must retain the exact
@@ -163,10 +166,11 @@ attendee receipt or response. The validated event ID remains private in the
 operation's process memory.
 
 Cancel normally uses that retained validated ID. If process state was lost or
-Create returned an uncertain result, the explicit Cancel action first queries
-Cory's exact 15-minute calendar window and proceeds only when the response
-contains exactly one non-cancelled event matching the full immutable contract,
-including the fixed transaction ID. It then submits one Graph
+Create returned an uncertain result, the explicit Cancel action first filters
+Cory's events server-side for the exact marker ID and value. It requests at
+most two matches and proceeds only when the unpaginated response contains
+exactly one non-cancelled event with the exact marker and full immutable run
+contract, including the new transaction ID. It then submits one Graph
 `POST /me/events/{id}/cancel` request with the fixed harmless cleanup comment.
 Zero, duplicate, mismatched, cancelled, malformed, or paginated recovery
 results cause no mutation.
@@ -176,6 +180,9 @@ operator. Every stage after Create starts blocks a second create; uncertain and
 configured stages offer the separate explicit Cancel action. Once cancellation
 starts, a separate cancellation-uncertain stage blocks another attempt if its
 response is not confirmed. Signing in never performs recovery.
+The per-account browser cache key includes `ap2-calendar-20260724-002`, so the
+previous cancelled rehearsal does not block this fresh run. No migration or
+automatic lookup runs.
 
 A process-local busy/completed boundary serializes create and cancel across
 operator and Dev-app callers. It has no database, queue, or durable lock; the
