@@ -30,6 +30,31 @@ Use incremental checks for image-only changes.
 
 Start with the decisive query. Do not add evidence-sealing ceremony unless the result is consequential or ambiguous.
 
+Use the Dev app for fast direct canaries and response-shape discovery. Use the
+runtime managed identity for product operations that are not meant to appear as
+a user, and use the shared simulated-user client when delegated user behavior is
+part of the experiment. A Dev-app canary does not replace proof through the
+product actor.
+
+Reuse a verified authentication session or token cache within one controlled
+test batch when isolation does not require a fresh sign-in. Use a fresh browser
+context when authentication itself is under test. A local browser harness
+should shorten the feedback loop; stop improving it when the harness costs more
+time than the product risk it removes.
+
+Backend simulated-user CBA and SPA operator sign-in are separate sessions.
+Prefer one in-memory MSAL cache per simulated user, silent acquisition before
+interactive CBA, and Graph `/me` for fixed-user verification. Treat Microsoft
+Graph access tokens as opaque. Do not log or persist tokens, browser state, or
+token caches during Pass 3.
+
+After a direct canary establishes the service contract, stabilize the code with
+local tests and prefer one reviewed cloud build and one hosted mutation proof.
+Run independent Pages and API image work concurrently when possible.
+
+See [the development workflow](docs/development-workflow.md) for the shared
+testing and actor-selection strategy.
+
 ### Simplicity
 
 Prefer solutions that keep the overall system simple.
