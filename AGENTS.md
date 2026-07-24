@@ -16,6 +16,20 @@ Prefer fast feedback loops.
 
 Try to avoid repeated operations that incur wait times (e.g. merging, github or tenant operations)
 
+### Efficient experimentation
+
+Design experiments marker- and cleanup-first so their mutations can be identified and reversed.
+
+Validate fields that control mutation safety rather than normalizing upstream presentation details.
+
+If repeated findings converge on one abstraction, simplify or remove it.
+
+When feasible, run deterministic local tests, then a local canary through the real product path before hosted deployment. Avoid repeated CI or cloud cycles.
+
+Use incremental checks for image-only changes.
+
+Start with the decisive query. Do not add evidence-sealing ceremony unless the result is consequential or ambiguous.
+
 ### Simplicity
 
 Prefer solutions that keep the overall system simple.
