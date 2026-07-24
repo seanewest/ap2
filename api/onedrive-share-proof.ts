@@ -227,8 +227,9 @@ export class DelegatedGraphOneDriveShareProof
     this.#scheduleDeadline = timing.scheduleDeadline ?? scheduleDeadline;
     this.#verificationWindowMs = timing.verificationWindowMs ?? 55_000;
     if (
+      !Number.isInteger(this.#verificationWindowMs) ||
       this.#verificationWindowMs <= 0 ||
-      this.#verificationWindowMs >= 60_000
+      this.#verificationWindowMs > 55_000
     ) {
       throw new TypeError("The OneDrive verification window is invalid.");
     }

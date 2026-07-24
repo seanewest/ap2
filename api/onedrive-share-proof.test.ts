@@ -193,6 +193,46 @@ function deadlineHangFixture(steps: Array<Response | "hang">) {
 }
 
 describe("DelegatedGraphOneDriveShareProof", () => {
+  it.each([1, 55_000])(
+    "accepts an integer verification window within bounds: %s",
+    (verificationWindowMs) => {
+      expect(() =>
+        new DelegatedGraphOneDriveShareProof(
+          tokenProvider(HOMER_IDENTITY, "homer-token"),
+          tokenProvider(MARGE_IDENTITY, "marge-token"),
+          MARGE_IDENTITY,
+          vi.fn() as typeof fetch,
+          () => CLIENT_REQUEST_ID,
+          { verificationWindowMs },
+        )
+      ).not.toThrow();
+    },
+  );
+
+  it.each([
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    0,
+    -1,
+    1.5,
+    55_001,
+  ])(
+    "rejects an invalid verification window: %s",
+    (verificationWindowMs) => {
+      expect(() =>
+        new DelegatedGraphOneDriveShareProof(
+          tokenProvider(HOMER_IDENTITY, "homer-token"),
+          tokenProvider(MARGE_IDENTITY, "marge-token"),
+          MARGE_IDENTITY,
+          vi.fn() as typeof fetch,
+          () => CLIENT_REQUEST_ID,
+          { verificationWindowMs },
+        )
+      ).toThrow("The OneDrive verification window is invalid.");
+    },
+  );
+
   it("creates the fixed bytes once and grants only Marge read access", async () => {
     const fixture = operation([
       new Response(undefined, { status: 404 }),
