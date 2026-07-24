@@ -9,10 +9,12 @@ import {
 import {
   ApiAccessError,
   OneDriveInviteFailureError,
+  OneDriveVerifyFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type OneDriveInviteFailure,
   type OneDriveProofResult,
+  type OneDriveVerifyFailure,
   type RehearsalStatus,
   type SimulatedEmailResult,
 } from "./api/client";
@@ -50,7 +52,9 @@ type OneDriveProofState = {
   stage: OneDriveProofStage;
   activity: "idle" | "sharing" | "verifying" | "removing";
   message?: string;
+  notice?: string;
   inviteFailure?: OneDriveInviteFailure;
+  verifyFailure?: OneDriveVerifyFailure;
 };
 
 type ViewState =
@@ -387,7 +391,16 @@ export function createAfterPartyApp(
           apiAccess,
           rehearsalStatus,
           simulatedEmail,
-          oneDriveProof: { stage: nextStage, activity: "idle" },
+          oneDriveProof: {
+            stage: nextStage,
+            activity: "idle",
+            ...(result.state === "pending"
+              ? {
+                  notice:
+                    "Marge access is still being confirmed. Try Verify again later. The proof file was not changed.",
+                }
+              : {}),
+          },
         });
       }
     } catch (error) {
@@ -422,6 +435,22 @@ export function createAfterPartyApp(
             activity: "idle",
             message: error.message,
             inviteFailure: error.diagnostic,
+          },
+        });
+        return;
+      }
+      if (action === "verify" && error instanceof OneDriveVerifyFailureError) {
+        setState({
+          kind: "signed-in",
+          account,
+          apiAccess,
+          rehearsalStatus,
+          simulatedEmail,
+          oneDriveProof: {
+            stage: previousStage,
+            activity: "idle",
+            message: error.message,
+            verifyFailure: error.diagnostic,
           },
         });
         return;
@@ -704,8 +733,14 @@ function createOneDriveProofPanel(
   if (state.message) {
     panel.append(createStatus(state.message, "error"));
   }
+  if (state.notice) {
+    panel.append(createStatus(state.notice, "notice"));
+  }
   if (state.inviteFailure) {
     panel.append(createOneDriveInviteFailureList(state.inviteFailure));
+  }
+  if (state.verifyFailure) {
+    panel.append(createOneDriveVerifyFailureList(state.verifyFailure));
   }
 
   panel.append(
@@ -779,6 +814,53 @@ function inviteResponseShape(
       return "Permission reconciliation failed";
     case "permission-reconciliation-mismatch":
       return "Permission reconciliation was ambiguous";
+  }
+}
+
+function createOneDriveVerifyFailureList(
+  failure: OneDriveVerifyFailure,
+): HTMLDListElement {
+  const list = document.createElement("dl");
+  list.className = "identity-list";
+  appendIdentity(
+    list,
+    "Failed stage",
+    "Read the exact file bytes as Marge",
+  );
+  appendIdentity(list, "Microsoft Graph status", String(failure.upstreamStatus));
+  appendIdentity(
+    list,
+    "Microsoft Graph error code",
+    failure.graphErrorCode ?? "Not provided",
+  );
+  if (failure.requestId) {
+    appendIdentity(list, "Microsoft Graph request ID", failure.requestId);
+  }
+  appendIdentity(list, "Client request ID", failure.clientRequestId);
+  if (failure.responseDate) {
+    appendIdentity(list, "Microsoft Graph response date", failure.responseDate);
+  }
+  if (failure.retryAfter) {
+    appendIdentity(list, "Microsoft Graph retry after", failure.retryAfter);
+  }
+  appendIdentity(list, "Response shape", verifyResponseShape(failure.responseShape));
+  return list;
+}
+
+function verifyResponseShape(
+  value: OneDriveVerifyFailure["responseShape"],
+): string {
+  switch (value) {
+    case "graph-error":
+      return "Microsoft Graph error";
+    case "non-json":
+      return "No JSON response";
+    case "invalid-download-redirect":
+      return "Download redirect was not accepted";
+    case "content-response-error":
+      return "File content response could not be used";
+    case "content-mismatch":
+      return "File bytes did not match";
   }
 }
 
@@ -917,7 +999,7 @@ function isAllowedOneDriveAction(
 }
 
 function oneDriveStage(result: OneDriveProofResult): OneDriveProofStage {
-  return result.state;
+  return result.state === "pending" ? "shared" : result.state;
 }
 
 function oneDriveStorageKey(account: AccountIdentity): string {

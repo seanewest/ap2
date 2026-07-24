@@ -11,6 +11,7 @@ import {
   OneDriveInviteFailureError,
   OneDriveProofBusyError,
   OneDriveProofConflictError,
+  OneDriveVerifyFailureError,
   ProcessLocalOneDriveShareProofBoundary,
   type OneDriveShareProofOperation,
 } from "./onedrive-share-proof.js";
@@ -73,6 +74,7 @@ function operation(
   request: ReturnType<typeof vi.fn>;
   homer: ReturnType<typeof tokenProvider>;
   marge: ReturnType<typeof tokenProvider>;
+  sleep: ReturnType<typeof vi.fn>;
 } {
   const queue = [...responses];
   const request = vi.fn(async () => {
@@ -84,6 +86,10 @@ function operation(
   });
   const homer = tokenProvider(HOMER_IDENTITY, "homer-token");
   const marge = tokenProvider(MARGE_IDENTITY, "marge-token");
+  let nowMs = 0;
+  const sleep = vi.fn(async (milliseconds: number) => {
+    nowMs += milliseconds;
+  });
   return {
     operation: new DelegatedGraphOneDriveShareProof(
       homer,
@@ -91,11 +97,32 @@ function operation(
       MARGE_IDENTITY,
       request as typeof fetch,
       () => CLIENT_REQUEST_ID,
+      {
+        now: () => nowMs,
+        sleep,
+      },
     ),
     request,
     homer,
     marge,
+    sleep,
   };
+}
+
+async function afterConfirmedShare(
+  verificationResponses: readonly Response[],
+) {
+  const fixture = operation([
+    new Response(undefined, { status: 404 }),
+    Response.json({ id: "root-item" }),
+    Response.json({ uploadUrl: "https://upload.example/proof" }),
+    Response.json(ITEM, { status: 201 }),
+    Response.json({ value: [MARGE_READ_PERMISSION] }),
+    Response.json(ITEM),
+    ...verificationResponses,
+  ]);
+  await fixture.operation.share();
+  return fixture;
 }
 
 describe("DelegatedGraphOneDriveShareProof", () => {
@@ -462,10 +489,8 @@ describe("DelegatedGraphOneDriveShareProof", () => {
     ).toHaveLength(1);
   });
 
-  it("verifies exact bytes through Marge's direct drive/item content path", async () => {
-    const fixture = operation([
-      Response.json(ITEM),
-      Response.json(ITEM),
+  it("verifies an immediate 302 through the exact Marge content path", async () => {
+    const fixture = await afterConfirmedShare([
       new Response(undefined, {
         status: 302,
         headers: { Location: "https://download.example/proof" },
@@ -481,19 +506,228 @@ describe("DelegatedGraphOneDriveShareProof", () => {
     });
     expect(fixture.marge.getToken).toHaveBeenCalledWith(GRAPH_FILES_READ_SCOPE);
     const calls = fixture.request.mock.calls as Array<[string, RequestInit]>;
-    const directMetadata = requiredCall(calls, 1);
-    const graphContent = requiredCall(calls, 2);
-    const directContent = requiredCall(calls, 3);
-    expect(directMetadata[0]).toBe(
-      "https://graph.microsoft.com/v1.0/drives/homer-drive/items/proof-item?$select=id,name,size,file,eTag,parentReference",
-    );
+    const graphContent = requiredCall(calls, 6);
+    const directContent = requiredCall(calls, 7);
     expect(graphContent[0]).toBe(
       "https://graph.microsoft.com/v1.0/drives/homer-drive/items/proof-item/content",
     );
     expect(graphContent[1].headers).toEqual({
       Authorization: "Bearer marge-token",
+      "client-request-id": CLIENT_REQUEST_ID,
+      "return-client-request-id": "true",
     });
     expect(directContent[1].headers).toBeUndefined();
+    expect(
+      calls.some(([url]) =>
+        url.includes("/drives/homer-drive/items/proof-item?$select=")
+      ),
+    ).toBe(false);
+  });
+
+  it("accepts direct 200 exact bytes without a redirect or metadata read", async () => {
+    const fixture = await afterConfirmedShare([
+      new Response(ONEDRIVE_PROOF_CONTENT),
+    ]);
+
+    await expect(fixture.operation.verify()).resolves.toMatchObject({
+      state: "verified",
+      contentMatches: true,
+    });
+    expect(fixture.request).toHaveBeenCalledTimes(7);
+  });
+
+  it("retries 403 and 404 propagation responses before exact bytes succeed", async () => {
+    const fixture = await afterConfirmedShare([
+      Response.json({ error: { code: "accessDenied" } }, { status: 403 }),
+      Response.json({ error: { code: "itemNotFound" } }, { status: 404 }),
+      new Response(ONEDRIVE_PROOF_CONTENT),
+    ]);
+
+    await expect(fixture.operation.verify()).resolves.toMatchObject({
+      state: "verified",
+    });
+    expect(fixture.sleep.mock.calls).toEqual([[1_000], [2_000]]);
+  });
+
+  it("honors 429 Retry-After and retries 503 before success", async () => {
+    const fixture = await afterConfirmedShare([
+      Response.json(
+        { error: { code: "tooManyRequests" } },
+        { status: 429, headers: { "Retry-After": "2" } },
+      ),
+      Response.json({ error: { code: "serviceUnavailable" } }, { status: 503 }),
+      new Response(ONEDRIVE_PROOF_CONTENT),
+    ]);
+
+    await expect(fixture.operation.verify()).resolves.toMatchObject({
+      state: "verified",
+    });
+    expect(fixture.sleep.mock.calls).toEqual([[2_000], [2_000]]);
+  });
+
+  it("returns pending at the 55-second propagation deadline", async () => {
+    const fixture = await afterConfirmedShare([
+      ...Array.from(
+        { length: 10 },
+        () => Response.json({ error: { code: "accessDenied" } }, { status: 403 }),
+      ),
+    ]);
+
+    await expect(fixture.operation.verify()).resolves.toEqual({
+      state: "pending",
+      path: ONEDRIVE_PROOF_PATH,
+      verifiedAs: MARGE_USER_PRINCIPAL_NAME,
+      reason: "access-propagation",
+    });
+    expect(fixture.sleep.mock.calls.flat()).toEqual([
+      1_000,
+      2_000,
+      4_000,
+      8_000,
+      8_000,
+      8_000,
+      8_000,
+      8_000,
+      8_000,
+    ]);
+  });
+
+  it("does not start a new retry window for an explicit later Verify", async () => {
+    const fixture = operation([
+      Response.json(ITEM),
+      Response.json({ error: { code: "itemNotFound" } }, { status: 404 }),
+    ]);
+
+    await expect(fixture.operation.verify()).resolves.toMatchObject({
+      state: "pending",
+      reason: "access-propagation",
+    });
+    expect(fixture.sleep).not.toHaveBeenCalled();
+    expect(fixture.request).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns safe terminal diagnostics for 401 without retry", async () => {
+    const requestId = "11111111-1111-4111-8111-111111111111";
+    const fixture = await afterConfirmedShare([
+      Response.json(
+        {
+          error: {
+            code: "unauthorized",
+            message: "raw provider detail",
+            innerError: {
+              code: "invalidAuthenticationToken",
+              "request-id": requestId,
+              itemId: "must-not-escape",
+            },
+          },
+        },
+        {
+          status: 401,
+          headers: {
+            Date: "Thu, 23 Jul 2026 23:00:00 GMT",
+            "Retry-After": "5",
+          },
+        },
+      ),
+    ]);
+    const error = await fixture.operation.verify().catch((value) => value);
+    expect(error).toBeInstanceOf(OneDriveVerifyFailureError);
+    expect(error.diagnostic).toEqual({
+      state: "marge-access-not-confirmed",
+      stage: "verify-content",
+      upstreamStatus: 401,
+      graphErrorCode: "invalidAuthenticationToken",
+      requestId,
+      clientRequestId: CLIENT_REQUEST_ID,
+      responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+      retryAfter: "5",
+      responseShape: "graph-error",
+    });
+    expect(fixture.sleep).not.toHaveBeenCalled();
+    expect(JSON.stringify(error)).not.toContain("raw provider detail");
+    expect(JSON.stringify(error)).not.toContain("must-not-escape");
+    expect(JSON.stringify(error)).not.toContain("proof-item");
+    expect(JSON.stringify(error)).not.toContain("homer-drive");
+    expect(JSON.stringify(error)).not.toContain(ONEDRIVE_PROOF_CONTENT);
+  });
+
+  it("fails immediately for a 400 Graph response", async () => {
+    const fixture = await afterConfirmedShare([
+      Response.json(
+        { error: { code: "invalidRequest" } },
+        { status: 400 },
+      ),
+    ]);
+
+    const error = await fixture.operation.verify().catch((value) => value);
+
+    expect(error).toBeInstanceOf(OneDriveVerifyFailureError);
+    expect(error.diagnostic).toMatchObject({
+      upstreamStatus: 400,
+      graphErrorCode: "invalidRequest",
+      responseShape: "graph-error",
+    });
+    expect(fixture.sleep).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "http://unsafe.example/proof"])(
+    "fails immediately for missing or unsafe download location %s",
+    async (location) => {
+      const fixture = await afterConfirmedShare([
+        new Response(undefined, {
+          status: 302,
+          headers: location ? { Location: location } : {},
+        }),
+      ]);
+
+      const error = await fixture.operation.verify().catch((value) => value);
+
+      expect(error).toBeInstanceOf(OneDriveVerifyFailureError);
+      expect(error.diagnostic).toMatchObject({
+        stage: "verify-content",
+        upstreamStatus: 302,
+        responseShape: "invalid-download-redirect",
+      });
+      expect(fixture.sleep).not.toHaveBeenCalled();
+    },
+  );
+
+  it("fails immediately when the preauthenticated download fails", async () => {
+    const fixture = await afterConfirmedShare([
+      new Response(undefined, {
+        status: 302,
+        headers: { Location: "https://download.example/proof" },
+      }),
+      new Response("provider detail", { status: 502 }),
+    ]);
+
+    const error = await fixture.operation.verify().catch((value) => value);
+
+    expect(error).toBeInstanceOf(OneDriveVerifyFailureError);
+    expect(error.diagnostic).toMatchObject({
+      stage: "verify-content",
+      upstreamStatus: 502,
+      responseShape: "content-response-error",
+    });
+    expect(JSON.stringify(error)).not.toContain("provider detail");
+  });
+
+  it("fails immediately for wrong bytes without returning either content value", async () => {
+    const changed = "Marge shared this harmless AP2 rehearsal file with Marge.\n";
+    expect(Buffer.byteLength(changed)).toBe(PROOF_SIZE);
+    const fixture = await afterConfirmedShare([new Response(changed)]);
+
+    const error = await fixture.operation.verify().catch((value) => value);
+
+    expect(error).toBeInstanceOf(OneDriveVerifyFailureError);
+    expect(error.diagnostic).toMatchObject({
+      stage: "verify-content",
+      upstreamStatus: 200,
+      responseShape: "content-mismatch",
+    });
+    expect(fixture.sleep).not.toHaveBeenCalled();
+    expect(JSON.stringify(error)).not.toContain(changed);
+    expect(JSON.stringify(error)).not.toContain(ONEDRIVE_PROOF_CONTENT);
   });
 
   it("rejects malformed metadata and mismatched content", async () => {

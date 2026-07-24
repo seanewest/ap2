@@ -11,6 +11,7 @@ import {
 import {
   ApiAccessError,
   OneDriveInviteFailureError,
+  OneDriveVerifyFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type OneDriveProofResult,
@@ -50,7 +51,9 @@ class FakeApi implements AfterPartyApi {
     vi.fn<
       (
         accessToken: string,
-      ) => Promise<Extract<OneDriveProofResult, { state: "verified" }>>
+      ) => Promise<
+        Extract<OneDriveProofResult, { state: "verified" | "pending" }>
+      >
     >();
   removeOneDriveProof =
     vi.fn<
@@ -668,6 +671,91 @@ describe("After Party authentication UI", () => {
     oneDriveVerifyButton()?.click();
     await nextTask();
     expect(root.textContent).toContain("Marge access could not be verified.");
+    expect(oneDriveVerifyButton()?.disabled).toBe(false);
+    expect(oneDriveRemoveButton()?.disabled).toBe(false);
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("shared");
+  });
+
+  it("shows structured Marge diagnostics without changing the shared stage", async () => {
+    localStorage.setItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+      "shared",
+    );
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.verifyOneDriveProof.mockRejectedValue(
+      new OneDriveVerifyFailureError({
+        state: "marge-access-not-confirmed",
+        stage: "verify-content",
+        upstreamStatus: 401,
+        graphErrorCode: "invalidAuthenticationToken",
+        requestId: "11111111-1111-4111-8111-111111111111",
+        clientRequestId: "22222222-2222-4222-8222-222222222222",
+        responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+        retryAfter: "5",
+        responseShape: "graph-error",
+      }),
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    oneDriveVerifyButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain("Marge access is not yet confirmed.");
+    expect(root.textContent).toContain("The proof file was not changed.");
+    expect(root.textContent).toContain("Read the exact file bytes as Marge");
+    expect(root.textContent).toContain("Microsoft Graph status401");
+    expect(root.textContent).toContain(
+      "Microsoft Graph error codeinvalidAuthenticationToken",
+    );
+    expect(root.textContent).toContain(
+      "Microsoft Graph request ID11111111-1111-4111-8111-111111111111",
+    );
+    expect(root.textContent).toContain(
+      "Client request ID22222222-2222-4222-8222-222222222222",
+    );
+    expect(root.textContent).not.toContain("temporary-token");
+    expect(oneDriveVerifyButton()?.disabled).toBe(false);
+    expect(oneDriveRemoveButton()?.disabled).toBe(false);
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("shared");
+  });
+
+  it("shows pending propagation and permits explicit later Verify", async () => {
+    localStorage.setItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+      "shared",
+    );
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.verifyOneDriveProof.mockResolvedValue({
+      state: "pending",
+      path: "/AP2-OneDrive-share-proof.txt",
+      verifiedAs: "marge.simpson@corywest.onmicrosoft.com",
+      reason: "access-propagation",
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    oneDriveVerifyButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain(
+      "Marge access is still being confirmed. Try Verify again later.",
+    );
+    expect(root.textContent).not.toContain("API could not complete");
     expect(oneDriveVerifyButton()?.disabled).toBe(false);
     expect(oneDriveRemoveButton()?.disabled).toBe(false);
     expect(localStorage.getItem(

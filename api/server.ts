@@ -12,6 +12,7 @@ import {
   OneDriveInviteFailureError,
   OneDriveProofBusyError,
   OneDriveProofConflictError,
+  OneDriveVerifyFailureError,
   type OneDriveShareProofOperation,
 } from "./onedrive-share-proof.js";
 import { InvalidTokenError, type TokenVerifier } from "./token-verifier.js";
@@ -259,6 +260,13 @@ async function handleAuthorizedRequest(
     if (error instanceof OneDriveInviteFailureError) {
       sendJson(response, 502, {
         error: "onedrive_invite_failed",
+        ...error.diagnostic,
+      });
+      return;
+    }
+    if (error instanceof OneDriveVerifyFailureError) {
+      sendJson(response, 502, {
+        error: "onedrive_verify_failed",
         ...error.diagnostic,
       });
       return;

@@ -5,6 +5,7 @@ import {
   ApiAccessError,
   HttpAfterPartyApi,
   OneDriveInviteFailureError,
+  OneDriveVerifyFailureError,
 } from "./client";
 
 describe("HTTP After Party API client", () => {
@@ -361,6 +362,95 @@ describe("HTTP After Party API client", () => {
     await expect(
       malformedClient.shareOneDriveProof("token"),
     ).rejects.toEqual(new ApiAccessError());
+  });
+
+  it("returns only safe structured Marge verification diagnostics", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          error: "onedrive_verify_failed",
+          state: "marge-access-not-confirmed",
+          stage: "verify-content",
+          upstreamStatus: 401,
+          graphErrorCode: "invalidAuthenticationToken",
+          requestId: "11111111-1111-4111-8111-111111111111",
+          clientRequestId: "22222222-2222-4222-8222-222222222222",
+          responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+          retryAfter: "5",
+          responseShape: "graph-error",
+          token: "must-not-escape",
+          rawGraphResponse: { itemId: "must-not-escape" },
+        },
+        { status: 502 },
+      ),
+    );
+    const client = new HttpAfterPartyApi("https://student-api.example", request);
+
+    const error = await client
+      .verifyOneDriveProof("sensitive-access-token")
+      .catch((value) => value);
+
+    expect(error).toBeInstanceOf(OneDriveVerifyFailureError);
+    expect(error.diagnostic).toEqual({
+      state: "marge-access-not-confirmed",
+      stage: "verify-content",
+      upstreamStatus: 401,
+      graphErrorCode: "invalidAuthenticationToken",
+      requestId: "11111111-1111-4111-8111-111111111111",
+      clientRequestId: "22222222-2222-4222-8222-222222222222",
+      responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+      retryAfter: "5",
+      responseShape: "graph-error",
+    });
+    expect(JSON.stringify(error)).not.toContain("sensitive-access-token");
+    expect(JSON.stringify(error)).not.toContain("must-not-escape");
+    expect(JSON.stringify(error)).not.toContain("rawGraphResponse");
+  });
+
+  it("accepts a safe pending verification result for explicit later Verify", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          state: "pending",
+          path: "/AP2-OneDrive-share-proof.txt",
+          verifiedAs: "marge.simpson@corywest.onmicrosoft.com",
+          reason: "access-propagation",
+          itemId: "must-not-escape",
+        },
+        { status: 200 },
+      ),
+    );
+    const client = new HttpAfterPartyApi("https://student-api.example", request);
+
+    await expect(client.verifyOneDriveProof("token")).resolves.toEqual({
+      state: "pending",
+      path: "/AP2-OneDrive-share-proof.txt",
+      verifiedAs: "marge.simpson@corywest.onmicrosoft.com",
+      reason: "access-propagation",
+    });
+  });
+
+  it("uses a Marge-specific safe fallback for malformed verify failures", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          error: "onedrive_verify_failed",
+          state: "marge-access-not-confirmed",
+          stage: "verify-content",
+          upstreamStatus: "401 with raw detail",
+          clientRequestId: "not-a-guid",
+          responseShape: "raw",
+        },
+        { status: 502 },
+      ),
+    );
+    const client = new HttpAfterPartyApi("https://student-api.example", request);
+
+    await expect(client.verifyOneDriveProof("token")).rejects.toEqual(
+      new ApiAccessError(
+        "Marge access is not yet confirmed. The proof file was not changed.",
+      ),
+    );
   });
 
   it.each([

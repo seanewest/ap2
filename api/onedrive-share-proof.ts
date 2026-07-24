@@ -40,13 +40,21 @@ export type OneDriveProofResult =
       contentMatches: true;
     }
   | {
+      state: "pending";
+      path: typeof ONEDRIVE_PROOF_PATH;
+      verifiedAs: typeof MARGE_USER_PRINCIPAL_NAME;
+      reason: "access-propagation";
+    }
+  | {
       state: "removed";
       path: typeof ONEDRIVE_PROOF_PATH;
     };
 
 export interface OneDriveShareProofOperation {
   share(): Promise<Extract<OneDriveProofResult, { state: "shared" }>>;
-  verify(): Promise<Extract<OneDriveProofResult, { state: "verified" }>>;
+  verify(): Promise<
+    Extract<OneDriveProofResult, { state: "verified" | "pending" }>
+  >;
   remove(): Promise<Extract<OneDriveProofResult, { state: "removed" }>>;
 }
 
@@ -87,6 +95,33 @@ export class OneDriveInviteFailureError extends Error {
   constructor(diagnostic: OneDriveInviteFailure) {
     super("Homer's proof file was created, but sharing it with Marge failed.");
     this.name = "OneDriveInviteFailureError";
+    this.diagnostic = diagnostic;
+  }
+}
+
+export interface OneDriveVerifyFailure {
+  state: "marge-access-not-confirmed";
+  stage: "verify-content";
+  upstreamStatus: number;
+  graphErrorCode?: string;
+  requestId?: string;
+  clientRequestId: string;
+  responseDate?: string;
+  retryAfter?: string;
+  responseShape:
+    | "graph-error"
+    | "non-json"
+    | "invalid-download-redirect"
+    | "content-response-error"
+    | "content-mismatch";
+}
+
+export class OneDriveVerifyFailureError extends Error {
+  readonly diagnostic: OneDriveVerifyFailure;
+
+  constructor(diagnostic: OneDriveVerifyFailure) {
+    super("Marge access to the exact proof file is not confirmed.");
+    this.name = "OneDriveVerifyFailureError";
     this.diagnostic = diagnostic;
   }
 }
@@ -142,6 +177,10 @@ export class DelegatedGraphOneDriveShareProof
   readonly #margeIdentity: SimulatedUserIdentity;
   readonly #request: typeof fetch;
   readonly #createClientRequestId: () => string;
+  readonly #now: () => number;
+  readonly #sleep: (milliseconds: number) => Promise<void>;
+  readonly #verificationWindowMs: number;
+  #shareConfirmedAtMs?: number;
 
   constructor(
     homerTokens: DelegatedGraphTokenProvider,
@@ -149,6 +188,11 @@ export class DelegatedGraphOneDriveShareProof
     margeIdentity: SimulatedUserIdentity,
     request: typeof fetch = fetch,
     createClientRequestId: () => string = randomUUID,
+    timing: {
+      now?: () => number;
+      sleep?: (milliseconds: number) => Promise<void>;
+      verificationWindowMs?: number;
+    } = {},
   ) {
     if (
       margeIdentity.userPrincipalName !== MARGE_USER_PRINCIPAL_NAME ||
@@ -161,6 +205,17 @@ export class DelegatedGraphOneDriveShareProof
     this.#margeIdentity = margeIdentity;
     this.#request = request.bind(globalThis);
     this.#createClientRequestId = createClientRequestId;
+    this.#now = timing.now ?? Date.now;
+    this.#sleep = timing.sleep ??
+      ((milliseconds) =>
+        new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.#verificationWindowMs = timing.verificationWindowMs ?? 55_000;
+    if (
+      this.#verificationWindowMs <= 0 ||
+      this.#verificationWindowMs >= 60_000
+    ) {
+      throw new TypeError("The OneDrive verification window is invalid.");
+    }
   }
 
   async share(): Promise<Extract<OneDriveProofResult, { state: "shared" }>> {
@@ -170,6 +225,7 @@ export class DelegatedGraphOneDriveShareProof
     const uploadUrl = await this.#createUploadSession(homer.token, rootId);
     const item = await this.#uploadProof(uploadUrl);
     await this.#grantMargeReadAccess(homer.token, item.id);
+    this.#shareConfirmedAtMs = this.#now();
     return {
       state: "shared",
       path: ONEDRIVE_PROOF_PATH,
@@ -180,7 +236,7 @@ export class DelegatedGraphOneDriveShareProof
   }
 
   async verify(): Promise<
-    Extract<OneDriveProofResult, { state: "verified" }>
+    Extract<OneDriveProofResult, { state: "verified" | "pending" }>
   > {
     const homer = await this.#homerToken();
     const item = await this.#resolveProof(homer.token);
@@ -188,20 +244,18 @@ export class DelegatedGraphOneDriveShareProof
     const directUrl =
       `${GRAPH_ROOT}/drives/${encodeURIComponent(item.driveId)}` +
       `/items/${encodeURIComponent(item.id)}`;
-    const metadataResponse = await this.#request(
-      `${directUrl}?$select=id,name,size,file,eTag,parentReference`,
-      graphGet(marge.token),
+    const contentMatches = await this.#verifyMargeContent(
+      `${directUrl}/content`,
+      marge.token,
     );
-    if (!metadataResponse.ok) {
-      throw new Error(
-        `Microsoft Graph could not verify Marge access (HTTP ${metadataResponse.status}).`,
-      );
+    if (!contentMatches) {
+      return {
+        state: "pending",
+        path: ONEDRIVE_PROOF_PATH,
+        verifiedAs: MARGE_USER_PRINCIPAL_NAME,
+        reason: "access-propagation",
+      };
     }
-    const directItem = parseProofItem(await readJson(metadataResponse));
-    if (directItem.id !== item.id || directItem.driveId !== item.driveId) {
-      throw new Error("Microsoft Graph returned an unexpected shared file.");
-    }
-    await this.#requireExactContent(`${directUrl}/content`, marge.token);
     return {
       state: "verified",
       path: ONEDRIVE_PROOF_PATH,
@@ -437,10 +491,7 @@ export class DelegatedGraphOneDriveShareProof
     accessToken: string,
     itemId: string,
   ): Promise<void> {
-    const clientRequestId = this.#createClientRequestId();
-    if (!safeGuid(clientRequestId)) {
-      throw new Error("The OneDrive client request ID generator is invalid.");
-    }
+    const clientRequestId = this.#newClientRequestId();
     const response = await this.#request(
       `${GRAPH_ROOT}/me/drive/items/${encodeURIComponent(itemId)}/invite`,
       {
@@ -524,6 +575,120 @@ export class DelegatedGraphOneDriveShareProof
     }
   }
 
+  async #verifyMargeContent(
+    contentUrl: string,
+    accessToken: string,
+  ): Promise<boolean> {
+    const confirmedAt = this.#shareConfirmedAtMs;
+    const deadline = confirmedAt === undefined
+      ? this.#now()
+      : confirmedAt + this.#verificationWindowMs;
+    let attempt = 0;
+    while (true) {
+      const clientRequestId = this.#newClientRequestId();
+      const response = await this.#request(contentUrl, {
+        method: "GET",
+        redirect: "manual",
+        headers: graphHeaders(accessToken, clientRequestId),
+      });
+      if (response.status === 302) {
+        const location = response.headers.get("location");
+        if (!location || !isSafeUploadUrl(location)) {
+          throw new OneDriveVerifyFailureError(
+            verifyFailureDiagnostic(
+              response,
+              undefined,
+              clientRequestId,
+              "verify-content",
+              "invalid-download-redirect",
+            ),
+          );
+        }
+        const download = await this.#request(location, {
+          method: "GET",
+          redirect: "error",
+        });
+        if (!download.ok) {
+          throw new OneDriveVerifyFailureError(
+            verifyFailureDiagnostic(
+              download,
+              undefined,
+              clientRequestId,
+              "verify-content",
+              "content-response-error",
+            ),
+          );
+        }
+        return this.#requireMargeBytes(download, clientRequestId);
+      }
+      if (response.ok) {
+        return this.#requireMargeBytes(response, clientRequestId);
+      }
+
+      const value = await readJson(response);
+      const delay = verificationRetryDelay(
+        response,
+        attempt,
+        this.#now(),
+      );
+      if (
+        delay !== undefined &&
+        attempt < 10 &&
+        this.#now() + delay <= deadline
+      ) {
+        attempt += 1;
+        await this.#sleep(delay);
+        continue;
+      }
+      if (
+        isPendingVerificationStatus(response.status) &&
+        (response.status !== 429 || delay !== undefined)
+      ) {
+        return false;
+      }
+      throw new OneDriveVerifyFailureError(
+        verifyFailureDiagnostic(
+          response,
+          value,
+          clientRequestId,
+          "verify-content",
+          isRecord(value) && isRecord(value.error)
+            ? "graph-error"
+            : value === undefined
+              ? "non-json"
+              : "content-response-error",
+        ),
+      );
+    }
+  }
+
+  async #requireMargeBytes(
+    response: Response,
+    clientRequestId: string,
+  ): Promise<true> {
+    const content = Buffer.from(await response.arrayBuffer());
+    if (!content.equals(Buffer.from(ONEDRIVE_PROOF_CONTENT))) {
+      throw new OneDriveVerifyFailureError(
+        verifyFailureDiagnostic(
+          response,
+          undefined,
+          clientRequestId,
+          "verify-content",
+          "content-mismatch",
+        ),
+      );
+    }
+    return true;
+  }
+
+  #newClientRequestId(): string {
+    const clientRequestId = this.#createClientRequestId();
+    if (!safeGuid(clientRequestId)) {
+      throw new Error("The OneDrive client request ID generator is invalid.");
+    }
+    return clientRequestId;
+  }
+
   async #resolveProof(accessToken: string): Promise<DriveItem> {
     const response = await this.#request(
       PROOF_PATH_METADATA_URL,
@@ -575,11 +740,29 @@ export class DelegatedGraphOneDriveShareProof
   }
 }
 
-function graphGet(accessToken: string): RequestInit {
+function graphGet(
+  accessToken: string,
+  clientRequestId?: string,
+): RequestInit {
   return {
     method: "GET",
     redirect: "error",
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: graphHeaders(accessToken, clientRequestId),
+  };
+}
+
+function graphHeaders(
+  accessToken: string,
+  clientRequestId?: string,
+): Record<string, string> {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    ...(clientRequestId
+      ? {
+          "client-request-id": clientRequestId,
+          "return-client-request-id": "true",
+        }
+      : {}),
   };
 }
 
@@ -627,6 +810,42 @@ function inviteFailureDiagnostic(
   stage: OneDriveInviteFailure["stage"],
   responseShape: OneDriveInviteFailure["responseShape"],
 ): OneDriveInviteFailure {
+  return {
+    state: "file-created-sharing-failed",
+    stage,
+    responseShape,
+    ...upstreamDiagnostic(response, value, clientRequestId),
+  };
+}
+
+function verifyFailureDiagnostic(
+  response: Response,
+  value: unknown,
+  clientRequestId: string,
+  stage: OneDriveVerifyFailure["stage"],
+  responseShape: OneDriveVerifyFailure["responseShape"],
+): OneDriveVerifyFailure {
+  return {
+    state: "marge-access-not-confirmed",
+    stage,
+    responseShape,
+    ...upstreamDiagnostic(response, value, clientRequestId),
+  };
+}
+
+function upstreamDiagnostic(
+  response: Response,
+  value: unknown,
+  clientRequestId: string,
+): Pick<
+  OneDriveInviteFailure,
+  | "upstreamStatus"
+  | "graphErrorCode"
+  | "requestId"
+  | "clientRequestId"
+  | "responseDate"
+  | "retryAfter"
+> {
   const graphErrors = graphErrorChain(value);
   const graphErrorCode = graphErrors
     .map((error) => safeGraphErrorCode(error.code))
@@ -640,11 +859,8 @@ function inviteFailureDiagnostic(
   const responseDate = safeHttpDate(response.headers.get("date"));
   const retryAfter = safeRetryAfter(response.headers.get("retry-after"));
   return {
-    state: "file-created-sharing-failed",
-    stage,
     upstreamStatus: response.status,
     clientRequestId: clientRequestId.toLowerCase(),
-    responseShape,
     ...(graphErrorCode ? { graphErrorCode } : {}),
     ...(requestId ? { requestId } : {}),
     ...(responseDate ? { responseDate } : {}),
@@ -696,6 +912,36 @@ function safeRetryAfter(value: unknown): string | undefined {
     return value;
   }
   return safeHttpDate(value);
+}
+
+function verificationRetryDelay(
+  response: Response,
+  attempt: number,
+  nowMs: number,
+): number | undefined {
+  if (
+    response.status === 403 ||
+    response.status === 404 ||
+    response.status === 503
+  ) {
+    return Math.min(1_000 * 2 ** attempt, 8_000);
+  }
+  if (response.status !== 429) {
+    return undefined;
+  }
+  const retryAfter = response.headers.get("retry-after");
+  if (!retryAfter) {
+    return undefined;
+  }
+  if (/^(?:0|[1-9][0-9]{0,5})$/.test(retryAfter)) {
+    return Number(retryAfter) * 1_000;
+  }
+  const retryAt = Date.parse(retryAfter);
+  return Number.isFinite(retryAt) ? Math.max(0, retryAt - nowMs) : undefined;
+}
+
+function isPendingVerificationStatus(status: number): boolean {
+  return status === 403 || status === 404 || status === 429 || status === 503;
 }
 
 function safeGuid(value: unknown): string | undefined {
