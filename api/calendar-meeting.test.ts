@@ -92,6 +92,19 @@ function createdMeeting(
   };
 }
 
+function graphNormalizedHtml(content = CALENDAR_MEETING_BODY): string {
+  return [
+    "<html>",
+    "<head>",
+    '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">',
+    "</head>",
+    "<body>",
+    `<div>${content}</div>`,
+    "</body>",
+    "</html>",
+  ].join("\r\n");
+}
+
 describe("delegated Graph calendar meeting operation", () => {
   it("creates the exact harmless meeting once and returns only safe fields", async () => {
     const tokenProvider = {
@@ -164,6 +177,31 @@ describe("delegated Graph calendar meeting operation", () => {
     );
   });
 
+  it("accepts Graph HTML normalization only when the short approved body remains exact", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json(
+          createdMeeting({
+            body: {
+              contentType: "html",
+              content: graphNormalizedHtml(),
+            },
+            bodyPreview: CALENDAR_MEETING_BODY,
+          }),
+          { status: 201 },
+        ),
+      );
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+    );
+
+    await expect(operation.create()).resolves.toEqual(configuredResult);
+    expect(request).toHaveBeenCalledOnce();
+  });
+
   it.each([
     [
       "another tenant",
@@ -218,6 +256,38 @@ describe("delegated Graph calendar meeting operation", () => {
     ["online meeting", { isOnlineMeeting: true }],
     ["recurring meeting", { recurrence: { pattern: {} } }],
     ["wrong body", { body: { contentType: "text", content: "wrong" } }],
+    [
+      "wrong normalized HTML body",
+      {
+        body: {
+          contentType: "html",
+          content: graphNormalizedHtml("Different calendar content."),
+        },
+        bodyPreview: CALENDAR_MEETING_BODY,
+      },
+    ],
+    [
+      "wrong normalized HTML preview",
+      {
+        body: {
+          contentType: "html",
+          content: graphNormalizedHtml(),
+        },
+        bodyPreview: "Different calendar content.",
+      },
+    ],
+    [
+      "extra HTML content",
+      {
+        body: {
+          contentType: "html",
+          content: graphNormalizedHtml(
+            `${CALENDAR_MEETING_BODY}<script>other content</script>`,
+          ),
+        },
+        bodyPreview: CALENDAR_MEETING_BODY,
+      },
+    ],
   ])("fails closed on a 201 with %s", async (_label, overrides) => {
     const request = vi
       .fn<typeof fetch>()

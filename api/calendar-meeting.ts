@@ -269,7 +269,7 @@ function isExactCreatedMeeting(
   }
   return (
     value.subject === CALENDAR_MEETING_SUBJECT &&
-    isExactBody(value.body) &&
+    isExactBody(value.body, value.bodyPreview) &&
     isExactDateTime(value.start, CALENDAR_MEETING_START) &&
     isExactDateTime(value.end, CALENDAR_MEETING_END) &&
     isExactAttendees(value.attendees) &&
@@ -290,12 +290,57 @@ function isExactCreatedMeeting(
   );
 }
 
-function isExactBody(value: unknown): boolean {
+function isExactBody(value: unknown, bodyPreview: unknown): boolean {
+  if (!isRecord(value) || typeof value.content !== "string") {
+    return false;
+  }
+  if (value.contentType === "text") {
+    return value.content === CALENDAR_MEETING_BODY;
+  }
   return (
-    isRecord(value) &&
-    value.contentType === "text" &&
-    value.content === CALENDAR_MEETING_BODY
+    value.contentType === "html" &&
+    bodyPreview === CALENDAR_MEETING_BODY &&
+    normalizedGraphHtmlText(value.content) === CALENDAR_MEETING_BODY
   );
+}
+
+function normalizedGraphHtmlText(value: string): string | undefined {
+  if (value.length > 4_096 || /<!--|<!doctype/i.test(value)) {
+    return undefined;
+  }
+  const match = /^(?:\s*<html>\s*)?(?:<head>\s*(?:<meta\s+http-equiv=(?:"Content-Type"|'Content-Type')\s+content=(?:"text\/html;\s*charset=utf-8"|'text\/html;\s*charset=utf-8')\s*\/?>\s*)?<\/head>\s*)?(?:<body>\s*)?([\s\S]*?)(?:\s*<\/body>)?(?:\s*<\/html>)?\s*$/i.exec(
+    value,
+  );
+  if (!match) {
+    return undefined;
+  }
+  const body = match[1];
+  if (body === undefined) {
+    return undefined;
+  }
+  const withoutBreaks = body.replace(/<br\s*\/?>/gi, "\n");
+  const withoutSafeWrappers = withoutBreaks.replace(
+    /<\/?(?:div|p|span)>/gi,
+    " ",
+  );
+  if (/[<>]/.test(withoutSafeWrappers)) {
+    return undefined;
+  }
+  const decoded = decodeApprovedHtmlEntities(withoutSafeWrappers);
+  return decoded?.replace(/\s+/g, " ").trim();
+}
+
+function decodeApprovedHtmlEntities(value: string): string | undefined {
+  const decoded = value
+    .replace(/&nbsp;|&#160;|&#xA0;/gi, " ")
+    .replace(/&amp;|&#38;|&#x26;/gi, "&")
+    .replace(/&quot;|&#34;|&#x22;/gi, '"')
+    .replace(/&#39;|&#x27;/gi, "'")
+    .replace(/&lt;|&#60;|&#x3C;/gi, "<")
+    .replace(/&gt;|&#62;|&#x3E;/gi, ">");
+  return /&(?:#\d+|#x[0-9a-f]+|[a-z]+);/i.test(decoded)
+    ? undefined
+    : decoded;
 }
 
 function isExactDateTime(value: unknown, expected: string): boolean {
