@@ -50,6 +50,13 @@ export type InboxRuleProofResult =
       displayName: typeof INBOX_RULE_PROOF_DISPLAY_NAME;
     }
   | { state: "removed"; displayName: typeof INBOX_RULE_PROOF_DISPLAY_NAME };
+export const CATEGORY_PROOF_DISPLAY_NAME =
+  "AP2 Category Proof [ap2-category-20260725-001]";
+export const CATEGORY_PROOF_RUN_ID = "ap2-category-20260725-001";
+export const CATEGORY_PROOF_COLOR = "preset7";
+export type CategoryProofResult =
+  | { state: "configured"; displayName: typeof CATEGORY_PROOF_DISPLAY_NAME }
+  | { state: "removed"; displayName: typeof CATEGORY_PROOF_DISPLAY_NAME };
 
 export const CALENDAR_MEETING_ORGANIZER =
   "cory@corywest.onmicrosoft.com";
@@ -150,6 +157,12 @@ export interface AfterPartyApi {
   removeInboxRuleProof(accessToken: string): Promise<
     Extract<InboxRuleProofResult, { state: "removed" }>
   >;
+  createCategoryProof(accessToken: string): Promise<
+    Extract<CategoryProofResult, { state: "configured" }>
+  >;
+  removeCategoryProof(accessToken: string): Promise<
+    Extract<CategoryProofResult, { state: "removed" }>
+  >;
 }
 
 export class ApiAccessError extends Error {
@@ -180,6 +193,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly calendarMeetingCancelUrl: string;
   private readonly contactProofUrl: string;
   private readonly inboxRuleProofUrl: string;
+  private readonly categoryProofUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
@@ -209,6 +223,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       `${baseUrl}/`,
     ).toString();
     this.inboxRuleProofUrl = new URL("api/inbox-rule-proof", `${baseUrl}/`)
+      .toString();
+    this.categoryProofUrl = new URL("api/category-proof", `${baseUrl}/`)
       .toString();
     this.request = request.bind(globalThis);
   }
@@ -407,6 +423,28 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     );
   }
 
+  async createCategoryProof(accessToken: string) {
+    return this.fixedProofRequest(
+      this.categoryProofUrl,
+      accessToken,
+      "POST",
+      201,
+      "configured",
+      isSafeCategoryProofResult,
+    );
+  }
+
+  async removeCategoryProof(accessToken: string) {
+    return this.fixedProofRequest(
+      this.categoryProofUrl,
+      accessToken,
+      "DELETE",
+      200,
+      "removed",
+      isSafeCategoryProofResult,
+    );
+  }
+
   private async oneDriveProofRequest<T extends OneDriveProofResult["state"]>(
     accessToken: string,
     method: "POST" | "DELETE",
@@ -465,6 +503,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       if (error === "inbox_rule_state_conflict") {
         throw new ApiAccessError(
           "The inbox-rule proof is not in the expected state. Nothing was changed.",
+        );
+      }
+      if (error === "category_state_conflict") {
+        throw new ApiAccessError(
+          "The category proof is not in the expected state. Nothing was changed.",
         );
       }
       if (failureContext === "calendar") {
@@ -666,6 +709,15 @@ function isSafeInboxRuleProofResult(value: unknown): value is InboxRuleProofResu
     result.displayName === INBOX_RULE_PROOF_DISPLAY_NAME &&
     (result.state === "removed" || result.state === "configured")
   );
+}
+
+function isSafeCategoryProofResult(value: unknown): value is CategoryProofResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  return result.displayName === CATEGORY_PROOF_DISPLAY_NAME &&
+    (result.state === "removed" || result.state === "configured");
 }
 
 function isSafeOneDriveProofResult(

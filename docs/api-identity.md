@@ -284,3 +284,18 @@ paginated, malformed, or mismatched state causes no mutation. Graph mutations
 are never retried, and omission of `stopProcessingRules` is accepted as its
 requested false default. Browser state records an uncertain attempt before
 mutation; exact-name Graph reconciliation owns correctness.
+
+## One Outlook category rehearsal
+
+`POST` and `DELETE /api/category-proof` are separate explicit actions. They
+reuse Cory's existing CBA provider and delegated `MailboxSettings.ReadWrite`;
+signing in does not list or change categories.
+
+Each action performs one bounded, unfiltered list of Cory's Outlook master
+categories. Create accepts one exact existing `AP2 Category Proof
+[ap2-category-20260725-001]` with color `preset7`, or creates it once. Remove
+deletes one exact match by its retained or reconciled ID; absence is already
+removed. Duplicate, paginated, malformed, or mismatched results cause no
+mutation. Graph mutations are never retried. Browser state records an uncertain
+attempt before mutation, while the exact-name Graph reconciliation owns
+correctness.

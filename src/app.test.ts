@@ -14,6 +14,7 @@ import {
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
+  type CategoryProofResult,
   type ContactProofResult,
   type InboxRuleProofResult,
   type OneDriveProofResult,
@@ -34,6 +35,8 @@ const contactStorageKey =
   "ap2.contact-proof.ap2-contact-20260724-001.student-tenant-id.student-object-id";
 const inboxRuleStorageKey =
   "ap2.inbox-rule-proof.ap2-rule-20260725-001.student-tenant-id.student-object-id";
+const categoryStorageKey =
+  "ap2.category-proof.ap2-category-20260725-001.student-tenant-id.student-object-id";
 
 class FakeAuthentication implements Authentication {
   initialize = vi.fn<() => Promise<AuthenticationStartup>>();
@@ -99,6 +102,18 @@ class FakeApi implements AfterPartyApi {
         accessToken: string,
       ) => Promise<Extract<InboxRuleProofResult, { state: "removed" }>>
     >();
+  createCategoryProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<CategoryProofResult, { state: "configured" }>>
+    >();
+  removeCategoryProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<CategoryProofResult, { state: "removed" }>>
+    >();
 }
 
 describe("After Party authentication UI", () => {
@@ -139,6 +154,8 @@ describe("After Party authentication UI", () => {
     expect(contactRemoveButton()).toBeNull();
     expect(inboxRuleCreateButton()).toBeNull();
     expect(inboxRuleRemoveButton()).toBeNull();
+    expect(categoryCreateButton()).toBeNull();
+    expect(categoryRemoveButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -984,6 +1001,90 @@ describe("After Party authentication UI", () => {
     },
   );
 
+  it("creates and removes the fixed category through explicit clicks", async () => {
+    const create = createDeferred<
+      Extract<CategoryProofResult, { state: "configured" }>
+    >();
+    const remove = createDeferred<
+      Extract<CategoryProofResult, { state: "removed" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.createCategoryProof.mockReturnValue(create.promise);
+    api.removeCategoryProof.mockReturnValue(remove.promise);
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+    expect(api.createCategoryProof).not.toHaveBeenCalled();
+    expect(root.textContent).toContain(
+      "AP2 Category Proof [ap2-category-20260725-001]",
+    );
+    expect(root.textContent).toContain("preset7");
+    expect(categoryCreateButton()?.disabled).toBe(false);
+    expect(categoryRemoveButton()?.disabled).toBe(true);
+
+    categoryCreateButton()?.click();
+    await nextTask();
+    expect(localStorage.getItem(categoryStorageKey)).toBe("uncertain");
+    expect(api.createCategoryProof).toHaveBeenCalledOnce();
+    categoryCreateButton()?.click();
+    expect(api.createCategoryProof).toHaveBeenCalledOnce();
+
+    create.resolve({
+      state: "configured",
+      displayName: "AP2 Category Proof [ap2-category-20260725-001]",
+    });
+    await nextTask();
+    expect(root.textContent).toContain("Category rehearsal: Configured.");
+    expect(categoryRemoveButton()?.disabled).toBe(false);
+
+    categoryRemoveButton()?.click();
+    await nextTask();
+    expect(api.removeCategoryProof).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(categoryStorageKey)).toBe(
+      "removal-uncertain",
+    );
+    categoryRemoveButton()?.click();
+    expect(api.removeCategoryProof).toHaveBeenCalledOnce();
+    remove.resolve({
+      state: "removed",
+      displayName: "AP2 Category Proof [ap2-category-20260725-001]",
+    });
+    await nextTask();
+    expect(localStorage.getItem(categoryStorageKey)).toBe("removed");
+    expect(root.textContent).toContain("Category rehearsal: Removed.");
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it.each([
+    ["uncertain", true, false],
+    ["configured", true, false],
+    ["removal-uncertain", true, true],
+    ["removed", true, true],
+  ] as const)(
+    "restores category stage %s without an automatic call",
+    async (stage, createDisabled, removeDisabled) => {
+      localStorage.setItem(categoryStorageKey, stage);
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      const app = createAfterPartyApp(root, authentication, api);
+
+      await app.start();
+      expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+      expect(api.createCategoryProof).not.toHaveBeenCalled();
+      expect(api.removeCategoryProof).not.toHaveBeenCalled();
+      expect(categoryCreateButton()?.disabled).toBe(createDisabled);
+      expect(categoryRemoveButton()?.disabled).toBe(removeDisabled);
+    },
+  );
+
   it("creates and removes the fixed disabled Inbox rule through explicit clicks", async () => {
     const create = createDeferred<
       Extract<InboxRuleProofResult, { state: "configured" }>
@@ -1208,6 +1309,14 @@ describe("After Party authentication UI", () => {
 
   function inboxRuleRemoveButton(): HTMLButtonElement | null {
     return root.querySelector("[data-action='remove-inbox-rule']");
+  }
+
+  function categoryCreateButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='create-category-proof']");
+  }
+
+  function categoryRemoveButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='remove-category-proof']");
   }
 });
 

@@ -15,6 +15,11 @@ import {
   type CalendarMeetingResult,
 } from "./calendar-meeting.js";
 import {
+  CATEGORY_DISPLAY_NAME,
+  CategoryProofConflictError,
+  type CategoryProofResult,
+} from "./category-proof.js";
+import {
   CONTACT_DISPLAY_NAME,
   CONTACT_EMAIL,
   ContactProofConflictError,
@@ -121,6 +126,14 @@ const inboxRuleProofOperation = {
   create: vi.fn().mockResolvedValue(inboxRuleResults.configured),
   remove: vi.fn().mockResolvedValue(inboxRuleResults.removed),
 };
+const categoryResults = {
+  configured: { state: "configured", displayName: CATEGORY_DISPLAY_NAME },
+  removed: { state: "removed", displayName: CATEGORY_DISPLAY_NAME },
+} as const satisfies Record<string, CategoryProofResult>;
+const categoryProofOperation = {
+  create: vi.fn().mockResolvedValue(categoryResults.configured),
+  remove: vi.fn().mockResolvedValue(categoryResults.removed),
+};
 const oneDriveResults = {
   configured: {
     state: "configured",
@@ -151,6 +164,7 @@ const server = createApiServer({
   calendarMeetingOperation,
   contactProofOperation,
   inboxRuleProofOperation,
+  categoryProofOperation,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -174,7 +188,11 @@ describe("local API", () => {
     await expect(response.json()).resolves.toEqual({ status: "ok" });
   });
 
-  it.each(["/api/contact-proof", "/api/inbox-rule-proof"])(
+  it.each([
+    "/api/contact-proof",
+    "/api/inbox-rule-proof",
+    "/api/category-proof",
+  ])(
     "preflights only explicit mutation methods and Authorization for %s",
     async (path) => {
     const response = await fetch(`${baseUrl}${path}`, {
@@ -683,6 +701,60 @@ describe("local API", () => {
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
       error: "inbox_rule_state_conflict",
+    });
+  });
+
+  it.each([
+    ["POST", "create", categoryResults.configured, 201],
+    ["DELETE", "remove", categoryResults.removed, 200],
+  ] as const)(
+    "%s runs the exact category operation for both authorized caller shapes",
+    async (method, operation, expected, status) => {
+      const mock = categoryProofOperation[operation];
+      mock.mockClear();
+      for (const claims of [
+        {
+          tid: STUDENT_TENANT_ID,
+          oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+          scp: REQUIRED_DELEGATED_SCOPE,
+        },
+        {
+          tid: STUDENT_TENANT_ID,
+          idtyp: "app",
+          azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+          roles: [REQUIRED_APPLICATION_ROLE],
+        },
+      ]) {
+        const response = await protectedRequest(
+          claims,
+          "http://localhost:5173",
+          "/api/category-proof",
+          method,
+        );
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toEqual(expected);
+      }
+      expect(mock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("fails closed on category conflict without exposing details", async () => {
+    categoryProofOperation.create.mockRejectedValueOnce(
+      new CategoryProofConflictError(),
+    );
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/category-proof",
+      "POST",
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "category_state_conflict",
     });
   });
 

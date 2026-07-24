@@ -4,6 +4,7 @@ import {
   GRAPH_CALENDARS_READ_WRITE_SCOPE,
   ProcessLocalCalendarMeetingBoundary,
 } from "./calendar-meeting.js";
+import { DelegatedGraphCategoryProof } from "./category-proof.js";
 import {
   DelegatedGraphContactProof,
   GRAPH_CONTACTS_READ_WRITE_SCOPE,
@@ -87,6 +88,10 @@ const inboxRuleProofOperation =
   coryTokenProvider && cory
     ? new DelegatedGraphInboxRuleProof(coryTokenProvider, cory)
     : undefined;
+const categoryProofOperation =
+  coryTokenProvider && cory
+    ? new DelegatedGraphCategoryProof(coryTokenProvider, cory)
+    : undefined;
 const server = createApiServer({
   tokenVerifier,
   callerPolicy: config.callerPolicy,
@@ -98,6 +103,7 @@ const server = createApiServer({
   calendarMeetingOperation,
   contactProofOperation,
   inboxRuleProofOperation,
+  categoryProofOperation,
   allowedOrigin: config.allowedOrigin,
 });
 
