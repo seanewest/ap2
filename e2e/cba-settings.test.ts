@@ -1,4 +1,11 @@
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -58,6 +65,61 @@ describe("CBA browser settings", () => {
     expect(settings.outputDirectory).toBe(join(credentials, "results"));
   });
 
+  it.each([
+    [
+      "https://seanewest.github.io/ap2/",
+      "https://seanewest.github.io/ap2/",
+    ],
+    ["http://localhost:5173/", "http://localhost:5173/"],
+    ["http://127.0.0.1:4173/", "http://127.0.0.1:4173/"],
+    ["https://[::1]:4173/", "https://[::1]:4173/"],
+  ])("preserves a safe app base URL: %s", async (appUrl, expected) => {
+    const root = await temporaryDirectory("ap2-project-");
+    const credentials = await temporaryDirectory("ap2-cba-");
+    const pfxPath = await privatePfx(credentials);
+
+    const settings = loadCbaE2eSettings(
+      {
+        AP2_CBA_PFX_PATH: pfxPath,
+        AP2_CBA_PFX_PASSPHRASE: "test-passphrase",
+        AP2_E2E_APP_URL: appUrl,
+        AP2_PLAYWRIGHT_OUTPUT_DIR: join(credentials, "results"),
+      },
+      root,
+    );
+
+    expect(settings.appUrl).toBe(expected);
+  });
+
+  it.each([
+    "ftp://seanewest.github.io/ap2/",
+    "https://user:secret@seanewest.github.io/ap2/",
+    "https://seanewest.github.io/ap2/?unsafe=true",
+    "https://seanewest.github.io/ap2/#unsafe",
+    "https://seanewest.github.io/ap2",
+    "https://seanewest.github.io/",
+    "https://seanewest.github.io/another-app/",
+    "https://example.test/ap2/",
+    "http://localhost:5173/ap2/",
+    "not-an-absolute-url",
+  ])("refuses an unsafe app base URL: %s", async (appUrl) => {
+    const root = await temporaryDirectory("ap2-project-");
+    const credentials = await temporaryDirectory("ap2-cba-");
+    const pfxPath = await privatePfx(credentials);
+
+    expect(() =>
+      loadCbaE2eSettings(
+        {
+          AP2_CBA_PFX_PATH: pfxPath,
+          AP2_CBA_PFX_PASSPHRASE: "test-passphrase",
+          AP2_E2E_APP_URL: appUrl,
+          AP2_PLAYWRIGHT_OUTPUT_DIR: join(credentials, "results"),
+        },
+        root,
+      ),
+    ).toThrow("AP2_E2E_APP_URL");
+  });
+
   it("refuses an unsafe API evidence target", async () => {
     const root = await temporaryDirectory("ap2-project-");
     const credentials = await temporaryDirectory("ap2-cba-");
@@ -109,6 +171,27 @@ describe("CBA browser settings", () => {
       ),
     ).toThrow("group or other users");
   });
+
+  it("refuses a Playwright output symlink into the repository", async () => {
+    const root = await temporaryDirectory("ap2-project-");
+    const credentials = await temporaryDirectory("ap2-cba-");
+    const pfxPath = await privatePfx(credentials);
+    const inside = join(root, "browser-output");
+    await mkdir(inside);
+    const linkedOutput = join(credentials, "linked-output");
+    await symlink(inside, linkedOutput, "dir");
+
+    expect(() =>
+      loadCbaE2eSettings(
+        {
+          AP2_CBA_PFX_PATH: pfxPath,
+          AP2_CBA_PFX_PASSPHRASE: "test-passphrase",
+          AP2_PLAYWRIGHT_OUTPUT_DIR: linkedOutput,
+        },
+        root,
+      ),
+    ).toThrow("symbolic-link");
+  });
 });
 
 async function temporaryDirectory(prefix: string): Promise<string> {
@@ -116,4 +199,11 @@ async function temporaryDirectory(prefix: string): Promise<string> {
   temporaryDirectories.push(directory);
   await mkdir(directory, { recursive: true });
   return directory;
+}
+
+async function privatePfx(directory: string): Promise<string> {
+  const path = join(directory, "operator.pfx");
+  await writeFile(path, "test-pfx");
+  await chmod(path, 0o600);
+  return path;
 }

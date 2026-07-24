@@ -125,6 +125,72 @@ describe("API route evidence ledger", () => {
     ]);
   });
 
+  it("preserves response evidence when JSON never settles", async () => {
+    vi.useFakeTimers();
+    try {
+      const test = fixture();
+      const request = test.request(
+        "GET",
+        "https://api.example.test/api/whoami",
+      );
+      test.emit("request", request);
+      test.setTime(2_500);
+      test.emit("response", {
+        request: () => request,
+        status: () => 504,
+        json: () => new Promise<never>(() => undefined),
+      } as unknown as PlaywrightResponse);
+
+      const snapshot = test.ledger.snapshot();
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      await expect(snapshot).resolves.toEqual([
+        {
+          sequence: 1,
+          method: "GET",
+          path: "/api/whoami",
+          startedAtUtc: "2026-07-24T01:00:00.000Z",
+          durationMs: 2_500,
+          outcome: "response",
+          status: 504,
+          bodyShape: "unavailable",
+        },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("preserves response evidence when JSON extraction fails", async () => {
+    const test = fixture();
+    const request = test.request(
+      "GET",
+      "https://api.example.test/api/rehearsal-status",
+    );
+    test.emit("request", request);
+    test.setTime(800);
+    test.emit("response", {
+      request: () => request,
+      status: () => 502,
+      json: async () => {
+        throw new Error("body unavailable");
+      },
+    } as unknown as PlaywrightResponse);
+
+    await expect(test.ledger.snapshot()).resolves.toEqual([
+      {
+        sequence: 1,
+        method: "GET",
+        path: "/api/rehearsal-status",
+        startedAtUtc: "2026-07-24T01:00:00.000Z",
+        durationMs: 800,
+        outcome: "response",
+        status: 502,
+        bodyShape: "unavailable",
+      },
+    ]);
+  });
+
   it("ignores requests outside the configured API origin", async () => {
     const test = fixture();
     test.emit(

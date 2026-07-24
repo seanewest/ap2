@@ -53,6 +53,7 @@ const SAFE_BODY_FIELDS = new Set([
   "contentMatches",
   "reason",
 ]);
+const SAFE_BODY_TIMEOUT_MS = 1_000;
 
 export class ApiRouteLedger {
   readonly #apiOrigin: string;
@@ -85,9 +86,8 @@ export class ApiRouteLedger {
   }
 
   async snapshot(): Promise<ApiRouteEvidence[]> {
-    await Promise.allSettled([...this.#bodyReads]);
     const now = this.#clock.monotonicMs();
-    return this.#entries.map((entry) => ({
+    const baseEvidence = this.#entries.map((entry) => ({
       sequence: entry.sequence,
       method: entry.method,
       path: entry.path,
@@ -97,11 +97,21 @@ export class ApiRouteLedger {
         : entry.durationMs,
       outcome: entry.outcome,
       ...(entry.status === undefined ? {} : { status: entry.status }),
-      ...(entry.safeBody === undefined ? {} : { safeBody: entry.safeBody }),
-      ...(entry.bodyShape === undefined
-        ? {}
-        : { bodyShape: entry.bodyShape }),
     }));
+    await Promise.allSettled([...this.#bodyReads]);
+    return baseEvidence.map((evidence, index) => {
+      const entry = this.#entries[index];
+      if (!entry) {
+        return evidence;
+      }
+      return {
+        ...evidence,
+        ...(entry.safeBody === undefined ? {} : { safeBody: entry.safeBody }),
+        ...(entry.bodyShape === undefined
+          ? {}
+          : { bodyShape: entry.bodyShape }),
+      };
+    });
   }
 
   #recordRequest(request: PlaywrightRequest): void {
@@ -161,13 +171,25 @@ async function readSafeBody(
   safeBody?: Record<string, SafeValue>;
   bodyShape: "json-object" | "unavailable";
 }> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    const value: unknown = await response.json();
-    if (!isRecord(value)) {
+    const outcome = await Promise.race([
+      response.json().then(
+        (value: unknown) => ({ kind: "value" as const, value }),
+        () => ({ kind: "unavailable" as const }),
+      ),
+      new Promise<{ kind: "unavailable" }>((resolve) => {
+        timeout = setTimeout(
+          () => resolve({ kind: "unavailable" }),
+          SAFE_BODY_TIMEOUT_MS,
+        );
+      }),
+    ]);
+    if (outcome.kind !== "value" || !isRecord(outcome.value)) {
       return { bodyShape: "unavailable" };
     }
     const safeBody = Object.fromEntries(
-      Object.entries(value).filter(
+      Object.entries(outcome.value).filter(
         ([key, fieldValue]) =>
           SAFE_BODY_FIELDS.has(key) &&
           (typeof fieldValue === "string" ||
@@ -178,6 +200,10 @@ async function readSafeBody(
     return { safeBody, bodyShape: "json-object" };
   } catch {
     return { bodyShape: "unavailable" };
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
   }
 }
 
