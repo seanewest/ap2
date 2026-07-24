@@ -24,6 +24,8 @@ import {
   INBOX_RULE_PROOF_RUN_ID,
   INBOX_RULE_PROOF_SUBJECT,
   OneDriveInviteFailureError,
+  SHAREPOINT_FILE_PROOF_NAME,
+  SHAREPOINT_FILE_PROOF_RUN_ID,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
@@ -112,6 +114,7 @@ type ViewState =
       calendarMeeting: CalendarMeetingState;
       inboxRuleProof: FixedProofState;
       categoryProof: FixedProofState;
+      sharePointFileProof: FixedProofState;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -511,8 +514,8 @@ export function createAfterPartyApp(
     }
   };
 
-  const runMailboxProofAction = async (
-    proof: "inboxRuleProof" | "categoryProof",
+  const runFixedProofAction = async (
+    proof: "inboxRuleProof" | "categoryProof" | "sharePointFileProof",
     action: "create" | "remove",
   ): Promise<void> => {
     if (
@@ -527,7 +530,11 @@ export function createAfterPartyApp(
     const attemptedStage =
       action === "create" ? "uncertain" : "removal-uncertain";
     const activity = action === "create" ? "creating" : "removing";
-    const label = proof === "inboxRuleProof" ? "inbox-rule" : "category";
+    const label = proof === "inboxRuleProof"
+      ? "inbox-rule"
+      : proof === "categoryProof"
+        ? "category"
+        : "SharePoint file";
     setSignedInPatch(account, {
       [proof]: { stage: previousStage, activity },
     });
@@ -549,9 +556,13 @@ export function createAfterPartyApp(
         ? action === "create"
           ? await api.createInboxRuleProof(accessToken)
           : await api.removeInboxRuleProof(accessToken)
-        : action === "create"
-          ? await api.createCategoryProof(accessToken)
-          : await api.removeCategoryProof(accessToken);
+        : proof === "categoryProof"
+          ? action === "create"
+            ? await api.createCategoryProof(accessToken)
+            : await api.removeCategoryProof(accessToken)
+          : action === "create"
+            ? await api.createSharePointFileProof(accessToken)
+            : await api.removeSharePointFileProof(accessToken);
       if (!isCurrentSignedInAccount(state, account)) {
         return;
       }
@@ -628,19 +639,31 @@ export function createAfterPartyApp(
     root
       .querySelector<HTMLButtonElement>("[data-action='create-inbox-rule']")
       ?.addEventListener("click", () =>
-        void runMailboxProofAction("inboxRuleProof", "create"));
+        void runFixedProofAction("inboxRuleProof", "create"));
     root
       .querySelector<HTMLButtonElement>("[data-action='remove-inbox-rule']")
       ?.addEventListener("click", () =>
-        void runMailboxProofAction("inboxRuleProof", "remove"));
+        void runFixedProofAction("inboxRuleProof", "remove"));
     root
       .querySelector<HTMLButtonElement>("[data-action='create-category-proof']")
       ?.addEventListener("click", () =>
-        void runMailboxProofAction("categoryProof", "create"));
+        void runFixedProofAction("categoryProof", "create"));
     root
       .querySelector<HTMLButtonElement>("[data-action='remove-category-proof']")
       ?.addEventListener("click", () =>
-        void runMailboxProofAction("categoryProof", "remove"));
+        void runFixedProofAction("categoryProof", "remove"));
+    root
+      .querySelector<HTMLButtonElement>(
+        "[data-action='create-sharepoint-file-proof']",
+      )
+      ?.addEventListener("click", () =>
+        void runFixedProofAction("sharePointFileProof", "create"));
+    root
+      .querySelector<HTMLButtonElement>(
+        "[data-action='remove-sharepoint-file-proof']",
+      )
+      ?.addEventListener("click", () =>
+        void runFixedProofAction("sharePointFileProof", "remove"));
   };
 
   const start = async (): Promise<void> => {
@@ -683,6 +706,16 @@ export function createAfterPartyApp(
                 stage: readFixedProofStage(
                   storage,
                   fixedProofStorageKey(startup.account, "categoryProof"),
+                ),
+                activity: "idle",
+              },
+              sharePointFileProof: {
+                stage: readFixedProofStage(
+                  storage,
+                  fixedProofStorageKey(
+                    startup.account,
+                    "sharePointFileProof",
+                  ),
                 ),
                 activity: "idle",
               },
@@ -773,6 +806,10 @@ function createStatePanel(
           apiOperationLoading,
         ),
         createCategoryProofPanel(state.categoryProof, apiOperationLoading),
+        createSharePointFileProofPanel(
+          state.sharePointFileProof,
+          apiOperationLoading,
+        ),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -817,7 +854,9 @@ function createButton(
     | "create-inbox-rule"
     | "remove-inbox-rule"
     | "create-category-proof"
-    | "remove-category-proof",
+    | "remove-category-proof"
+    | "create-sharepoint-file-proof"
+    | "remove-sharepoint-file-proof",
   className: string,
   disabled = false,
 ): HTMLButtonElement {
@@ -1254,6 +1293,59 @@ function createCategoryProofPanel(
   return panel;
 }
 
+function createSharePointFileProofPanel(
+  state: FixedProofState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+  panel.append(createStatus(
+    "Real tenant activity: the API managed identity creates one fixed harmless file in SharePoint root Documents, then explicitly removes it to the recycle bin.",
+    "notice",
+  ));
+  const messages: Record<FixedProofStage, string> = {
+    "not-started": "SharePoint file rehearsal: not started in this browser.",
+    uncertain:
+      "SharePoint file rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
+    configured: "SharePoint file rehearsal: Configured.",
+    "removal-uncertain":
+      "SharePoint file rehearsal: Remove is uncertain. Do not repeat it.",
+    removed: "SharePoint file rehearsal: Removed to SharePoint recycle bin.",
+  };
+  panel.append(createStatus(state.activity === "idle"
+    ? messages[state.stage]
+    : `${state.activity === "creating" ? "Creating" : "Removing"} the fixed SharePoint file…`));
+  if (state.activity !== "idle") {
+    panel.setAttribute("aria-busy", "true");
+  }
+  if (state.message) {
+    panel.append(createStatus(state.message, "error"));
+  }
+  const details = document.createElement("dl");
+  details.className = "identity-list";
+  appendIdentity(details, "Actor", "API system managed identity");
+  appendIdentity(details, "Location", "SharePoint root Documents");
+  appendIdentity(details, "File", SHAREPOINT_FILE_PROOF_NAME);
+  appendIdentity(details, "Content size", "78 ASCII bytes");
+  panel.append(
+    details,
+    createButton(
+      "Create SharePoint file proof",
+      "create-sharepoint-file-proof",
+      "primary",
+      apiOperationLoading || state.stage !== "not-started",
+    ),
+    createButton(
+      "Remove SharePoint file proof",
+      "remove-sharepoint-file-proof",
+      "secondary",
+      apiOperationLoading ||
+        !["configured", "uncertain"].includes(state.stage),
+    ),
+  );
+  return panel;
+}
+
 function createRehearsalStatusPanel(
   state: RehearsalStatusState,
   apiOperationLoading: boolean,
@@ -1387,6 +1479,7 @@ function isApiOperationBusy(
     state.calendarMeeting.activity !== "idle" ||
     state.inboxRuleProof.activity !== "idle" ||
     state.categoryProof.activity !== "idle" ||
+    state.sharePointFileProof.activity !== "idle" ||
     contactProof.activity !== "idle"
   );
 }
@@ -1457,11 +1550,13 @@ function contactStorageKey(account: AccountIdentity): string {
 
 function fixedProofStorageKey(
   account: AccountIdentity,
-  proof: "inboxRuleProof" | "categoryProof",
+  proof: "inboxRuleProof" | "categoryProof" | "sharePointFileProof",
 ): string {
   const [name, runId] = proof === "inboxRuleProof"
     ? ["inbox-rule-proof", INBOX_RULE_PROOF_RUN_ID]
-    : ["category-proof", CATEGORY_PROOF_RUN_ID];
+    : proof === "categoryProof"
+      ? ["category-proof", CATEGORY_PROOF_RUN_ID]
+      : ["sharepoint-file-proof", SHAREPOINT_FILE_PROOF_RUN_ID];
   return `ap2.${name}.${runId}.${account.tenantId}.${account.accountId}`;
 }
 

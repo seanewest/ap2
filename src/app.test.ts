@@ -19,6 +19,7 @@ import {
   type InboxRuleProofResult,
   type OneDriveProofResult,
   type RehearsalStatus,
+  type SharePointFileProofResult,
   type SimulatedEmailResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
@@ -37,6 +38,8 @@ const inboxRuleStorageKey =
   "ap2.inbox-rule-proof.ap2-rule-20260725-001.student-tenant-id.student-object-id";
 const categoryStorageKey =
   "ap2.category-proof.ap2-category-20260725-001.student-tenant-id.student-object-id";
+const sharePointFileStorageKey =
+  "ap2.sharepoint-file-proof.ap2-sharepoint-file-20260725-001.student-tenant-id.student-object-id";
 
 class FakeAuthentication implements Authentication {
   initialize = vi.fn<() => Promise<AuthenticationStartup>>();
@@ -114,6 +117,20 @@ class FakeApi implements AfterPartyApi {
         accessToken: string,
       ) => Promise<Extract<CategoryProofResult, { state: "removed" }>>
     >();
+  createSharePointFileProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<
+        Extract<SharePointFileProofResult, { state: "configured" }>
+      >
+    >();
+  removeSharePointFileProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<SharePointFileProofResult, { state: "removed" }>>
+    >();
 }
 
 describe("After Party authentication UI", () => {
@@ -156,6 +173,8 @@ describe("After Party authentication UI", () => {
     expect(inboxRuleRemoveButton()).toBeNull();
     expect(categoryCreateButton()).toBeNull();
     expect(categoryRemoveButton()).toBeNull();
+    expect(sharePointFileCreateButton()).toBeNull();
+    expect(sharePointFileRemoveButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -1001,6 +1020,70 @@ describe("After Party authentication UI", () => {
     },
   );
 
+  it("creates and removes the fixed SharePoint file through explicit clicks", async () => {
+    const create = createDeferred<
+      Extract<SharePointFileProofResult, { state: "configured" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.createSharePointFileProof.mockReturnValue(create.promise);
+    api.removeSharePointFileProof.mockResolvedValue({
+      state: "removed",
+      name: "AP2 SharePoint File Proof [ap2-sharepoint-file-20260725-001].txt",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+
+    expect(root.textContent).toContain("API system managed identity");
+    expect(root.textContent).toContain("78 ASCII bytes");
+    expect(api.createSharePointFileProof).not.toHaveBeenCalled();
+    sharePointFileCreateButton()?.click();
+    await nextTask();
+    expect(api.createSharePointFileProof).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(sharePointFileStorageKey)).toBe("uncertain");
+    sharePointFileCreateButton()?.click();
+    expect(api.createSharePointFileProof).toHaveBeenCalledOnce();
+    create.resolve({
+      state: "configured",
+      name: "AP2 SharePoint File Proof [ap2-sharepoint-file-20260725-001].txt",
+    });
+    await nextTask();
+    expect(localStorage.getItem(sharePointFileStorageKey)).toBe("configured");
+    expect(root.textContent).toContain("SharePoint file rehearsal: Configured.");
+
+    sharePointFileRemoveButton()?.click();
+    await nextTask();
+    expect(api.removeSharePointFileProof).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(sharePointFileStorageKey)).toBe("removed");
+    expect(root.textContent).toContain("Removed to SharePoint recycle bin");
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it.each([
+    ["uncertain", true, false],
+    ["configured", true, false],
+    ["removal-uncertain", true, true],
+  ] as const)(
+    "restores SharePoint file stage %s without an automatic call",
+    async (stage, createDisabled, removeDisabled) => {
+      localStorage.setItem(sharePointFileStorageKey, stage);
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      await createAfterPartyApp(root, authentication, api).start();
+      expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+      expect(api.createSharePointFileProof).not.toHaveBeenCalled();
+      expect(api.removeSharePointFileProof).not.toHaveBeenCalled();
+      expect(sharePointFileCreateButton()?.disabled).toBe(createDisabled);
+      expect(sharePointFileRemoveButton()?.disabled).toBe(removeDisabled);
+    },
+  );
+
   it("creates and removes the fixed category through explicit clicks", async () => {
     const create = createDeferred<
       Extract<CategoryProofResult, { state: "configured" }>
@@ -1317,6 +1400,14 @@ describe("After Party authentication UI", () => {
 
   function categoryRemoveButton(): HTMLButtonElement | null {
     return root.querySelector("[data-action='remove-category-proof']");
+  }
+
+  function sharePointFileCreateButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='create-sharepoint-file-proof']");
+  }
+
+  function sharePointFileRemoveButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='remove-sharepoint-file-proof']");
   }
 });
 

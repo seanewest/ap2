@@ -18,6 +18,10 @@ import {
   type InboxRuleProofOperation,
 } from "./inbox-rule-proof.js";
 import type { RehearsalStatusProvider } from "./rehearsal-status.js";
+import {
+  SharePointFileProofConflictError,
+  type SharePointFileProofOperation,
+} from "./sharepoint-file-proof.js";
 import type { SimulatedEmailOperation } from "./simulated-email.js";
 import {
   OneDriveInviteFailureError,
@@ -37,6 +41,7 @@ export interface ApiDependencies {
   contactProofOperation?: ContactProofOperation;
   inboxRuleProofOperation?: InboxRuleProofOperation;
   categoryProofOperation?: CategoryProofOperation;
+  sharePointFileProofOperation?: SharePointFileProofOperation;
   allowedOrigin?: string;
 }
 
@@ -76,7 +81,8 @@ async function route(
     request.method === "OPTIONS" &&
     (pathname === "/api/contact-proof" ||
       pathname === "/api/inbox-rule-proof" ||
-      pathname === "/api/category-proof")
+      pathname === "/api/category-proof" ||
+      pathname === "/api/sharepoint-file-proof")
   ) {
     handleProtectedPreflight(request, response, origin, ["POST", "DELETE"]);
     return;
@@ -142,13 +148,15 @@ async function route(
     (request.method === "POST" || request.method === "DELETE") &&
     (pathname === "/api/contact-proof" ||
       pathname === "/api/inbox-rule-proof" ||
-      pathname === "/api/category-proof")
+      pathname === "/api/category-proof" ||
+      pathname === "/api/sharepoint-file-proof")
   ) {
     const action = request.method === "POST" ? "create" : "remove";
     const operation = {
       "/api/contact-proof": dependencies.contactProofOperation,
       "/api/inbox-rule-proof": dependencies.inboxRuleProofOperation,
       "/api/category-proof": dependencies.categoryProofOperation,
+      "/api/sharepoint-file-proof": dependencies.sharePointFileProofOperation,
     }[pathname];
     await handleAuthorizedRequest(
       request,
@@ -367,6 +375,10 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof CategoryProofConflictError) {
       sendJson(response, 409, { error: "category_state_conflict" });
+      return;
+    }
+    if (error instanceof SharePointFileProofConflictError) {
+      sendJson(response, 409, { error: "sharepoint_file_state_conflict" });
       return;
     }
     throw error;

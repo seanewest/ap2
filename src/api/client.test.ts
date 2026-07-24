@@ -14,9 +14,70 @@ import {
   HttpAfterPartyApi,
   INBOX_RULE_PROOF_DISPLAY_NAME,
   OneDriveInviteFailureError,
+  SHAREPOINT_FILE_PROOF_NAME,
 } from "./client";
 
 describe("HTTP After Party API client", () => {
+  it.each([
+    ["createSharePointFileProof", "POST", 201, {
+      state: "configured",
+      name: SHAREPOINT_FILE_PROOF_NAME,
+    }],
+    ["removeSharePointFileProof", "DELETE", 200, {
+      state: "removed",
+      name: SHAREPOINT_FILE_PROOF_NAME,
+    }],
+  ] as const)("safely invokes %s", async (method, verb, status, result) => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(result, { status }),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    );
+    await expect(client[method]("temporary-token")).resolves.toEqual(result);
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/sharepoint-file-proof",
+      expect.objectContaining({
+        method: verb,
+        credentials: "omit",
+        redirect: "error",
+        headers: { Authorization: "Bearer temporary-token" },
+      }),
+    );
+  });
+
+  it("rejects malformed SharePoint results and strips unexpected identifiers", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        state: "configured",
+        name: "wrong",
+        id: "raw-id",
+      }, { status: 201 }),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      ).createSharePointFileProof("secret-token"),
+    ).rejects.toEqual(new ApiAccessError());
+    request.mockResolvedValueOnce(Response.json({
+      state: "configured",
+      name: SHAREPOINT_FILE_PROOF_NAME,
+      id: "raw-id",
+      eTag: "raw-etag",
+    }, { status: 201 }));
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      ).createSharePointFileProof("secret-token"),
+    ).resolves.toEqual({
+      state: "configured",
+      name: SHAREPOINT_FILE_PROOF_NAME,
+    });
+  });
+
   it.each([
     ["createCategoryProof", "POST", 201, {
       state: "configured",
