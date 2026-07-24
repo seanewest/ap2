@@ -21,6 +21,10 @@ import {
   DraftProofConflictError,
   type DraftProofOperation,
 } from "./draft-proof.js";
+import {
+  TodoTaskProofConflictError,
+  type TodoTaskProofOperation,
+} from "./todo-task-proof.js";
 import type { RehearsalStatusProvider } from "./rehearsal-status.js";
 import {
   SharePointFileProofConflictError,
@@ -47,6 +51,7 @@ export interface ApiDependencies {
   categoryProofOperation?: CategoryProofOperation;
   sharePointFileProofOperation?: SharePointFileProofOperation;
   draftProofOperation?: DraftProofOperation;
+  todoTaskProofOperation?: TodoTaskProofOperation;
   allowedOrigin?: string;
 }
 
@@ -88,7 +93,8 @@ async function route(
       pathname === "/api/inbox-rule-proof" ||
       pathname === "/api/category-proof" ||
       pathname === "/api/sharepoint-file-proof" ||
-      pathname === "/api/draft-proof")
+      pathname === "/api/draft-proof" ||
+      pathname === "/api/todo-task-proof")
   ) {
     handleProtectedPreflight(request, response, origin, ["POST", "DELETE"]);
     return;
@@ -156,7 +162,8 @@ async function route(
       pathname === "/api/inbox-rule-proof" ||
       pathname === "/api/category-proof" ||
       pathname === "/api/sharepoint-file-proof" ||
-      pathname === "/api/draft-proof")
+      pathname === "/api/draft-proof" ||
+      pathname === "/api/todo-task-proof")
   ) {
     const action = request.method === "POST" ? "create" : "remove";
     const operation = {
@@ -165,6 +172,7 @@ async function route(
       "/api/category-proof": dependencies.categoryProofOperation,
       "/api/sharepoint-file-proof": dependencies.sharePointFileProofOperation,
       "/api/draft-proof": dependencies.draftProofOperation,
+      "/api/todo-task-proof": dependencies.todoTaskProofOperation,
     }[pathname];
     await handleAuthorizedRequest(
       request,
@@ -391,6 +399,10 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof DraftProofConflictError) {
       sendJson(response, 409, { error: "draft_state_conflict" });
+      return;
+    }
+    if (error instanceof TodoTaskProofConflictError) {
+      sendJson(response, 409, { error: "todo_task_state_conflict" });
       return;
     }
     throw error;

@@ -30,6 +30,8 @@ import {
   OneDriveInviteFailureError,
   SHAREPOINT_FILE_PROOF_NAME,
   SHAREPOINT_FILE_PROOF_RUN_ID,
+  TODO_TASK_PROOF_RUN_ID,
+  TODO_TASK_PROOF_TITLE,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
@@ -120,6 +122,7 @@ type ViewState =
       categoryProof: FixedProofState;
       sharePointFileProof: FixedProofState;
       draftProof: FixedProofState;
+      todoTaskProof: FixedProofState;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -521,7 +524,7 @@ export function createAfterPartyApp(
 
   const runFixedProofAction = async (
     proof: "inboxRuleProof" | "categoryProof" | "sharePointFileProof" |
-      "draftProof",
+      "draftProof" | "todoTaskProof",
     action: "create" | "remove",
   ): Promise<void> => {
     if (
@@ -540,9 +543,11 @@ export function createAfterPartyApp(
       ? "inbox-rule"
       : proof === "categoryProof"
         ? "category"
-        : proof === "sharePointFileProof"
-          ? "SharePoint file"
-          : "unsent draft";
+          : proof === "sharePointFileProof"
+            ? "SharePoint file"
+            : proof === "draftProof"
+              ? "unsent draft"
+              : "To Do task";
     setSignedInPatch(account, {
       [proof]: { stage: previousStage, activity },
     });
@@ -572,9 +577,13 @@ export function createAfterPartyApp(
             ? action === "create"
               ? await api.createSharePointFileProof(accessToken)
               : await api.removeSharePointFileProof(accessToken)
-            : action === "create"
-              ? await api.createDraftProof(accessToken)
-              : await api.removeDraftProof(accessToken);
+            : proof === "draftProof"
+              ? action === "create"
+                ? await api.createDraftProof(accessToken)
+                : await api.removeDraftProof(accessToken)
+              : action === "create"
+                ? await api.createTodoTaskProof(accessToken)
+                : await api.removeTodoTaskProof(accessToken);
       if (!isCurrentSignedInAccount(state, account)) {
         return;
       }
@@ -684,6 +693,14 @@ export function createAfterPartyApp(
       .querySelector<HTMLButtonElement>("[data-action='remove-draft-proof']")
       ?.addEventListener("click", () =>
         void runFixedProofAction("draftProof", "remove"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='create-todo-task-proof']")
+      ?.addEventListener("click", () =>
+        void runFixedProofAction("todoTaskProof", "create"));
+    root
+      .querySelector<HTMLButtonElement>("[data-action='remove-todo-task-proof']")
+      ?.addEventListener("click", () =>
+        void runFixedProofAction("todoTaskProof", "remove"));
   };
 
   const start = async (): Promise<void> => {
@@ -743,6 +760,13 @@ export function createAfterPartyApp(
                 stage: readFixedProofStage(
                   storage,
                   fixedProofStorageKey(startup.account, "draftProof"),
+                ),
+                activity: "idle",
+              },
+              todoTaskProof: {
+                stage: readFixedProofStage(
+                  storage,
+                  fixedProofStorageKey(startup.account, "todoTaskProof"),
                 ),
                 activity: "idle",
               },
@@ -838,6 +862,7 @@ function createStatePanel(
           apiOperationLoading,
         ),
         createDraftProofPanel(state.draftProof, apiOperationLoading),
+        createTodoTaskProofPanel(state.todoTaskProof, apiOperationLoading),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -886,7 +911,9 @@ function createButton(
     | "create-sharepoint-file-proof"
     | "remove-sharepoint-file-proof"
     | "create-draft-proof"
-    | "remove-draft-proof",
+    | "remove-draft-proof"
+    | "create-todo-task-proof"
+    | "remove-todo-task-proof",
   className: string,
   disabled = false,
 ): HTMLButtonElement {
@@ -1429,6 +1456,58 @@ function createDraftProofPanel(
   return panel;
 }
 
+function createTodoTaskProofPanel(
+  state: FixedProofState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+  panel.append(createStatus(
+    "Real tenant activity: Cory creates one fixed harmless Microsoft To Do task, then explicitly removes it. The task is never completed or shared.",
+    "notice",
+  ));
+  const messages: Record<FixedProofStage, string> = {
+    "not-started": "To Do task rehearsal: not started in this browser.",
+    uncertain:
+      "To Do task rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
+    configured: "To Do task rehearsal: Configured.",
+    "removal-uncertain":
+      "To Do task rehearsal: Remove is uncertain. Do not repeat it.",
+    removed: "To Do task rehearsal: Removed.",
+  };
+  panel.append(createStatus(state.activity === "idle"
+    ? messages[state.stage]
+    : `${state.activity === "creating" ? "Creating" : "Removing"} the fixed To Do task…`));
+  if (state.activity !== "idle") panel.setAttribute("aria-busy", "true");
+  if (state.message) panel.append(createStatus(state.message, "error"));
+  const details = document.createElement("dl");
+  details.className = "identity-list";
+  appendIdentity(details, "Owner", "cory@corywest.onmicrosoft.com");
+  appendIdentity(details, "List", "Default To Do list");
+  appendIdentity(details, "Title", TODO_TASK_PROOF_TITLE);
+  appendIdentity(details, "Status", "Not started");
+  appendIdentity(details, "Importance", "Low");
+  appendIdentity(details, "Reminder", "Off");
+  appendIdentity(details, "Categories", "None");
+  panel.append(
+    details,
+    createButton(
+      "Create To Do task proof",
+      "create-todo-task-proof",
+      "primary",
+      apiOperationLoading || state.stage !== "not-started",
+    ),
+    createButton(
+      "Remove To Do task proof",
+      "remove-todo-task-proof",
+      "secondary",
+      apiOperationLoading ||
+        !["configured", "uncertain"].includes(state.stage),
+    ),
+  );
+  return panel;
+}
+
 function createRehearsalStatusPanel(
   state: RehearsalStatusState,
   apiOperationLoading: boolean,
@@ -1564,6 +1643,7 @@ function isApiOperationBusy(
     state.categoryProof.activity !== "idle" ||
     state.sharePointFileProof.activity !== "idle" ||
     state.draftProof.activity !== "idle" ||
+    state.todoTaskProof.activity !== "idle" ||
     contactProof.activity !== "idle"
   );
 }
@@ -1635,7 +1715,7 @@ function contactStorageKey(account: AccountIdentity): string {
 function fixedProofStorageKey(
   account: AccountIdentity,
   proof: "inboxRuleProof" | "categoryProof" | "sharePointFileProof" |
-    "draftProof",
+    "draftProof" | "todoTaskProof",
 ): string {
   const [name, runId] = proof === "inboxRuleProof"
     ? ["inbox-rule-proof", INBOX_RULE_PROOF_RUN_ID]
@@ -1643,7 +1723,9 @@ function fixedProofStorageKey(
       ? ["category-proof", CATEGORY_PROOF_RUN_ID]
       : proof === "sharePointFileProof"
         ? ["sharepoint-file-proof", SHAREPOINT_FILE_PROOF_RUN_ID]
-        : ["draft-proof", DRAFT_PROOF_RUN_ID];
+        : proof === "draftProof"
+          ? ["draft-proof", DRAFT_PROOF_RUN_ID]
+          : ["todo-task-proof", TODO_TASK_PROOF_RUN_ID];
   return `ap2.${name}.${runId}.${account.tenantId}.${account.accountId}`;
 }
 

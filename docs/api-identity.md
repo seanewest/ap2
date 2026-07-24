@@ -334,3 +334,15 @@ mismatched results cause no mutation. Graph mutations are never retried. The
 feature has no send, reply, or forward route, and it never reads a recipient
 mailbox. Browser state records an uncertain attempt before mutation; the marker
 query owns correctness.
+
+## One To Do task rehearsal
+
+`POST` and `DELETE /api/todo-task-proof` are separate explicit actions using
+Cory's existing CBA settings and delegated `Tasks.ReadWrite`. Signing in makes
+no To Do request. Each action reads the unshared default list and its plain,
+unfiltered task page without following pagination. Create accepts one exact
+fixed-title task or creates it once as not started, low importance, with no
+reminder, categories, dates, body, attachments, or links. Remove deletes one
+exact full-contract match; absence is already removed. Malformed, paginated,
+duplicate, or mismatched state causes no mutation. Mutations are never retried,
+and no complete, update, sharing, polling, recipient, or mail path exists.

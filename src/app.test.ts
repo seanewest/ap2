@@ -22,6 +22,7 @@ import {
   type RehearsalStatus,
   type SharePointFileProofResult,
   type SimulatedEmailResult,
+  type TodoTaskProofResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
 
@@ -43,6 +44,8 @@ const sharePointFileStorageKey =
   "ap2.sharepoint-file-proof.ap2-sharepoint-file-20260725-001.student-tenant-id.student-object-id";
 const draftStorageKey =
   "ap2.draft-proof.ap2-draft-20260725-001.student-tenant-id.student-object-id";
+const todoTaskStorageKey =
+  "ap2.todo-task-proof.ap2-todo-task-20260725-002.student-tenant-id.student-object-id";
 
 class FakeAuthentication implements Authentication {
   initialize = vi.fn<() => Promise<AuthenticationStartup>>();
@@ -146,6 +149,18 @@ class FakeApi implements AfterPartyApi {
         accessToken: string,
       ) => Promise<Extract<DraftProofResult, { state: "removed" }>>
     >();
+  createTodoTaskProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<TodoTaskProofResult, { state: "configured" }>>
+    >();
+  removeTodoTaskProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<TodoTaskProofResult, { state: "removed" }>>
+    >();
 }
 
 describe("After Party authentication UI", () => {
@@ -192,6 +207,8 @@ describe("After Party authentication UI", () => {
     expect(sharePointFileRemoveButton()).toBeNull();
     expect(draftCreateButton()).toBeNull();
     expect(draftRemoveButton()).toBeNull();
+    expect(todoTaskCreateButton()).toBeNull();
+    expect(todoTaskRemoveButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -1037,6 +1054,54 @@ describe("After Party authentication UI", () => {
     },
   );
 
+  it("creates and removes the fixed To Do task only through explicit clicks", async () => {
+    const create = createDeferred<
+      Extract<TodoTaskProofResult, { state: "configured" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.createTodoTaskProof.mockReturnValue(create.promise);
+    api.removeTodoTaskProof.mockResolvedValue({
+      state: "removed",
+      title: "AP2 harmless task [ap2-todo-task-20260725-002]",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+
+    expect(root.textContent).toContain(
+      "AP2 harmless task [ap2-todo-task-20260725-002]",
+    );
+    expect(root.textContent).toContain("never completed or shared");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.createTodoTaskProof).not.toHaveBeenCalled();
+
+    todoTaskCreateButton()?.click();
+    await nextTask();
+    expect(localStorage.getItem(todoTaskStorageKey)).toBe("uncertain");
+    expect(api.createTodoTaskProof).toHaveBeenCalledOnce();
+    todoTaskCreateButton()?.click();
+    expect(api.createTodoTaskProof).toHaveBeenCalledOnce();
+
+    create.resolve({
+      state: "configured",
+      title: "AP2 harmless task [ap2-todo-task-20260725-002]",
+    });
+    await nextTask();
+    expect(root.textContent).toContain("To Do task rehearsal: Configured.");
+    expect(todoTaskCreateButton()?.disabled).toBe(true);
+    expect(todoTaskRemoveButton()?.disabled).toBe(false);
+
+    todoTaskRemoveButton()?.click();
+    await nextTask();
+    expect(api.removeTodoTaskProof).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(todoTaskStorageKey)).toBe("removed");
+    expect(root.textContent).toContain("To Do task rehearsal: Removed.");
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
   it("creates and removes the fixed unsent draft through explicit clicks", async () => {
     const create = createDeferred<
       Extract<DraftProofResult, { state: "configured" }>
@@ -1504,6 +1569,14 @@ describe("After Party authentication UI", () => {
 
   function draftRemoveButton(): HTMLButtonElement | null {
     return root.querySelector("[data-action='remove-draft-proof']");
+  }
+
+  function todoTaskCreateButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='create-todo-task-proof']");
+  }
+
+  function todoTaskRemoveButton(): HTMLButtonElement | null {
+    return root.querySelector("[data-action='remove-todo-task-proof']");
   }
 });
 
