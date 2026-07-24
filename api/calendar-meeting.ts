@@ -9,18 +9,20 @@ import {
 
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
 const GRAPH_EVENTS_URL = `${GRAPH_ROOT}/me/events`;
-const GRAPH_CALENDAR_VIEW_URL = `${GRAPH_ROOT}/me/calendarView`;
 
 export const GRAPH_CALENDARS_READ_WRITE_SCOPE =
   "https://graph.microsoft.com/Calendars.ReadWrite";
+export const CALENDAR_MEETING_RUN_ID = "ap2-calendar-20260724-002";
+export const CALENDAR_MEETING_RUN_PROPERTY_ID =
+  "String {c352ae90-352e-4c3f-8f7c-ab63d2ca32cc} Name AP2RunId";
 export const CALENDAR_MEETING_TRANSACTION_ID =
-  "c61d88a4-92bf-4f16-aa5b-efa6dbb16e92";
+  "cfc3b7d3-2ab8-4ec0-b93a-9ea24fcb5ba4";
 export const CALENDAR_MEETING_SUBJECT =
   "AP2 Pass 3 calendar rehearsal — no action required";
 export const CALENDAR_MEETING_BODY =
   "Harmless AP2 calendar rehearsal. No action or response is required. The organizer will cancel it after observation.";
-export const CALENDAR_MEETING_START = "2026-07-24T18:00:00Z";
-export const CALENDAR_MEETING_END = "2026-07-24T18:15:00Z";
+export const CALENDAR_MEETING_START = "2026-07-24T19:00:00Z";
+export const CALENDAR_MEETING_END = "2026-07-24T19:15:00Z";
 export const CALENDAR_MEETING_TIME_ZONE = "UTC";
 export const CALENDAR_MEETING_CANCEL_COMMENT =
   "AP2 Pass 3 calendar rehearsal complete. No action is required.";
@@ -209,9 +211,11 @@ export class DelegatedGraphCalendarMeetingOperation
   }
 
   async #recoverEventId(cory: DelegatedGraphToken): Promise<string> {
-    const url = new URL(GRAPH_CALENDAR_VIEW_URL);
-    url.searchParams.set("startDateTime", CALENDAR_MEETING_START);
-    url.searchParams.set("endDateTime", CALENDAR_MEETING_END);
+    const url = new URL(GRAPH_EVENTS_URL);
+    url.searchParams.set(
+      "$filter",
+      `singleValueExtendedProperties/Any(ep: ep/id eq '${CALENDAR_MEETING_RUN_PROPERTY_ID}' and ep/value eq '${CALENDAR_MEETING_RUN_ID}')`,
+    );
     url.searchParams.set(
       "$select",
       [
@@ -238,6 +242,10 @@ export class DelegatedGraphCalendarMeetingOperation
         "transactionId",
         "isCancelled",
       ].join(","),
+    );
+    url.searchParams.set(
+      "$expand",
+      `singleValueExtendedProperties($filter=id eq '${CALENDAR_MEETING_RUN_PROPERTY_ID}')`,
     );
     url.searchParams.set("$top", "2");
     const response = await this.#request(url, {
@@ -307,6 +315,12 @@ function fixedMeetingRequest(): Record<string, unknown> {
     sensitivity: "normal",
     isOnlineMeeting: false,
     transactionId: CALENDAR_MEETING_TRANSACTION_ID,
+    singleValueExtendedProperties: [
+      {
+        id: CALENDAR_MEETING_RUN_PROPERTY_ID,
+        value: CALENDAR_MEETING_RUN_ID,
+      },
+    ],
   };
 }
 
@@ -369,7 +383,21 @@ function isExactBody(value: unknown, bodyPreview: unknown): boolean {
 function isExactRecoverableMeeting(
   value: unknown,
 ): value is Record<string, unknown> & { id: string } {
-  return isExactCreatedMeeting(value) && value.isCancelled === false;
+  return (
+    isExactCreatedMeeting(value) &&
+    value.isCancelled === false &&
+    isExactRunMarker(value.singleValueExtendedProperties)
+  );
+}
+
+function isExactRunMarker(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length === 1 &&
+    isRecord(value[0]) &&
+    value[0].id === CALENDAR_MEETING_RUN_PROPERTY_ID &&
+    value[0].value === CALENDAR_MEETING_RUN_ID
+  );
 }
 
 function isExactDateTime(value: unknown, expected: string): boolean {

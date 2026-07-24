@@ -33,8 +33,9 @@ export const CALENDAR_MEETING_ATTENDEES = [
 ] as const;
 export const CALENDAR_MEETING_SUBJECT =
   "AP2 Pass 3 calendar rehearsal — no action required";
-export const CALENDAR_MEETING_START = "2026-07-24T18:00:00Z";
-export const CALENDAR_MEETING_END = "2026-07-24T18:15:00Z";
+export const CALENDAR_MEETING_RUN_ID = "ap2-calendar-20260724-002";
+export const CALENDAR_MEETING_START = "2026-07-24T19:00:00Z";
+export const CALENDAR_MEETING_END = "2026-07-24T19:15:00Z";
 
 export type CalendarMeetingResult =
   | {
