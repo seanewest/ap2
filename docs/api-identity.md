@@ -34,9 +34,11 @@ comma-separated list. `AUTH_AUTOMATION_CLIENT_ID` can replace the app-only
 client ID. The Student tenant cannot be overridden.
 
 Browser access is disabled unless `CORS_ALLOWED_ORIGIN` names one exact
-HTTP(S) origin. The protected endpoint preflights accept only that origin,
-`GET`, and the `Authorization` header. Requests without an `Origin` header
-remain available to the app-only proof and other non-browser clients.
+HTTP(S) origin. Protected preflights accept only that origin and the
+`Authorization` header. The read endpoints allow `GET`, simulated email allows
+`POST`, the OneDrive proof allows `POST` and `DELETE`, and both calendar routes
+allow `POST`. Requests without an `Origin` header remain available to the
+app-only proof and other non-browser clients.
 
 ## Rehearsal status
 
@@ -64,21 +66,132 @@ that delivery is confirmed. Tokens are cached only in process memory, no
 refresh token is requested, and every browser acquisition uses a fresh
 non-persistent context.
 
-Production enables the operation only when all three settings are present:
+Production enables Homer's operation only when the shared client and both
+Homer certificate settings are present:
 
-- `HOMER_CBA_CLIENT_ID`: UUID of the existing public client
+- `SIMULATED_USER_CLIENT_ID`: UUID of the existing shared multitenant public
+  client
 - `HOMER_CBA_PFX_PATH`: absolute path to the externally mounted Homer PFX
 - `HOMER_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
 
-The public client must already allow the fixed `http://localhost` redirect and
-have consent for delegated `User.Read` and `Mail.Send`. Homer must already have
-working Student CBA. The container needs outbound access to Microsoft login,
-certificate authentication, and Graph endpoints. This application work does
-not create consent, identity, certificate, or tenant configuration.
+The public client must already allow the exact
+`http://localhost/ap2-simulated-user-callback` redirect and have consent for
+delegated `User.Read` and `Mail.Send`. Homer must already have working Student
+CBA. The container needs outbound access to Microsoft login, certificate
+authentication, and Graph endpoints. This application work does not create
+consent, identity, certificate, or tenant configuration.
 
 The disposable rehearsal assumes one controlled click against one API replica.
 It does not claim exactly-once delivery across callers, replicas, or restarts,
 and intentionally adds no job or durable idempotency system.
+
+## OneDrive share proof
+
+`POST` and `DELETE /api/onedrive-share-proof` use the same exact delegated and
+app-only caller policy. The two methods are deliberately separate human
+actions:
+
+- `POST` refuses an existing `/AP2-OneDrive-share-proof.txt`, creates that
+  fixed file with the exact rehearsal sentence, and grants only
+  `marge.simpson@corywest.onmicrosoft.com` read access. Sign-in is required and
+  no invitation is sent. Configured success requires exactly one no-link
+  permission with role `read` and `grantedToV2.user.id` equal to Marge's
+  immutable object ID. If Graph's `200` response does not contain that shape,
+  AP2 performs one owner-side permissions read and accepts only one matching
+  effective permission. It never repeats the invite.
+- `DELETE` resolves the fixed item and its permissions, revokes only the exact
+  Marge read permission, then re-resolves and validates the 58-byte file before
+  deleting once with its current eTag. OneDrive moves the item to the recycle
+  bin. If a prior revoke succeeded but its response was lost, a later cleanup
+  can safely continue when no Marge permission remains.
+
+The API never retries an upload-session creation, upload, invite, permission
+revoke, or file delete. “Configured” means Microsoft Graph confirmed the exact
+Marge read permission; it does not claim that Marge opened the file or that
+OneDrive has exposed every inheritance detail.
+
+After an uncertain mutation response, the UI disables sharing and offers only
+cleanup. Its stage is stored per signed-in account in browser storage so a
+reload does not blindly repeat a mutation. After configured success, a human
+can sign in to OneDrive as Marge in a separate browser or profile, open
+**Shared > Shared with you**, find `AP2-OneDrive-share-proof.txt`, then return
+to the SPA and click Cleanup.
+
+Homer uses delegated `Files.ReadWrite` through the same shared public client
+and exact callback used by the email operation. The OneDrive runtime requires
+only Homer's existing certificate settings. Its in-memory token cache and
+disposable Playwright context are not shared with a browser profile. The
+repository does not embed or persist the certificate.
+The operation returns only its safe stage, fixed path, identity, and access
+summary; it never returns tokens, credentials, item IDs, eTags, upload URLs, or
+raw Graph responses.
+
+One process-local boundary serializes share and cleanup across operator and
+Dev-app callers. Concurrent requests receive
+`proof_operation_busy`. This is rehearsal-only coordination: it has no durable
+lock, database, queue, or cross-replica protection. The live proof therefore
+requires Container Apps `maxReplicas=1`.
+
+## One calendar rehearsal
+
+`POST /api/calendar-meeting` and
+`POST /api/calendar-meeting/cancel` use the same exact delegated and app-only
+caller policy. They are separate explicit human actions. Signing in does not
+call either route.
+
+Create signs in only `cory@corywest.onmicrosoft.com` through the existing
+shared simulated-user client and requests delegated `User.Read` and
+`Calendars.ReadWrite`. It submits one Graph create request with the fixed
+transaction ID `c61d88a4-92bf-4f16-aa5b-efa6dbb16e92` and:
+
+- subject `AP2 Pass 3 calendar rehearsal — no action required`
+- plain body `Harmless AP2 calendar rehearsal. No action or response is
+  required. The organizer will cancel it after observation.`
+- July 24, 2026, 18:00–18:15 UTC (2:00–2:15 PM EDT)
+- required attendees only `kobe@corywest.onmicrosoft.com` and
+  `marge.simpson@corywest.onmicrosoft.com`
+- free availability, no reminder or response request, no new-time proposals,
+  low importance, normal sensitivity, and no online meeting, location,
+  recurrence, attachment, or link
+
+Only a strict `201` response matching the fixed meeting becomes `Configured`.
+For Graph's documented HTML normalization, the response must retain the exact
+full fixed `bodyPreview` and report HTML body content; AP2 does not interpret
+Graph's generated HTML markup.
+That means Graph accepted the meeting and invitations; it does not claim
+attendee receipt or response. The validated event ID remains private in the
+operation's process memory.
+
+Cancel normally uses that retained validated ID. If process state was lost or
+Create returned an uncertain result, the explicit Cancel action first queries
+Cory's exact 15-minute calendar window and proceeds only when the response
+contains exactly one non-cancelled event matching the full immutable contract,
+including the fixed transaction ID. It then submits one Graph
+`POST /me/events/{id}/cancel` request with the fixed harmless cleanup comment.
+Zero, duplicate, mismatched, cancelled, malformed, or paginated recovery
+results cause no mutation.
+Only `202` becomes `Cancellation accepted`. Neither mutation is retried.
+Before either API mutation, the SPA stores an `uncertain` stage for the signed-in
+operator. Every stage after Create starts blocks a second create; uncertain and
+configured stages offer the separate explicit Cancel action. Once cancellation
+starts, a separate cancellation-uncertain stage blocks another attempt if its
+response is not confirmed. Signing in never performs recovery.
+
+A process-local busy/completed boundary serializes create and cancel across
+operator and Dev-app callers. It has no database, queue, or durable lock; the
+narrow read-only lookup is used only by an explicit Cancel after process state
+loss. The live proof therefore requires `maxReplicas=1`.
+
+Production enables the calendar operation only when the existing Homer/shared
+client configuration and all three Cory settings are present:
+
+- `CORY_CBA_OBJECT_ID`: Cory's immutable Student user object ID
+- `CORY_CBA_PFX_PATH`: absolute path to the externally mounted Cory PFX
+- `CORY_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
+
+The shared public client must already have delegated
+`Calendars.ReadWrite` consent. Cory must already have working Student CBA.
+Certificates and tokens remain outside repository and response output.
 
 ## Identity setup and rollback
 

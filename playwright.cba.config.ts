@@ -9,7 +9,7 @@ chmodSync(settings.outputDirectory, 0o700);
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "cba-auth.spec.ts",
-  timeout: 120_000,
+  timeout: 240_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,

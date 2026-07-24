@@ -10,8 +10,11 @@ import {
 } from "./auth/authentication";
 import {
   ApiAccessError,
+  OneDriveInviteFailureError,
   type AfterPartyApi,
   type ApiCallerIdentity,
+  type CalendarMeetingResult,
+  type OneDriveProofResult,
   type RehearsalStatus,
   type SimulatedEmailResult,
 } from "./api/client";
@@ -38,6 +41,32 @@ class FakeApi implements AfterPartyApi {
     vi.fn<(accessToken: string) => Promise<RehearsalStatus>>();
   sendSimulatedEmail =
     vi.fn<(accessToken: string) => Promise<SimulatedEmailResult>>();
+  shareOneDriveProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<OneDriveProofResult, { state: "configured" }>>
+    >();
+  removeOneDriveProof =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<OneDriveProofResult, { state: "removed" }>>
+    >();
+  createCalendarMeeting =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<Extract<CalendarMeetingResult, { state: "configured" }>>
+    >();
+  cancelCalendarMeeting =
+    vi.fn<
+      (
+        accessToken: string,
+      ) => Promise<
+        Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
+      >
+    >();
 }
 
 describe("After Party authentication UI", () => {
@@ -46,6 +75,7 @@ describe("After Party authentication UI", () => {
   let api: FakeApi;
 
   beforeEach(() => {
+    localStorage.clear();
     document.body.innerHTML = '<div id="app"></div>';
     root = document.querySelector<HTMLElement>("#app")!;
     authentication = new FakeAuthentication();
@@ -68,6 +98,11 @@ describe("After Party authentication UI", () => {
     expect(apiButton()).toBeNull();
     expect(rehearsalButton()).toBeNull();
     expect(simulatedEmailButton()).toBeNull();
+    expect(oneDriveShareButton()).toBeNull();
+    expect(oneDriveVerifyButton()).toBeNull();
+    expect(oneDriveRemoveButton()).toBeNull();
+    expect(calendarCreateButton()).toBeNull();
+    expect(calendarCancelButton()).toBeNull();
   });
 
   it("shows identity after a successful redirect", async () => {
@@ -486,6 +521,408 @@ describe("After Party authentication UI", () => {
     expect(simulatedEmailButton()?.disabled).toBe(true);
   });
 
+  it("configures access and cleans up only on separate clicks", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.shareOneDriveProof.mockResolvedValue({
+      state: "configured",
+      path: "/AP2-OneDrive-share-proof.txt",
+      owner: "homer.simpson@corywest.onmicrosoft.com",
+      recipient: "marge.simpson@corywest.onmicrosoft.com",
+      access: "read",
+    });
+    api.removeOneDriveProof.mockResolvedValue({
+      state: "removed",
+      path: "/AP2-OneDrive-share-proof.txt",
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    expect(root.textContent).toContain("not started in this browser");
+    expect(root.textContent).toContain(
+      "Real tenant activity: Cory creates one fixed harmless 15-minute meeting inviting only Kobe and Marge, then explicitly cancels it.",
+    );
+    oneDriveShareButton()?.click();
+    await nextTask();
+    expect(api.shareOneDriveProof).toHaveBeenCalledWith("temporary-token");
+    expect(api.removeOneDriveProof).not.toHaveBeenCalled();
+    expect(root.textContent).toContain(
+      "read-only access is configured for Marge",
+    );
+    expect(root.textContent).toContain(
+      "sign in to OneDrive as marge.simpson@corywest.onmicrosoft.com",
+    );
+    expect(root.textContent).toContain("Open Shared, then Shared with you");
+    expect(root.textContent).toContain("AP2-OneDrive-share-proof.txt");
+    expect(root.textContent).toContain(
+      "Return here and click Clean up OneDrive proof when finished",
+    );
+    expect(oneDriveVerifyButton()).toBeNull();
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    oneDriveShareButton()?.click();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(1);
+
+    oneDriveRemoveButton()?.click();
+    await nextTask();
+    expect(api.removeOneDriveProof).toHaveBeenCalledWith("temporary-token");
+    expect(root.textContent).toContain("removed to Homer's recycle bin");
+    expect(oneDriveShareButton()?.disabled).toBe(false);
+    expect(oneDriveRemoveButton()?.disabled).toBe(true);
+
+    const rerun = createDeferred<
+      Extract<OneDriveProofResult, { state: "configured" }>
+    >();
+    api.shareOneDriveProof.mockReturnValueOnce(rerun.promise);
+    oneDriveShareButton()?.click();
+    await nextTask();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(2);
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("uncertain");
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    oneDriveShareButton()?.click();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(2);
+
+    rerun.resolve({
+      state: "configured",
+      path: "/AP2-OneDrive-share-proof.txt",
+      owner: "homer.simpson@corywest.onmicrosoft.com",
+      recipient: "marge.simpson@corywest.onmicrosoft.com",
+      access: "read",
+    });
+    await nextTask();
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    oneDriveShareButton()?.click();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(2);
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it("records an uncertain mutation before the request and restores it after reload", async () => {
+    const deferred = createDeferred<
+      Extract<OneDriveProofResult, { state: "configured" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.shareOneDriveProof.mockReturnValue(deferred.promise);
+    let app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    oneDriveShareButton()?.click();
+    await nextTask();
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("uncertain");
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    expect(simulatedEmailButton()?.disabled).toBe(true);
+    oneDriveShareButton()?.click();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(1);
+
+    document.body.innerHTML = '<div id="app"></div>';
+    root = document.querySelector<HTMLElement>("#app")!;
+    app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+    expect(root.textContent).toContain("last change outcome is uncertain");
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    expect(oneDriveVerifyButton()).toBeNull();
+    expect(oneDriveRemoveButton()?.disabled).toBe(false);
+  });
+
+  it("plainly reports file-created invite failure and directs cleanup", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.shareOneDriveProof.mockRejectedValue(
+      new OneDriveInviteFailureError({
+        state: "file-created-sharing-failed",
+        stage: "invite",
+        upstreamStatus: 400,
+        graphErrorCode: "invalidRequest",
+        requestId: "11111111-1111-4111-8111-111111111111",
+        clientRequestId: "22222222-2222-4222-8222-222222222222",
+        responseDate: "Thu, 23 Jul 2026 23:00:00 GMT",
+        retryAfter: "30",
+        responseShape: "graph-error",
+      }),
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    oneDriveShareButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain(
+      "Homer's file was created, but sharing it with Marge failed.",
+    );
+    expect(root.textContent).toContain(
+      "Clean up the OneDrive proof before trying again.",
+    );
+    expect(root.textContent).toContain("Invite Marge with read access");
+    expect(root.textContent).toContain("Microsoft Graph status400");
+    expect(root.textContent).toContain("Microsoft Graph error codeinvalidRequest");
+    expect(root.textContent).toContain(
+      "Microsoft Graph request ID11111111-1111-4111-8111-111111111111",
+    );
+    expect(root.textContent).toContain(
+      "Client request ID22222222-2222-4222-8222-222222222222",
+    );
+    expect(root.textContent).toContain(
+      "Microsoft Graph response dateThu, 23 Jul 2026 23:00:00 GMT",
+    );
+    expect(root.textContent).toContain("Microsoft Graph retry after30");
+    expect(root.textContent).toContain("Response shapeMicrosoft Graph error");
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    expect(oneDriveRemoveButton()?.disabled).toBe(false);
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("uncertain");
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it("interprets the old shared stage as configured without claiming verification", async () => {
+    localStorage.setItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+      "shared",
+    );
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    expect(root.textContent).toContain(
+      "read-only access is configured for Marge",
+    );
+    expect(root.textContent).not.toContain("verified");
+    expect(oneDriveVerifyButton()).toBeNull();
+    expect(oneDriveRemoveButton()?.disabled).toBe(false);
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("shared");
+  });
+
+  it("creates and cancels the fixed meeting only through separate explicit clicks", async () => {
+    const create = createDeferred<
+      Extract<CalendarMeetingResult, { state: "configured" }>
+    >();
+    const cancel = createDeferred<
+      Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
+    >();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.createCalendarMeeting.mockReturnValue(create.promise);
+    api.cancelCalendarMeeting.mockReturnValue(cancel.promise);
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+
+    expect(api.createCalendarMeeting).not.toHaveBeenCalled();
+    expect(api.cancelCalendarMeeting).not.toHaveBeenCalled();
+    expect(calendarCreateButton()?.disabled).toBe(false);
+    expect(calendarCancelButton()?.disabled).toBe(true);
+    expect(root.textContent).toContain("not started in this browser");
+    expect(root.textContent).toContain("cory@corywest.onmicrosoft.com");
+    expect(root.textContent).toContain("kobe@corywest.onmicrosoft.com");
+    expect(root.textContent).toContain(
+      "marge.simpson@corywest.onmicrosoft.com",
+    );
+    expect(root.textContent).toContain(
+      "AP2 Pass 3 calendar rehearsal — no action required",
+    );
+    expect(root.textContent).toContain(
+      "Harmless AP2 calendar rehearsal. No action or response is required. The organizer will cancel it after observation.",
+    );
+    expect(root.textContent).toContain("Real tenant activity");
+    expect(root.textContent).toContain("15 minutes");
+    expect(root.textContent).toContain("Show asFree");
+    expect(root.textContent).toContain("ReminderOff");
+    expect(root.textContent).toContain("Teams / online meetingOff");
+    expect(root.textContent).toContain("ResponsesNot requested");
+    expect(root.textContent).toContain("2026-07-24T18:00:00Z");
+    expect(root.textContent).toContain("2026-07-24T18:15:00Z");
+    expect(root.textContent).toContain("2:00–2:15 PM EDT");
+
+    calendarCreateButton()?.click();
+    await nextTask();
+    expect(api.createCalendarMeeting).toHaveBeenCalledOnce();
+    expect(api.createCalendarMeeting).toHaveBeenCalledWith("temporary-token");
+    expect(localStorage.getItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+    )).toBe("uncertain");
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(true);
+    calendarCreateButton()?.click();
+    expect(api.createCalendarMeeting).toHaveBeenCalledOnce();
+
+    create.resolve({
+      state: "configured",
+      organizer: "cory@corywest.onmicrosoft.com",
+      attendees: [
+        "kobe@corywest.onmicrosoft.com",
+        "marge.simpson@corywest.onmicrosoft.com",
+      ],
+      subject: "AP2 Pass 3 calendar rehearsal — no action required",
+      start: "2026-07-24T18:00:00Z",
+      end: "2026-07-24T18:15:00Z",
+    });
+    await nextTask();
+    expect(root.textContent).toContain("Calendar rehearsal: Configured");
+    expect(root.textContent).toContain(
+      "attendee receipt or response is not confirmed",
+    );
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(false);
+    calendarCreateButton()?.click();
+    expect(api.createCalendarMeeting).toHaveBeenCalledOnce();
+
+    calendarCancelButton()?.click();
+    await nextTask();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledWith("temporary-token");
+    expect(localStorage.getItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+    )).toBe("cancellation-uncertain");
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(true);
+    calendarCancelButton()?.click();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+
+    cancel.resolve({
+      state: "cancellation-accepted",
+      organizer: "cory@corywest.onmicrosoft.com",
+      subject: "AP2 Pass 3 calendar rehearsal — no action required",
+    });
+    await nextTask();
+    expect(root.textContent).toContain(
+      "Calendar rehearsal: Cancellation accepted",
+    );
+    expect(root.textContent).toContain("Attendee receipt is not confirmed");
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(true);
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it("offers explicit cancellation recovery from an uncertain calendar state", async () => {
+    localStorage.setItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      "uncertain",
+    );
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.cancelCalendarMeeting.mockResolvedValue({
+      state: "cancellation-accepted",
+      organizer: "cory@corywest.onmicrosoft.com",
+      subject: "AP2 Pass 3 calendar rehearsal — no action required",
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+
+    expect(api.cancelCalendarMeeting).not.toHaveBeenCalled();
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(root.textContent).toContain(
+      "Do not create again; Cancel can explicitly find and cancel one exact matching meeting.",
+    );
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(false);
+
+    calendarCancelButton()?.click();
+    await nextTask();
+
+    expect(api.createCalendarMeeting).not.toHaveBeenCalled();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledWith("temporary-token");
+    expect(localStorage.getItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+    )).toBe("cancellation-accepted");
+    expect(root.textContent).toContain(
+      "Calendar rehearsal: Cancellation accepted",
+    );
+    expect(calendarCancelButton()?.disabled).toBe(true);
+  });
+
+  it("does not offer a second cancellation after an uncertain response", async () => {
+    localStorage.setItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      "uncertain",
+    );
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.cancelCalendarMeeting.mockRejectedValue(
+      new ApiAccessError("Cancellation was not confirmed."),
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+    calendarCancelButton()?.click();
+    await nextTask();
+
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+    )).toBe("cancellation-uncertain");
+    expect(root.textContent).toContain(
+      "Calendar rehearsal: cancellation is uncertain. Do not repeat it.",
+    );
+    expect(calendarCancelButton()?.disabled).toBe(true);
+
+    calendarCancelButton()?.click();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["uncertain", true, false],
+    ["configured", true, false],
+    ["cancellation-uncertain", true, true],
+    ["cancellation-accepted", true, true],
+  ] as const)(
+    "restores calendar stage %s without an automatic call",
+    async (stage, createDisabled, cancelDisabled) => {
+      localStorage.setItem(
+        "ap2.calendar-meeting.student-tenant-id.student-object-id",
+        stage,
+      );
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      const app = createAfterPartyApp(root, authentication, api);
+
+      await app.start();
+
+      expect(api.createCalendarMeeting).not.toHaveBeenCalled();
+      expect(api.cancelCalendarMeeting).not.toHaveBeenCalled();
+      expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+      expect(calendarCreateButton()?.disabled).toBe(createDisabled);
+      expect(calendarCancelButton()?.disabled).toBe(cancelDisabled);
+    },
+  );
+
   function signInButton(): HTMLButtonElement {
     return root.querySelector<HTMLButtonElement>("[data-action='sign-in']")!;
   }
@@ -503,6 +940,36 @@ describe("After Party authentication UI", () => {
   function simulatedEmailButton(): HTMLButtonElement | null {
     return root.querySelector<HTMLButtonElement>(
       "[data-action='send-simulated-email']",
+    );
+  }
+
+  function oneDriveShareButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='share-onedrive-proof']",
+    );
+  }
+
+  function oneDriveVerifyButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='verify-onedrive-proof']",
+    );
+  }
+
+  function oneDriveRemoveButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='remove-onedrive-proof']",
+    );
+  }
+
+  function calendarCreateButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='create-calendar-meeting']",
+    );
+  }
+
+  function calendarCancelButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='cancel-calendar-meeting']",
     );
   }
 });

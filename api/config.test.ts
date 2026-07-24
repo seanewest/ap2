@@ -49,28 +49,93 @@ describe("loadApiConfig", () => {
       STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
     ]);
     expect(config.callerPolicy.automationClientId).toBe(DEVELOPMENT_AUTOMATION_CLIENT_ID);
-    expect(config.homerCba).toBeUndefined();
+    expect(config.simulatedUsersCba).toBeUndefined();
   });
 
-  it("accepts one complete Homer CBA configuration", () => {
+  it("accepts complete Homer CBA configuration under one client", () => {
     const config = loadApiConfig({
       AUTH_ISSUER: "https://issuer.example/",
       AUTH_AUDIENCE: "api://audience",
       AUTH_JWKS_URL: "https://issuer.example/keys",
-      HOMER_CBA_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+      SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
       HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
       HOMER_CBA_PFX_PASSPHRASE: "secret-passphrase",
     });
 
-    expect(config.homerCba).toEqual({
+    expect(config.simulatedUsersCba).toEqual({
       clientId: "11111111-1111-4111-8111-111111111111",
-      pfxPath: "/run/secrets/homer.pfx",
-      pfxPassphrase: "secret-passphrase",
+      homer: {
+        pfxPath: "/run/secrets/homer.pfx",
+        pfxPassphrase: "secret-passphrase",
+      },
+    });
+  });
+
+  it("accepts complete Cory CBA configuration under the existing shared client", () => {
+    const config = loadApiConfig({
+      AUTH_ISSUER: "https://issuer.example/",
+      AUTH_AUDIENCE: "api://audience",
+      AUTH_JWKS_URL: "https://issuer.example/keys",
+      SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+      HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
+      HOMER_CBA_PFX_PASSPHRASE: "homer-passphrase",
+      CORY_CBA_OBJECT_ID: "22222222-2222-4222-8222-222222222222",
+      CORY_CBA_PFX_PATH: "/run/secrets/cory.pfx",
+      CORY_CBA_PFX_PASSPHRASE: "cory-passphrase",
+    });
+
+    expect(config.simulatedUsersCba?.cory).toEqual({
+      objectId: "22222222-2222-4222-8222-222222222222",
+      pfxPath: "/run/secrets/cory.pfx",
+      pfxPassphrase: "cory-passphrase",
     });
   });
 
   it.each([
-    ["HOMER_CBA_CLIENT_ID", "11111111-1111-4111-8111-111111111111"],
+    ["CORY_CBA_OBJECT_ID", "22222222-2222-4222-8222-222222222222"],
+    ["CORY_CBA_PFX_PATH", "/run/secrets/cory.pfx"],
+    ["CORY_CBA_PFX_PASSPHRASE", "cory-passphrase"],
+  ])("rejects partial Cory CBA configuration with only %s", (name, value) => {
+    expect(() =>
+      loadApiConfig({
+        AUTH_ISSUER: "https://issuer.example/",
+        AUTH_AUDIENCE: "api://audience",
+        AUTH_JWKS_URL: "https://issuer.example/keys",
+        SIMULATED_USER_CLIENT_ID:
+          "11111111-1111-4111-8111-111111111111",
+        HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
+        HOMER_CBA_PFX_PASSPHRASE: "homer-passphrase",
+        [name]: value,
+      }),
+    ).toThrow("must be configured together");
+  });
+
+  it("rejects an invalid Cory object ID or non-absolute PFX path", () => {
+    const environment = {
+      AUTH_ISSUER: "https://issuer.example/",
+      AUTH_AUDIENCE: "api://audience",
+      AUTH_JWKS_URL: "https://issuer.example/keys",
+      SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+      HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
+      HOMER_CBA_PFX_PASSPHRASE: "homer-passphrase",
+      CORY_CBA_OBJECT_ID: "not-an-object-id",
+      CORY_CBA_PFX_PATH: "/run/secrets/cory.pfx",
+      CORY_CBA_PFX_PASSPHRASE: "cory-passphrase",
+    };
+    expect(() => loadApiConfig(environment)).toThrow(
+      "CORY_CBA_OBJECT_ID must be a UUID",
+    );
+    expect(() =>
+      loadApiConfig({
+        ...environment,
+        CORY_CBA_OBJECT_ID: "22222222-2222-4222-8222-222222222222",
+        CORY_CBA_PFX_PATH: "cory.pfx",
+      }),
+    ).toThrow("CORY_CBA_PFX_PATH must be an absolute path");
+  });
+
+  it.each([
+    ["SIMULATED_USER_CLIENT_ID", "11111111-1111-4111-8111-111111111111"],
     ["HOMER_CBA_PFX_PATH", "/run/secrets/homer.pfx"],
     ["HOMER_CBA_PFX_PASSPHRASE", "secret-passphrase"],
   ])("rejects partial Homer CBA configuration with only %s", (name, value) => {
@@ -89,17 +154,17 @@ describe("loadApiConfig", () => {
       AUTH_ISSUER: "https://issuer.example/",
       AUTH_AUDIENCE: "api://audience",
       AUTH_JWKS_URL: "https://issuer.example/keys",
-      HOMER_CBA_CLIENT_ID: "not-a-client-id",
+      SIMULATED_USER_CLIENT_ID: "not-a-client-id",
       HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
       HOMER_CBA_PFX_PASSPHRASE: "secret-passphrase",
     };
     expect(() => loadApiConfig(environment)).toThrow(
-      "HOMER_CBA_CLIENT_ID must be a UUID",
+      "SIMULATED_USER_CLIENT_ID must be a UUID",
     );
     expect(() =>
       loadApiConfig({
         ...environment,
-        HOMER_CBA_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+        SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
         HOMER_CBA_PFX_PATH: "homer.pfx",
       }),
     ).toThrow("HOMER_CBA_PFX_PATH must be an absolute path");

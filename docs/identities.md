@@ -29,9 +29,12 @@ Student tenant
 │   ├── Runtime managed identity
 │   │   └── calls Azure as the runtime
 │   │
-│   └── Homer simulated-user identity
-│       ├── signs in with CBA in a fresh headless browser context
-│       └── calls Microsoft Graph with a delegated token
+│   └── Shared simulated-user client
+│       ├── Homer: sends email and owns the fixed OneDrive proof
+│       ├── Cory: creates and cancels the fixed calendar rehearsal
+│       ├── signs each simulated user in with their own CBA certificate
+│       │   in a fresh headless browser context
+│       └── keeps delegated tokens only in isolated process-memory caches
 ```
 
 ## Backend identities

@@ -1,11 +1,17 @@
-import { STUDENT_TENANT_ID } from "./identity.js";
+import {
+  HOMER_IDENTITY,
+  MARGE_USER_PRINCIPAL_NAME,
+  type DelegatedGraphTokenProvider,
+} from "./simulated-user.js";
 
-export const HOMER_OBJECT_ID = "6e54e3a9-7651-4520-a331-047550ae6fca";
-export const HOMER_USER_PRINCIPAL_NAME =
-  "homer.simpson@corywest.onmicrosoft.com";
-export const HOMER_DISPLAY_NAME = "Homer Simpson";
-export const MARGE_USER_PRINCIPAL_NAME =
-  "marge.simpson@corywest.onmicrosoft.com";
+export const HOMER_OBJECT_ID = HOMER_IDENTITY.objectId;
+export const HOMER_USER_PRINCIPAL_NAME = HOMER_IDENTITY.userPrincipalName;
+export const HOMER_DISPLAY_NAME = HOMER_IDENTITY.displayName;
+export { MARGE_USER_PRINCIPAL_NAME };
+export type {
+  DelegatedGraphToken,
+  DelegatedGraphTokenProvider,
+} from "./simulated-user.js";
 export const SIMULATED_EMAIL_SUBJECT = "Dinner tonight";
 
 export const GRAPH_MAIL_SEND_SCOPE = "https://graph.microsoft.com/Mail.Send";
@@ -22,19 +28,6 @@ export interface SimulatedEmailResult {
 
 export interface SimulatedEmailOperation {
   send(): Promise<SimulatedEmailResult>;
-}
-
-export interface DelegatedGraphToken {
-  token: string;
-  identity: {
-    tenantId: string;
-    objectId: string;
-    userPrincipalName: string;
-  };
-}
-
-export interface DelegatedGraphTokenProvider {
-  getToken(scope: string): Promise<DelegatedGraphToken | null>;
 }
 
 export class DelegatedGraphSimulatedEmailOperation
@@ -59,7 +52,7 @@ export class DelegatedGraphSimulatedEmailOperation
       throw new Error("Token provider returned no delegated Graph token");
     }
     if (
-      delegatedToken.identity.tenantId !== STUDENT_TENANT_ID ||
+      delegatedToken.identity.tenantId !== HOMER_IDENTITY.tenantId ||
       delegatedToken.identity.objectId !== HOMER_OBJECT_ID ||
       delegatedToken.identity.userPrincipalName !==
         HOMER_USER_PRINCIPAL_NAME

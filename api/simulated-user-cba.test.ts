@@ -7,8 +7,9 @@ vi.mock("playwright", () => ({
 }));
 
 import {
-  HomerDelegatedTokenProvider,
+  SimulatedUserDelegatedTokenProvider,
   SimulatedUserCbaError,
+  SIMULATED_USER_REDIRECT_URI,
   type AuthorizationCodeBrowser,
 } from "./simulated-user-cba.js";
 import { STUDENT_TENANT_ID } from "./identity.js";
@@ -18,6 +19,13 @@ import {
   HOMER_OBJECT_ID,
   HOMER_USER_PRINCIPAL_NAME,
 } from "./simulated-email.js";
+import {
+  CORY_DISPLAY_NAME,
+  CORY_USER_PRINCIPAL_NAME,
+  HOMER_IDENTITY,
+  coryIdentity,
+} from "./simulated-user.js";
+import { GRAPH_CALENDARS_READ_WRITE_SCOPE } from "./calendar-meeting.js";
 
 const CLIENT_ID = "11111111-1111-4111-8111-111111111111";
 const NOW = Date.UTC(2026, 6, 23, 12);
@@ -81,9 +89,12 @@ function createProvider(options: {
   browser?: AuthorizationCodeBrowser;
   request?: typeof fetch;
   now?: () => number;
-}): HomerDelegatedTokenProvider {
-  return new HomerDelegatedTokenProvider({
+  allowedScopes?: readonly string[];
+}): SimulatedUserDelegatedTokenProvider {
+  return new SimulatedUserDelegatedTokenProvider({
     clientId: CLIENT_ID,
+    identity: HOMER_IDENTITY,
+    allowedScopes: options.allowedScopes ?? [GRAPH_MAIL_SEND_SCOPE],
     pfxPath: "/run/secrets/homer.pfx",
     pfxPassphrase: PASSPHRASE,
     browser: options.browser,
@@ -92,7 +103,7 @@ function createProvider(options: {
   });
 }
 
-describe("HomerDelegatedTokenProvider", () => {
+describe("SimulatedUserDelegatedTokenProvider", () => {
   it("uses public-client PKCE, requests only the bounded scopes, and verifies Homer", async () => {
     const token = accessToken();
     const { browser, acquire } = createBrowser();
@@ -114,6 +125,15 @@ describe("HomerDelegatedTokenProvider", () => {
     const browserRequest = browserCall[0];
     expect(browserRequest.pfxPath).toBe("/run/secrets/homer.pfx");
     expect(browserRequest.pfxPassphrase).toBe(PASSPHRASE);
+    expect(browserRequest.redirectUri).toBe(
+      "http://localhost/ap2-simulated-user-callback",
+    );
+    expect(SIMULATED_USER_REDIRECT_URI).toBe(
+      "http://localhost/ap2-simulated-user-callback",
+    );
+    expect(browserRequest.authorizeUrl.searchParams.get("redirect_uri")).toBe(
+      SIMULATED_USER_REDIRECT_URI,
+    );
     expect(browserRequest.authorizeUrl.searchParams.get("login_hint")).toBe(
       HOMER_USER_PRINCIPAL_NAME,
     );
@@ -140,6 +160,9 @@ describe("HomerDelegatedTokenProvider", () => {
     const tokenBody = tokenCall.init?.body as URLSearchParams;
     expect(tokenBody.get("grant_type")).toBe("authorization_code");
     expect(tokenBody.get("refresh_token")).toBeNull();
+    expect(tokenBody.get("redirect_uri")).toBe(
+      SIMULATED_USER_REDIRECT_URI,
+    );
     expect(tokenBody.get("scope")).not.toContain("offline_access");
     expect(
       Buffer.from(
@@ -297,6 +320,87 @@ describe("HomerDelegatedTokenProvider", () => {
       ],
     });
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("requests Homer's Files.ReadWrite scope explicitly", async () => {
+    const filesScope = "https://graph.microsoft.com/Files.ReadWrite";
+    const token = accessToken({ scp: "Files.ReadWrite User.Read" });
+    const { browser, acquire } = createBrowser();
+    const { request } = createRequest(token);
+    const provider = createProvider({
+      browser,
+      request,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, filesScope],
+    });
+
+    await expect(provider.getToken(filesScope)).resolves.toEqual(
+      delegatedToken(token),
+    );
+    expect(
+      acquire.mock.calls[0]?.[0].authorizeUrl.searchParams
+        .get("scope")
+        ?.split(" "),
+    ).toEqual([
+      "openid",
+      "profile",
+      "https://graph.microsoft.com/User.Read",
+      filesScope,
+    ]);
+  });
+
+  it("uses an isolated Cory identity and requests Calendars.ReadWrite explicitly", async () => {
+    const coryObjectId = "22222222-2222-4222-8222-222222222222";
+    const token = accessToken({
+      oid: coryObjectId,
+      scp: "Calendars.ReadWrite User.Read",
+    });
+    const { browser, acquire } = createBrowser();
+    const request = vi.fn(
+      async (input: string | URL | Request): Promise<Response> => {
+        if (input.toString().includes("/oauth2/v2.0/token")) {
+          return Response.json({ access_token: token });
+        }
+        return Response.json({
+          id: coryObjectId,
+          displayName: CORY_DISPLAY_NAME,
+          userPrincipalName: CORY_USER_PRINCIPAL_NAME,
+        });
+      },
+    ) as unknown as typeof fetch;
+    const provider = new SimulatedUserDelegatedTokenProvider({
+      clientId: CLIENT_ID,
+      identity: coryIdentity(coryObjectId),
+      allowedScopes: [GRAPH_CALENDARS_READ_WRITE_SCOPE],
+      pfxPath: "/run/secrets/cory.pfx",
+      pfxPassphrase: PASSPHRASE,
+      browser,
+      request,
+      now: () => NOW,
+    });
+
+    await expect(
+      provider.getToken(GRAPH_CALENDARS_READ_WRITE_SCOPE),
+    ).resolves.toEqual({
+      token,
+      identity: {
+        tenantId: STUDENT_TENANT_ID,
+        objectId: coryObjectId,
+        userPrincipalName: CORY_USER_PRINCIPAL_NAME,
+      },
+    });
+    expect(acquire.mock.calls[0]?.[0].pfxPath).toBe(
+      "/run/secrets/cory.pfx",
+    );
+    expect(
+      acquire.mock.calls[0]?.[0].authorizeUrl.searchParams
+        .get("scope")
+        ?.split(" "),
+    ).toEqual([
+      "openid",
+      "profile",
+      "https://graph.microsoft.com/User.Read",
+      GRAPH_CALENDARS_READ_WRITE_SCOPE,
+    ]);
   });
 });
 
