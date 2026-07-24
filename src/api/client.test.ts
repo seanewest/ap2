@@ -11,6 +11,7 @@ import {
   CATEGORY_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_EMAIL,
+  DRAFT_PROOF_SUBJECT,
   HttpAfterPartyApi,
   INBOX_RULE_PROOF_DISPLAY_NAME,
   OneDriveInviteFailureError,
@@ -18,6 +19,56 @@ import {
 } from "./client";
 
 describe("HTTP After Party API client", () => {
+  it.each([
+    ["createDraftProof", "POST", 201, {
+      state: "configured",
+      subject: DRAFT_PROOF_SUBJECT,
+    }],
+    ["removeDraftProof", "DELETE", 200, {
+      state: "removed",
+      subject: DRAFT_PROOF_SUBJECT,
+    }],
+  ] as const)("safely invokes %s without exposing extra fields", async (
+    method,
+    verb,
+    status,
+    result,
+  ) => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({ ...result, id: "raw-id", token: "raw-token" }, {
+        status,
+      }),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    );
+    await expect(client[method]("temporary-token")).resolves.toEqual(result);
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/draft-proof",
+      {
+        method: verb,
+        credentials: "omit",
+        redirect: "error",
+        headers: { Authorization: "Bearer temporary-token" },
+      },
+    );
+  });
+
+  it("rejects malformed draft results", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({ state: "configured", subject: "wrong" }, {
+        status: 201,
+      }),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      ).createDraftProof("token"),
+    ).rejects.toEqual(new ApiAccessError());
+  });
+
   it.each([
     ["createSharePointFileProof", "POST", 201, {
       state: "configured",

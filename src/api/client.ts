@@ -64,6 +64,18 @@ export const SHAREPOINT_FILE_PROOF_RUN_ID =
 export type SharePointFileProofResult =
   | { state: "configured"; name: typeof SHAREPOINT_FILE_PROOF_NAME }
   | { state: "removed"; name: typeof SHAREPOINT_FILE_PROOF_NAME };
+export const DRAFT_PROOF_RUN_ID = "ap2-draft-20260725-001";
+export const DRAFT_PROOF_SUBJECT =
+  "AP2 Pass 3 harmless draft — ap2-draft-20260725-001";
+export const DRAFT_PROOF_BODY =
+  "Harmless AP2 draft. This message must not be sent.";
+export const DRAFT_PROOF_RECIPIENTS = [
+  "kobe@corywest.onmicrosoft.com",
+  "marge.simpson@corywest.onmicrosoft.com",
+] as const;
+export type DraftProofResult =
+  | { state: "configured"; subject: typeof DRAFT_PROOF_SUBJECT }
+  | { state: "removed"; subject: typeof DRAFT_PROOF_SUBJECT };
 
 export const CALENDAR_MEETING_ORGANIZER =
   "cory@corywest.onmicrosoft.com";
@@ -176,6 +188,12 @@ export interface AfterPartyApi {
   removeSharePointFileProof(accessToken: string): Promise<
     Extract<SharePointFileProofResult, { state: "removed" }>
   >;
+  createDraftProof(accessToken: string): Promise<
+    Extract<DraftProofResult, { state: "configured" }>
+  >;
+  removeDraftProof(accessToken: string): Promise<
+    Extract<DraftProofResult, { state: "removed" }>
+  >;
 }
 
 export class ApiAccessError extends Error {
@@ -208,6 +226,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly inboxRuleProofUrl: string;
   private readonly categoryProofUrl: string;
   private readonly sharePointFileProofUrl: string;
+  private readonly draftProofUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
@@ -244,6 +263,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       "api/sharepoint-file-proof",
       `${baseUrl}/`,
     ).toString();
+    this.draftProofUrl = new URL("api/draft-proof", `${baseUrl}/`).toString();
     this.request = request.bind(globalThis);
   }
 
@@ -487,6 +507,30 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     return { state: "removed", name: SHAREPOINT_FILE_PROOF_NAME } as const;
   }
 
+  async createDraftProof(accessToken: string) {
+    await this.fixedProofRequest(
+      this.draftProofUrl,
+      accessToken,
+      "POST",
+      201,
+      "configured",
+      isSafeDraftProofResult,
+    );
+    return { state: "configured", subject: DRAFT_PROOF_SUBJECT } as const;
+  }
+
+  async removeDraftProof(accessToken: string) {
+    await this.fixedProofRequest(
+      this.draftProofUrl,
+      accessToken,
+      "DELETE",
+      200,
+      "removed",
+      isSafeDraftProofResult,
+    );
+    return { state: "removed", subject: DRAFT_PROOF_SUBJECT } as const;
+  }
+
   private async oneDriveProofRequest<T extends OneDriveProofResult["state"]>(
     accessToken: string,
     method: "POST" | "DELETE",
@@ -555,6 +599,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       if (error === "sharepoint_file_state_conflict") {
         throw new ApiAccessError(
           "The SharePoint file proof is not in the expected state. Nothing was changed.",
+        );
+      }
+      if (error === "draft_state_conflict") {
+        throw new ApiAccessError(
+          "The unsent-draft proof is not in the expected state. Nothing was changed.",
         );
       }
       if (failureContext === "calendar") {
@@ -775,6 +824,13 @@ function isSafeSharePointFileProofResult(
   }
   const result = value as Record<string, unknown>;
   return result.name === SHAREPOINT_FILE_PROOF_NAME &&
+    (result.state === "removed" || result.state === "configured");
+}
+
+function isSafeDraftProofResult(value: unknown): value is DraftProofResult {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as Record<string, unknown>;
+  return result.subject === DRAFT_PROOF_SUBJECT &&
     (result.state === "removed" || result.state === "configured");
 }
 

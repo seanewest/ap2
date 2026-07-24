@@ -318,3 +318,19 @@ prevents deleting across a concurrent change. A successful delete moves the
 file to the SharePoint recycle bin. The experiment never lists, shares, retries,
 polls, or permanently purges content. Browser state records an uncertain attempt
 before mutation, while exact-path Graph reconciliation owns correctness.
+
+## One unsent-draft rehearsal
+
+`POST` and `DELETE /api/draft-proof` are separate explicit actions. They reuse
+Cory's existing CBA settings and delegated `Mail.ReadWrite`; signing in does not
+inspect or change Cory's mailbox.
+
+Each action performs one bounded exact-marker query in Cory's Drafts folder.
+Create accepts one exact existing draft or creates one unsent message with the
+fixed harmless subject and body, only Kobe and Marge in To, empty Cc/Bcc, low
+importance, and no attachments. Remove deletes one exact marker and full-draft
+match; absence is already removed. Duplicate, paginated, malformed, sent, or
+mismatched results cause no mutation. Graph mutations are never retried. The
+feature has no send, reply, or forward route, and it never reads a recipient
+mailbox. Browser state records an uncertain attempt before mutation; the marker
+query owns correctness.
