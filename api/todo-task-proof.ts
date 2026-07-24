@@ -30,7 +30,9 @@ export class DelegatedGraphTodoTaskProof implements TodoTaskProofOperation {
   async create(): Promise<TodoTaskProofResult> {
     const token = await this.coryToken();
     const listId = await this.defaultListId(token.token);
+    this.requireRetainedList(listId);
     const existing = await this.findExact(token.token, listId);
+    this.requireRetainedTask(existing);
     if (existing) {
       this.retain(listId, existing.id);
       return result("configured");
@@ -60,16 +62,12 @@ export class DelegatedGraphTodoTaskProof implements TodoTaskProofOperation {
   async remove(): Promise<TodoTaskProofResult> {
     const token = await this.coryToken();
     const listId = await this.defaultListId(token.token);
+    this.requireRetainedList(listId);
     const existing = await this.findExact(token.token, listId);
+    this.requireRetainedTask(existing);
     if (!existing) {
       this.retained = undefined;
       return result("removed");
-    }
-    if (
-      this.retained &&
-      (this.retained.listId !== listId || this.retained.taskId !== existing.id)
-    ) {
-      throw new TodoTaskProofConflictError();
     }
     const response = await this.request(
       `${tasksUrl(listId)}/${encodeURIComponent(existing.id)}`,
@@ -159,6 +157,18 @@ export class DelegatedGraphTodoTaskProof implements TodoTaskProofOperation {
       throw new TodoTaskProofConflictError();
     }
     this.retained = { listId, taskId };
+  }
+
+  private requireRetainedList(listId: string): void {
+    if (this.retained && this.retained.listId !== listId) {
+      throw new TodoTaskProofConflictError();
+    }
+  }
+
+  private requireRetainedTask(existing: { id: string } | undefined): void {
+    if (this.retained && this.retained.taskId !== existing?.id) {
+      throw new TodoTaskProofConflictError();
+    }
   }
 }
 

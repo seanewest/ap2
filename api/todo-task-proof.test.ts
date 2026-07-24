@@ -170,20 +170,49 @@ describe("DelegatedGraphTodoTaskProof", () => {
     });
     expect(absent.request).toHaveBeenCalledTimes(2);
   });
-  it("rejects retained identity changes and never retries deletion", async () => {
-    const mismatch = fixture([
-      lists(),
-      tasks(),
-      Response.json(task(), { status: 201 }),
-      lists([{ ...defaultList, id: "changed" }]),
-      tasks([task()]),
-    ]);
-    await mismatch.operation.create();
-    await expect(mismatch.operation.remove()).rejects.toBeInstanceOf(
-      TodoTaskProofConflictError,
-    );
-    expect(mismatch.request).toHaveBeenCalledTimes(5);
-
+  it.each(["create", "remove"] as const)(
+    "refuses retained + absent on %s without another mutation",
+    async (action) => {
+      const test = fixture([
+        lists(), tasks(), Response.json(task(), { status: 201 }),
+        lists(), tasks(),
+      ]);
+      await test.operation.create();
+      await expect(test.operation[action]()).rejects.toBeInstanceOf(
+        TodoTaskProofConflictError,
+      );
+      expect(test.request).toHaveBeenCalledTimes(5);
+    },
+  );
+  it.each(["create", "remove"] as const)(
+    "refuses a retained list move on %s before reading tasks",
+    async (action) => {
+      const test = fixture([
+        lists(), tasks(), Response.json(task(), { status: 201 }),
+        lists([{ ...defaultList, id: "changed" }]),
+      ]);
+      await test.operation.create();
+      await expect(test.operation[action]()).rejects.toBeInstanceOf(
+        TodoTaskProofConflictError,
+      );
+      expect(test.request).toHaveBeenCalledTimes(4);
+    },
+  );
+  it.each(["create", "remove"] as const)(
+    "refuses a retained task identity mismatch on %s without mutation",
+    async (action) => {
+      const test = fixture([
+        lists(), tasks(), Response.json(task(), { status: 201 }),
+        lists(), tasks([task({ id: "moved" })]),
+      ]);
+      await test.operation.create();
+      await expect(test.operation[action]()).rejects.toBeInstanceOf(
+        TodoTaskProofConflictError,
+      );
+      expect(test.request).toHaveBeenCalledTimes(5);
+    },
+  );
+  it("never retries failed deletion", async () => {
     const failed = fixture([
       lists(),
       tasks([task()]),
