@@ -62,6 +62,7 @@ type CalendarMeetingStage =
   | "not-started"
   | "uncertain"
   | "configured"
+  | "cancellation-uncertain"
   | "cancellation-accepted";
 
 type CalendarMeetingState = {
@@ -501,6 +502,8 @@ export function createAfterPartyApp(
     const simulatedEmail = state.simulatedEmail;
     const oneDriveProof = state.oneDriveProof;
     const previousStage = state.calendarMeeting.stage;
+    const attemptedStage =
+      action === "create" ? "uncertain" : "cancellation-uncertain";
     setState({
       kind: "signed-in",
       account,
@@ -520,7 +523,7 @@ export function createAfterPartyApp(
       if (!isCurrentSignedInAccount(state, account)) {
         return;
       }
-      persistCalendarMeetingStage(storage, account, "uncertain");
+      persistCalendarMeetingStage(storage, account, attemptedStage);
       setState({
         kind: "signed-in",
         account,
@@ -529,7 +532,7 @@ export function createAfterPartyApp(
         simulatedEmail,
         oneDriveProof,
         calendarMeeting: {
-          stage: "uncertain",
+          stage: attemptedStage,
           activity: action === "create" ? "creating" : "cancelling",
         },
       });
@@ -577,7 +580,7 @@ export function createAfterPartyApp(
         error instanceof AccessTokenError || error instanceof ApiAccessError
           ? error.message
           : "The calendar change was not confirmed. Do not repeat it.";
-      persistCalendarMeetingStage(storage, account, "uncertain");
+      persistCalendarMeetingStage(storage, account, attemptedStage);
       setState({
         kind: "signed-in",
         account,
@@ -586,7 +589,7 @@ export function createAfterPartyApp(
         simulatedEmail,
         oneDriveProof,
         calendarMeeting: {
-          stage: "uncertain",
+          stage: attemptedStage,
           activity: "idle",
           message,
         },
@@ -918,11 +921,15 @@ function createCalendarMeetingPanel(
           ? "Calendar rehearsal: Configured. Microsoft accepted the meeting and invitations; attendee receipt or response is not confirmed."
           : state.stage === "cancellation-accepted"
             ? "Calendar rehearsal: Cancellation accepted. Attendee receipt is not confirmed."
-            : "Calendar rehearsal: the last change outcome is uncertain. Do not repeat either action.";
+            : state.stage === "cancellation-uncertain"
+              ? "Calendar rehearsal: cancellation is uncertain. Do not repeat it."
+              : "Calendar rehearsal: creation is uncertain. Do not create again; Cancel can explicitly find and cancel one exact matching meeting.";
     panel.append(
       createStatus(
         message,
-        state.stage === "uncertain" ? "notice" : "status",
+        ["uncertain", "cancellation-uncertain"].includes(state.stage)
+          ? "notice"
+          : "status",
       ),
     );
   }
@@ -941,7 +948,8 @@ function createCalendarMeetingPanel(
       "Cancel calendar meeting",
       "cancel-calendar-meeting",
       "secondary",
-      apiOperationLoading || state.stage !== "configured",
+      apiOperationLoading ||
+        !["configured", "uncertain"].includes(state.stage),
     ),
   );
   return panel;
@@ -1176,7 +1184,7 @@ function isAllowedCalendarMeetingAction(
 ): boolean {
   return action === "create"
     ? stage === "not-started"
-    : stage === "configured";
+    : stage === "configured" || stage === "uncertain";
 }
 
 function calendarMeetingStage(
@@ -1223,6 +1231,7 @@ function readCalendarMeetingStage(
   const value = storage.getItem(calendarMeetingStorageKey(account));
   return value === "uncertain" ||
       value === "configured" ||
+      value === "cancellation-uncertain" ||
       value === "cancellation-accepted"
     ? value
     : "not-started";

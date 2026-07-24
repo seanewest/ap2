@@ -155,22 +155,32 @@ transaction ID `c61d88a4-92bf-4f16-aa5b-efa6dbb16e92` and:
   recurrence, attachment, or link
 
 Only a strict `201` response matching the fixed meeting becomes `Configured`.
+For Graph's documented HTML normalization, the response must retain the exact
+full fixed `bodyPreview` and report HTML body content; AP2 does not interpret
+Graph's generated HTML markup.
 That means Graph accepted the meeting and invitations; it does not claim
 attendee receipt or response. The validated event ID remains private in the
 operation's process memory.
 
-Cancel uses only that retained validated ID and submits one Graph
+Cancel normally uses that retained validated ID. If process state was lost or
+Create returned an uncertain result, the explicit Cancel action first queries
+Cory's exact 15-minute calendar window and proceeds only when the response
+contains exactly one non-cancelled event matching the full immutable contract,
+including the fixed transaction ID. It then submits one Graph
 `POST /me/events/{id}/cancel` request with the fixed harmless cleanup comment.
+Zero, duplicate, mismatched, cancelled, malformed, or paginated recovery
+results cause no mutation.
 Only `202` becomes `Cancellation accepted`. Neither mutation is retried.
 Before either API mutation, the SPA stores an `uncertain` stage for the signed-in
-operator. Uncertain, configured, and cancellation-accepted stages block a
-second create.
+operator. Every stage after Create starts blocks a second create; uncertain and
+configured stages offer the separate explicit Cancel action. Once cancellation
+starts, a separate cancellation-uncertain stage blocks another attempt if its
+response is not confirmed. Signing in never performs recovery.
 
-A process-local busy/completed boundary permits one create attempt followed by
-one cancel attempt across operator and Dev-app callers. It has no database,
-queue, durable lock, or recovery after a replica restart. The live proof
-therefore requires `maxReplicas=1` and the same running replica through create,
-observation, and cancellation.
+A process-local busy/completed boundary serializes create and cancel across
+operator and Dev-app callers. It has no database, queue, or durable lock; the
+narrow read-only lookup is used only by an explicit Cancel after process state
+loss. The live proof therefore requires `maxReplicas=1`.
 
 Production enables the calendar operation only when the existing Homer/shared
 client configuration and all three Cory settings are present:

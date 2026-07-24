@@ -797,7 +797,7 @@ describe("After Party authentication UI", () => {
     expect(api.cancelCalendarMeeting).toHaveBeenCalledWith("temporary-token");
     expect(localStorage.getItem(
       "ap2.calendar-meeting.student-tenant-id.student-object-id",
-    )).toBe("uncertain");
+    )).toBe("cancellation-uncertain");
     expect(calendarCreateButton()?.disabled).toBe(true);
     expect(calendarCancelButton()?.disabled).toBe(true);
     calendarCancelButton()?.click();
@@ -818,9 +818,86 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).not.toContain("temporary-token");
   });
 
+  it("offers explicit cancellation recovery from an uncertain calendar state", async () => {
+    localStorage.setItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      "uncertain",
+    );
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.cancelCalendarMeeting.mockResolvedValue({
+      state: "cancellation-accepted",
+      organizer: "cory@corywest.onmicrosoft.com",
+      subject: "AP2 Pass 3 calendar rehearsal — no action required",
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+
+    expect(api.cancelCalendarMeeting).not.toHaveBeenCalled();
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(root.textContent).toContain(
+      "Do not create again; Cancel can explicitly find and cancel one exact matching meeting.",
+    );
+    expect(calendarCreateButton()?.disabled).toBe(true);
+    expect(calendarCancelButton()?.disabled).toBe(false);
+
+    calendarCancelButton()?.click();
+    await nextTask();
+
+    expect(api.createCalendarMeeting).not.toHaveBeenCalled();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledWith("temporary-token");
+    expect(localStorage.getItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+    )).toBe("cancellation-accepted");
+    expect(root.textContent).toContain(
+      "Calendar rehearsal: Cancellation accepted",
+    );
+    expect(calendarCancelButton()?.disabled).toBe(true);
+  });
+
+  it("does not offer a second cancellation after an uncertain response", async () => {
+    localStorage.setItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+      "uncertain",
+    );
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.cancelCalendarMeeting.mockRejectedValue(
+      new ApiAccessError("Cancellation was not confirmed."),
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+
+    await app.start();
+    calendarCancelButton()?.click();
+    await nextTask();
+
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+    expect(localStorage.getItem(
+      "ap2.calendar-meeting.student-tenant-id.student-object-id",
+    )).toBe("cancellation-uncertain");
+    expect(root.textContent).toContain(
+      "Calendar rehearsal: cancellation is uncertain. Do not repeat it.",
+    );
+    expect(calendarCancelButton()?.disabled).toBe(true);
+
+    calendarCancelButton()?.click();
+    expect(api.cancelCalendarMeeting).toHaveBeenCalledOnce();
+  });
+
   it.each([
-    ["uncertain", true, true],
+    ["uncertain", true, false],
     ["configured", true, false],
+    ["cancellation-uncertain", true, true],
     ["cancellation-accepted", true, true],
   ] as const)(
     "restores calendar stage %s without an automatic call",

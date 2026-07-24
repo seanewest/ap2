@@ -9,6 +9,7 @@ import {
 
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
 const GRAPH_EVENTS_URL = `${GRAPH_ROOT}/me/events`;
+const GRAPH_CALENDAR_VIEW_URL = `${GRAPH_ROOT}/me/calendarView`;
 
 export const GRAPH_CALENDARS_READ_WRITE_SCOPE =
   "https://graph.microsoft.com/Calendars.ReadWrite";
@@ -68,6 +69,7 @@ type CalendarMeetingStage =
   | "not-started"
   | "uncertain"
   | "configured"
+  | "cancellation-uncertain"
   | "cancellation-accepted";
 
 export class ProcessLocalCalendarMeetingBoundary
@@ -88,28 +90,37 @@ export class ProcessLocalCalendarMeetingBoundary
     if (this.#stage !== "not-started") {
       throw new CalendarMeetingConflictError();
     }
-    return this.#run("configured", () => this.#operation.create());
+    return this.#run(
+      "uncertain",
+      "configured",
+      () => this.#operation.create(),
+    );
   }
 
   cancel(): ReturnType<CalendarMeetingOperation["cancel"]> {
     if (this.#busy) {
       throw new CalendarMeetingBusyError();
     }
-    if (this.#stage !== "configured") {
+    if (
+      this.#stage === "cancellation-uncertain" ||
+      this.#stage === "cancellation-accepted"
+    ) {
       throw new CalendarMeetingConflictError();
     }
     return this.#run(
+      "cancellation-uncertain",
       "cancellation-accepted",
       () => this.#operation.cancel(),
     );
   }
 
   async #run<T>(
+    attemptedStage: CalendarMeetingStage,
     completedStage: CalendarMeetingStage,
     operation: () => Promise<T>,
   ): Promise<T> {
     this.#busy = true;
-    this.#stage = "uncertain";
+    this.#stage = attemptedStage;
     try {
       const result = await operation();
       this.#stage = completedStage;
@@ -171,11 +182,8 @@ export class DelegatedGraphCalendarMeetingOperation
   async cancel(): Promise<
     Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
   > {
-    const eventId = this.#eventId;
-    if (!eventId) {
-      throw new CalendarMeetingConflictError();
-    }
     const cory = await this.#coryToken();
+    const eventId = this.#eventId ?? await this.#recoverEventId(cory);
     const response = await this.#request(
       `${GRAPH_EVENTS_URL}/${encodeURIComponent(eventId)}/cancel`,
       {
@@ -198,6 +206,61 @@ export class DelegatedGraphCalendarMeetingOperation
       organizer: CORY_USER_PRINCIPAL_NAME,
       subject: CALENDAR_MEETING_SUBJECT,
     };
+  }
+
+  async #recoverEventId(cory: DelegatedGraphToken): Promise<string> {
+    const url = new URL(GRAPH_CALENDAR_VIEW_URL);
+    url.searchParams.set("startDateTime", CALENDAR_MEETING_START);
+    url.searchParams.set("endDateTime", CALENDAR_MEETING_END);
+    url.searchParams.set(
+      "$select",
+      [
+        "id",
+        "subject",
+        "body",
+        "bodyPreview",
+        "start",
+        "end",
+        "attendees",
+        "organizer",
+        "isOrganizer",
+        "type",
+        "showAs",
+        "isReminderOn",
+        "responseRequested",
+        "allowNewTimeProposals",
+        "importance",
+        "sensitivity",
+        "isOnlineMeeting",
+        "hasAttachments",
+        "recurrence",
+        "location",
+        "transactionId",
+        "isCancelled",
+      ].join(","),
+    );
+    url.searchParams.set("$top", "2");
+    const response = await this.#request(url, {
+      method: "GET",
+      redirect: "error",
+      headers: {
+        Authorization: `Bearer ${cory.token}`,
+        Prefer: 'outlook.timezone="UTC"',
+      },
+    });
+    const value = await readJson(response);
+    if (
+      response.status !== 200 ||
+      !isRecord(value) ||
+      !Array.isArray(value.value) ||
+      value.value.length !== 1 ||
+      value["@odata.nextLink"] !== undefined ||
+      !isExactRecoverableMeeting(value.value[0])
+    ) {
+      throw new CalendarMeetingConflictError();
+    }
+    this.#eventId = value.value[0].id;
+    return value.value[0].id;
   }
 
   async #coryToken(): Promise<DelegatedGraphToken> {
@@ -299,48 +362,14 @@ function isExactBody(value: unknown, bodyPreview: unknown): boolean {
   }
   return (
     value.contentType === "html" &&
-    bodyPreview === CALENDAR_MEETING_BODY &&
-    normalizedGraphHtmlText(value.content) === CALENDAR_MEETING_BODY
+    bodyPreview === CALENDAR_MEETING_BODY
   );
 }
 
-function normalizedGraphHtmlText(value: string): string | undefined {
-  if (value.length > 4_096 || /<!--|<!doctype/i.test(value)) {
-    return undefined;
-  }
-  const match = /^(?:\s*<html>\s*)?(?:<head>\s*(?:<meta\s+http-equiv=(?:"Content-Type"|'Content-Type')\s+content=(?:"text\/html;\s*charset=utf-8"|'text\/html;\s*charset=utf-8')\s*\/?>\s*(?:<meta\s+content=(?:"text\/html;\s*charset=us-ascii"|'text\/html;\s*charset=us-ascii')\s*\/?>\s*)?)?<\/head>\s*)?(?:<body>\s*)?([\s\S]*?)(?:\s*<\/body>)?(?:\s*<\/html>)?\s*$/i.exec(
-    value,
-  );
-  if (!match) {
-    return undefined;
-  }
-  const body = match[1];
-  if (body === undefined) {
-    return undefined;
-  }
-  const withoutBreaks = body.replace(/<br\s*\/?>/gi, "\n");
-  const withoutSafeWrappers = withoutBreaks.replace(
-    /<\/?(?:div|p|span)>/gi,
-    " ",
-  );
-  if (/[<>]/.test(withoutSafeWrappers)) {
-    return undefined;
-  }
-  const decoded = decodeApprovedHtmlEntities(withoutSafeWrappers);
-  return decoded?.replace(/\s+/g, " ").trim();
-}
-
-function decodeApprovedHtmlEntities(value: string): string | undefined {
-  const decoded = value
-    .replace(/&nbsp;|&#160;|&#xA0;/gi, " ")
-    .replace(/&amp;|&#38;|&#x26;/gi, "&")
-    .replace(/&quot;|&#34;|&#x22;/gi, '"')
-    .replace(/&#39;|&#x27;/gi, "'")
-    .replace(/&lt;|&#60;|&#x3C;/gi, "<")
-    .replace(/&gt;|&#62;|&#x3E;/gi, ">");
-  return /&(?:#\d+|#x[0-9a-f]+|[a-z]+);/i.test(decoded)
-    ? undefined
-    : decoded;
+function isExactRecoverableMeeting(
+  value: unknown,
+): value is Record<string, unknown> & { id: string } {
+  return isExactCreatedMeeting(value) && value.isCancelled === false;
 }
 
 function isExactDateTime(value: unknown, expected: string): boolean {
