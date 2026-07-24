@@ -8,6 +8,7 @@ import {
   CALENDAR_MEETING_ORGANIZER,
   CALENDAR_MEETING_START,
   CALENDAR_MEETING_SUBJECT,
+  CATEGORY_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_EMAIL,
   HttpAfterPartyApi,
@@ -16,6 +17,51 @@ import {
 } from "./client";
 
 describe("HTTP After Party API client", () => {
+  it.each([
+    ["createCategoryProof", "POST", 201, {
+      state: "configured",
+      displayName: CATEGORY_PROOF_DISPLAY_NAME,
+    }],
+    ["removeCategoryProof", "DELETE", 200, {
+      state: "removed",
+      displayName: CATEGORY_PROOF_DISPLAY_NAME,
+    }],
+  ] as const)("safely invokes %s", async (method, verb, status, result) => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(result, { status }),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    );
+
+    await expect(client[method]("category-token")).resolves.toEqual(result);
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/category-proof",
+      {
+        method: verb,
+        credentials: "omit",
+        redirect: "error",
+        headers: { Authorization: "Bearer category-token" },
+      },
+    );
+  });
+
+  it("rejects malformed category results", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        state: "configured",
+        displayName: "wrong",
+      }, { status: 201 }),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      ).createCategoryProof("token"),
+    ).rejects.toEqual(new ApiAccessError());
+  });
+
   it.each([
     ["createInboxRuleProof", "POST", 201, {
       state: "configured",

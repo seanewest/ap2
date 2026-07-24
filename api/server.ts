@@ -11,6 +11,7 @@ import {
   CalendarMeetingConflictError,
   type CalendarMeetingOperation,
 } from "./calendar-meeting.js";
+import { CategoryProofConflictError, type CategoryProofOperation } from "./category-proof.js";
 import { ContactProofConflictError, type ContactProofOperation } from "./contact-proof.js";
 import {
   InboxRuleProofConflictError,
@@ -35,6 +36,7 @@ export interface ApiDependencies {
   calendarMeetingOperation?: CalendarMeetingOperation;
   contactProofOperation?: ContactProofOperation;
   inboxRuleProofOperation?: InboxRuleProofOperation;
+  categoryProofOperation?: CategoryProofOperation;
   allowedOrigin?: string;
 }
 
@@ -73,7 +75,8 @@ async function route(
   if (
     request.method === "OPTIONS" &&
     (pathname === "/api/contact-proof" ||
-      pathname === "/api/inbox-rule-proof")
+      pathname === "/api/inbox-rule-proof" ||
+      pathname === "/api/category-proof")
   ) {
     handleProtectedPreflight(request, response, origin, ["POST", "DELETE"]);
     return;
@@ -138,13 +141,15 @@ async function route(
   if (
     (request.method === "POST" || request.method === "DELETE") &&
     (pathname === "/api/contact-proof" ||
-      pathname === "/api/inbox-rule-proof")
+      pathname === "/api/inbox-rule-proof" ||
+      pathname === "/api/category-proof")
   ) {
     const action = request.method === "POST" ? "create" : "remove";
-    const operation =
-      pathname === "/api/contact-proof"
-        ? dependencies.contactProofOperation
-        : dependencies.inboxRuleProofOperation;
+    const operation = {
+      "/api/contact-proof": dependencies.contactProofOperation,
+      "/api/inbox-rule-proof": dependencies.inboxRuleProofOperation,
+      "/api/category-proof": dependencies.categoryProofOperation,
+    }[pathname];
     await handleAuthorizedRequest(
       request,
       response,
@@ -358,6 +363,10 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof InboxRuleProofConflictError) {
       sendJson(response, 409, { error: "inbox_rule_state_conflict" });
+      return;
+    }
+    if (error instanceof CategoryProofConflictError) {
+      sendJson(response, 409, { error: "category_state_conflict" });
       return;
     }
     throw error;
