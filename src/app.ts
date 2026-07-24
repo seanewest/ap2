@@ -698,7 +698,8 @@ function createOneDriveProofPanel(
       "Create and share OneDrive proof",
       "share-onedrive-proof",
       "primary",
-      apiOperationLoading || state.stage !== "not-started",
+      apiOperationLoading ||
+        (state.stage !== "not-started" && state.stage !== "removed"),
     ),
     createButton(
       "Clean up OneDrive proof",
@@ -901,7 +902,7 @@ function isAllowedOneDriveAction(
   action: "share" | "remove",
 ): boolean {
   if (action === "share") {
-    return stage === "not-started";
+    return stage === "not-started" || stage === "removed";
   }
   return stage === "configured" || stage === "uncertain";
 }

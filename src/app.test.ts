@@ -543,13 +543,42 @@ describe("After Party authentication UI", () => {
       "Return here and click Clean up OneDrive proof when finished",
     );
     expect(oneDriveVerifyButton()).toBeNull();
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    oneDriveShareButton()?.click();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(1);
 
     oneDriveRemoveButton()?.click();
     await nextTask();
     expect(api.removeOneDriveProof).toHaveBeenCalledWith("temporary-token");
     expect(root.textContent).toContain("removed to Homer's recycle bin");
-    expect(oneDriveShareButton()?.disabled).toBe(true);
+    expect(oneDriveShareButton()?.disabled).toBe(false);
     expect(oneDriveRemoveButton()?.disabled).toBe(true);
+
+    const rerun = createDeferred<
+      Extract<OneDriveProofResult, { state: "configured" }>
+    >();
+    api.shareOneDriveProof.mockReturnValueOnce(rerun.promise);
+    oneDriveShareButton()?.click();
+    await nextTask();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(2);
+    expect(localStorage.getItem(
+      "ap2.onedrive-share-proof.student-tenant-id.student-object-id",
+    )).toBe("uncertain");
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    oneDriveShareButton()?.click();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(2);
+
+    rerun.resolve({
+      state: "configured",
+      path: "/AP2-OneDrive-share-proof.txt",
+      owner: "homer.simpson@corywest.onmicrosoft.com",
+      recipient: "marge.simpson@corywest.onmicrosoft.com",
+      access: "read",
+    });
+    await nextTask();
+    expect(oneDriveShareButton()?.disabled).toBe(true);
+    oneDriveShareButton()?.click();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(2);
     expect(root.textContent).not.toContain("temporary-token");
   });
 
@@ -574,6 +603,8 @@ describe("After Party authentication UI", () => {
     )).toBe("uncertain");
     expect(oneDriveShareButton()?.disabled).toBe(true);
     expect(simulatedEmailButton()?.disabled).toBe(true);
+    oneDriveShareButton()?.click();
+    expect(api.shareOneDriveProof).toHaveBeenCalledTimes(1);
 
     document.body.innerHTML = '<div id="app"></div>';
     root = document.querySelector<HTMLElement>("#app")!;
