@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { STUDENT_CBA_TEST_OPERATOR_OBJECT_ID } from "../api/identity";
 import { ApiRouteLedger } from "./api-route-ledger";
 import {
   FIRST_API_RESPONSE_TIMEOUT_MS,
@@ -82,7 +83,13 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
   });
   await page.getByRole("button", { name: "Check API access" }).click();
   await expect(page.getByText("Checking API access…")).toBeVisible();
-  expect((await Promise.race([whoAmIResponse, whoAmIFailure])).status()).toBe(200);
+  const whoAmI = await Promise.race([whoAmIResponse, whoAmIFailure]);
+  expect(whoAmI.status()).toBe(200);
+  await expect(whoAmI.json()).resolves.toMatchObject({
+    callerType: "delegated",
+    objectId: STUDENT_CBA_TEST_OPERATOR_OBJECT_ID,
+    tenantId: STUDENT_TENANT_ID,
+  });
   await expect(page.getByText("API access confirmed.")).toBeVisible();
   await expect(
     page.locator("dd").getByText("delegated", { exact: true }),
