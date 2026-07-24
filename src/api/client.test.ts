@@ -16,6 +16,7 @@ import {
   INBOX_RULE_PROOF_DISPLAY_NAME,
   OneDriveInviteFailureError,
   SHAREPOINT_FILE_PROOF_NAME,
+  TODO_TASK_PROOF_TITLE,
 } from "./client";
 
 describe("HTTP After Party API client", () => {
@@ -66,6 +67,46 @@ describe("HTTP After Party API client", () => {
         "https://student-api.example",
         request,
       ).createDraftProof("token"),
+    ).rejects.toEqual(new ApiAccessError());
+  });
+
+  it.each([
+    ["createTodoTaskProof", "POST", 201, "configured"],
+    ["removeTodoTaskProof", "DELETE", 200, "removed"],
+  ] as const)("safely invokes %s", async (method, verb, status, state) => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        state,
+        title: TODO_TASK_PROOF_TITLE,
+        id: "not-exposed",
+      }, { status }),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    );
+    await expect(client[method]("temporary-token")).resolves.toEqual({
+      state,
+      title: TODO_TASK_PROOF_TITLE,
+    });
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/todo-task-proof",
+      expect.objectContaining({
+        method: verb,
+        headers: { Authorization: "Bearer temporary-token" },
+      }),
+    );
+  });
+
+  it("rejects malformed To Do task results", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({ state: "configured", title: "wrong" }, { status: 201 }),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      ).createTodoTaskProof("token"),
     ).rejects.toEqual(new ApiAccessError());
   });
 

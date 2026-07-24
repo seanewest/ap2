@@ -17,6 +17,10 @@ import {
   DelegatedGraphDraftProof,
   GRAPH_MAIL_READ_WRITE_SCOPE,
 } from "./draft-proof.js";
+import {
+  DelegatedGraphTodoTaskProof,
+  GRAPH_TASKS_READ_WRITE_SCOPE,
+} from "./todo-task-proof.js";
 import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { GraphSharePointFileProof } from "./sharepoint-file-proof.js";
@@ -77,6 +81,7 @@ const coryTokenProvider =
           GRAPH_CONTACTS_READ_WRITE_SCOPE,
           GRAPH_MAILBOX_SETTINGS_READ_WRITE_SCOPE,
           GRAPH_MAIL_READ_WRITE_SCOPE,
+          GRAPH_TASKS_READ_WRITE_SCOPE,
         ],
       })
     : undefined;
@@ -102,6 +107,10 @@ const draftProofOperation =
   coryTokenProvider && cory
     ? new DelegatedGraphDraftProof(coryTokenProvider, cory)
     : undefined;
+const todoTaskProofOperation =
+  coryTokenProvider && cory
+    ? new DelegatedGraphTodoTaskProof(coryTokenProvider, cory)
+    : undefined;
 const managedIdentity = new ManagedIdentityCredential();
 const server = createApiServer({
   tokenVerifier,
@@ -114,6 +123,7 @@ const server = createApiServer({
   inboxRuleProofOperation,
   categoryProofOperation,
   draftProofOperation,
+  todoTaskProofOperation,
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
   allowedOrigin: config.allowedOrigin,
 });

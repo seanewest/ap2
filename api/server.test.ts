@@ -31,6 +31,11 @@ import {
   type DraftProofResult,
 } from "./draft-proof.js";
 import {
+  TODO_TASK_TITLE,
+  TodoTaskProofConflictError,
+  type TodoTaskProofResult,
+} from "./todo-task-proof.js";
+import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   REQUIRED_APPLICATION_ROLE,
   REQUIRED_DELEGATED_SCOPE,
@@ -160,6 +165,14 @@ const draftProofOperation = {
   create: vi.fn().mockResolvedValue(draftResults.configured),
   remove: vi.fn().mockResolvedValue(draftResults.removed),
 };
+const todoTaskResults = {
+  configured: { state: "configured", title: TODO_TASK_TITLE },
+  removed: { state: "removed", title: TODO_TASK_TITLE },
+} as const satisfies Record<string, TodoTaskProofResult>;
+const todoTaskProofOperation = {
+  create: vi.fn().mockResolvedValue(todoTaskResults.configured),
+  remove: vi.fn().mockResolvedValue(todoTaskResults.removed),
+};
 const oneDriveResults = {
   configured: {
     state: "configured",
@@ -193,6 +206,7 @@ const server = createApiServer({
   categoryProofOperation,
   sharePointFileProofOperation,
   draftProofOperation,
+  todoTaskProofOperation,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -222,6 +236,7 @@ describe("local API", () => {
     "/api/category-proof",
     "/api/sharepoint-file-proof",
     "/api/draft-proof",
+    "/api/todo-task-proof",
   ])(
     "preflights only explicit mutation methods and Authorization for %s",
     async (path) => {
@@ -914,6 +929,60 @@ describe("local API", () => {
     }
     expect(draftProofOperation.create).not.toHaveBeenCalled();
     expect(draftProofOperation.remove).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["POST", "create", todoTaskResults.configured, 201],
+    ["DELETE", "remove", todoTaskResults.removed, 200],
+  ] as const)(
+    "%s runs the To Do task proof for both authorized caller shapes",
+    async (method, operation, expected, status) => {
+      const mock = todoTaskProofOperation[operation];
+      mock.mockClear();
+      for (const claims of [
+        {
+          tid: STUDENT_TENANT_ID,
+          oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+          scp: REQUIRED_DELEGATED_SCOPE,
+        },
+        {
+          tid: STUDENT_TENANT_ID,
+          idtyp: "app",
+          azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+          roles: [REQUIRED_APPLICATION_ROLE],
+        },
+      ]) {
+        const response = await protectedRequest(
+          claims,
+          "http://localhost:5173",
+          "/api/todo-task-proof",
+          method,
+        );
+        expect(response.status).toBe(status);
+        await expect(response.json()).resolves.toEqual(expected);
+      }
+      expect(mock).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("fails closed on To Do task conflict", async () => {
+    todoTaskProofOperation.create.mockRejectedValueOnce(
+      new TodoTaskProofConflictError(),
+    );
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/todo-task-proof",
+      "POST",
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "todo_task_state_conflict",
+    });
   });
 
   it.each([

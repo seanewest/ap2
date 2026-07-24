@@ -76,6 +76,12 @@ export const DRAFT_PROOF_RECIPIENTS = [
 export type DraftProofResult =
   | { state: "configured"; subject: typeof DRAFT_PROOF_SUBJECT }
   | { state: "removed"; subject: typeof DRAFT_PROOF_SUBJECT };
+export const TODO_TASK_PROOF_RUN_ID = "ap2-todo-task-20260725-002";
+export const TODO_TASK_PROOF_TITLE =
+  "AP2 harmless task [ap2-todo-task-20260725-002]";
+export type TodoTaskProofResult =
+  | { state: "configured"; title: typeof TODO_TASK_PROOF_TITLE }
+  | { state: "removed"; title: typeof TODO_TASK_PROOF_TITLE };
 
 export const CALENDAR_MEETING_ORGANIZER =
   "cory@corywest.onmicrosoft.com";
@@ -194,6 +200,12 @@ export interface AfterPartyApi {
   removeDraftProof(accessToken: string): Promise<
     Extract<DraftProofResult, { state: "removed" }>
   >;
+  createTodoTaskProof(accessToken: string): Promise<
+    Extract<TodoTaskProofResult, { state: "configured" }>
+  >;
+  removeTodoTaskProof(accessToken: string): Promise<
+    Extract<TodoTaskProofResult, { state: "removed" }>
+  >;
 }
 
 export class ApiAccessError extends Error {
@@ -227,6 +239,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly categoryProofUrl: string;
   private readonly sharePointFileProofUrl: string;
   private readonly draftProofUrl: string;
+  private readonly todoTaskProofUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
@@ -264,6 +277,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       `${baseUrl}/`,
     ).toString();
     this.draftProofUrl = new URL("api/draft-proof", `${baseUrl}/`).toString();
+    this.todoTaskProofUrl = new URL(
+      "api/todo-task-proof",
+      `${baseUrl}/`,
+    ).toString();
     this.request = request.bind(globalThis);
   }
 
@@ -531,6 +548,30 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     return { state: "removed", subject: DRAFT_PROOF_SUBJECT } as const;
   }
 
+  async createTodoTaskProof(accessToken: string) {
+    await this.fixedProofRequest(
+      this.todoTaskProofUrl,
+      accessToken,
+      "POST",
+      201,
+      "configured",
+      isSafeTodoTaskProofResult,
+    );
+    return { state: "configured", title: TODO_TASK_PROOF_TITLE } as const;
+  }
+
+  async removeTodoTaskProof(accessToken: string) {
+    await this.fixedProofRequest(
+      this.todoTaskProofUrl,
+      accessToken,
+      "DELETE",
+      200,
+      "removed",
+      isSafeTodoTaskProofResult,
+    );
+    return { state: "removed", title: TODO_TASK_PROOF_TITLE } as const;
+  }
+
   private async oneDriveProofRequest<T extends OneDriveProofResult["state"]>(
     accessToken: string,
     method: "POST" | "DELETE",
@@ -604,6 +645,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       if (error === "draft_state_conflict") {
         throw new ApiAccessError(
           "The unsent-draft proof is not in the expected state. Nothing was changed.",
+        );
+      }
+      if (error === "todo_task_state_conflict") {
+        throw new ApiAccessError(
+          "The To Do task proof is not in the expected state. Nothing was changed.",
         );
       }
       if (failureContext === "calendar") {
@@ -831,6 +877,15 @@ function isSafeDraftProofResult(value: unknown): value is DraftProofResult {
   if (typeof value !== "object" || value === null) return false;
   const result = value as Record<string, unknown>;
   return result.subject === DRAFT_PROOF_SUBJECT &&
+    (result.state === "removed" || result.state === "configured");
+}
+
+function isSafeTodoTaskProofResult(
+  value: unknown,
+): value is TodoTaskProofResult {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as Record<string, unknown>;
+  return result.title === TODO_TASK_PROOF_TITLE &&
     (result.state === "removed" || result.state === "configured");
 }
 
