@@ -46,6 +46,8 @@ Pass 3 has two purposes:
 
 The implementation may eventually be thrown away and rebuilt in another pass. That is expected, not a failure.
 
+During Pass 3, the rehearsal API may be kept warm as needed because development speed and exploration take priority over minimizing hosting cost. Later passes should revisit student-borne hosting cost, scale-to-zero behavior, and SPA timeout and user messaging when the API is cold. Do not build cold-start or cost-control machinery solely for those concerns in Pass 3.
+
 ## Pass 3 identity and permission posture
 
 The Dev app is a development and test identity for Pass 3. It will never be installed, consented, or present in a real student's tenant. It may directly query or manipulate Microsoft services for development and diagnostics.
