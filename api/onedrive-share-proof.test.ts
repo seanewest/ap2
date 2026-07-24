@@ -125,6 +125,73 @@ async function afterConfirmedShare(
   return fixture;
 }
 
+function deadlineHangFixture(steps: Array<Response | "hang">) {
+  let startHang: () => void = () => undefined;
+  const hangStarted = new Promise<void>((resolve) => {
+    startHang = resolve;
+  });
+  let hungSignal: AbortSignal | undefined;
+  const request = vi.fn(async (_url: string, init?: RequestInit) => {
+    const step = steps.shift();
+    if (step !== "hang") {
+      if (!step) {
+        throw new Error("Unexpected Graph request");
+      }
+      return step;
+    }
+    if (!init?.signal) {
+      throw new Error("The deadline signal was not supplied.");
+    }
+    hungSignal = init.signal;
+    startHang();
+    return await new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener(
+        "abort",
+        () => reject(new DOMException("Verification deadline", "AbortError")),
+        { once: true },
+      );
+    });
+  });
+  const deadlineCallbacks: Array<() => void> = [];
+  const scheduledMilliseconds: number[] = [];
+  const cancelDeadline = vi.fn();
+  let nowMs = 0;
+  const realOperation = new DelegatedGraphOneDriveShareProof(
+    tokenProvider(HOMER_IDENTITY, "homer-token"),
+    tokenProvider(MARGE_IDENTITY, "marge-token"),
+    MARGE_IDENTITY,
+    request as typeof fetch,
+    () => CLIENT_REQUEST_ID,
+    {
+      now: () => nowMs,
+      sleep: vi.fn(),
+      scheduleDeadline: (callback, milliseconds) => {
+        deadlineCallbacks.push(callback);
+        scheduledMilliseconds.push(milliseconds);
+        return cancelDeadline;
+      },
+    },
+  );
+  return {
+    boundary: new ProcessLocalOneDriveShareProofBoundary(realOperation),
+    advanceTime: (milliseconds: number) => {
+      nowMs += milliseconds;
+    },
+    hangStarted,
+    fireDeadline: () => {
+      const callback = deadlineCallbacks.at(0);
+      if (!callback) {
+        throw new Error("The verification deadline was not scheduled.");
+      }
+      callback();
+    },
+    hungSignal: () => hungSignal,
+    scheduledMilliseconds,
+    cancelDeadline,
+    request,
+  };
+}
+
 describe("DelegatedGraphOneDriveShareProof", () => {
   it("creates the fixed bytes once and grants only Marge read access", async () => {
     const fixture = operation([
@@ -489,7 +556,7 @@ describe("DelegatedGraphOneDriveShareProof", () => {
     ).toHaveLength(1);
   });
 
-  it("verifies an immediate 302 through the exact Marge content path", async () => {
+  it("uses only Graph's safe preauthenticated redirect without forwarding authorization", async () => {
     const fixture = await afterConfirmedShare([
       new Response(undefined, {
         status: 302,
@@ -516,6 +583,10 @@ describe("DelegatedGraphOneDriveShareProof", () => {
       "client-request-id": CLIENT_REQUEST_ID,
       "return-client-request-id": "true",
     });
+    expect(graphContent[1].redirect).toBe("manual");
+    expect(graphContent[1].signal).toBeInstanceOf(AbortSignal);
+    expect(directContent[0]).toBe("https://download.example/proof");
+    expect(directContent[1].redirect).toBe("error");
     expect(directContent[1].headers).toBeUndefined();
     expect(
       calls.some(([url]) =>
@@ -546,7 +617,8 @@ describe("DelegatedGraphOneDriveShareProof", () => {
     await expect(fixture.operation.verify()).resolves.toMatchObject({
       state: "verified",
     });
-    expect(fixture.sleep.mock.calls).toEqual([[1_000], [2_000]]);
+    expect(fixture.sleep.mock.calls.map(([milliseconds]) => milliseconds))
+      .toEqual([1_000, 2_000]);
   });
 
   it("honors 429 Retry-After and retries 503 before success", async () => {
@@ -562,7 +634,8 @@ describe("DelegatedGraphOneDriveShareProof", () => {
     await expect(fixture.operation.verify()).resolves.toMatchObject({
       state: "verified",
     });
-    expect(fixture.sleep.mock.calls).toEqual([[2_000], [2_000]]);
+    expect(fixture.sleep.mock.calls.map(([milliseconds]) => milliseconds))
+      .toEqual([2_000, 2_000]);
   });
 
   it("returns pending at the 55-second propagation deadline", async () => {
@@ -579,7 +652,8 @@ describe("DelegatedGraphOneDriveShareProof", () => {
       verifiedAs: MARGE_USER_PRINCIPAL_NAME,
       reason: "access-propagation",
     });
-    expect(fixture.sleep.mock.calls.flat()).toEqual([
+    expect(fixture.sleep.mock.calls.map(([milliseconds]) => milliseconds))
+      .toEqual([
       1_000,
       2_000,
       4_000,
@@ -589,7 +663,79 @@ describe("DelegatedGraphOneDriveShareProof", () => {
       8_000,
       8_000,
       8_000,
+      ]);
+  });
+
+  it("aborts an in-flight Graph GET at the deadline and releases Share", async () => {
+    const fixture = deadlineHangFixture([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json({ value: [MARGE_READ_PERMISSION] }),
+      "hang",
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json({ value: [MARGE_READ_PERMISSION] }),
     ]);
+    await fixture.boundary.share();
+    fixture.advanceTime(9_000);
+
+    const verification = fixture.boundary.verify();
+    await fixture.hangStarted;
+    fixture.fireDeadline();
+
+    await expect(verification).resolves.toMatchObject({
+      state: "pending",
+      reason: "access-propagation",
+    });
+    expect(fixture.hungSignal()?.aborted).toBe(true);
+    expect(fixture.scheduledMilliseconds).toEqual([46_000]);
+    await expect(fixture.boundary.share()).resolves.toMatchObject({
+      state: "shared",
+    });
+    expect(fixture.cancelDeadline).toHaveBeenCalledOnce();
+  });
+
+  it("aborts an in-flight download GET at the deadline and releases cleanup", async () => {
+    const fixture = deadlineHangFixture([
+      new Response(undefined, { status: 404 }),
+      Response.json({ id: "root-item" }),
+      Response.json({ uploadUrl: "https://upload.example/proof" }),
+      Response.json(ITEM, { status: 201 }),
+      Response.json({ value: [MARGE_READ_PERMISSION] }),
+      Response.json(ITEM),
+      new Response(undefined, {
+        status: 302,
+        headers: { Location: "https://download.example/proof" },
+      }),
+      "hang",
+      Response.json(ITEM),
+      new Response(ONEDRIVE_PROOF_CONTENT),
+      Response.json({ value: [OWNER_PERMISSION] }),
+      Response.json(UPDATED_ITEM),
+      new Response(ONEDRIVE_PROOF_CONTENT),
+      new Response(undefined, { status: 204 }),
+    ]);
+    await fixture.boundary.share();
+
+    const verification = fixture.boundary.verify();
+    await fixture.hangStarted;
+    fixture.fireDeadline();
+
+    await expect(verification).resolves.toMatchObject({
+      state: "pending",
+      reason: "access-propagation",
+    });
+    expect(fixture.hungSignal()?.aborted).toBe(true);
+    expect(fixture.scheduledMilliseconds).toEqual([55_000]);
+    await expect(fixture.boundary.remove()).resolves.toEqual({
+      state: "removed",
+      path: ONEDRIVE_PROOF_PATH,
+    });
+    expect(fixture.cancelDeadline).toHaveBeenCalledOnce();
   });
 
   it("does not start a new retry window for an explicit later Verify", async () => {
@@ -670,7 +816,42 @@ describe("DelegatedGraphOneDriveShareProof", () => {
     expect(fixture.sleep).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, "http://unsafe.example/proof"])(
+  it.each(
+    [403, 404, 429, 503].flatMap((status) =>
+      [
+        [status, "non-json", "non-json"],
+        [status, "malformed-schema", "malformed-response"],
+        [status, "unexpected-body", "malformed-response"],
+      ] as const
+    ),
+  )(
+    "does not retry malformed %i %s responses",
+    async (status, bodyKind, responseShape) => {
+      const response = bodyKind === "non-json"
+        ? new Response("{not-json", { status })
+        : bodyKind === "malformed-schema"
+          ? Response.json({ error: { code: 123 } }, { status })
+          : Response.json({ value: [] }, { status });
+      const fixture = await afterConfirmedShare([response]);
+
+      const error = await fixture.operation.verify().catch((value) => value);
+
+      expect(error).toBeInstanceOf(OneDriveVerifyFailureError);
+      expect(error.diagnostic).toMatchObject({
+        upstreamStatus: status,
+        responseShape,
+      });
+      expect(fixture.sleep).not.toHaveBeenCalled();
+      expect(fixture.request).toHaveBeenCalledTimes(7);
+    },
+  );
+
+  it.each([
+    undefined,
+    "http://unsafe.example/proof",
+    "ftp://unsafe.example/proof",
+    "https://user:password@download.example/proof",
+  ])(
     "fails immediately for missing or unsafe download location %s",
     async (location) => {
       const fixture = await afterConfirmedShare([

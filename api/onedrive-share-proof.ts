@@ -111,6 +111,7 @@ export interface OneDriveVerifyFailure {
   responseShape:
     | "graph-error"
     | "non-json"
+    | "malformed-response"
     | "invalid-download-redirect"
     | "content-response-error"
     | "content-mismatch";
@@ -169,6 +170,8 @@ interface DriveItem {
   driveId: string;
 }
 
+const VERIFICATION_DEADLINE = Symbol("verification-deadline");
+
 export class DelegatedGraphOneDriveShareProof
   implements OneDriveShareProofOperation
 {
@@ -178,7 +181,14 @@ export class DelegatedGraphOneDriveShareProof
   readonly #request: typeof fetch;
   readonly #createClientRequestId: () => string;
   readonly #now: () => number;
-  readonly #sleep: (milliseconds: number) => Promise<void>;
+  readonly #sleep: (
+    milliseconds: number,
+    signal: AbortSignal,
+  ) => Promise<void>;
+  readonly #scheduleDeadline: (
+    callback: () => void,
+    milliseconds: number,
+  ) => () => void;
   readonly #verificationWindowMs: number;
   #shareConfirmedAtMs?: number;
 
@@ -190,7 +200,14 @@ export class DelegatedGraphOneDriveShareProof
     createClientRequestId: () => string = randomUUID,
     timing: {
       now?: () => number;
-      sleep?: (milliseconds: number) => Promise<void>;
+      sleep?: (
+        milliseconds: number,
+        signal: AbortSignal,
+      ) => Promise<void>;
+      scheduleDeadline?: (
+        callback: () => void,
+        milliseconds: number,
+      ) => () => void;
       verificationWindowMs?: number;
     } = {},
   ) {
@@ -206,9 +223,8 @@ export class DelegatedGraphOneDriveShareProof
     this.#request = request.bind(globalThis);
     this.#createClientRequestId = createClientRequestId;
     this.#now = timing.now ?? Date.now;
-    this.#sleep = timing.sleep ??
-      ((milliseconds) =>
-        new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.#sleep = timing.sleep ?? sleepWithSignal;
+    this.#scheduleDeadline = timing.scheduleDeadline ?? scheduleDeadline;
     this.#verificationWindowMs = timing.verificationWindowMs ?? 55_000;
     if (
       this.#verificationWindowMs <= 0 ||
@@ -238,17 +254,42 @@ export class DelegatedGraphOneDriveShareProof
   async verify(): Promise<
     Extract<OneDriveProofResult, { state: "verified" | "pending" }>
   > {
-    const homer = await this.#homerToken();
-    const item = await this.#resolveProof(homer.token);
-    const marge = await this.#margeToken();
-    const directUrl =
-      `${GRAPH_ROOT}/drives/${encodeURIComponent(item.driveId)}` +
-      `/items/${encodeURIComponent(item.id)}`;
-    const contentMatches = await this.#verifyMargeContent(
-      `${directUrl}/content`,
-      marge.token,
+    const now = this.#now();
+    const confirmedDeadline = this.#shareConfirmedAtMs === undefined
+      ? undefined
+      : this.#shareConfirmedAtMs + this.#verificationWindowMs;
+    const retryDeadline = confirmedDeadline !== undefined &&
+        confirmedDeadline > now
+      ? confirmedDeadline
+      : undefined;
+    const hardDeadline = retryDeadline ?? now + this.#verificationWindowMs;
+    const result = await this.#runUntilVerificationDeadline(
+      hardDeadline,
+      async (signal) => {
+        const homer = await this.#homerToken();
+        const item = await this.#resolveProof(homer.token, signal);
+        const marge = await this.#margeToken();
+        const directUrl =
+          `${GRAPH_ROOT}/drives/${encodeURIComponent(item.driveId)}` +
+          `/items/${encodeURIComponent(item.id)}`;
+        const contentMatches = await this.#verifyMargeContent(
+          `${directUrl}/content`,
+          marge.token,
+          signal,
+          hardDeadline,
+          retryDeadline !== undefined,
+        );
+        return contentMatches
+          ? ({
+              state: "verified" as const,
+              path: ONEDRIVE_PROOF_PATH,
+              verifiedAs: MARGE_USER_PRINCIPAL_NAME,
+              contentMatches: true as const,
+            } as const)
+          : undefined;
+      },
     );
-    if (!contentMatches) {
+    if (!result) {
       return {
         state: "pending",
         path: ONEDRIVE_PROOF_PATH,
@@ -256,12 +297,7 @@ export class DelegatedGraphOneDriveShareProof
         reason: "access-propagation",
       };
     }
-    return {
-      state: "verified",
-      path: ONEDRIVE_PROOF_PATH,
-      verifiedAs: MARGE_USER_PRINCIPAL_NAME,
-      contentMatches: true,
-    };
+    return result;
   }
 
   async remove(): Promise<
@@ -578,22 +614,27 @@ export class DelegatedGraphOneDriveShareProof
   async #verifyMargeContent(
     contentUrl: string,
     accessToken: string,
+    signal: AbortSignal,
+    deadline: number,
+    retryAllowed: boolean,
   ): Promise<boolean> {
-    const confirmedAt = this.#shareConfirmedAtMs;
-    const deadline = confirmedAt === undefined
-      ? this.#now()
-      : confirmedAt + this.#verificationWindowMs;
     let attempt = 0;
     while (true) {
+      if (signal.aborted || this.#now() >= deadline) {
+        return false;
+      }
       const clientRequestId = this.#newClientRequestId();
       const response = await this.#request(contentUrl, {
         method: "GET",
         redirect: "manual",
         headers: graphHeaders(accessToken, clientRequestId),
+        signal,
       });
       if (response.status === 302) {
+        // This preauthenticated URL is accepted only from the authenticated
+        // Graph response. Never forward either Authorization header to it.
         const location = response.headers.get("location");
-        if (!location || !isSafeUploadUrl(location)) {
+        if (!location || !isSafePreauthenticatedDownloadUrl(location)) {
           throw new OneDriveVerifyFailureError(
             verifyFailureDiagnostic(
               response,
@@ -607,6 +648,7 @@ export class DelegatedGraphOneDriveShareProof
         const download = await this.#request(location, {
           method: "GET",
           redirect: "error",
+          signal,
         });
         if (!download.ok) {
           throw new OneDriveVerifyFailureError(
@@ -626,6 +668,18 @@ export class DelegatedGraphOneDriveShareProof
       }
 
       const value = await readJson(response);
+      const expectedGraphError = isExpectedGraphError(value);
+      if (isPendingVerificationStatus(response.status) && !expectedGraphError) {
+        throw new OneDriveVerifyFailureError(
+          verifyFailureDiagnostic(
+            response,
+            value,
+            clientRequestId,
+            "verify-content",
+            value === undefined ? "non-json" : "malformed-response",
+          ),
+        );
+      }
       const delay = verificationRetryDelay(
         response,
         attempt,
@@ -634,10 +688,11 @@ export class DelegatedGraphOneDriveShareProof
       if (
         delay !== undefined &&
         attempt < 10 &&
+        retryAllowed &&
         this.#now() + delay <= deadline
       ) {
         attempt += 1;
-        await this.#sleep(delay);
+        await this.#sleep(delay, signal);
         continue;
       }
       if (
@@ -652,13 +707,48 @@ export class DelegatedGraphOneDriveShareProof
           value,
           clientRequestId,
           "verify-content",
-          isRecord(value) && isRecord(value.error)
+          expectedGraphError
             ? "graph-error"
             : value === undefined
               ? "non-json"
-              : "content-response-error",
+              : "malformed-response",
         ),
       );
+    }
+  }
+
+  async #runUntilVerificationDeadline<T>(
+    deadline: number,
+    operation: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T | undefined> {
+    const remaining = Math.max(0, deadline - this.#now());
+    if (remaining === 0) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    let reachDeadline: () => void = () => undefined;
+    const deadlineReached = new Promise<typeof VERIFICATION_DEADLINE>(
+      (resolve) => {
+        reachDeadline = () => resolve(VERIFICATION_DEADLINE);
+      },
+    );
+    const cancelDeadline = this.#scheduleDeadline(() => {
+      controller.abort();
+      reachDeadline();
+    }, remaining);
+    try {
+      const result = await Promise.race([
+        operation(controller.signal),
+        deadlineReached,
+      ]);
+      return result === VERIFICATION_DEADLINE ? undefined : result;
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return undefined;
+      }
+      throw error;
+    } finally {
+      cancelDeadline();
     }
   }
 
@@ -689,10 +779,13 @@ export class DelegatedGraphOneDriveShareProof
     return clientRequestId;
   }
 
-  async #resolveProof(accessToken: string): Promise<DriveItem> {
+  async #resolveProof(
+    accessToken: string,
+    signal?: AbortSignal,
+  ): Promise<DriveItem> {
     const response = await this.#request(
       PROOF_PATH_METADATA_URL,
-      graphGet(accessToken),
+      { ...graphGet(accessToken), signal },
     );
     if (response.status === 404) {
       throw new OneDriveProofConflictError(
@@ -1050,12 +1143,55 @@ function classifyMargeReadPermission(
 }
 
 function isSafeUploadUrl(value: string): boolean {
+  return isSafeHttpsUrl(value);
+}
+
+function isSafePreauthenticatedDownloadUrl(value: string): boolean {
+  return isSafeHttpsUrl(value);
+}
+
+function isSafeHttpsUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return url.protocol === "https:" && !url.username && !url.password;
   } catch {
     return false;
   }
+}
+
+function isExpectedGraphError(value: unknown): boolean {
+  return isRecord(value) &&
+    isRecord(value.error) &&
+    safeGraphErrorCode(value.error.code) !== undefined;
+}
+
+function sleepWithSignal(
+  milliseconds: number,
+  signal: AbortSignal,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(handle);
+      reject(signal.reason);
+    };
+    const handle = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function scheduleDeadline(
+  callback: () => void,
+  milliseconds: number,
+): () => void {
+  const handle = setTimeout(callback, milliseconds);
+  return () => clearTimeout(handle);
 }
 
 async function readJson(response: Response): Promise<unknown> {

@@ -95,8 +95,10 @@ separate human actions:
   fixed file with the exact rehearsal sentence, and grants only
   `marge.simpson@corywest.onmicrosoft.com` read access. Sign-in is required and
   no invitation is sent.
-- `GET` signs in as Marge and reads the exact drive/item content path. It
-  succeeds only when the metadata and bytes match.
+- `GET` has Homer resolve and validate the fixed item, then signs in as Marge
+  and reads only that exact drive/item content path. Marge succeeds only when
+  the bytes match exactly; her access does not depend on a second metadata
+  response.
 - `DELETE` resolves the fixed item and its permissions, revokes only the exact
   direct Marge read permission, then re-resolves and validates the 58-byte file
   before deleting once with its current eTag. OneDrive moves the item to the
@@ -105,6 +107,18 @@ separate human actions:
 
 The API never retries an upload-session creation, upload, invite, permission
 revoke, or file delete.
+Immediately after a confirmed share, Marge's read-only content request may
+retry only safely formed Microsoft Graph `403`, `404`, `429`, or `503` errors
+within one hard 55-second deadline. A deadline returns confirmation pending;
+the SPA never polls and a later Verify is an explicit human action.
+
+Microsoft Graph may return an HTTPS preauthenticated `Location` for file
+content. AP2 consumes it only from the authenticated Graph content response,
+rejects non-HTTPS URLs and URLs containing credentials, and never forwards the
+Graph or AP2 Authorization header to that download URL. Pass 3 deliberately
+does not guess at a hostname allowlist because Microsoft controls the
+preauthenticated download host.
+
 After an uncertain mutation response, the UI disables sharing and offers only
 explicit verification or cleanup. Its stage is stored per signed-in account in
 browser storage so a reload does not blindly repeat a mutation.

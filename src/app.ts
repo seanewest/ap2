@@ -855,6 +855,8 @@ function verifyResponseShape(
       return "Microsoft Graph error";
     case "non-json":
       return "No JSON response";
+    case "malformed-response":
+      return "Unexpected Microsoft Graph response";
     case "invalid-download-redirect":
       return "Download redirect was not accepted";
     case "content-response-error":

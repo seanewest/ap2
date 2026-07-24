@@ -85,6 +85,7 @@ export interface OneDriveVerifyFailure {
   responseShape:
     | "graph-error"
     | "non-json"
+    | "malformed-response"
     | "invalid-download-redirect"
     | "content-response-error"
     | "content-mismatch";
@@ -496,6 +497,7 @@ function isSafeOneDriveVerifyFailure(
 function isVerifyResponseShape(value: unknown): boolean {
   return value === "graph-error" ||
     value === "non-json" ||
+    value === "malformed-response" ||
     value === "invalid-download-redirect" ||
     value === "content-response-error" ||
     value === "content-mismatch";
