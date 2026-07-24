@@ -8,11 +8,61 @@ import {
   CALENDAR_MEETING_ORGANIZER,
   CALENDAR_MEETING_START,
   CALENDAR_MEETING_SUBJECT,
+  CONTACT_PROOF_DISPLAY_NAME,
+  CONTACT_PROOF_EMAIL,
   HttpAfterPartyApi,
   OneDriveInviteFailureError,
 } from "./client";
 
 describe("HTTP After Party API client", () => {
+  it.each([
+    ["createContactProof", "POST", 201, {
+      state: "configured",
+      displayName: CONTACT_PROOF_DISPLAY_NAME,
+      email: CONTACT_PROOF_EMAIL,
+    }],
+    ["removeContactProof", "DELETE", 200, {
+      state: "removed",
+      displayName: CONTACT_PROOF_DISPLAY_NAME,
+    }],
+  ] as const)("safely invokes %s", async (method, verb, status, result) => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(result, { status }),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    );
+
+    await expect(client[method]("contact-token")).resolves.toEqual(result);
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/contact-proof",
+      {
+        method: verb,
+        credentials: "omit",
+        redirect: "error",
+        headers: { Authorization: "Bearer contact-token" },
+      },
+    );
+    expect(JSON.stringify(result)).not.toContain("contact-token");
+  });
+
+  it("rejects a malformed contact response", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        state: "configured",
+        displayName: CONTACT_PROOF_DISPLAY_NAME,
+        email: "wrong@example.com",
+      }, { status: 201 }),
+    );
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      ).createContactProof("token"),
+    ).rejects.toEqual(new ApiAccessError());
+  });
+
   it("sends the Bearer token only to the configured whoami URL and returns safe fields", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(

@@ -11,6 +11,7 @@ import {
   CalendarMeetingConflictError,
   type CalendarMeetingOperation,
 } from "./calendar-meeting.js";
+import { ContactProofConflictError, type ContactProofOperation } from "./contact-proof.js";
 import type { RehearsalStatusProvider } from "./rehearsal-status.js";
 import type { SimulatedEmailOperation } from "./simulated-email.js";
 import {
@@ -28,6 +29,7 @@ export interface ApiDependencies {
   simulatedEmailOperation?: SimulatedEmailOperation;
   oneDriveShareProofOperation?: OneDriveShareProofOperation;
   calendarMeetingOperation?: CalendarMeetingOperation;
+  contactProofOperation?: ContactProofOperation;
   allowedOrigin?: string;
 }
 
@@ -60,6 +62,11 @@ async function route(
     (pathname === "/api/whoami" || pathname === "/api/rehearsal-status")
   ) {
     handleProtectedPreflight(request, response, origin, ["GET"]);
+    return;
+  }
+
+  if (request.method === "OPTIONS" && pathname === "/api/contact-proof") {
+    handleProtectedPreflight(request, response, origin, ["POST", "DELETE"]);
     return;
   }
 
@@ -116,6 +123,26 @@ async function route(
     pathname === "/api/onedrive-share-proof"
   ) {
     await oneDriveShareProof(request, response, dependencies, "share");
+    return;
+  }
+
+  if (
+    (request.method === "POST" || request.method === "DELETE") &&
+    pathname === "/api/contact-proof"
+  ) {
+    const action = request.method === "POST" ? "create" : "remove";
+    await handleAuthorizedRequest(
+      request,
+      response,
+      dependencies,
+      () => {
+        if (!dependencies.contactProofOperation) {
+          throw new Error("Contact proof operation is not configured");
+        }
+        return dependencies.contactProofOperation[action]();
+      },
+      action === "create" ? 201 : 200,
+    );
     return;
   }
 
@@ -309,6 +336,10 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof CalendarMeetingBusyError) {
       sendJson(response, 409, { error: "calendar_operation_busy" });
+      return;
+    }
+    if (error instanceof ContactProofConflictError) {
+      sendJson(response, 409, { error: "contact_state_conflict" });
       return;
     }
     throw error;
