@@ -39,6 +39,22 @@ completes Microsoft's logout redirect, and verifies the signed-out state again
 after a reload. Browser output defaults to `/tmp/ap2-playwright-cba` and
 contains no reusable storage state.
 
+For a hosted read-only preflight, point both evidence targets explicitly:
+
+```sh
+export AP2_E2E_APP_URL=https://seanewest.github.io/ap2/
+export AP2_E2E_API_BASE_URL=https://ca-ap2-api.happycliff-97dcb6b8.eastus.azurecontainerapps.io
+export AP2_PLAYWRIGHT_OUTPUT_DIR=/tmp/ap2-playwright-cba
+npm run test:e2e:cba
+```
+
+The first API response has an explicit 90-second allowance for a Container Apps
+cold start. Every matching `/api/` request is attached to the Playwright result
+as `api-route-ledger.json`, including its method, path, safe response fields,
+status, and elapsed time. The attachment is written from test cleanup even when
+an assertion fails or a request is still pending. It never records request
+headers, request bodies, tokens, full URLs, or raw response bodies.
+
 ## Required Student state
 
 The test is fixed to Student tenant

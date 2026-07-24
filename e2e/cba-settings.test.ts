@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   certificateOrigins,
+  FIRST_API_RESPONSE_TIMEOUT_MS,
   loadCbaE2eSettings,
   STUDENT_OPERATOR,
   STUDENT_TENANT_ID,
@@ -24,6 +25,7 @@ describe("CBA browser settings", () => {
     expect(STUDENT_OPERATOR).toBe(
       "after-party-operator@corywest.onmicrosoft.com",
     );
+    expect(FIRST_API_RESPONSE_TIMEOUT_MS).toBe(90_000);
   });
 
   it("targets both exact Microsoft certificate-authentication origins", () => {
@@ -44,6 +46,7 @@ describe("CBA browser settings", () => {
       {
         AP2_CBA_PFX_PATH: pfxPath,
         AP2_CBA_PFX_PASSPHRASE: "test-passphrase",
+        AP2_E2E_API_BASE_URL: "https://api.example.test/",
         AP2_PLAYWRIGHT_OUTPUT_DIR: join(credentials, "results"),
       },
       root,
@@ -51,7 +54,28 @@ describe("CBA browser settings", () => {
 
     expect(settings.pfx.toString()).toBe("test-pfx");
     expect(settings.passphrase).toBe("test-passphrase");
+    expect(settings.apiBaseUrl).toBe("https://api.example.test");
     expect(settings.outputDirectory).toBe(join(credentials, "results"));
+  });
+
+  it("refuses an unsafe API evidence target", async () => {
+    const root = await temporaryDirectory("ap2-project-");
+    const credentials = await temporaryDirectory("ap2-cba-");
+    const pfxPath = join(credentials, "operator.pfx");
+    await writeFile(pfxPath, "test-pfx");
+    await chmod(pfxPath, 0o600);
+
+    expect(() =>
+      loadCbaE2eSettings(
+        {
+          AP2_CBA_PFX_PATH: pfxPath,
+          AP2_CBA_PFX_PASSPHRASE: "test-passphrase",
+          AP2_E2E_API_BASE_URL:
+            "https://user:secret@api.example.test?unsafe=true",
+        },
+        root,
+      ),
+    ).toThrow("AP2_E2E_API_BASE_URL");
   });
 
   it("refuses credentials inside the project or with broad permissions", async () => {

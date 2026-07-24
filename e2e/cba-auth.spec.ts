@@ -1,12 +1,22 @@
 import { expect, test, type Page } from "@playwright/test";
+import { ApiRouteLedger } from "./api-route-ledger";
 import {
+  FIRST_API_RESPONSE_TIMEOUT_MS,
+  loadCbaE2eSettings,
   STUDENT_OPERATOR,
   STUDENT_TENANT_ID,
 } from "./cba-settings";
 
 test("signs in, checks delegated API and rehearsal status, and signs out through Microsoft CBA", async ({
   page,
-}) => {
+}, testInfo) => {
+  const settings = loadCbaE2eSettings();
+  const apiOrigin = new URL(settings.apiBaseUrl).origin;
+  const apiRouteLedger = new ApiRouteLedger(
+    page,
+    settings.apiBaseUrl,
+  );
+  try {
   await page.goto("./");
   await expect(page.getByText("You are signed out.")).toBeVisible();
 
@@ -36,18 +46,23 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
     }),
   ).toBeVisible();
 
-  const whoAmIResponse = page.waitForResponse((response) => {
-    const url = new URL(response.url());
-    return (
-      response.request().method() === "GET" &&
-      url.pathname === "/api/whoami"
-    );
-  });
+  const whoAmIResponse = page.waitForResponse(
+    (response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === "GET" &&
+        url.origin === apiOrigin &&
+        url.pathname === "/api/whoami"
+      );
+    },
+    { timeout: FIRST_API_RESPONSE_TIMEOUT_MS },
+  );
   const whoAmIFailure = new Promise<never>((_resolve, reject) => {
     page.on("requestfailed", (request) => {
       const url = new URL(request.url());
       if (
         request.method() === "GET" &&
+        url.origin === apiOrigin &&
         url.pathname === "/api/whoami"
       ) {
         reject(
@@ -75,6 +90,7 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
     const url = new URL(response.url());
     return (
       response.request().method() === "GET" &&
+      url.origin === apiOrigin &&
       url.pathname === "/api/rehearsal-status"
     );
   });
@@ -137,6 +153,14 @@ test("signs in, checks delegated API and rehearsal status, and signs out through
       name: "Send one internal email: Homer → Marge",
     }),
   ).toHaveCount(0);
+  } finally {
+    await testInfo.attach("api-route-ledger.json", {
+      body: Buffer.from(
+        JSON.stringify(await apiRouteLedger.snapshot(), null, 2),
+      ),
+      contentType: "application/json",
+    });
+  }
 });
 
 async function enterStudentOperator(page: Page): Promise<void> {

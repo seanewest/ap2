@@ -6,8 +6,11 @@ export { STUDENT_TENANT_ID };
 export const STUDENT_OPERATOR =
   "after-party-operator@corywest.onmicrosoft.com";
 export const LOCAL_APP_URL = "http://localhost:5173/";
+export const LOCAL_API_URL = "http://127.0.0.1:3000";
+export const FIRST_API_RESPONSE_TIMEOUT_MS = 90_000;
 
 export interface CbaE2eSettings {
+  apiBaseUrl: string;
   appUrl: string;
   certificateOrigins: readonly string[];
   outputDirectory: string;
@@ -39,6 +42,11 @@ export function loadCbaE2eSettings(
   }
 
   const appUrl = new URL(environment.AP2_E2E_APP_URL ?? LOCAL_APP_URL).toString();
+  const apiBaseUrl = validatedApiBaseUrl(
+    environment.AP2_E2E_API_BASE_URL ??
+      environment.VITE_API_BASE_URL ??
+      LOCAL_API_URL,
+  );
   const outputDirectory = resolve(
     environment.AP2_PLAYWRIGHT_OUTPUT_DIR ?? "/tmp/ap2-playwright-cba",
   );
@@ -47,12 +55,29 @@ export function loadCbaE2eSettings(
   }
 
   return {
+    apiBaseUrl,
     appUrl,
     certificateOrigins: certificateOrigins(STUDENT_TENANT_ID),
     outputDirectory,
     passphrase,
     pfx: readFileSync(absolutePfxPath),
   };
+}
+
+function validatedApiBaseUrl(value: string): string {
+  const url = new URL(value);
+  if (
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error(
+      "AP2_E2E_API_BASE_URL must be an HTTP(S) URL without credentials, query, or fragment.",
+    );
+  }
+  return url.toString().replace(/\/$/, "");
 }
 
 export function certificateOrigins(tenantId: string): readonly string[] {
