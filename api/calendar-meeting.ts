@@ -308,7 +308,7 @@ function normalizedGraphHtmlText(value: string): string | undefined {
   if (value.length > 4_096 || /<!--|<!doctype/i.test(value)) {
     return undefined;
   }
-  const match = /^(?:\s*<html>\s*)?(?:<head>\s*(?:<meta\s+http-equiv=(?:"Content-Type"|'Content-Type')\s+content=(?:"text\/html;\s*charset=utf-8"|'text\/html;\s*charset=utf-8')\s*\/?>\s*)?<\/head>\s*)?(?:<body>\s*)?([\s\S]*?)(?:\s*<\/body>)?(?:\s*<\/html>)?\s*$/i.exec(
+  const match = /^(?:\s*<html>\s*)?(?:<head>\s*(?:<meta\s+http-equiv=(?:"Content-Type"|'Content-Type')\s+content=(?:"text\/html;\s*charset=utf-8"|'text\/html;\s*charset=utf-8')\s*\/?>\s*(?:<meta\s+content=(?:"text\/html;\s*charset=us-ascii"|'text\/html;\s*charset=us-ascii')\s*\/?>\s*)?)?<\/head>\s*)?(?:<body>\s*)?([\s\S]*?)(?:\s*<\/body>)?(?:\s*<\/html>)?\s*$/i.exec(
     value,
   );
   if (!match) {

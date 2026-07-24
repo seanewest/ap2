@@ -92,11 +92,17 @@ function createdMeeting(
   };
 }
 
-function graphNormalizedHtml(content = CALENDAR_MEETING_BODY): string {
+function graphNormalizedHtml(
+  content = CALENDAR_MEETING_BODY,
+  documentedAsciiMeta = false,
+): string {
   return [
     "<html>",
     "<head>",
     '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">',
+    ...(documentedAsciiMeta
+      ? ['<meta content="text/html; charset=us-ascii">']
+      : []),
     "</head>",
     "<body>",
     `<div>${content}</div>`,
@@ -202,6 +208,39 @@ describe("delegated Graph calendar meeting operation", () => {
     expect(request).toHaveBeenCalledOnce();
   });
 
+  it("accepts the documented two-meta Graph wrapper and retains its event ID for cancellation", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json(
+          createdMeeting({
+            body: {
+              contentType: "html",
+              content: graphNormalizedHtml(
+                CALENDAR_MEETING_BODY,
+                true,
+              ),
+            },
+            bodyPreview: CALENDAR_MEETING_BODY,
+          }),
+          { status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 202 }));
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+    );
+
+    await expect(operation.create()).resolves.toEqual(configuredResult);
+    await expect(operation.cancel()).resolves.toEqual(cancellationResult);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]?.[0]).toBe(
+      "https://graph.microsoft.com/v1.0/me/events/event%2Fid/cancel",
+    );
+  });
+
   it.each([
     [
       "another tenant",
@@ -283,6 +322,35 @@ describe("delegated Graph calendar meeting operation", () => {
           contentType: "html",
           content: graphNormalizedHtml(
             `${CALENDAR_MEETING_BODY}<script>other content</script>`,
+          ),
+        },
+        bodyPreview: CALENDAR_MEETING_BODY,
+      },
+    ],
+    [
+      "the additional meta without the required UTF-8 meta",
+      {
+        body: {
+          contentType: "html",
+          content: graphNormalizedHtml().replace(
+            '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">',
+            '<meta content="text/html; charset=us-ascii">',
+          ),
+        },
+        bodyPreview: CALENDAR_MEETING_BODY,
+      },
+    ],
+    [
+      "an unknown extra head meta",
+      {
+        body: {
+          contentType: "html",
+          content: graphNormalizedHtml(
+            CALENDAR_MEETING_BODY,
+            true,
+          ).replace(
+            "</head>",
+            '<meta content="text/html; charset=utf-7">\r\n</head>',
           ),
         },
         bodyPreview: CALENDAR_MEETING_BODY,
