@@ -66,6 +66,11 @@ mutation information should steer an active turn.
 Judge apparent stalls by elapsed wall time and worker status, not rapid Captain
 continuations or the temporary absence of an output file.
 
+After assigning an app-server worker, end the Captain turn and let the job queue
+resume the Captain when the worker finishes. Do not keep the Captain turn alive
+with sleep commands or repeated thread reads. Inspect an active worker directly
+only when delivery or completion state is genuinely ambiguous.
+
 ## Keep reports decision-ready
 
 A worker notification is not the audit record. Detailed reasoning, request
