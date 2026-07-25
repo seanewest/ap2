@@ -1,11 +1,13 @@
 // @vitest-environment node
 
+import { spawnSync } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { STUDENT_TENANT_ID } from "../api/identity.js";
 import {
+  CALENDAR_RESET_RUN_PROPERTY_ID,
   CALENDAR_RESET_USERS,
   previewCalendarReset,
   requiredLabConstructedAt,
@@ -29,6 +31,12 @@ function event(
     organizer: { emailAddress: { address: CORY.userPrincipalName } },
     attendees: [],
     isCancelled: false,
+    singleValueExtendedProperties: [
+      {
+        id: CALENDAR_RESET_RUN_PROPERTY_ID,
+        value: "ap2-calendar-20260724-002",
+      },
+    ],
     ...overrides,
   };
 }
@@ -71,6 +79,27 @@ describe("calendar reset preview", () => {
         Date.parse("2026-07-24T00:00:00Z"),
       ),
     ).toThrow("future");
+    expect(
+      requiredLabConstructedAt(
+        "2026-07-23T12:00:00.1234567Z",
+        Date.parse("2026-07-24T00:00:00Z"),
+      ),
+    ).toBe("2026-07-23T12:00:00.1234567Z");
+  });
+
+  it("starts the documented source CLI under the repository runtime", () => {
+    const result = spawnSync(
+      process.execPath,
+      ["scripts/preview-calendar-reset.ts"],
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+      },
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Usage:");
+    expect(result.stderr).not.toContain("ERR_MODULE_NOT_FOUND");
   });
 
   it("follows every page, selects at-or-after cutoff, and classifies unsafe items", async () => {
@@ -95,6 +124,9 @@ describe("calendar reset preview", () => {
                 ],
               }),
               event("malformed", { changeKey: undefined }),
+              event("unmarked", {
+                singleValueExtendedProperties: undefined,
+              }),
             ],
           }),
           { status: 200 },
@@ -138,6 +170,9 @@ describe("calendar reset preview", () => {
       "attendees",
       "isCancelled",
     ]);
+    expect(firstUrl.searchParams.get("$expand")).toBe(
+      `singleValueExtendedProperties($filter=id eq '${CALENDAR_RESET_RUN_PROPERTY_ID}')`,
+    );
     for (const call of request.mock.calls) {
       expect(call[1]).toMatchObject({
         method: "GET",
@@ -151,6 +186,7 @@ describe("calendar reset preview", () => {
       "external",
       "malformed",
       "recurring",
+      "unmarked",
     ]);
     expect(
       Object.fromEntries(
@@ -161,14 +197,50 @@ describe("calendar reset preview", () => {
       external: ["attendee_not_allowlisted"],
       malformed: ["malformed_event"],
       recurring: ["recurring_event"],
+      unmarked: ["missing_ap2_marker"],
     });
     expect(manifest.items[0]?.createdDateTime).toBe(
-      "2026-07-23T12:00:00.123Z",
+      "2026-07-23T12:00:00.1234567Z",
     );
     const serialized = JSON.stringify(manifest);
     expect(serialized).not.toContain("sensitive-token");
     expect(serialized).not.toContain("subject");
     expect(serialized).not.toContain("body");
+  });
+
+  it("compares the cutoff at full accepted fractional precision", async () => {
+    const request = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      return Response.json({
+        value: url.pathname === `/v1.0/users/${CORY.objectId}/events`
+          ? [
+              event("before", {
+                createdDateTime: "2026-07-23T12:00:00.1234566Z",
+              }),
+              event("boundary", {
+                createdDateTime: "2026-07-23T12:00:00.1234567Z",
+              }),
+              event("after", {
+                createdDateTime: "2026-07-23T12:00:00.1234568Z",
+              }),
+            ]
+          : [],
+      });
+    });
+
+    const manifest = await previewCalendarReset(
+      "2026-07-23T12:00:00.1234567Z",
+      { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+      request,
+    );
+
+    expect(manifest.labConstructedAt).toBe(
+      "2026-07-23T12:00:00.1234567Z",
+    );
+    expect(manifest.items.map(({ eventId }) => eventId)).toEqual([
+      "boundary",
+      "after",
+    ]);
   });
 
   it("refuses recurring, malformed, cancelled, and out-of-allowlist parties", async () => {

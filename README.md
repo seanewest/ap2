@@ -119,7 +119,9 @@ The tool is fixed to the exact Student tenant and immutable Cory, Homer, Kobe,
 and Marge object ID/UPN pairs. It follows every Graph event page and writes a
 new mode-0600 manifest outside the repository. The protected manifest contains
 event IDs and change keys for later drift-safe review, but no token, body, or
-subject. The command has no apply, cancel, or delete mode.
+subject. Only events carrying the established AP2 calendar-run marker can be
+eligible; unmarked post-cutoff events remain visible but refused. The command
+has no apply, cancel, or delete mode.
 
 Summarize a local Codex transcript, including wall and Codex-reported active
 time, slow tool calls, likely stalls, token use, and automatic goal retries.

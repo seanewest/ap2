@@ -5,10 +5,13 @@ import { ClientCertificateCredential } from "@azure/identity";
 import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   STUDENT_TENANT_ID,
-} from "../api/identity.js";
+} from "../api/identity.ts";
 
 const GRAPH_ORIGIN = "https://graph.microsoft.com";
 const GRAPH_SCOPE = `${GRAPH_ORIGIN}/.default`;
+export const CALENDAR_RESET_RUN_PROPERTY_ID =
+  "String {c352ae90-352e-4c3f-8f7c-ab63d2ca32cc} Name AP2RunId";
+const AP2_CALENDAR_RUN_ID = /^ap2-calendar-\d{8}-\d{3}$/;
 const EVENT_FIELDS = [
   "id", "changeKey", "createdDateTime", "type", "isOrganizer",
   "organizer", "attendees", "isCancelled",
@@ -33,7 +36,13 @@ export interface AccessTokenCredential {
 
 type EventType = "singleInstance" | "seriesMaster" | "occurrence" | "exception" | "unknown";
 type RefusalReason = "already_cancelled" | "attendee_not_allowlisted"
-  | "malformed_event" | "organizer_not_allowlisted" | "recurring_event";
+  | "malformed_event" | "missing_ap2_marker" | "organizer_not_allowlisted"
+  | "recurring_event";
+
+interface UtcInstant {
+  canonical: string;
+  ticks100ns: bigint;
+}
 
 interface PreviewItem {
   ownerObjectId: string;
@@ -62,14 +71,14 @@ export function requiredLabConstructedAt(
   value: string,
   nowMs = Date.now(),
 ): string {
-  const milliseconds = utcMilliseconds(value);
-  if (milliseconds === undefined) {
+  const instant = utcInstant(value);
+  if (!instant) {
     throw new Error("The lab construction timestamp must be an exact UTC timestamp.");
   }
-  if (milliseconds > nowMs) {
+  if (instant.ticks100ns > BigInt(nowMs) * 10_000n) {
     throw new Error("The lab construction timestamp cannot be in the future.");
   }
-  return new Date(milliseconds).toISOString();
+  return instant.canonical;
 }
 
 export async function previewCalendarReset(
@@ -77,8 +86,8 @@ export async function previewCalendarReset(
   credential: AccessTokenCredential,
   request: typeof fetch = fetch,
 ): Promise<CalendarResetPreviewManifest> {
-  const cutoffMs = utcMilliseconds(labConstructedAt);
-  if (cutoffMs === undefined) {
+  const cutoff = utcInstant(labConstructedAt);
+  if (!cutoff) {
     throw new Error("The lab construction timestamp must be an exact UTC timestamp.");
   }
   const accessToken = await credential.getToken(GRAPH_SCOPE);
@@ -94,7 +103,7 @@ export async function previewCalendarReset(
     items.push(
       ...await previewUser(
         user,
-        cutoffMs,
+        cutoff,
         allowlistedUpns,
         accessToken.token,
         request,
@@ -110,7 +119,7 @@ export async function previewCalendarReset(
     schemaVersion: 1,
     operation: "calendar-reset-preview",
     tenantId: STUDENT_TENANT_ID,
-    labConstructedAt,
+    labConstructedAt: cutoff.canonical,
     selectionRule: "createdDateTime >= labConstructedAt",
     users: CALENDAR_RESET_USERS,
     items,
@@ -119,7 +128,7 @@ export async function previewCalendarReset(
 
 async function previewUser(
   user: (typeof CALENDAR_RESET_USERS)[number],
-  cutoffMs: number,
+  cutoff: UtcInstant,
   allowlistedUpns: ReadonlySet<string>,
   accessToken: string,
   request: typeof fetch,
@@ -142,7 +151,7 @@ async function previewUser(
     }
     const page = await graphPage(response);
     for (const value of page.value) {
-      const item = classify(value, user, allowlistedUpns, cutoffMs);
+      const item = classify(value, user, allowlistedUpns, cutoff);
       if (item) {
         items.push(item);
       }
@@ -159,11 +168,11 @@ function classify(
   value: unknown,
   owner: (typeof CALENDAR_RESET_USERS)[number],
   allowlistedUpns: ReadonlySet<string>,
-  cutoffMs: number,
+  cutoff: UtcInstant,
 ): PreviewItem | undefined {
   const event = record(value);
-  const createdMs = utcMilliseconds(event.createdDateTime);
-  if (createdMs !== undefined && createdMs < cutoffMs) {
+  const created = utcInstant(event.createdDateTime);
+  if (created && created.ticks100ns < cutoff.ticks100ns) {
     return undefined;
   }
   const eventType = eventTypeOf(event.type);
@@ -176,7 +185,7 @@ function classify(
   if (
     !nonEmpty(event.id) ||
     !nonEmpty(event.changeKey) ||
-    createdMs === undefined ||
+    !created ||
     eventType === "unknown" ||
     isOrganizer === null ||
     isCancelled === null ||
@@ -201,6 +210,9 @@ function classify(
   if (outsiders) {
     reasons.add("attendee_not_allowlisted");
   }
+  if (!hasAp2CalendarMarker(event.singleValueExtendedProperties)) {
+    reasons.add("missing_ap2_marker");
+  }
 
   const refusalReasons = [...reasons].sort();
   return {
@@ -208,9 +220,8 @@ function classify(
     ownerUserPrincipalName: owner.userPrincipalName,
     eventId: nonEmpty(event.id) ?? null,
     changeKey: nonEmpty(event.changeKey) ?? null,
-    selection: createdMs === undefined ? "indeterminate" : "selected",
-    createdDateTime:
-      createdMs === undefined ? null : new Date(createdMs).toISOString(),
+    selection: created ? "selected" : "indeterminate",
+    createdDateTime: created?.canonical ?? null,
     eventType,
     isOrganizer,
     classification: refusalReasons.length ? "refused" : "eligible",
@@ -221,6 +232,10 @@ function classify(
 function eventsUrl(objectId: string): URL {
   const url = new URL(`${GRAPH_ORIGIN}/v1.0/users/${objectId}/events`);
   url.searchParams.set("$select", EVENT_FIELDS.join(","));
+  url.searchParams.set(
+    "$expand",
+    `singleValueExtendedProperties($filter=id eq '${CALENDAR_RESET_RUN_PROPERTY_ID}')`,
+  );
   url.searchParams.set("$top", "100");
   return url;
 }
@@ -282,15 +297,42 @@ export function writeProtectedManifest(
   return target;
 }
 
-function utcMilliseconds(value: unknown): number | undefined {
-  if (
-    typeof value !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?Z$/.test(value)
-  ) {
+function utcInstant(value: unknown): UtcInstant | undefined {
+  if (typeof value !== "string") {
     return undefined;
   }
-  const milliseconds = Date.parse(value.replace(/\.(\d{3})\d+Z$/, ".$1Z"));
-  return Number.isFinite(milliseconds) ? milliseconds : undefined;
+  const match =
+    /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,7}))?Z$/
+      .exec(value);
+  if (!match?.[1]) {
+    return undefined;
+  }
+  const wholeSecondMs = Date.parse(`${match[1]}Z`);
+  if (!Number.isFinite(wholeSecondMs)) {
+    return undefined;
+  }
+  const fraction = match[2];
+  const fractionalTicks = fraction
+    ? BigInt(fraction.padEnd(7, "0"))
+    : 0n;
+  return {
+    canonical: fraction
+      ? `${match[1]}.${fraction}Z`
+      : new Date(wholeSecondMs).toISOString(),
+    ticks100ns: BigInt(wholeSecondMs) * 10_000n + fractionalTicks,
+  };
+}
+
+function hasAp2CalendarMarker(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length !== 1) {
+    return false;
+  }
+  const property = record(value[0]);
+  return (
+    property.id === CALENDAR_RESET_RUN_PROPERTY_ID &&
+    typeof property.value === "string" &&
+    AP2_CALENDAR_RUN_ID.test(property.value)
+  );
 }
 
 function eventTypeOf(value: unknown): EventType {
