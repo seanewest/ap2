@@ -134,16 +134,16 @@ time, slow tool calls, likely stalls, token use, and automatic goal retries.
 Select the worker explicitly when several agents share `CODEX_HOME`:
 
 ```sh
-npm run report:codex -- --name Lebron
-npm run report:codex -- --name Durant
+npm run report:codex -- --name Worker-A
+npm run report:codex -- --name Worker-B
 ```
 
 You can also select with `--thread-id` or `--path`. For valid JSON with no npm
 banner, use npm's silent mode or invoke the script directly:
 
 ```sh
-npm run --silent report:codex -- --name Lebron --json
-node scripts/codex-session-report.ts --name Lebron --json
+npm run --silent report:codex -- --name Worker-A --json
+node scripts/codex-session-report.ts --name Worker-A --json
 ```
 
 See the [Codex session report guide](docs/codex-session-report.md) for timing

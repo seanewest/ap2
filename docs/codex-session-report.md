@@ -6,8 +6,8 @@ does not use an LLM, copy prompts, or require SQLite.
 Choose a saved worker name when several agents share the same Codex home:
 
 ```sh
-npm run report:codex -- --name Lebron
-npm run report:codex -- --name Durant
+npm run report:codex -- --name Worker-A
+npm run report:codex -- --name Worker-B
 ```
 
 Names are exact apart from letter case. If a name is missing or ambiguous, use
@@ -25,8 +25,8 @@ For machine-readable output, npm must run silently because normal `npm run`
 prints a banner. Both commands below produce JSON directly:
 
 ```sh
-npm run --silent report:codex -- --name Lebron --json
-node scripts/codex-session-report.ts --name Lebron --json
+npm run --silent report:codex -- --name Worker-A --json
+node scripts/codex-session-report.ts --name Worker-A --json
 ```
 
 ## Timing meanings

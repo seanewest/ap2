@@ -39,13 +39,12 @@ the validator, and use the retained or marked artifact for cleanup.
 
 ## Authentication feedback loops
 
-The backend currently keeps access tokens in an isolated in-process cache per
-simulated-user provider and exact scope. This makes a second action using the
-same actor and scope fast while the replica remains alive. The cache does not
-survive a restart, does not request `offline_access` or retain a refresh token,
-and does not help the operator's SPA browser session. The current manual
-implementation also decodes Graph access-token claims; a replacement should
-treat Graph tokens as opaque and verify the fixed identity through Graph
+The backend keeps one in-memory MSAL public-client application and cache per
+simulated-user provider. It attempts `acquireTokenSilent` for the fixed Student
+authority, account, and requested scopes before falling back to the existing
+Playwright CBA interaction when Microsoft requires interaction. The
+interactive request includes `offline_access`, Graph tokens remain opaque, and
+every token result is followed by exact fixed-user verification through Graph
 `/me`.
 
 Within one controlled QA batch:
@@ -59,18 +58,9 @@ Within one controlled QA batch:
 - never replace a delegated-user proof with the Dev app when the simulated
   actor is part of the behavior.
 
-An in-memory `@azure/msal-node` cache can improve this without durable token
-storage. Keep one public-client application and cache per simulated user,
-request `offline_access`, attempt `acquireTokenSilent` first, and fall back to
-the existing fresh Playwright CBA interaction only when Microsoft requires it.
-After the first CBA interaction for a user, newly requested consented Graph
-scopes can usually be obtained silently. This can collapse several first-use
-scope-specific browser flows into one user login on a warm API or reused local
-process.
-
-That cache still does not survive a fresh container or revision and does not
-remove the operator browser's CBA interaction. Do not persist it during Pass 3:
-a persistent cache contains durable refresh-token credentials and needs
+The cache does not survive a fresh container or revision and does not remove
+the operator browser's CBA interaction. Do not persist it during Pass 3: a
+persistent cache contains durable refresh-token credentials and needs
 encryption, locking, eviction, revocation handling, and cross-replica design.
 
 ## Eventual consistency

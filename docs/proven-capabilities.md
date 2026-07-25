@@ -72,6 +72,9 @@ they are not additional tenant capabilities.
 - Homer, Cory, Marge, and Kobe have each completed fresh CBA sign-in through
   the shared simulated-user client for the delegated scopes needed by the
   bounded rehearsals.
+- The deployed in-memory MSAL cache completed one cold Cory workload action
+  followed by a different-scope Cory action without a second interactive CBA
+  flow, then removed both created artifacts.
 - The deployed HTTPS shape is GitHub Pages -> exact-origin CORS -> one Azure
   Container App, backed by an ACR and Container Apps environment. No private
   network, custom domain, Log Analytics workspace, or CI-gated API deployment
@@ -98,9 +101,10 @@ they are not additional tenant capabilities.
   markers, IDs, eTags, browser state, and a process-local busy boundary, but
   there is no durable queue, database, cross-replica lock, or exactly-once
   guarantee across callers, replicas, or restarts.
-- Simulated-user tokens are cached only in API process memory. Each fresh CBA
-  acquisition launches an isolated headless browser; persistent token caching
-  has not been built.
+- Simulated-user MSAL caches exist only in API process memory. The first
+  request after a restart may launch an isolated headless CBA browser; later
+  consented scopes can be acquired silently while that replica remains alive.
+  No durable token cache has been built.
 - Pass 3 intentionally retains broad Dev-app and API-MI permissions, CBA
   mappings/certificates, shared delegated consent, and the rehearsal Azure
   resources. Least privilege and production hardening are deferred.

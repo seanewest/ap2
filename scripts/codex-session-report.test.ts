@@ -252,14 +252,14 @@ describe("resolveSessionSelection", () => {
     const id = "019f87a8-2a8c-7921-a8d3-72e08a90146c";
     const { home, sessions } = await fixtureHome([
       { id, thread_name: "AP2 Worker", updated_at: "2026-07-22T00:00:00Z" },
-      { id, thread_name: "Lebron", updated_at: "2026-07-22T00:01:00Z" },
+      { id, thread_name: "Worker-A", updated_at: "2026-07-22T00:01:00Z" },
     ]);
     const path = await transcript(sessions, id);
 
-    await expect(resolveSessionSelection({ codexHome: home, name: "lebron" })).resolves.toMatchObject({
+    await expect(resolveSessionSelection({ codexHome: home, name: "worker-a" })).resolves.toMatchObject({
       sessionPath: path,
       threadId: id,
-      threadName: "Lebron",
+      threadName: "Worker-A",
       selectedBy: "name",
     });
     await expect(resolveSessionSelection({ codexHome: home, threadId: id })).resolves.toMatchObject({
@@ -278,13 +278,13 @@ describe("resolveSessionSelection", () => {
     const firstId = "019f87a8-2a8c-7921-a8d3-72e08a90146c";
     const secondId = "019f8c2f-38ab-74b0-be19-1136cb626f8f";
     const { home, sessions } = await fixtureHome([
-      { id: firstId, thread_name: "Lebron", updated_at: "2026-07-22T00:01:00Z" },
-      { id: secondId, thread_name: "Lebron", updated_at: "2026-07-22T00:02:00Z" },
+      { id: firstId, thread_name: "Worker-A", updated_at: "2026-07-22T00:01:00Z" },
+      { id: secondId, thread_name: "Worker-A", updated_at: "2026-07-22T00:02:00Z" },
     ]);
     await transcript(sessions, firstId);
     await transcript(sessions, secondId);
 
-    await expect(resolveSessionSelection({ codexHome: home, name: "Lebron" })).rejects.toThrow(
+    await expect(resolveSessionSelection({ codexHome: home, name: "Worker-A" })).rejects.toThrow(
       /ambiguous.*--thread-id or --path/i,
     );
     await expect(resolveSessionSelection({ codexHome: home })).rejects.toThrow(/Select one with --name/);
