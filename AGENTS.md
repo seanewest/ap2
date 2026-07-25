@@ -81,6 +81,8 @@ When communicating with a human, write like a person, not an agent status report
 
 Prefer solutions that are easy to explain at a high level to a human.
 
+Keep worker-to-Captain reports concise. State the outcome, blockers, material changes, and only the decisive evidence or references. Prefer one short paragraph. Leave step-by-step logs, exhaustive checks, routine unchanged-state details, and full timing data in the worker thread or evidence files unless they explain an ambiguity, risk, or requested decision.
+
 ### Languages
 
 Keep the number of implementation languages small. Prefer TypeScript for application code,
