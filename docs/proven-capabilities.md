@@ -49,6 +49,7 @@ not mean the operation has been added to the SPA/API product path.
 | User manager | Set Cory as Kobe's manager, later observed the exact relationship, and removed it. | Dev diagnostic app | Later read confirmed no manager |
 | Disabled Conditional Access policy | Added only the two needed Dev-app permissions, created one exact policy in `disabled` state, validated its inert contract, and deleted it. The policy was never enabled or put in report-only mode. | Dev diagnostic app | Zero active exact-name matches; Entra audit and deleted-policy retention accepted |
 | Exchange and message-trace diagnostics | Connected app-only to Exchange Online, read bounded organization configuration, and ran bounded message-trace diagnostics. The official Transport Data Platform Graph service principal also returned a successful trace read. | Dev diagnostic app and Microsoft Transport Data Platform service principal | Read-only; the Dev permissions and Exchange Administrator assignment remain |
+| Defender posture snapshot | Read the latest Microsoft Secure Score and reduced 69 controls to tenant-level and category-level score aggregates. Older score history was reported as truncated and deliberately not paged. | Dev diagnostic app | Read-only |
 | Mail folder | Created and deleted one ordinary visible top-level Cory mail folder. No message or send route was used. | c91 delegated — Cory | Exact folder absent |
 | Disabled Inbox rule | Created and deleted one exact harmless disabled rule. | c91 delegated — Cory | Exact rule absent |
 | Outlook category | Created and deleted one exact category. | c91 delegated — Cory | Exact category absent |
@@ -67,8 +68,9 @@ they are not additional tenant capabilities.
 
 | Scenario | Attacker-side unit | Defender-side observation | Boundary still visible |
 | --- | --- | --- | --- |
-| OAuth application reconnaissance | One over-permissioned application used four fixed reads to survey identity, mail, personal storage, and shared storage without a user sign-in. | A separate bounded query found the exact successful service-principal token event for Microsoft Graph in the reconnaissance window. | The sign-in log proves token acquisition, not the four individual reads. The Dev diagnostic app performed both proof roles, so separate attacker and defender identities remain unproven. |
+| OAuth application reconnaissance | One over-permissioned application used four fixed reads to survey identity, mail, personal storage, and shared storage without a user sign-in. | A separate bounded query found the exact successful service-principal token event for Microsoft Graph in the reconnaissance window. A bounded Defender query found no alert in the broader observation window. | The sign-in log proves token acquisition, not the four individual reads; zero visible alerts does not prove that no other detection exists. The Dev diagnostic app performed both proof roles, so separate attacker and defender identities remain unproven. |
 | Inbox-rule persistence staging | The Dev diagnostic app created one enabled Cory Inbox rule that triggers only on a unique AP2 subject marker and can mark the matching message read and stop later rules. A separate grant inventory confirmed its exact `MailboxSettings.ReadWrite` authority. | A separate app-only inventory reduced Cory's complete rule set to behavior counts and found exactly the expected enabled mark-read/stop-processing shape. | The rule cannot forward, redirect, delete, move, or address a recipient. The marker was never sent, so message influence was deliberately not exercised; the rule remains active for the deferred cleanup decision. |
+| Dormant OAuth application persistence | The Dev diagnostic app registered one single-tenant application with one short-lived password credential, then discarded the generated secret without storing or using it. The application has no service principal, permissions, roles, scopes, keys, or redirect URI. | A tenant-wide aggregate inventory found exactly one full dormant-configuration match with one password expiring within 48 hours. Separate name-based reconciliation confirmed the canary. | The application cannot obtain workload access. Immediate and naturally delayed directory-audit reads did not produce an exact actor-and-target correlation, so audit visibility remains unproven and no further query is planned. The app remains privately identifiable for deferred cleanup. |
 
 ## Identity and infrastructure proofs
 
@@ -106,6 +108,11 @@ they are not additional tenant capabilities.
   persistence-scenario residue. Its unique AP2 subject condition has never
   been sent, and it has no forwarding, redirect, deletion, move, or recipient
   action. Its protected exact identity is retained outside Git for later
+  cleanup.
+- One dormant single-tenant application is retained with a short-lived
+  password credential whose generated secret was discarded. It has no service
+  principal, requested access, role, scope, key, or redirect URI; its protected
+  exact identity is retained outside Git for the delayed audit check and
   cleanup.
 - Immediate Microsoft reads can lag accepted writes. The staged group,
   profile, manager, and calendar canaries waited for natural time rather than
