@@ -1,12 +1,18 @@
 # AP2
 
-AP2 is a minimal TypeScript SPA that signs operators in with their Microsoft
-work or school account. It uses the multitenant `After Party Exploratory`
-application registration and requests identity scopes only.
+AP2 is a TypeScript SPA and API used to explore bounded Microsoft 365 and Azure
+lab operations. Operators sign in through the multitenant `After Party
+Exploratory` application, then explicitly trigger fixed rehearsal actions.
 
 ## Architecture
 
-See [Identities](docs/identities.md).
+See:
+
+- [Product direction and Pass 3 charter](docs/product-direction.md)
+- [Identities](docs/identities.md)
+- [Proven capabilities](docs/proven-capabilities.md)
+- [Pass 3 development workflow](docs/development-workflow.md)
+- [Lab reset strategy](docs/lab-reset-strategy.md)
 
 ## Developer bootstrap
 
