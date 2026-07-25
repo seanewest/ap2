@@ -69,7 +69,8 @@ they are not additional tenant capabilities.
 | Scenario | Attacker-side unit | Defender-side observation | Boundary still visible |
 | --- | --- | --- | --- |
 | OAuth application reconnaissance | One over-permissioned application used four fixed reads to survey identity, mail, personal storage, and shared storage without a user sign-in. | A separate bounded query found the exact successful service-principal token event for Microsoft Graph in the reconnaissance window. A bounded Defender query found no alert in the broader observation window. | The sign-in log proves token acquisition, not the four individual reads; zero visible alerts does not prove that no other detection exists. The Dev diagnostic app performed both proof roles, so separate attacker and defender identities remain unproven. |
-| Inbox-rule persistence staging | The Dev diagnostic app created one enabled Cory Inbox rule that triggers only on a unique AP2 subject marker and can mark the matching message read and stop later rules. A separate grant inventory confirmed its exact `MailboxSettings.ReadWrite` authority. | A separate app-only inventory reduced Cory's complete rule set to behavior counts and found exactly the expected enabled mark-read/stop-processing shape. | The rule cannot forward, redirect, delete, move, or address a recipient. The marker was never sent, so message influence was deliberately not exercised; the rule remains active for the deferred cleanup decision. |
+| OAuth application mail staging | The Dev diagnostic app placed one marker-bound draft in Cory's mailbox without Cory signing in. The draft has no recipient, attachment, link, or send-family action. | A separate aggregate Drafts inventory found exactly one true, recipient-free, attachment-free, low-importance AP2-marked draft. | This adds app-only actor semantics to the already-proven draft capability; it does not prove delivery or message influence. The draft remains privately identifiable for deferred cleanup. |
+| Inbox-rule persistence staging | The Dev diagnostic app created one enabled Cory Inbox rule that triggers only on a unique AP2 subject marker and can mark the matching message read and stop later rules. A separate grant inventory confirmed its exact `MailboxSettings.ReadWrite` authority. | A separate inventory found exactly the expected enabled mark-read/stop-processing shape. The same app could read the Inbox-rule collections of all four fixed lab users, demonstrating tenant-wide mailbox-settings reach. | The rule cannot forward, redirect, delete, move, or address a recipient. The marker was never sent, so message influence was deliberately not exercised; the rule remains active for the deferred cleanup decision. |
 | Dormant OAuth application persistence | The Dev diagnostic app registered one single-tenant application with one short-lived password credential, then discarded the generated secret without storing or using it. The application has no service principal, permissions, roles, scopes, keys, or redirect URI. | A tenant-wide aggregate inventory found exactly one full dormant-configuration match with one password expiring within 48 hours. Separate name-based reconciliation confirmed the canary. | The application cannot obtain workload access. Immediate and naturally delayed directory-audit reads did not produce an exact actor-and-target correlation, so audit visibility remains unproven and no further query is planned. The app remains privately identifiable for deferred cleanup. |
 
 ## Identity and infrastructure proofs
@@ -112,8 +113,10 @@ they are not additional tenant capabilities.
 - One dormant single-tenant application is retained with a short-lived
   password credential whose generated secret was discarded. It has no service
   principal, requested access, role, scope, key, or redirect URI; its protected
-  exact identity is retained outside Git for the delayed audit check and
-  cleanup.
+  exact identity is retained outside Git for deferred cleanup.
+- One recipient-free, attachment-free, unsent Cory draft is retained as
+  app-only staging evidence. Its protected marker and exact identity are
+  retained outside Git for the first authorized residue-cleanup pass.
 - Immediate Microsoft reads can lag accepted writes. The staged group,
   profile, manager, and calendar canaries waited for natural time rather than
   retrying mutations. OneDrive's Marge-side access never advanced beyond
