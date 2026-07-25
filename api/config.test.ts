@@ -71,7 +71,7 @@ describe("loadApiConfig", () => {
     });
   });
 
-  it("accepts complete Cory CBA configuration under the existing shared client", () => {
+  it("accepts complete Homer and Cory CBA configuration under one shared client", () => {
     const config = loadApiConfig({
       AUTH_ISSUER: "https://issuer.example/",
       AUTH_AUDIENCE: "api://audience",
@@ -88,6 +88,27 @@ describe("loadApiConfig", () => {
       objectId: "22222222-2222-4222-8222-222222222222",
       pfxPath: "/run/secrets/cory.pfx",
       pfxPassphrase: "cory-passphrase",
+    });
+  });
+
+  it("accepts complete Cory-only CBA configuration under the shared client", () => {
+    const config = loadApiConfig({
+      AUTH_ISSUER: "https://issuer.example/",
+      AUTH_AUDIENCE: "api://audience",
+      AUTH_JWKS_URL: "https://issuer.example/keys",
+      SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+      CORY_CBA_OBJECT_ID: "22222222-2222-4222-8222-222222222222",
+      CORY_CBA_PFX_PATH: "/run/secrets/cory.pfx",
+      CORY_CBA_PFX_PASSPHRASE: "cory-passphrase",
+    });
+
+    expect(config.simulatedUsersCba).toEqual({
+      clientId: "11111111-1111-4111-8111-111111111111",
+      cory: {
+        objectId: "22222222-2222-4222-8222-222222222222",
+        pfxPath: "/run/secrets/cory.pfx",
+        pfxPassphrase: "cory-passphrase",
+      },
     });
   });
 
@@ -145,6 +166,27 @@ describe("loadApiConfig", () => {
         AUTH_AUDIENCE: "api://audience",
         AUTH_JWKS_URL: "https://issuer.example/keys",
         [name]: value,
+      }),
+    ).toThrow("must be configured together");
+  });
+
+  it.each([
+    {
+      HOMER_CBA_PFX_PATH: "/run/secrets/homer.pfx",
+      HOMER_CBA_PFX_PASSPHRASE: "homer-passphrase",
+    },
+    {
+      CORY_CBA_OBJECT_ID: "22222222-2222-4222-8222-222222222222",
+      CORY_CBA_PFX_PATH: "/run/secrets/cory.pfx",
+      CORY_CBA_PFX_PASSPHRASE: "cory-passphrase",
+    },
+  ])("rejects complete user CBA configuration without the shared client", (user) => {
+    expect(() =>
+      loadApiConfig({
+        AUTH_ISSUER: "https://issuer.example/",
+        AUTH_AUDIENCE: "api://audience",
+        AUTH_JWKS_URL: "https://issuer.example/keys",
+        ...user,
       }),
     ).toThrow("must be configured together");
   });
