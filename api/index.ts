@@ -48,10 +48,11 @@ const tokenVerifier = createRemoteTokenVerifier({
   jwksUrl: config.jwksUrl,
   allowInsecureHttp: config.allowInsecureJwks,
 });
-const homerTokenProvider = config.simulatedUsersCba
+const homerConfig = config.simulatedUsersCba?.homer;
+const homerTokenProvider = config.simulatedUsersCba && homerConfig
   ? new SimulatedUserDelegatedTokenProvider({
       clientId: config.simulatedUsersCba.clientId,
-      ...config.simulatedUsersCba.homer,
+      ...homerConfig,
       identity: HOMER_IDENTITY,
       allowedScopes: [GRAPH_MAIL_SEND_SCOPE, GRAPH_FILES_READ_WRITE_SCOPE],
     })

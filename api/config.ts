@@ -13,7 +13,7 @@ export interface SimulatedUserCertificateConfig {
 
 export interface SimulatedUsersCbaConfig {
   clientId: string;
-  homer: SimulatedUserCertificateConfig;
+  homer?: SimulatedUserCertificateConfig;
   cory?: SimulatedUserCertificateConfig & { objectId: string };
 }
 
@@ -74,9 +74,9 @@ function parseSimulatedUsersCbaConfig(
   ) {
     return undefined;
   }
-  if (!clientId || !homer) {
+  if (!clientId || (!homer && !cory)) {
     throw new Error(
-      "SIMULATED_USER_CLIENT_ID and Homer's complete certificate must be configured together",
+      "SIMULATED_USER_CLIENT_ID and at least one complete simulated-user certificate must be configured together",
     );
   }
   if (!isUuid(clientId)) {
@@ -92,7 +92,7 @@ function parseSimulatedUsersCbaConfig(
   }
   return {
     clientId,
-    homer,
+    ...(homer ? { homer } : {}),
     ...(cory && coryObjectId
       ? { cory: { ...cory, objectId: coryObjectId } }
       : {}),
