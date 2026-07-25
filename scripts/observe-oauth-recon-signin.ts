@@ -42,6 +42,7 @@ export interface OauthReconSigninObservation {
   unit: "oauth-recon-signin";
   observer: "development-automation-app";
   count: number;
+  observed: boolean;
   truncated: boolean;
   allMatchesInWindow: boolean;
   allMatchesExactApp: boolean;
@@ -104,25 +105,28 @@ export async function observeOauthReconSignin(
     throw new Error("Observer response was malformed.");
   }
   const signIns = record.value.map(parseSignIn);
+  const observed = signIns.length > 0;
 
   return {
     schema: "oauth-recon-signin-observer/v1",
     unit: "oauth-recon-signin",
     observer: "development-automation-app",
     count: signIns.length,
+    observed,
     truncated: typeof nextLink === "string" || signIns.length === TOP,
-    allMatchesInWindow: signIns.every(
+    allMatchesInWindow: observed && signIns.every(
       ({ createdTicks }) =>
         createdTicks >= window.startTicks && createdTicks <= window.endTicks,
     ),
-    allMatchesExactApp: signIns.every(
+    allMatchesExactApp: observed && signIns.every(
       ({ appId }) => appId === DEVELOPMENT_AUTOMATION_CLIENT_ID,
     ),
-    allMatchesSuccessful: signIns.every(({ successful }) => successful),
-    allMatchesServicePrincipal: signIns.every(
+    allMatchesSuccessful: observed &&
+      signIns.every(({ successful }) => successful),
+    allMatchesServicePrincipal: observed && signIns.every(
       ({ servicePrincipal }) => servicePrincipal,
     ),
-    allMatchesGraphResource: signIns.every(
+    allMatchesGraphResource: observed && signIns.every(
       ({ resourceId }) => resourceId === GRAPH_RESOURCE_ID,
     ),
   };

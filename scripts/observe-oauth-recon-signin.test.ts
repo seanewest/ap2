@@ -102,6 +102,7 @@ describe("OAuth reconnaissance sign-in observer", () => {
       unit: "oauth-recon-signin",
       observer: "development-automation-app",
       count: 2,
+      observed: true,
       truncated: true,
       allMatchesInWindow: true,
       allMatchesExactApp: true,
@@ -125,6 +126,28 @@ describe("OAuth reconnaissance sign-in observer", () => {
     ]) {
       expect(output).not.toContain(unsafe);
     }
+  });
+
+  it("does not present an empty result as a successful correlation", async () => {
+    const result = await observeOauthReconSignin(
+      requiredObservationWindow(START, END),
+      { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+      vi.fn().mockResolvedValue(Response.json({ value: [] })),
+    );
+
+    expect(result).toEqual({
+      schema: "oauth-recon-signin-observer/v1",
+      unit: "oauth-recon-signin",
+      observer: "development-automation-app",
+      count: 0,
+      observed: false,
+      truncated: false,
+      allMatchesInWindow: false,
+      allMatchesExactApp: false,
+      allMatchesSuccessful: false,
+      allMatchesServicePrincipal: false,
+      allMatchesGraphResource: false,
+    });
   });
 
   it("reports mismatches and cap truncation without pagination", async () => {
