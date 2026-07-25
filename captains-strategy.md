@@ -63,6 +63,9 @@ Ordinary worker reports should be queued while the Captain is active and start
 a new Captain turn after the current turn completes. Only urgent safety or
 mutation information should steer an active turn.
 
+Judge apparent stalls by elapsed wall time and worker status, not rapid Captain
+continuations or the temporary absence of an output file.
+
 ## Keep reports decision-ready
 
 A worker notification is not the audit record. Detailed reasoning, request
@@ -117,3 +120,42 @@ When a path is blocked on human input or external convergence, record the exact
 state and move to another independent capability. A terminal experiment state
 does not require exhaustive hardening, production least privilege, or a
 general framework during Pass 3.
+
+## Control accumulation
+
+Pass 3 produces evidence, prototypes, and product features; those are different
+commitments. Mutate the tenant only when the experiment answers a new learning
+question that an existing proof cannot answer. A different actor performing an
+already-proven operation is usually a variant, not a new capability. Stop when
+the question is answered, even if more variants are available.
+
+Keep the smallest artifact that preserves the useful result:
+
+- detailed evidence belongs in a protected artifact; the capability ledger
+  retains only the result and its important boundary;
+- temporary experiment code may be removed after the result is recorded;
+- reusable code earns continued maintenance through demonstrated scenario
+  reuse or a product path that needs it;
+- a lesson becomes a standing rule only when it prevents a material, recurring
+  failure. When adding one, replace or remove obsolete guidance instead of
+  stacking another exception on top.
+
+Documents need distinct jobs. `AGENTS.md` owns stable repository-wide
+instructions, this file owns Captain judgment and coordination,
+`docs/development-workflow.md` owns the delivery loop, and
+`docs/proven-capabilities.md` owns live results and limitations. Feature docs
+should exist only when code and tests cannot carry the feature-specific
+contract. Link to the canonical explanation; do not copy it into every
+document.
+
+Treat growing integration cost as evidence about the architecture. If a simple
+Microsoft operation repeatedly requires bespoke configuration, routing, state,
+tests, and documentation, identify historical coupling before adding another
+case. Consolidate a repeated pattern only when the current experiments reveal
+its stable shape; do not build a generic framework merely to conceal the cost.
+
+Use the human reader's vocabulary. Explain an internal nickname or proof term
+in plain language on first use, and lead status reports with what happened in
+Microsoft 365 and why it matters. The coordination process is a tool, not a
+deliverable: keep only the checks that can change safety, evidence, or the
+current decision.
