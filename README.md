@@ -134,20 +134,10 @@ shape is refused with `apply_scope_disabled`, every `plannedAction` is `null`,
 and all planned-action summary counts are zero.
 
 Calendar reset remains preview-only. There is no package command, confirmation
-flag, or executable Graph mutation path for applying a calendar reset.
-
-The bounded canary established that Microsoft Graph accepted an event `DELETE`
-carrying a genuinely stale event ETag with HTTP `204`. A read-only follow-up
-then found the exact event absent, found zero events with the canary marker, and
-produced a fresh preview with zero eligible and zero indeterminate events. In
-this tested route, event `DELETE` did not enforce `If-Match` as a mutation
-precondition.
-
-The canary fixture is confirmed absent, but this is negative safety evidence,
-not authorization to broaden cleanup. Conditional calendar deletion cannot
-currently provide the required drift guard, so broad calendar apply remains
-unsupported. The retained schema-v2 preview is the only calendar-reset
-capability in this repository.
+flag, or executable Graph mutation path for applying a calendar reset. The
+failed conditional-delete safety assumption and live canary result are recorded
+in the [lab reset strategy](docs/lab-reset-strategy.md) and
+[proven-capabilities ledger](docs/proven-capabilities.md).
 
 Summarize a local Codex transcript, including wall and Codex-reported active
 time, slow tool calls, likely stalls, token use, and automatic goal retries.
