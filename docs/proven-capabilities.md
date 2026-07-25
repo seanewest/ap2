@@ -42,6 +42,7 @@ not mean the operation has been added to the SPA/API product path.
 
 | Canary | What was directly proven | Actor | Cleanup / final state |
 | --- | --- | --- | --- |
+| Application cross-workload reconnaissance | One app-only execution used one token and four fixed reads to observe Cory's directory memberships and mailbox-folder metadata plus the roots of Cory's OneDrive and the fixed SharePoint drive. The bounded collections were not truncated, and the output retained only counts and reachability—not tenant object details. | Dev diagnostic app | Read-only |
 | Empty Azure resource group | Created one tagged, empty Student resource group through ARM, confirmed it contained no resources, and deleted it. | Dev diagnostic app | Later exact GET returned `404` |
 | Security group and membership | Created an inert cloud-only security group, later added Kobe, observed him as the sole member after natural propagation time, removed him, observed the group empty, and deleted it. | Dev diagnostic app | Later exact-name read returned zero |
 | User profile field | Set Kobe's `officeLocation` to an AP2 marker and later observed that marker. | Dev diagnostic app | Restored to `null`; later exact read confirmed restoration |
