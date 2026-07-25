@@ -3,7 +3,6 @@
 import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import {
-  OAUTH_RECON_SIGNIN_CONFIGURATION,
   observeOauthReconSignin,
   requiredObservationWindow,
 } from "./observe-oauth-recon-signin.js";
@@ -48,10 +47,6 @@ describe("OAuth reconnaissance sign-in observer", () => {
   });
 
   it("uses one token and one bounded GET with the exact fixed filter", async () => {
-    expect(OAUTH_RECON_SIGNIN_CONFIGURATION).toEqual({
-      tenantId: "92563293-315c-4b6c-9b90-bcb47ee8c970",
-      clientId: CLIENT_ID,
-    });
     const credential = {
       getToken: vi.fn().mockResolvedValue({ token: "private-token" }),
     };
@@ -104,11 +99,7 @@ describe("OAuth reconnaissance sign-in observer", () => {
       count: 2,
       observed: true,
       truncated: true,
-      allMatchesInWindow: true,
-      allMatchesExactApp: true,
-      allMatchesSuccessful: true,
-      allMatchesServicePrincipal: true,
-      allMatchesGraphResource: true,
+      exactCorrelation: true,
     });
     const output = JSON.stringify(result);
     for (const unsafe of [
@@ -142,11 +133,7 @@ describe("OAuth reconnaissance sign-in observer", () => {
       count: 0,
       observed: false,
       truncated: false,
-      allMatchesInWindow: false,
-      allMatchesExactApp: false,
-      allMatchesSuccessful: false,
-      allMatchesServicePrincipal: false,
-      allMatchesGraphResource: false,
+      exactCorrelation: false,
     });
   });
 
@@ -173,11 +160,7 @@ describe("OAuth reconnaissance sign-in observer", () => {
     expect(result).toMatchObject({
       count: 10,
       truncated: true,
-      allMatchesInWindow: false,
-      allMatchesExactApp: false,
-      allMatchesSuccessful: false,
-      allMatchesServicePrincipal: false,
-      allMatchesGraphResource: false,
+      exactCorrelation: false,
     });
   });
 

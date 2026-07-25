@@ -13,11 +13,6 @@ const GRAPH_RESOURCE_ID = "00000003-0000-0000-c000-000000000000";
 const TOP = 10;
 const MAX_WINDOW_MS = 15 * 60 * 1_000;
 
-export const OAUTH_RECON_SIGNIN_CONFIGURATION = {
-  tenantId: STUDENT_TENANT_ID,
-  clientId: DEVELOPMENT_AUTOMATION_CLIENT_ID,
-} as const;
-
 interface GraphCredential {
   getToken(scope: string): Promise<{ token: string } | null>;
 }
@@ -44,11 +39,7 @@ export interface OauthReconSigninObservation {
   count: number;
   observed: boolean;
   truncated: boolean;
-  allMatchesInWindow: boolean;
-  allMatchesExactApp: boolean;
-  allMatchesSuccessful: boolean;
-  allMatchesServicePrincipal: boolean;
-  allMatchesGraphResource: boolean;
+  exactCorrelation: boolean;
 }
 
 export function requiredObservationWindow(
@@ -106,6 +97,15 @@ export async function observeOauthReconSignin(
   }
   const signIns = record.value.map(parseSignIn);
   const observed = signIns.length > 0;
+  const exactCorrelation = observed && signIns.every(
+    ({ createdTicks, appId, successful, servicePrincipal, resourceId }) =>
+      createdTicks >= window.startTicks &&
+      createdTicks <= window.endTicks &&
+      appId === DEVELOPMENT_AUTOMATION_CLIENT_ID &&
+      successful &&
+      servicePrincipal &&
+      resourceId === GRAPH_RESOURCE_ID,
+  );
 
   return {
     schema: "oauth-recon-signin-observer/v1",
@@ -114,21 +114,7 @@ export async function observeOauthReconSignin(
     count: signIns.length,
     observed,
     truncated: typeof nextLink === "string" || signIns.length === TOP,
-    allMatchesInWindow: observed && signIns.every(
-      ({ createdTicks }) =>
-        createdTicks >= window.startTicks && createdTicks <= window.endTicks,
-    ),
-    allMatchesExactApp: observed && signIns.every(
-      ({ appId }) => appId === DEVELOPMENT_AUTOMATION_CLIENT_ID,
-    ),
-    allMatchesSuccessful: observed &&
-      signIns.every(({ successful }) => successful),
-    allMatchesServicePrincipal: observed && signIns.every(
-      ({ servicePrincipal }) => servicePrincipal,
-    ),
-    allMatchesGraphResource: observed && signIns.every(
-      ({ resourceId }) => resourceId === GRAPH_RESOURCE_ID,
-    ),
+    exactCorrelation,
   };
 }
 
