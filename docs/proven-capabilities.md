@@ -55,6 +55,7 @@ not mean the operation has been added to the SPA/API product path.
 | SharePoint file | Uploaded the exact bounded file to the fixed site, validated its bytes, and deleted it by exact identity/eTag. | Dev diagnostic app | Active path returned `404`; recycle-bin/audit history retained |
 | Temporary To Do list | Created and deleted one temporary list without tasks or sharing. | c91 delegated — Cory | Exact list absent |
 | Temporary To Do list/task lifecycle | Created a temporary list and task, completed the task, then deleted both. No sharing or mail route was used. | c91 delegated — Cory | Exact task and list absent |
+| Calendar event conditional-delete check | Graph accepted one event `DELETE` carrying a genuinely stale event ETag with HTTP `204`, proving that `If-Match` was ignored on the tested route. | Dev diagnostic app | Read-only follow-up found the exact event absent, marker count zero, and preview eligible `0` / indeterminate `0` |
 
 The contact and disabled-rule operations were also exercised through the
 production-shaped local SPA, rootless API container, operator CBA, and Cory
@@ -97,6 +98,11 @@ they are not additional tenant capabilities.
   profile, manager, and calendar canaries waited for natural time rather than
   retrying mutations. OneDrive's Marge-side access never advanced beyond
   pending within the bounded verification window.
+- Broad calendar apply is unsupported. The conditional-delete canary showed
+  that event `DELETE` did not enforce `If-Match` on the tested route, so the
+  repository retains only the read-only schema-v2 calendar preview. Its
+  contract declares no apply scope, and its classified actions are diagnostic
+  metadata with no planned or executable action.
 - Mutations are deliberately not retried. Some hosted operations use fixed
   markers, IDs, eTags, browser state, and a process-local busy boundary, but
   there is no durable queue, database, cross-replica lock, or exactly-once

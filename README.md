@@ -122,12 +122,32 @@ AP2_AUTOMATION_CERTIFICATE_PATH='<certificate-pem-outside-git>' \
 ```
 
 The tool is fixed to the exact Student tenant and immutable Cory, Homer, Kobe,
-and Marge object ID/UPN pairs. It follows every Graph event page and writes a
-new mode-0600 manifest outside the repository. The protected manifest contains
-event IDs and change keys for later drift-safe review, but no token, body, or
-subject. Only events carrying the established AP2 calendar-run marker can be
-eligible; unmarked post-cutoff events remain visible but refused. The command
-has no apply, cancel, or delete mode.
+and Marge object ID/UPN pairs. Every calendar GET requests immutable Outlook
+IDs, follows every page, and writes a new owner-only mode-0400 schema-v2
+manifest outside the repository. The command prints the manifest SHA-256.
+The manifest retains the exact per-mailbox immutable ID, literal
+`@odata.etag`, change key, `iCalUId` logical key, transaction ID, marker,
+organizer/attendee metadata, read-only diagnostic classification, and
+count/refusal summary, but no token, body, subject, or other presentation
+fields. Its contract declares `applyScope: "none"`; every otherwise actionable
+shape is refused with `apply_scope_disabled`, every `plannedAction` is `null`,
+and all planned-action summary counts are zero.
+
+Calendar reset remains preview-only. There is no package command, confirmation
+flag, or executable Graph mutation path for applying a calendar reset.
+
+The bounded canary established that Microsoft Graph accepted an event `DELETE`
+carrying a genuinely stale event ETag with HTTP `204`. A read-only follow-up
+then found the exact event absent, found zero events with the canary marker, and
+produced a fresh preview with zero eligible and zero indeterminate events. In
+this tested route, event `DELETE` did not enforce `If-Match` as a mutation
+precondition.
+
+The canary fixture is confirmed absent, but this is negative safety evidence,
+not authorization to broaden cleanup. Conditional calendar deletion cannot
+currently provide the required drift guard, so broad calendar apply remains
+unsupported. The retained schema-v2 preview is the only calendar-reset
+capability in this repository.
 
 Summarize a local Codex transcript, including wall and Codex-reported active
 time, slow tool calls, likely stalls, token use, and automatic goal retries.

@@ -37,14 +37,56 @@ collection.
 
 ## Coordinate parallel work
 
-Delegate independent research, review, documentation, and implementation
-slices when slots are available. Keep workers off the same files unless one
-explicitly owns integration. Reports should identify the artifact, commit,
-tests, true blocker, and whether any mutation or cleanup remains.
+Parallelize independent work whose inputs are already stable. Do not keep every
+worker occupied merely because a slot is available. Idle workers are preferable
+to speculative work that will become stale or create another review cycle.
+
+Use dependencies, not worker count, to choose the shape of the work. A common
+safe sequence is:
+
+1. one worker implements;
+2. one worker reviews the exact implementation;
+3. one worker runs the reviewed live canary;
+4. one worker integrates and closes out the proven result.
+
+Research or design review may overlap implementation when it can change the
+implementation contract early. Integration planning, destructive testing, and
+final evidence review should wait for the artifacts they consume. Keep workers
+off the same files unless one explicitly owns integration.
+
+Give workers broad, outcome-based goals. Follow up only when a genuine blocker,
+a changed decision, or missing acceptance evidence requires it. Do not turn
+every report into another assignment, and do not duplicate a worker's technical
+investigation unless the Captain must adjudicate conflicting evidence.
 
 Ordinary worker reports should be queued while the Captain is active and start
 a new Captain turn after the current turn completes. Only urgent safety or
 mutation information should steer an active turn.
+
+## Keep reports decision-ready
+
+A worker notification is not the audit record. Detailed reasoning, request
+semantics, exhaustive checks, and evidence belong in the commit, PR, worker
+thread, protected artifact, or a separately referenced report.
+
+Worker notifications must be under 150 words and use:
+
+```text
+STATUS: PASS | BLOCKED
+RESULT: One to three sentences with the conclusion.
+CAPTAIN ACTION: None, or the one decision or action required.
+DETAILS: PR, commit, artifact, or report location.
+```
+
+Include a hash, request detail, source link, or test list only when it is
+decisive to the current blocker, mutation boundary, or exact artifact under
+review. Prefer one decisive reference over an evidence dump.
+
+The Captain should normally act on a worker report without restating it. Give
+one consolidated update at the end of a phase. Send an immediate interpretation
+only when the human must understand a new blocker, safety boundary, or changed
+decision before work continues, and do not repeat that interpretation again in
+the same phase.
 
 ## Use temporary delivery lanes
 
@@ -56,9 +98,18 @@ Repeated feature work was efficient when four concurrent lanes covered:
 - documentation, GitHub integration, merge, and closeout.
 
 These are temporary planning lanes, not permanent agent roles, names, or
-permissions. Assign and combine them according to the current bottleneck, and
-let workers use subagents for bounded parallel work. Keep one explicit owner
-for integration when lanes touch the same files or external state.
+permissions. They describe work that may exist, not seats that must remain
+filled. Assign, combine, sequence, or leave them idle according to the current
+bottleneck. Keep one explicit owner for integration when lanes touch the same
+files or external state.
+
+## Check action bias
+
+Before changing coordination infrastructure, worktrees, branches, sessions, or
+other shared setup, ask whether the observed state actually prevents the
+requested work. Nonblocking hygiene is not automatically an immediate task.
+Prefer inspection and a concise recommendation; ask the human before changing
+shared setup when their intended workflow is uncertain.
 
 ## Prefer progress over polish
 
