@@ -1,6 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
+import {
+  InteractionRequiredAuthError,
+  PublicClientApplication,
+  type AccountInfo,
+  type AuthenticationResult,
+  type AuthorizationCodeRequest as MsalAuthorizationCodeRequest,
+  type SilentFlowRequest,
+} from "@azure/msal-node";
 import { chromium, type BrowserContext, type Page } from "playwright";
-import { decodeJwt } from "jose";
 import { STUDENT_TENANT_ID } from "./identity.js";
 import {
   type DelegatedGraphToken,
@@ -15,8 +22,9 @@ const CERTIFICATE_AUTHENTICATION_ORIGINS = [
 ] as const;
 export const SIMULATED_USER_REDIRECT_URI =
   "http://localhost/ap2-simulated-user-callback";
-const CACHE_SKEW_MS = 120_000;
 const GRAPH_USER_READ_SCOPE = `${GRAPH_ORIGIN}/User.Read`;
+const STUDENT_AUTHORITY =
+  `https://login.microsoftonline.com/${STUDENT_TENANT_ID}`;
 
 interface AuthorizationCodeRequest {
   authorizeUrl: URL;
@@ -39,14 +47,16 @@ export interface SimulatedUserDelegatedTokenProviderOptions {
   identity: SimulatedUserIdentity;
   allowedScopes: readonly string[];
   browser?: AuthorizationCodeBrowser;
+  msalClient?: SimulatedUserMsalClient;
   request?: typeof fetch;
-  now?: () => number;
   timeoutMs?: number;
 }
 
-interface CachedAccessToken {
-  token: string;
-  expiresAtMs: number;
+export interface SimulatedUserMsalClient {
+  acquireTokenByCode(
+    request: MsalAuthorizationCodeRequest,
+  ): Promise<AuthenticationResult>;
+  acquireTokenSilent(request: SilentFlowRequest): Promise<AuthenticationResult>;
 }
 
 export class SimulatedUserCbaError extends Error {
@@ -65,11 +75,12 @@ export class SimulatedUserDelegatedTokenProvider
   readonly #identity: SimulatedUserIdentity;
   readonly #allowedScopes: ReadonlySet<string>;
   readonly #browser: AuthorizationCodeBrowser;
+  readonly #msalClient: SimulatedUserMsalClient;
   readonly #request: typeof fetch;
-  readonly #now: () => number;
   readonly #timeoutMs: number;
-  readonly #cachedAccessTokens = new Map<string, CachedAccessToken>();
   readonly #acquisitions = new Map<string, Promise<string>>();
+  #account?: AccountInfo;
+  #interactiveAcquisition?: Promise<InteractiveAcquisition>;
 
   constructor(options: SimulatedUserDelegatedTokenProviderOptions) {
     if (
@@ -80,7 +91,8 @@ export class SimulatedUserDelegatedTokenProvider
       !isUuid(options.identity.objectId) ||
       options.identity.displayName.length === 0 ||
       options.identity.userPrincipalName.length === 0 ||
-      options.allowedScopes.length === 0
+      options.allowedScopes.length === 0 ||
+      options.allowedScopes.some((scope) => !isGraphScope(scope))
     ) {
       throw new TypeError("The simulated-user CBA configuration is incomplete.");
     }
@@ -96,8 +108,14 @@ export class SimulatedUserDelegatedTokenProvider
     this.#identity = options.identity;
     this.#allowedScopes = new Set(options.allowedScopes);
     this.#browser = options.browser ?? new PlaywrightAuthorizationCodeBrowser();
+    this.#msalClient = options.msalClient ??
+      new PublicClientApplication({
+        auth: {
+          clientId: options.clientId,
+          authority: STUDENT_AUTHORITY,
+        },
+      });
     this.#request = (options.request ?? fetch).bind(globalThis);
-    this.#now = options.now ?? Date.now;
     this.#timeoutMs = timeoutMs;
   }
 
@@ -120,14 +138,6 @@ export class SimulatedUserDelegatedTokenProvider
   }
 
   async #getAccessToken(scope: string): Promise<string> {
-    const cachedAccessToken = this.#cachedAccessTokens.get(scope);
-    if (
-      cachedAccessToken &&
-      this.#now() < cachedAccessToken.expiresAtMs - CACHE_SKEW_MS
-    ) {
-      return cachedAccessToken.token;
-    }
-
     let acquisition = this.#acquisitions.get(scope);
     if (!acquisition) {
       acquisition = this.#acquireAccessToken(scope).finally(() => {
@@ -140,42 +150,27 @@ export class SimulatedUserDelegatedTokenProvider
 
   async #acquireAccessToken(scope: string): Promise<string> {
     try {
-      const authorizationScopes = buildAuthorizationScopes(scope);
-      const pkce = createPkce();
-      const state = base64Url(randomBytes(32));
-      const authorizeUrl = createAuthorizeUrl({
-        clientId: this.#clientId,
-        redirectUri: SIMULATED_USER_REDIRECT_URI,
-        state,
-        challenge: pkce.challenge,
-        scopes: authorizationScopes,
-        userPrincipalName: this.#identity.userPrincipalName,
-      });
-      const code = await this.#browser.acquireAuthorizationCode({
-        authorizeUrl,
-        expectedState: state,
-        redirectUri: SIMULATED_USER_REDIRECT_URI,
-        pfxPath: this.#pfxPath,
-        pfxPassphrase: this.#pfxPassphrase,
-        userPrincipalName: this.#identity.userPrincipalName,
-        timeoutMs: this.#timeoutMs,
-      });
-      const token = await this.#exchangeCode(
-        code,
-        pkce.verifier,
-        authorizationScopes,
-      );
-      const expiresAtMs = validateAccessToken(
-        token,
-        this.#now(),
-        this.#identity,
-        scope,
-      );
-      await this.#verifyIdentity(token);
-      this.#cachedAccessTokens.set(scope, { token, expiresAtMs });
-      return token;
+      if (!this.#account) {
+        const interactive = await this.#acquireInteractive(scope);
+        if (interactive.scope === scope) {
+          return interactive.accessToken;
+        }
+      }
+
+      while (true) {
+        try {
+          return await this.#acquireSilent(scope);
+        } catch (error) {
+          if (!(error instanceof InteractionRequiredAuthError)) {
+            throw error;
+          }
+          const interactive = await this.#acquireInteractive(scope);
+          if (interactive.scope === scope) {
+            return interactive.accessToken;
+          }
+        }
+      }
     } catch (error) {
-      this.#cachedAccessTokens.delete(scope);
       if (error instanceof SimulatedUserCbaError) {
         throw error;
       }
@@ -185,46 +180,82 @@ export class SimulatedUserDelegatedTokenProvider
     }
   }
 
-  async #exchangeCode(
-    code: string,
-    verifier: string,
-    scopes: readonly string[],
-  ): Promise<string> {
-    let response: Response;
-    try {
-      response = await this.#request(
-        `https://login.microsoftonline.com/${STUDENT_TENANT_ID}/oauth2/v2.0/token`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: this.#clientId,
-            code,
-            redirect_uri: SIMULATED_USER_REDIRECT_URI,
-            grant_type: "authorization_code",
-            code_verifier: verifier,
-            scope: scopes.join(" "),
-          }),
-        },
-      );
-    } catch {
+  async #acquireSilent(scope: string): Promise<string> {
+    if (!this.#account) {
       throw new SimulatedUserCbaError(
-        "Microsoft token exchange could not be reached.",
+        "The simulated-user MSAL account is unavailable.",
       );
     }
+    const result = await this.#msalClient.acquireTokenSilent({
+      account: this.#account,
+      authority: STUDENT_AUTHORITY,
+      scopes: buildTokenScopes(scope),
+    });
+    return this.#acceptAuthenticationResult(result, scope);
+  }
 
-    const value = await readJson(response);
+  #acquireInteractive(scope: string): Promise<InteractiveAcquisition> {
+    if (!this.#interactiveAcquisition) {
+      this.#interactiveAcquisition = this.#runInteractive(scope).finally(() => {
+        this.#interactiveAcquisition = undefined;
+      });
+    }
+    return this.#interactiveAcquisition;
+  }
+
+  async #runInteractive(scope: string): Promise<InteractiveAcquisition> {
+    const authorizationScopes = buildAuthorizationScopes(scope);
+    const pkce = createPkce();
+    const state = base64Url(randomBytes(32));
+    const authorizeUrl = createAuthorizeUrl({
+      clientId: this.#clientId,
+      redirectUri: SIMULATED_USER_REDIRECT_URI,
+      state,
+      challenge: pkce.challenge,
+      scopes: authorizationScopes,
+      userPrincipalName: this.#identity.userPrincipalName,
+    });
+    const code = await this.#browser.acquireAuthorizationCode({
+      authorizeUrl,
+      expectedState: state,
+      redirectUri: SIMULATED_USER_REDIRECT_URI,
+      pfxPath: this.#pfxPath,
+      pfxPassphrase: this.#pfxPassphrase,
+      userPrincipalName: this.#identity.userPrincipalName,
+      timeoutMs: this.#timeoutMs,
+    });
+    const result = await this.#msalClient.acquireTokenByCode({
+      authority: STUDENT_AUTHORITY,
+      code,
+      codeVerifier: pkce.verifier,
+      redirectUri: SIMULATED_USER_REDIRECT_URI,
+      scopes: [...authorizationScopes],
+    });
+    if (!result.account) {
+      throw new SimulatedUserCbaError(
+        "Microsoft did not return a simulated-user account.",
+      );
+    }
+    const accessToken = await this.#acceptAuthenticationResult(result, scope);
+    this.#account = result.account;
+    return { scope, accessToken };
+  }
+
+  async #acceptAuthenticationResult(
+    result: AuthenticationResult,
+    requestedScope: string,
+  ): Promise<string> {
     if (
-      !response.ok ||
-      !isRecord(value) ||
-      typeof value.access_token !== "string" ||
-      value.access_token.length === 0
+      !result.accessToken ||
+      !hasGraphScope(result.scopes, GRAPH_USER_READ_SCOPE) ||
+      !hasGraphScope(result.scopes, requestedScope)
     ) {
       throw new SimulatedUserCbaError(
-        `Microsoft token exchange failed with HTTP ${response.status}.`,
+        "Microsoft did not return the requested simulated-user access.",
       );
     }
-    return value.access_token;
+    await this.#verifyIdentity(result.accessToken);
+    return result.accessToken;
   }
 
   async #verifyIdentity(accessToken: string): Promise<void> {
@@ -259,6 +290,11 @@ export class SimulatedUserDelegatedTokenProvider
       );
     }
   }
+}
+
+interface InteractiveAcquisition {
+  scope: string;
+  accessToken: string;
 }
 
 class PlaywrightAuthorizationCodeBrowser implements AuthorizationCodeBrowser {
@@ -476,52 +512,49 @@ function createAuthorizeUrl(input: {
   return url;
 }
 
-function validateAccessToken(
-  token: string,
-  nowMs: number,
-  identity: SimulatedUserIdentity,
-  requestedScope: string,
-): number {
-  let claims;
-  try {
-    claims = decodeJwt(token);
-  } catch {
-    throw new SimulatedUserCbaError(
-      "Microsoft returned an invalid simulated-user access token.",
-    );
-  }
-
-  const scopes =
-    typeof claims.scp === "string" ? claims.scp.split(" ").filter(Boolean) : [];
-  const expiresAtMs =
-    typeof claims.exp === "number" ? claims.exp * 1_000 : Number.NaN;
-  if (
-    claims.tid !== identity.tenantId ||
-    claims.oid !== identity.objectId ||
-    !scopes.includes("User.Read") ||
-    !scopes.includes(graphScopeName(requestedScope)) ||
-    !Number.isFinite(expiresAtMs) ||
-    expiresAtMs <= nowMs + CACHE_SKEW_MS
-  ) {
-    throw new SimulatedUserCbaError(
-      "Microsoft returned an invalid simulated-user access token.",
-    );
-  }
-  return expiresAtMs;
-}
-
 function buildAuthorizationScopes(requestedScope: string): readonly string[] {
-  return ["openid", "profile", GRAPH_USER_READ_SCOPE, requestedScope];
+  return [
+    "openid",
+    "profile",
+    "offline_access",
+    GRAPH_USER_READ_SCOPE,
+    requestedScope,
+  ];
 }
 
-function graphScopeName(scope: string): string {
-  const url = new URL(scope);
-  if (url.origin !== GRAPH_ORIGIN || url.pathname.split("/").length !== 2) {
-    throw new SimulatedUserCbaError(
-      "The simulated user token scope is not allowed.",
-    );
+function buildTokenScopes(requestedScope: string): string[] {
+  return [GRAPH_USER_READ_SCOPE, requestedScope];
+}
+
+function hasGraphScope(
+  grantedScopes: readonly string[],
+  requestedScope: string,
+): boolean {
+  const requested = graphScopeName(requestedScope);
+  return grantedScopes.some((scope) => graphScopeName(scope) === requested);
+}
+
+function graphScopeName(scope: string): string | undefined {
+  if (/^[A-Za-z][A-Za-z0-9.]*$/.test(scope)) {
+    return scope.toLowerCase();
   }
-  return url.pathname.slice(1);
+  try {
+    const url = new URL(scope);
+    return url.origin === GRAPH_ORIGIN &&
+        url.pathname.split("/").length === 2 &&
+        url.pathname.length > 1 &&
+        !url.search &&
+        !url.hash
+      ? url.pathname.slice(1).toLowerCase()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isGraphScope(scope: string): boolean {
+  return scope.startsWith(`${GRAPH_ORIGIN}/`) &&
+    graphScopeName(scope) !== undefined;
 }
 
 function createPkce(): { verifier: string; challenge: string } {

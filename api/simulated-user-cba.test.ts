@@ -1,4 +1,9 @@
 import { createHash } from "node:crypto";
+import {
+  InteractionRequiredAuthError,
+  type AccountInfo,
+  type AuthenticationResult,
+} from "@azure/msal-node";
 import { describe, expect, it, vi } from "vitest";
 
 const playwright = vi.hoisted(() => ({ launch: vi.fn() }));
@@ -11,6 +16,7 @@ import {
   SimulatedUserCbaError,
   SIMULATED_USER_REDIRECT_URI,
   type AuthorizationCodeBrowser,
+  type SimulatedUserMsalClient,
 } from "./simulated-user-cba.js";
 import { STUDENT_TENANT_ID } from "./identity.js";
 import {
@@ -28,26 +34,41 @@ import {
 import { GRAPH_CALENDARS_READ_WRITE_SCOPE } from "./calendar-meeting.js";
 
 const CLIENT_ID = "11111111-1111-4111-8111-111111111111";
-const NOW = Date.UTC(2026, 6, 23, 12);
 const PASSPHRASE = "private-passphrase";
+const AUTHORITY =
+  `https://login.microsoftonline.com/${STUDENT_TENANT_ID}`;
 
-function accessToken(
-  overrides: Record<string, unknown> = {},
-  expiresAt = NOW + 60 * 60 * 1_000,
-): string {
-  const header = Buffer.from(JSON.stringify({ alg: "none" })).toString(
-    "base64url",
-  );
-  const payload = Buffer.from(
-    JSON.stringify({
-      tid: STUDENT_TENANT_ID,
-      oid: HOMER_OBJECT_ID,
-      scp: "Mail.Send User.Read",
-      exp: expiresAt / 1_000,
-      ...overrides,
-    }),
-  ).toString("base64url");
-  return `${header}.${payload}.`;
+const HOMER_ACCOUNT: AccountInfo = {
+  homeAccountId: `${HOMER_OBJECT_ID}.${STUDENT_TENANT_ID}`,
+  environment: "login.microsoftonline.com",
+  tenantId: STUDENT_TENANT_ID,
+  username: HOMER_USER_PRINCIPAL_NAME,
+  localAccountId: HOMER_OBJECT_ID,
+  name: HOMER_DISPLAY_NAME,
+};
+
+function authenticationResult(
+  accessToken: string,
+  options: {
+    account?: AccountInfo | null;
+    scopes?: string[];
+    fromCache?: boolean;
+  } = {},
+): AuthenticationResult {
+  return {
+    authority: AUTHORITY,
+    uniqueId: HOMER_OBJECT_ID,
+    tenantId: STUDENT_TENANT_ID,
+    scopes: options.scopes ?? ["User.Read", "Mail.Send"],
+    account: options.account === undefined ? HOMER_ACCOUNT : options.account,
+    idToken: "opaque-id-token",
+    idTokenClaims: {},
+    accessToken,
+    fromCache: options.fromCache ?? false,
+    expiresOn: new Date(Date.now() + 60 * 60 * 1_000),
+    tokenType: "Bearer",
+    correlationId: "11111111-2222-4333-8444-555555555555",
+  };
 }
 
 function homerResponse(): Response {
@@ -58,37 +79,78 @@ function homerResponse(): Response {
   });
 }
 
-function createBrowser(code = "authorization-code"): {
+function createBrowser(codes = ["authorization-code"]): {
   browser: AuthorizationCodeBrowser;
   acquire: ReturnType<typeof vi.fn>;
 } {
-  const acquire = vi.fn(async () => code);
+  const remaining = [...codes];
+  const acquire = vi.fn(async () => remaining.shift() ?? "authorization-code");
   return {
     browser: { acquireAuthorizationCode: acquire },
     acquire,
   };
 }
 
-function createRequest(token: string): {
+function createMsalClient(options: {
+  interactive?: AuthenticationResult[];
+  silent?: Array<AuthenticationResult | Error>;
+} = {}): {
+  client: SimulatedUserMsalClient;
+  acquireTokenByCode: ReturnType<typeof vi.fn>;
+  acquireTokenSilent: ReturnType<typeof vi.fn>;
+} {
+  const interactive = [
+    ...(options.interactive ?? [authenticationResult("opaque-mail-token")]),
+  ];
+  const silent = [
+    ...(options.silent ?? [
+      authenticationResult("opaque-mail-token", { fromCache: true }),
+    ]),
+  ];
+  const acquireTokenByCode = vi.fn(async () => {
+    const result = interactive.shift();
+    if (!result) {
+      throw new Error("Unexpected interactive MSAL request");
+    }
+    return result;
+  });
+  const acquireTokenSilent = vi.fn(async () => {
+    const result = silent.shift();
+    if (result instanceof Error) {
+      throw result;
+    }
+    if (!result) {
+      throw new Error("Unexpected silent MSAL request");
+    }
+    return result;
+  });
+  return {
+    client: { acquireTokenByCode, acquireTokenSilent },
+    acquireTokenByCode,
+    acquireTokenSilent,
+  };
+}
+
+function createGraphRequest(
+  response: () => Response = homerResponse,
+): {
   request: typeof fetch;
   calls: Array<{ url: string; init?: RequestInit }>;
 } {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
-  const request = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    const url = input.toString();
-    calls.push({ url, init });
-    if (url.includes("/oauth2/v2.0/token")) {
-      return Response.json({ access_token: token });
-    }
-    return homerResponse();
-  }) as unknown as typeof fetch;
+  const request = vi.fn(
+    async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: input.toString(), init });
+      return response();
+    },
+  ) as unknown as typeof fetch;
   return { request, calls };
 }
 
 function createProvider(options: {
   browser?: AuthorizationCodeBrowser;
+  msalClient?: SimulatedUserMsalClient;
   request?: typeof fetch;
-  now?: () => number;
   allowedScopes?: readonly string[];
 }): SimulatedUserDelegatedTokenProvider {
   return new SimulatedUserDelegatedTokenProvider({
@@ -98,31 +160,31 @@ function createProvider(options: {
     pfxPath: "/run/secrets/homer.pfx",
     pfxPassphrase: PASSPHRASE,
     browser: options.browser,
+    msalClient: options.msalClient,
     request: options.request,
-    now: options.now ?? (() => NOW),
   });
 }
 
 describe("SimulatedUserDelegatedTokenProvider", () => {
-  it("uses public-client PKCE, requests only the bounded scopes, and verifies Homer", async () => {
-    const token = accessToken();
+  it("seeds MSAL with public-client PKCE and reuses its in-memory cache", async () => {
     const { browser, acquire } = createBrowser();
-    const { request, calls } = createRequest(token);
-    const provider = createProvider({ browser, request });
+    const msal = createMsalClient();
+    const { request, calls } = createGraphRequest();
+    const provider = createProvider({
+      browser,
+      msalClient: msal.client,
+      request,
+    });
 
     await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).resolves.toEqual(
-      delegatedToken(token),
+      delegatedToken("opaque-mail-token"),
     );
     await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).resolves.toEqual(
-      delegatedToken(token),
+      delegatedToken("opaque-mail-token"),
     );
 
-    expect(acquire).toHaveBeenCalledTimes(1);
-    const browserCall = acquire.mock.calls.at(0);
-    if (!browserCall) {
-      throw new Error("Expected one browser acquisition.");
-    }
-    const browserRequest = browserCall[0];
+    expect(acquire).toHaveBeenCalledOnce();
+    const browserRequest = acquire.mock.calls[0]?.[0];
     expect(browserRequest.pfxPath).toBe("/run/secrets/homer.pfx");
     expect(browserRequest.pfxPassphrase).toBe(PASSPHRASE);
     expect(browserRequest.redirectUri).toBe(
@@ -137,58 +199,72 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
     expect(browserRequest.authorizeUrl.searchParams.get("login_hint")).toBe(
       HOMER_USER_PRINCIPAL_NAME,
     );
-    const scopes = browserRequest.authorizeUrl.searchParams
-      .get("scope")
-      ?.split(" ");
-    expect(scopes).toEqual([
+    expect(
+      browserRequest.authorizeUrl.searchParams.get("scope")?.split(" "),
+    ).toEqual([
       "openid",
       "profile",
+      "offline_access",
       "https://graph.microsoft.com/User.Read",
       "https://graph.microsoft.com/Mail.Send",
     ]);
-    expect(scopes).not.toContain("offline_access");
     expect(
       browserRequest.authorizeUrl.searchParams.get("code_challenge_method"),
     ).toBe("S256");
 
-    expect(calls).toHaveLength(2);
-    const tokenCall = calls.at(0);
-    const graphCall = calls.at(1);
-    if (!tokenCall || !graphCall) {
-      throw new Error("Expected token and Graph requests.");
-    }
-    const tokenBody = tokenCall.init?.body as URLSearchParams;
-    expect(tokenBody.get("grant_type")).toBe("authorization_code");
-    expect(tokenBody.get("refresh_token")).toBeNull();
-    expect(tokenBody.get("redirect_uri")).toBe(
-      SIMULATED_USER_REDIRECT_URI,
-    );
-    expect(tokenBody.get("scope")).not.toContain("offline_access");
+    expect(msal.acquireTokenByCode).toHaveBeenCalledOnce();
+    const codeRequest = msal.acquireTokenByCode.mock.calls[0]?.[0];
+    expect(codeRequest).toMatchObject({
+      authority: AUTHORITY,
+      code: "authorization-code",
+      redirectUri: SIMULATED_USER_REDIRECT_URI,
+      scopes: [
+        "openid",
+        "profile",
+        "offline_access",
+        "https://graph.microsoft.com/User.Read",
+        GRAPH_MAIL_SEND_SCOPE,
+      ],
+    });
     expect(
       Buffer.from(
         createHash("sha256")
-          .update(tokenBody.get("code_verifier") ?? "")
+          .update(codeRequest.codeVerifier ?? "")
           .digest(),
       ).toString("base64url"),
     ).toBe(browserRequest.authorizeUrl.searchParams.get("code_challenge"));
-    expect(graphCall.url).toBe(
-      "https://graph.microsoft.com/v1.0/me?$select=id,displayName,userPrincipalName",
-    );
-    expect(graphCall.init?.headers).toEqual({
-      Authorization: `Bearer ${token}`,
+    expect(msal.acquireTokenSilent).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenSilent).toHaveBeenCalledWith({
+      account: HOMER_ACCOUNT,
+      authority: AUTHORITY,
+      scopes: [
+        "https://graph.microsoft.com/User.Read",
+        GRAPH_MAIL_SEND_SCOPE,
+      ],
     });
+
+    expect(calls).toHaveLength(2);
+    expect(calls.every(({ url }) =>
+      url ===
+        "https://graph.microsoft.com/v1.0/me?$select=id,displayName,userPrincipalName"
+    )).toBe(true);
+    expect(calls.map(({ init }) => init?.headers)).toEqual([
+      { Authorization: "Bearer opaque-mail-token" },
+      { Authorization: "Bearer opaque-mail-token" },
+    ]);
   });
 
-  it("shares one acquisition between concurrent callers", async () => {
+  it("shares one initial CBA acquisition between concurrent callers", async () => {
     let release!: (code: string) => void;
     const code = new Promise<string>((resolve) => {
       release = resolve;
     });
     const acquire = vi.fn(() => code);
-    const token = accessToken();
-    const { request } = createRequest(token);
+    const msal = createMsalClient();
+    const { request } = createGraphRequest();
     const provider = createProvider({
       browser: { acquireAuthorizationCode: acquire },
+      msalClient: msal.client,
       request,
     });
 
@@ -197,71 +273,288 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
     release("authorization-code");
 
     await expect(Promise.all([first, second])).resolves.toEqual([
-      delegatedToken(token),
-      delegatedToken(token),
+      delegatedToken("opaque-mail-token"),
+      delegatedToken("opaque-mail-token"),
     ]);
-    expect(acquire).toHaveBeenCalledTimes(1);
+    expect(acquire).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenByCode).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenSilent).not.toHaveBeenCalled();
   });
 
-  it("reacquires once the cached token reaches the two-minute boundary", async () => {
-    let now = NOW;
-    const firstToken = accessToken({}, NOW + 10 * 60 * 1_000);
-    const secondToken = accessToken({}, NOW + 70 * 60 * 1_000);
+  it("uses one initial CBA when different scopes arrive concurrently", async () => {
+    const filesScope = "https://graph.microsoft.com/Files.ReadWrite";
+    let release!: (code: string) => void;
+    const code = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const acquire = vi.fn(() => code);
+    const msal = createMsalClient({
+      silent: [
+        authenticationResult("opaque-files-token", {
+          scopes: ["User.Read", "Files.ReadWrite"],
+        }),
+      ],
+    });
+    const { request } = createGraphRequest();
+    const provider = createProvider({
+      browser: { acquireAuthorizationCode: acquire },
+      msalClient: msal.client,
+      request,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, filesScope],
+    });
+
+    const mail = provider.getToken(GRAPH_MAIL_SEND_SCOPE);
+    const files = provider.getToken(filesScope);
+    release("authorization-code");
+
+    await expect(Promise.all([mail, files])).resolves.toEqual([
+      delegatedToken("opaque-mail-token"),
+      delegatedToken("opaque-files-token"),
+    ]);
+    expect(acquire).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenByCode).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenSilent).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenSilent).toHaveBeenCalledWith({
+      account: HOMER_ACCOUNT,
+      authority: AUTHORITY,
+      scopes: ["https://graph.microsoft.com/User.Read", filesScope],
+    });
+  });
+
+  it("uses acquireTokenSilent for a later consented Graph scope", async () => {
+    const filesScope = "https://graph.microsoft.com/Files.ReadWrite";
     const { browser, acquire } = createBrowser();
-    const tokens = [firstToken, secondToken];
-    const request = vi.fn(
-      async (input: string | URL | Request): Promise<Response> => {
-        if (input.toString().includes("/oauth2/v2.0/token")) {
-          return Response.json({ access_token: tokens.shift() });
-        }
-        return homerResponse();
-      },
-    ) as unknown as typeof fetch;
-    const provider = createProvider({ browser, request, now: () => now });
+    const msal = createMsalClient({
+      silent: [
+        authenticationResult("opaque-files-token", {
+          scopes: ["User.Read", "Files.ReadWrite"],
+          fromCache: false,
+        }),
+      ],
+    });
+    const { request } = createGraphRequest();
+    const provider = createProvider({
+      browser,
+      msalClient: msal.client,
+      request,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, filesScope],
+    });
 
-    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).resolves.toEqual(
-      delegatedToken(firstToken),
+    await provider.getToken(GRAPH_MAIL_SEND_SCOPE);
+    await expect(provider.getToken(filesScope)).resolves.toEqual(
+      delegatedToken("opaque-files-token"),
     );
-    now = NOW + 8 * 60 * 1_000;
-    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).resolves.toEqual(
-      delegatedToken(secondToken),
-    );
-    expect(acquire).toHaveBeenCalledTimes(2);
+
+    expect(acquire).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenByCode).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenSilent).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenSilent).toHaveBeenCalledWith({
+      account: HOMER_ACCOUNT,
+      authority: AUTHORITY,
+      scopes: ["https://graph.microsoft.com/User.Read", filesScope],
+    });
   });
 
-  it.each([
-    ["another tenant", { tid: "22222222-2222-4222-8222-222222222222" }],
-    ["another user", { oid: "33333333-3333-4333-8333-333333333333" }],
-    ["missing Mail.Send", { scp: "User.Read" }],
-  ])("rejects a token for %s", async (_label, claims) => {
-    const { browser } = createBrowser();
-    const { request } = createRequest(accessToken(claims));
-    const provider = createProvider({ browser, request });
+  it("opens fresh Playwright only after silent acquisition requires interaction", async () => {
+    const filesScope = "https://graph.microsoft.com/Files.ReadWrite";
+    const { browser, acquire } = createBrowser(["mail-code", "files-code"]);
+    const msal = createMsalClient({
+      interactive: [
+        authenticationResult("opaque-mail-token"),
+        authenticationResult("opaque-files-token", {
+          scopes: ["User.Read", "Files.ReadWrite"],
+        }),
+      ],
+      silent: [
+        new InteractionRequiredAuthError(
+          "interaction_required",
+          "11111111-2222-4333-8444-555555555555",
+        ),
+      ],
+    });
+    const { request } = createGraphRequest();
+    const provider = createProvider({
+      browser,
+      msalClient: msal.client,
+      request,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, filesScope],
+    });
 
-    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).rejects.toThrow(
-      "Microsoft returned an invalid simulated-user access token.",
+    await provider.getToken(GRAPH_MAIL_SEND_SCOPE);
+    await expect(provider.getToken(filesScope)).resolves.toEqual(
+      delegatedToken("opaque-files-token"),
     );
+
+    expect(acquire).toHaveBeenCalledTimes(2);
+    expect(msal.acquireTokenByCode).toHaveBeenCalledTimes(2);
+    expect(msal.acquireTokenSilent).toHaveBeenCalledOnce();
+  });
+
+  it("shares one fallback interaction across concurrent silent failures", async () => {
+    const filesScope = "https://graph.microsoft.com/Files.ReadWrite";
+    const calendarScope = "https://graph.microsoft.com/Calendars.ReadWrite";
+    let releaseFallback!: (code: string) => void;
+    const fallbackCode = new Promise<string>((resolve) => {
+      releaseFallback = resolve;
+    });
+    const acquire = vi.fn()
+      .mockResolvedValueOnce("mail-code")
+      .mockImplementationOnce(() => fallbackCode);
+    const interactionRequired = () =>
+      new InteractionRequiredAuthError(
+        "interaction_required",
+        "11111111-2222-4333-8444-555555555555",
+      );
+    const msal = createMsalClient({
+      interactive: [
+        authenticationResult("opaque-mail-token"),
+        authenticationResult("opaque-files-token", {
+          scopes: ["User.Read", "Files.ReadWrite"],
+        }),
+      ],
+      silent: [
+        interactionRequired(),
+        interactionRequired(),
+        authenticationResult("opaque-calendar-token", {
+          scopes: ["User.Read", "Calendars.ReadWrite"],
+        }),
+      ],
+    });
+    const { request } = createGraphRequest();
+    const provider = createProvider({
+      browser: { acquireAuthorizationCode: acquire },
+      msalClient: msal.client,
+      request,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, filesScope, calendarScope],
+    });
+    await provider.getToken(GRAPH_MAIL_SEND_SCOPE);
+
+    const files = provider.getToken(filesScope);
+    const calendar = provider.getToken(calendarScope);
+    await vi.waitFor(() => expect(acquire).toHaveBeenCalledTimes(2));
+    releaseFallback("files-code");
+
+    await expect(Promise.all([files, calendar])).resolves.toEqual([
+      delegatedToken("opaque-files-token"),
+      delegatedToken("opaque-calendar-token"),
+    ]);
+    expect(acquire).toHaveBeenCalledTimes(2);
+    expect(msal.acquireTokenByCode).toHaveBeenCalledTimes(2);
+    expect(msal.acquireTokenSilent).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not open Playwright for a non-interaction silent failure", async () => {
+    const filesScope = "https://graph.microsoft.com/Files.ReadWrite";
+    const { browser, acquire } = createBrowser();
+    const msal = createMsalClient({
+      silent: [new Error(`silent failed with ${PASSPHRASE}`)],
+    });
+    const { request } = createGraphRequest();
+    const provider = createProvider({
+      browser,
+      msalClient: msal.client,
+      request,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, filesScope],
+    });
+
+    await provider.getToken(GRAPH_MAIL_SEND_SCOPE);
+    const error = await provider.getToken(filesScope).catch((value) => value);
+
+    expect(error).toBeInstanceOf(SimulatedUserCbaError);
+    expect(error.message).toBe(
+      "Simulated user authentication could not be completed.",
+    );
+    expect(error.message).not.toContain(PASSPHRASE);
+    expect(acquire).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenByCode).toHaveBeenCalledOnce();
   });
 
   it("rejects a Graph identity that is not exactly Homer", async () => {
     const { browser } = createBrowser();
-    const token = accessToken();
-    const request = vi.fn(
-      async (input: string | URL | Request): Promise<Response> => {
-        if (input.toString().includes("/oauth2/v2.0/token")) {
-          return Response.json({ access_token: token });
-        }
-        return Response.json({
-          id: HOMER_OBJECT_ID,
-          displayName: "Not Homer",
-          userPrincipalName: HOMER_USER_PRINCIPAL_NAME,
-        });
-      },
-    ) as unknown as typeof fetch;
-    const provider = createProvider({ browser, request });
+    const msal = createMsalClient();
+    const { request } = createGraphRequest(() =>
+      Response.json({
+        id: HOMER_OBJECT_ID,
+        displayName: "Not Homer",
+        userPrincipalName: HOMER_USER_PRINCIPAL_NAME,
+      })
+    );
+    const provider = createProvider({
+      browser,
+      msalClient: msal.client,
+      request,
+    });
 
     await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).rejects.toThrow(
       "Microsoft Graph did not confirm the fixed simulated user.",
+    );
+  });
+
+  it.each([
+    ["User.Read", ["Mail.Send"]],
+    ["the requested operation scope", ["User.Read"]],
+  ])("rejects an interactive result missing %s", async (_label, scopes) => {
+    const { browser } = createBrowser();
+    const msal = createMsalClient({
+      interactive: [
+        authenticationResult("opaque-mail-token", { scopes }),
+      ],
+    });
+    const { request } = createGraphRequest();
+    const provider = createProvider({
+      browser,
+      msalClient: msal.client,
+      request,
+    });
+
+    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).rejects.toThrow(
+      "Microsoft did not return the requested simulated-user access.",
+    );
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("rejects a silent result missing the later requested scope", async () => {
+    const filesScope = "https://graph.microsoft.com/Files.ReadWrite";
+    const { browser, acquire } = createBrowser();
+    const msal = createMsalClient({
+      silent: [
+        authenticationResult("opaque-files-token", {
+          scopes: ["User.Read"],
+        }),
+      ],
+    });
+    const { request } = createGraphRequest();
+    const provider = createProvider({
+      browser,
+      msalClient: msal.client,
+      request,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, filesScope],
+    });
+
+    await provider.getToken(GRAPH_MAIL_SEND_SCOPE);
+    await expect(provider.getToken(filesScope)).rejects.toThrow(
+      "Microsoft did not return the requested simulated-user access.",
+    );
+    expect(acquire).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenByCode).toHaveBeenCalledOnce();
+    expect(msal.acquireTokenSilent).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["missing account", authenticationResult("opaque-token", { account: null })],
+    ["missing token", authenticationResult("", {})],
+  ])("fails closed for an MSAL result with %s", async (_label, result) => {
+    const { browser } = createBrowser();
+    const msal = createMsalClient({ interactive: [result] });
+    const { request } = createGraphRequest();
+    const provider = createProvider({
+      browser,
+      msalClient: msal.client,
+      request,
+    });
+
+    await expect(provider.getToken(GRAPH_MAIL_SEND_SCOPE)).rejects.toBeInstanceOf(
+      SimulatedUserCbaError,
     );
   });
 
@@ -271,7 +564,8 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
         throw new Error(`browser failed with ${PASSPHRASE}`);
       }),
     };
-    const provider = createProvider({ browser });
+    const msal = createMsalClient();
+    const provider = createProvider({ browser, msalClient: msal.client });
 
     const error = await provider
       .getToken(GRAPH_MAIL_SEND_SCOPE)
@@ -283,14 +577,16 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
     expect(error.message).not.toContain(PASSPHRASE);
   });
 
-  it("refuses any token scope except the fixed Mail.Send scope", async () => {
+  it("refuses any token scope outside the configured Graph scopes", async () => {
     const { browser, acquire } = createBrowser();
-    const provider = createProvider({ browser });
+    const msal = createMsalClient();
+    const provider = createProvider({ browser, msalClient: msal.client });
 
     await expect(
       provider.getToken("https://graph.microsoft.com/User.Read"),
     ).rejects.toThrow("simulated user token scope is not allowed");
     expect(acquire).not.toHaveBeenCalled();
+    expect(msal.acquireTokenByCode).not.toHaveBeenCalled();
   });
 
   it("supplies Homer certificate only to both approved CBA origins", async () => {
@@ -322,51 +618,28 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it("requests Homer's Files.ReadWrite scope explicitly", async () => {
-    const filesScope = "https://graph.microsoft.com/Files.ReadWrite";
-    const token = accessToken({ scp: "Files.ReadWrite User.Read" });
-    const { browser, acquire } = createBrowser();
-    const { request } = createRequest(token);
-    const provider = createProvider({
-      browser,
-      request,
-      allowedScopes: [GRAPH_MAIL_SEND_SCOPE, filesScope],
-    });
-
-    await expect(provider.getToken(filesScope)).resolves.toEqual(
-      delegatedToken(token),
-    );
-    expect(
-      acquire.mock.calls[0]?.[0].authorizeUrl.searchParams
-        .get("scope")
-        ?.split(" "),
-    ).toEqual([
-      "openid",
-      "profile",
-      "https://graph.microsoft.com/User.Read",
-      filesScope,
-    ]);
-  });
-
-  it("uses an isolated Cory identity and requests Calendars.ReadWrite explicitly", async () => {
+  it("uses an isolated Cory identity and MSAL client", async () => {
     const coryObjectId = "22222222-2222-4222-8222-222222222222";
-    const token = accessToken({
-      oid: coryObjectId,
-      scp: "Calendars.ReadWrite User.Read",
+    const coryAccount: AccountInfo = {
+      ...HOMER_ACCOUNT,
+      homeAccountId: `${coryObjectId}.${STUDENT_TENANT_ID}`,
+      username: CORY_USER_PRINCIPAL_NAME,
+      localAccountId: coryObjectId,
+      name: CORY_DISPLAY_NAME,
+    };
+    const coryToken = authenticationResult("opaque-cory-token", {
+      account: coryAccount,
+      scopes: ["User.Read", "Calendars.ReadWrite"],
     });
     const { browser, acquire } = createBrowser();
-    const request = vi.fn(
-      async (input: string | URL | Request): Promise<Response> => {
-        if (input.toString().includes("/oauth2/v2.0/token")) {
-          return Response.json({ access_token: token });
-        }
-        return Response.json({
-          id: coryObjectId,
-          displayName: CORY_DISPLAY_NAME,
-          userPrincipalName: CORY_USER_PRINCIPAL_NAME,
-        });
-      },
-    ) as unknown as typeof fetch;
+    const msal = createMsalClient({ interactive: [coryToken] });
+    const { request } = createGraphRequest(() =>
+      Response.json({
+        id: coryObjectId,
+        displayName: CORY_DISPLAY_NAME,
+        userPrincipalName: CORY_USER_PRINCIPAL_NAME,
+      })
+    );
     const provider = new SimulatedUserDelegatedTokenProvider({
       clientId: CLIENT_ID,
       identity: coryIdentity(coryObjectId),
@@ -374,14 +647,14 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
       pfxPath: "/run/secrets/cory.pfx",
       pfxPassphrase: PASSPHRASE,
       browser,
+      msalClient: msal.client,
       request,
-      now: () => NOW,
     });
 
     await expect(
       provider.getToken(GRAPH_CALENDARS_READ_WRITE_SCOPE),
     ).resolves.toEqual({
-      token,
+      token: "opaque-cory-token",
       identity: {
         tenantId: STUDENT_TENANT_ID,
         objectId: coryObjectId,
@@ -398,6 +671,7 @@ describe("SimulatedUserDelegatedTokenProvider", () => {
     ).toEqual([
       "openid",
       "profile",
+      "offline_access",
       "https://graph.microsoft.com/User.Read",
       GRAPH_CALENDARS_READ_WRITE_SCOPE,
     ]);
