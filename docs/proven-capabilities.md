@@ -73,7 +73,7 @@ they are not additional tenant capabilities.
 | --- | --- | --- | --- |
 | OAuth application reconnaissance | One over-permissioned application used four fixed reads to survey identity, mail, personal storage, and shared storage without a user sign-in. | A separate bounded query found the exact successful service-principal token event for Microsoft Graph in the reconnaissance window. A bounded Defender query found no alert in the broader observation window. | The sign-in log proves token acquisition, not the four individual reads; zero visible alerts does not prove that no other detection exists. The Dev diagnostic app performed both proof roles, so separate attacker and defender identities remain unproven. |
 | OAuth application mail staging | The Dev diagnostic app placed one marker-bound draft in Cory's mailbox without Cory signing in. The draft has no recipient, attachment, link, or send-family action. | A separate aggregate Drafts inventory found exactly one true, recipient-free, attachment-free, low-importance AP2-marked draft. | This adds app-only actor semantics to the already-proven draft capability; it does not prove delivery or message influence. The draft remains privately identifiable for deferred cleanup. |
-| Inbox-rule persistence and effect | The Dev diagnostic app created one enabled Cory Inbox rule limited to an exact AP2 subject marker, mark-read, and stop-processing actions. A later single, non-retried app-only send delivered that harmless marker message from Homer to Cory. | After one bounded wait, one unpaged Inbox read found exactly one matching message already marked read with no attachment. A separate inventory had confirmed the rule shape and tenant-wide mailbox-settings reach. | This proves the mark-read effect, not runtime stop-processing. The rule cannot forward, redirect, delete, move, or address a recipient; the rule and one Inbox message remain for deferred cleanup. |
+| Inbox-rule persistence and effect | The Dev diagnostic app created one enabled Cory Inbox rule limited to an exact AP2 subject marker, mark-read, and stop-processing actions. A later single, non-retried app-only send delivered that harmless marker message from Homer to Cory. | After one bounded wait, one unpaged Inbox read found exactly one matching message already marked read with no attachment. A separate inventory had confirmed the rule shape and tenant-wide mailbox-settings reach. | This proves the mark-read effect, not runtime stop-processing. A later exact-rule deletion returned `204`, but two separately authorized exact-ID confirmation reads returned `500`; rule absence is therefore unconfirmed, and no second message was sent. |
 | Dormant OAuth application persistence | The Dev diagnostic app registered one single-tenant application with one short-lived password credential, then discarded the generated secret without storing or using it. The application has no service principal, permissions, roles, scopes, keys, or redirect URI. | A tenant-wide aggregate inventory found exactly one full dormant-configuration match with one password expiring within 48 hours. Separate name-based reconciliation confirmed the canary. | The application cannot obtain workload access. Immediate and naturally delayed directory-audit reads did not produce an exact actor-and-target correlation, so audit visibility remains unproven and no further query is planned. The app remains privately identifiable for deferred cleanup. |
 
 ## Identity and infrastructure proofs
@@ -108,11 +108,11 @@ they are not additional tenant capabilities.
   deleted-policy history.
 - The delivered email and cancelled attendee calendar copies are intentionally
   retained. OneDrive and SharePoint deletion can retain recycle-bin content.
-- One enabled Cory Inbox rule is intentionally retained as the first
-  persistence-scenario residue. Its unique AP2 subject condition has never
-  been sent, and it has no forwarding, redirect, deletion, move, or recipient
-  action. Its protected exact identity is retained outside Git for later
-  cleanup.
+- One harmless marker message remains in Cory's Inbox and was observed read.
+  The exact rule had no forwarding, redirect, deletion, move, or recipient
+  action. Its later deletion returned `204`, but two exact follow-up reads
+  returned `500`, so active rule state is unconfirmed. Protected evidence and
+  the exact identity remain outside Git; no second message was sent.
 - One dormant single-tenant application is retained with a short-lived
   password credential whose generated secret was discarded. It has no service
   principal, requested access, role, scope, key, or redirect URI; its protected
