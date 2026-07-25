@@ -63,6 +63,12 @@ production-shaped local SPA, rootless API container, operator CBA, and Cory
 CBA before their hosted proofs. Those runs corroborate the same product paths;
 they are not additional tenant capabilities.
 
+## Attack-inspired scenarios
+
+| Scenario | Attacker-side unit | Defender-side observation | Boundary still visible |
+| --- | --- | --- | --- |
+| OAuth application reconnaissance | One over-permissioned application used four fixed reads to survey identity, mail, personal storage, and shared storage without a user sign-in. | A separate bounded query found the exact successful service-principal token event for Microsoft Graph in the reconnaissance window. | The sign-in log proves token acquisition, not the four individual reads. The Dev diagnostic app performed both proof roles, so separate attacker and defender identities remain unproven. |
+
 ## Identity and infrastructure proofs
 
 - A Product-owned multitenant app can produce a Student service principal

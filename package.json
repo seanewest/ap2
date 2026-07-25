@@ -11,6 +11,7 @@
     "check:rehearsal-status": "node scripts/check-rehearsal-status.ts",
     "preview:calendar-reset": "node scripts/preview-calendar-reset.ts",
     "preview:oauth-app-recon": "node scripts/preview-oauth-app-recon.ts",
+    "observe:oauth-recon-signin": "node scripts/observe-oauth-recon-signin.ts",
     "report:codex": "node scripts/codex-session-report.ts",
     "test:e2e:cba": "playwright test --config playwright.cba.config.ts",
     "typecheck": "tsc --noEmit",
