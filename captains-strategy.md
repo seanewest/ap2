@@ -46,6 +46,20 @@ Ordinary worker reports should be queued while the Captain is active and start
 a new Captain turn after the current turn completes. Only urgent safety or
 mutation information should steer an active turn.
 
+## Use temporary delivery lanes
+
+Repeated feature work was efficient when four concurrent lanes covered:
+
+- implementation and product-path QA;
+- tenant, identity, Azure, and deployment;
+- research, design review, and mutation-safety review;
+- documentation, GitHub integration, merge, and closeout.
+
+These are temporary planning lanes, not permanent agent roles, names, or
+permissions. Assign and combine them according to the current bottleneck, and
+let workers use subagents for bounded parallel work. Keep one explicit owner
+for integration when lanes touch the same files or external state.
+
 ## Prefer progress over polish
 
 When a path is blocked on human input or external convergence, record the exact

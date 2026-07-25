@@ -879,14 +879,14 @@ function printHelp(): void {
   console.log(`Usage: npm run report:codex -- [selector] [--json]
 
 Selectors (choose one):
-  --name <saved-name>       Saved worker/thread name, for example Lebron
+  --name <saved-name>       Saved worker/thread name, for example Worker-A
   --thread-id <uuid>        Exact Codex thread ID
   --path <session.jsonl>    Exact transcript path (a positional path also works)
   --latest                  Explicitly choose the newest transcript
 
 With multiple local transcripts, a selector is required. If a saved name is
 ambiguous, use its thread ID or path. For JSON without npm banners, run:
-  npm run --silent report:codex -- --name Lebron --json
+  npm run --silent report:codex -- --name Worker-A --json
 or invoke node scripts/codex-session-report.ts directly.`);
 }
 
