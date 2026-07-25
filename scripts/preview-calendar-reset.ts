@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { realpathSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -11,10 +12,21 @@ const GRAPH_ORIGIN = "https://graph.microsoft.com";
 const GRAPH_SCOPE = `${GRAPH_ORIGIN}/.default`;
 export const CALENDAR_RESET_RUN_PROPERTY_ID =
   "String {c352ae90-352e-4c3f-8f7c-ab63d2ca32cc} Name AP2RunId";
-const AP2_CALENDAR_RUN_ID = /^ap2-calendar-\d{8}-\d{3}$/;
+const AP2_CALENDAR_RUN_ID_SOURCE = "^ap2-calendar-\\d{8}-\\d{3}$";
+const AP2_CALENDAR_RUN_ID = new RegExp(AP2_CALENDAR_RUN_ID_SOURCE);
+export const CALENDAR_RESET_CONTRACT = {
+  version: "ap2-calendar-reset-preview-only-v2",
+  idType: "ImmutableId",
+  applyScope: "none",
+  markerPropertyId: CALENDAR_RESET_RUN_PROPERTY_ID,
+  markerValuePattern: AP2_CALENDAR_RUN_ID_SOURCE,
+  organizerMeetingClassification: "organizer-cancellation",
+  organizerAppointmentClassification: "organizer-appointment-deletion",
+  attendeeCopyClassification: "attendee-copy-deletion",
+} as const;
 const EVENT_FIELDS = [
-  "id", "changeKey", "createdDateTime", "type", "isOrganizer",
-  "organizer", "attendees", "isCancelled",
+  "id", "changeKey", "iCalUId", "createdDateTime", "type", "isOrganizer",
+  "organizer", "attendees", "isCancelled", "transactionId",
 ] as const;
 
 export const CALENDAR_RESET_USERS = [
@@ -30,14 +42,19 @@ export const CALENDAR_RESET_USERS = [
     userPrincipalName: "marge.simpson@corywest.onmicrosoft.com" },
 ] as const;
 
-export interface AccessTokenCredential {
+interface AccessTokenCredential {
   getToken(scope: string): Promise<{ token: string } | null>;
 }
 
-type EventType = "singleInstance" | "seriesMaster" | "occurrence" | "exception" | "unknown";
+type EventType = "singleInstance" | "seriesMaster" | "occurrence"
+  | "exception" | "unknown";
 type RefusalReason = "already_cancelled" | "attendee_not_allowlisted"
-  | "malformed_event" | "missing_ap2_marker" | "organizer_not_allowlisted"
-  | "recurring_event";
+  | "apply_scope_disabled" | "malformed_event" | "missing_ap2_marker"
+  | "organizer_not_allowlisted" | "recurring_event";
+type CalendarResetAction =
+  | "organizer-cancellation"
+  | "organizer-appointment-deletion"
+  | "attendee-copy-deletion";
 
 interface UtcInstant {
   canonical: string;
@@ -49,21 +66,44 @@ interface PreviewItem {
   ownerUserPrincipalName: string;
   eventId: string | null;
   changeKey: string | null;
+  odataEtag: string | null;
+  iCalUId: string | null;
+  logicalMeetingKey: string | null;
+  transactionId: string | null;
   selection: "selected" | "indeterminate";
   createdDateTime: string | null;
   eventType: EventType;
   isOrganizer: boolean | null;
-  classification: "eligible" | "refused";
+  organizerUserPrincipalName: string | null;
+  attendeeUserPrincipalNames: string[] | null;
+  attendeeCount: number | null;
+  ap2RunId: string | null;
+  classifiedAction: CalendarResetAction | null;
+  plannedAction: null;
+  classification: "refused";
   refusalReasons: RefusalReason[];
 }
 
 export interface CalendarResetPreviewManifest {
-  schemaVersion: 1;
+  schemaVersion: 2;
   operation: "calendar-reset-preview";
   tenantId: typeof STUDENT_TENANT_ID;
+  previewedAt: string;
   labConstructedAt: string;
   selectionRule: "createdDateTime >= labConstructedAt";
+  contract: typeof CALENDAR_RESET_CONTRACT;
   users: typeof CALENDAR_RESET_USERS;
+  summary: {
+    total: number;
+    eligible: number;
+    refused: number;
+    indeterminate: number;
+    organizerCancellations: number;
+    organizerAppointmentDeletions: number;
+    attendeeCopyDeletions: number;
+    disabledOrganizerMeetings: number;
+    disabledAttendeeCopies: number;
+  };
   items: PreviewItem[];
 }
 
@@ -85,6 +125,7 @@ export async function previewCalendarReset(
   labConstructedAt: string,
   credential: AccessTokenCredential,
   request: typeof fetch = fetch,
+  nowMs = Date.now(),
 ): Promise<CalendarResetPreviewManifest> {
   const cutoff = utcInstant(labConstructedAt);
   if (!cutoff) {
@@ -116,12 +157,15 @@ export async function previewCalendarReset(
     (left.eventId ?? "").localeCompare(right.eventId ?? ""));
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     operation: "calendar-reset-preview",
     tenantId: STUDENT_TENANT_ID,
+    previewedAt: new Date(nowMs).toISOString(),
     labConstructedAt: cutoff.canonical,
     selectionRule: "createdDateTime >= labConstructedAt",
+    contract: CALENDAR_RESET_CONTRACT,
     users: CALENDAR_RESET_USERS,
+    summary: previewSummary(items),
     items,
   };
 }
@@ -144,14 +188,22 @@ async function previewUser(
     const response = await request(url, {
       method: "GET",
       redirect: "error",
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Prefer: 'IdType="ImmutableId"',
+      },
     });
     if (response.status !== 200) {
       throw new Error(`Microsoft Graph calendar preview failed with HTTP ${response.status}.`);
     }
     const page = await graphPage(response);
     for (const value of page.value) {
-      const item = classify(value, user, allowlistedUpns, cutoff);
+      const item = classifyCalendarResetEvent(
+        value,
+        user,
+        allowlistedUpns,
+        cutoff,
+      );
       if (item) {
         items.push(item);
       }
@@ -164,7 +216,7 @@ async function previewUser(
   return items;
 }
 
-function classify(
+function classifyCalendarResetEvent(
   value: unknown,
   owner: (typeof CALENDAR_RESET_USERS)[number],
   allowlistedUpns: ReadonlySet<string>,
@@ -180,17 +232,21 @@ function classify(
   const isCancelled = booleanOrNull(event.isCancelled);
   const organizer = recipientAddress(event.organizer);
   const attendees = attendeeAddresses(event.attendees);
+  const ap2RunId = ap2CalendarRunId(event.singleValueExtendedProperties);
   const reasons = new Set<RefusalReason>();
 
   if (
     !nonEmpty(event.id) ||
     !nonEmpty(event.changeKey) ||
+    !weakEtag(event["@odata.etag"]) ||
+    !nonEmpty(event.iCalUId) ||
     !created ||
     eventType === "unknown" ||
     isOrganizer === null ||
     isCancelled === null ||
     !organizer ||
     !attendees ||
+    (attendees && new Set(attendees).size !== attendees.length) ||
     (isOrganizer && organizer !== owner.userPrincipalName)
   ) {
     reasons.add("malformed_event");
@@ -210,23 +266,46 @@ function classify(
   if (outsiders) {
     reasons.add("attendee_not_allowlisted");
   }
-  if (!hasAp2CalendarMarker(event.singleValueExtendedProperties)) {
+  if (!ap2RunId) {
     reasons.add("missing_ap2_marker");
   }
 
+  const classifiedAction = isOrganizer === null || !attendees
+    ? null
+    : actionFor(isOrganizer, attendees.length);
+  if (classifiedAction !== null) {
+    reasons.add("apply_scope_disabled");
+  }
   const refusalReasons = [...reasons].sort();
   return {
     ownerObjectId: owner.objectId,
     ownerUserPrincipalName: owner.userPrincipalName,
     eventId: nonEmpty(event.id) ?? null,
     changeKey: nonEmpty(event.changeKey) ?? null,
+    odataEtag: weakEtag(event["@odata.etag"]) ?? null,
+    iCalUId: nonEmpty(event.iCalUId) ?? null,
+    logicalMeetingKey: nonEmpty(event.iCalUId) ?? null,
+    transactionId: nonEmpty(event.transactionId) ?? null,
     selection: created ? "selected" : "indeterminate",
     createdDateTime: created?.canonical ?? null,
     eventType,
     isOrganizer,
-    classification: refusalReasons.length ? "refused" : "eligible",
+    organizerUserPrincipalName: organizer ?? null,
+    attendeeUserPrincipalNames: attendees ?? null,
+    attendeeCount: attendees?.length ?? null,
+    ap2RunId: ap2RunId ?? null,
+    classifiedAction,
+    plannedAction: null,
+    classification: "refused",
     refusalReasons,
   };
+}
+
+function weakEtag(value: unknown): string | undefined {
+  return typeof value === "string" &&
+      /^W\/"[\x21\x23-\x7E]*"$/.test(value)
+    ? value
+    : undefined;
 }
 
 function eventsUrl(objectId: string): URL {
@@ -289,12 +368,28 @@ export function writeProtectedManifest(
   if (!fromRepository.startsWith("..") && !isAbsolute(fromRepository)) {
     throw new Error("The preview output must be outside the repository.");
   }
-  writeFileSync(target, `${JSON.stringify(manifest, null, 2)}\n`, {
+  const parentStat = statSync(parent);
+  if (
+    !parentStat.isDirectory() ||
+    (parentStat.mode & 0o077) !== 0 ||
+    (typeof process.getuid === "function" && parentStat.uid !== process.getuid())
+  ) {
+    throw new Error(
+      "The preview output directory must be owner-only and owned by this user.",
+    );
+  }
+  writeFileSync(target, serializeManifest(manifest), {
     encoding: "utf8",
     flag: "wx",
-    mode: 0o600,
+    mode: 0o400,
   });
   return target;
+}
+
+export function calendarResetManifestSha256(
+  manifest: CalendarResetPreviewManifest,
+): string {
+  return createHash("sha256").update(serializeManifest(manifest)).digest("hex");
 }
 
 function utcInstant(value: unknown): UtcInstant | undefined {
@@ -308,7 +403,10 @@ function utcInstant(value: unknown): UtcInstant | undefined {
     return undefined;
   }
   const wholeSecondMs = Date.parse(`${match[1]}Z`);
-  if (!Number.isFinite(wholeSecondMs)) {
+  if (
+    !Number.isFinite(wholeSecondMs) ||
+    new Date(wholeSecondMs).toISOString().slice(0, 19) !== match[1]
+  ) {
     return undefined;
   }
   const fraction = match[2];
@@ -323,16 +421,62 @@ function utcInstant(value: unknown): UtcInstant | undefined {
   };
 }
 
-function hasAp2CalendarMarker(value: unknown): boolean {
+function ap2CalendarRunId(value: unknown): string | undefined {
   if (!Array.isArray(value) || value.length !== 1) {
-    return false;
+    return undefined;
   }
   const property = record(value[0]);
   return (
     property.id === CALENDAR_RESET_RUN_PROPERTY_ID &&
     typeof property.value === "string" &&
     AP2_CALENDAR_RUN_ID.test(property.value)
-  );
+  )
+    ? property.value as string
+    : undefined;
+}
+
+function actionFor(
+  isOrganizer: boolean,
+  attendeeCount: number,
+): CalendarResetAction {
+  if (!isOrganizer) {
+    return CALENDAR_RESET_CONTRACT.attendeeCopyClassification;
+  }
+  return attendeeCount
+    ? CALENDAR_RESET_CONTRACT.organizerMeetingClassification
+    : CALENDAR_RESET_CONTRACT.organizerAppointmentClassification;
+}
+
+function previewSummary(
+  items: readonly PreviewItem[],
+): CalendarResetPreviewManifest["summary"] {
+  return {
+    total: items.length,
+    eligible: 0,
+    refused: items.length,
+    indeterminate: items.filter(
+      (item) => item.selection === "indeterminate",
+    ).length,
+    organizerCancellations: 0,
+    organizerAppointmentDeletions: 0,
+    attendeeCopyDeletions: 0,
+    disabledOrganizerMeetings: items.filter(
+      ({ classifiedAction, classification }) =>
+        classification === "refused" &&
+        classifiedAction ===
+          CALENDAR_RESET_CONTRACT.organizerMeetingClassification,
+    ).length,
+    disabledAttendeeCopies: items.filter(
+      ({ classifiedAction, classification }) =>
+        classification === "refused" &&
+        classifiedAction ===
+          CALENDAR_RESET_CONTRACT.attendeeCopyClassification,
+    ).length,
+  };
+}
+
+function serializeManifest(manifest: CalendarResetPreviewManifest): string {
+  return `${JSON.stringify(manifest, null, 2)}\n`;
 }
 
 function eventTypeOf(value: unknown): EventType {
@@ -366,7 +510,7 @@ function attendeeAddresses(value: unknown): string[] | undefined {
   return addresses.every(
     (address): address is string => address !== undefined,
   )
-    ? addresses
+    ? addresses.sort()
     : undefined;
 }
 
@@ -429,7 +573,9 @@ async function main(): Promise<void> {
   );
   const path = writeProtectedManifest(options.outputPath, manifest);
   console.log(
-    `Calendar reset preview wrote ${manifest.items.length} selected or indeterminate events to ${path}.`,
+    `Calendar reset preview wrote ${manifest.items.length} selected or ` +
+      `indeterminate events to ${path}. SHA-256: ` +
+      `${calendarResetManifestSha256(manifest)}.`,
   );
 }
 
