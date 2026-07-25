@@ -68,6 +68,7 @@ they are not additional tenant capabilities.
 | Scenario | Attacker-side unit | Defender-side observation | Boundary still visible |
 | --- | --- | --- | --- |
 | OAuth application reconnaissance | One over-permissioned application used four fixed reads to survey identity, mail, personal storage, and shared storage without a user sign-in. | A separate bounded query found the exact successful service-principal token event for Microsoft Graph in the reconnaissance window. | The sign-in log proves token acquisition, not the four individual reads. The Dev diagnostic app performed both proof roles, so separate attacker and defender identities remain unproven. |
+| Inbox-rule persistence staging | The Dev diagnostic app created one enabled Cory Inbox rule that triggers only on a unique AP2 subject marker and can mark the matching message read and stop later rules. A separate grant inventory confirmed its exact `MailboxSettings.ReadWrite` authority. | A separate app-only inventory reduced Cory's complete rule set to behavior counts and found exactly the expected enabled mark-read/stop-processing shape. | The rule cannot forward, redirect, delete, move, or address a recipient. The marker was never sent, so message influence was deliberately not exercised; the rule remains active for the deferred cleanup decision. |
 
 ## Identity and infrastructure proofs
 
@@ -101,6 +102,11 @@ they are not additional tenant capabilities.
   deleted-policy history.
 - The delivered email and cancelled attendee calendar copies are intentionally
   retained. OneDrive and SharePoint deletion can retain recycle-bin content.
+- One enabled Cory Inbox rule is intentionally retained as the first
+  persistence-scenario residue. Its unique AP2 subject condition has never
+  been sent, and it has no forwarding, redirect, deletion, move, or recipient
+  action. Its protected exact identity is retained outside Git for later
+  cleanup.
 - Immediate Microsoft reads can lag accepted writes. The staged group,
   profile, manager, and calendar canaries waited for natural time rather than
   retrying mutations. OneDrive's Marge-side access never advanced beyond
