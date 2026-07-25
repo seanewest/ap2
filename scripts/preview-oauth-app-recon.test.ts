@@ -99,6 +99,34 @@ describe("OAuth application reconnaissance preview", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it("does not expose authentication or transport exception details", async () => {
+    const request = vi.fn();
+    await expect(
+      previewOauthAppRecon(
+        {
+          getToken: vi
+            .fn()
+            .mockRejectedValue(new Error("private-authentication-detail")),
+        },
+        request,
+        NOW,
+      ),
+    ).rejects.toThrow("Microsoft Graph authentication failed.");
+    expect(request).not.toHaveBeenCalled();
+
+    await expect(
+      previewOauthAppRecon(
+        { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+        vi
+          .fn()
+          .mockRejectedValue(new Error("private-resource-url-or-network-detail")),
+        NOW,
+      ),
+    ).rejects.toThrow(
+      "Microsoft Graph directory memberships observation failed before receiving a response.",
+    );
+  });
+
   it("stops on Graph refusal without trying later steps", async () => {
     const request = vi.fn().mockResolvedValue(response({}, 403));
     await expect(

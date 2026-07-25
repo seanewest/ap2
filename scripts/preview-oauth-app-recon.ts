@@ -46,7 +46,12 @@ export async function previewOauthAppRecon(
   request: typeof fetch = fetch,
   nowMs = Date.now(),
 ): Promise<OauthAppReconPreview> {
-  const access = await credential.getToken(GRAPH_APPLICATION_SCOPE);
+  let access: { token: string } | null;
+  try {
+    access = await credential.getToken(GRAPH_APPLICATION_SCOPE);
+  } catch {
+    throw new Error("Microsoft Graph authentication failed.");
+  }
   if (!access?.token) {
     throw new Error("Microsoft Entra returned no Microsoft Graph access token.");
   }
@@ -119,11 +124,7 @@ async function observeCollection(
   request: typeof fetch,
   label: string,
 ): Promise<CollectionObservation> {
-  const response = await request(url, {
-    method: "GET",
-    redirect: "error",
-    headers,
-  });
+  const response = await requestGraph(url, headers, request, label);
   const body = await readJson(response);
   if (
     response.status !== 200 ||
@@ -153,11 +154,7 @@ async function observeRoot(
   request: typeof fetch,
   label: string,
 ): Promise<void> {
-  const response = await request(url, {
-    method: "GET",
-    redirect: "error",
-    headers,
-  });
+  const response = await requestGraph(url, headers, request, label);
   const body = await readJson(response);
   if (
     response.status !== 200 ||
@@ -167,6 +164,25 @@ async function observeRoot(
   ) {
     throw new Error(
       `Microsoft Graph ${label} observation failed with HTTP ${response.status}.`,
+    );
+  }
+}
+
+async function requestGraph(
+  url: URL,
+  headers: Record<string, string>,
+  request: typeof fetch,
+  label: string,
+): Promise<Response> {
+  try {
+    return await request(url, {
+      method: "GET",
+      redirect: "error",
+      headers,
+    });
+  } catch {
+    throw new Error(
+      `Microsoft Graph ${label} observation failed before receiving a response.`,
     );
   }
 }
