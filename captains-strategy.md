@@ -71,6 +71,11 @@ resume the Captain when the worker finishes. Do not keep the Captain turn alive
 with sleep commands or repeated thread reads. Inspect an active worker directly
 only when delivery or completion state is genuinely ambiguous.
 
+Every app-server assignment must explicitly tell the worker to invoke
+`notify-captain` exactly once with its final report. A final answer written only
+in the worker thread does not enter the Captain queue and cannot wake the
+Captain.
+
 ## Keep reports decision-ready
 
 A worker notification is not the audit record. Detailed reasoning, request
