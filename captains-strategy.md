@@ -35,6 +35,12 @@ Do not perfect a harness whose defects are unrelated to the product. Do not
 repeat a live mutation merely to repair test presentation or evidence
 collection.
 
+Before a live scenario, distinguish evidence that must prove the learning
+claim from optional corroboration such as a particular UI rendering or delayed
+audit record. Keep the authorized actor session through the bounded final reads
+needed for the must-prove evidence. An optional observation may remain honestly
+unproven without invalidating or repeating an otherwise useful scenario.
+
 ## Coordinate parallel work
 
 Parallelize independent work whose inputs are already stable. Do not keep every
@@ -66,15 +72,21 @@ mutation information should steer an active turn.
 Judge apparent stalls by elapsed wall time and worker status, not rapid Captain
 continuations or the temporary absence of an output file.
 
-After assigning an app-server worker, end the Captain turn and let the job queue
-resume the Captain when the worker finishes. Do not keep the Captain turn alive
-with sleep commands or repeated thread reads. Inspect an active worker directly
-only when delivery or completion state is genuinely ambiguous.
+Assign app-server workers with
+`/home/west/codex-agent-tools/bin/assign-worker-turn.mjs`, supplying the exact
+idle worker thread, worktree, and required worker label. The command resumes,
+starts, and watches the turn on one connection; app-server turn notifications
+are connection-scoped, so an after-the-fact watcher is unreliable. Let the
+terminal job yield, then end the Captain turn. Do not keep the Captain turn
+alive with sleep commands or repeated thread reads.
 
-Every app-server assignment must explicitly tell the worker to invoke
-`notify-captain` exactly once with its final report. A final answer written only
-in the worker thread does not enter the Captain queue and cannot wake the
-Captain.
+The assignment command mechanically adds the worker label and concise report
+format. On normal completion it forwards the worker's actual final through
+`notify-captain`; workers should not invoke that command themselves. It queues
+an ordinary generated fallback only on failure, interruption, `systemError`,
+terminal error, a missing final response, or its single bounded deadline. This
+keeps one source of delivery for both success and failure without leaving a
+stale watcher process.
 
 ## Keep reports decision-ready
 
