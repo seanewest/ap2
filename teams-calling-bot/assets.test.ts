@@ -49,6 +49,18 @@ describe("calling-bot deployment assets", () => {
     expect(dockerfile).toContain("USER node");
   });
 
+  it("renders both run-canary parameter values as lowercase strings", () => {
+    const conditional = bicep.match(
+      /name: 'TEAMS_CALLING_BOT_RUN_CANARY'\s+value: runCanary \? '([^']+)' : '([^']+)'/,
+    );
+    expect(conditional).not.toBeNull();
+    const render = (runCanary: boolean): string =>
+      runCanary ? conditional![1]! : conditional![2]!;
+    expect(render(true)).toBe("true");
+    expect(render(false)).toBe("false");
+    expect(bicep).not.toContain("string(runCanary)");
+  });
+
   it("packages identical normalized bytes on repeated builds", () => {
     const first = buildTeamsCallingBotPackage(
       "11111111-1111-4111-8111-111111111111",

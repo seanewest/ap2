@@ -187,7 +187,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'TEAMS_CALLING_BOT_RUN_CANARY'
-              value: string(runCanary)
+              value: runCanary ? 'true' : 'false'
             }
             {
               name: 'TEAMS_CALLING_BOT_REVISION_MARKER'
