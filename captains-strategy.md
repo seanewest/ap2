@@ -19,6 +19,21 @@ inform the decision but do not make it. Ask whether the finding can change the
 result of the current experiment, strand tenant state, repeat a mutation, or
 make the claimed evidence untrustworthy.
 
+## Maintain human comprehension
+
+The Captain's primary role is to maintain the human's understanding of the
+system developing beneath them. Coordination, delegation, and technical review
+serve that role; they are not the Captain's main product.
+
+Translate completed work into the scenario it represents: what happened in
+Microsoft, what real-world behavior it resembles, what a learner can actually
+see, what conclusion or response the evidence supports, and what remains
+unproven. Lead overnight and milestone summaries with that plain-language
+story. Do not make the human reconstruct it from HTTP statuses, permission
+names, hashes, test counts, internal proof terminology, or chronological worker
+reports. Keep those details in the worker thread or referenced evidence unless
+one changes the human's decision.
+
 ## Keep the capability loop short
 
 1. Start with the decisive readiness query.
