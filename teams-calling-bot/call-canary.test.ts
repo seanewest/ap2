@@ -77,7 +77,7 @@ describe("CallingCanary", () => {
     await vi.advanceTimersByTimeAsync(15_000);
     expect(requests.filter(({ method }) => method === "DELETE")).toHaveLength(1);
     expect(canary.handleNotificationEnvelope(
-      notification("call-one", "terminated"),
+      deletedNotification("call-one"),
       "digest-terminated",
     )).toBe("accepted");
 
@@ -123,7 +123,7 @@ describe("CallingCanary", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(requests.filter((method) => method === "DELETE")).toHaveLength(1);
     canary.handleNotificationEnvelope(
-      notification("call-two", "terminated"),
+      deletedNotification("call-two"),
       "digest-terminal",
     );
     await expect(run).resolves.toMatchObject({ outcome: "ended" });
@@ -144,7 +144,7 @@ describe("CallingCanary", () => {
     const run = canary.run();
     await flush();
     canary.handleNotificationEnvelope(
-      notification("call-three", "terminated"),
+      deletedNotification("call-three"),
       "digest-terminal",
     );
     await expect(run).resolves.toEqual({
@@ -201,7 +201,7 @@ describe("CallingCanary", () => {
     await flush();
     expect(methods).toEqual(["POST", "DELETE", "GET"]);
     canary.handleNotificationEnvelope(
-      notification("call-four", "terminated"),
+      deletedNotification("call-four"),
       "digest-terminal",
     );
     await expect(run).resolves.toMatchObject({
@@ -235,10 +235,48 @@ describe("CallingCanary", () => {
     await Promise.all([canary.shutdown(), canary.shutdown()]);
     expect(methods.filter((method) => method === "DELETE")).toHaveLength(1);
     canary.handleNotificationEnvelope(
-      notification("call-shutdown", "terminated"),
+      deletedNotification("call-shutdown"),
       "digest-terminal",
     );
     await expect(run).resolves.toMatchObject({ outcome: "ended" });
+  });
+
+  it("accepts official updated states and a field-free deleted terminal", async () => {
+    const methods: string[] = [];
+    const canary = new CallingCanary(
+      SETTINGS,
+      new MemoryJournal(),
+      new OneToken(),
+      async (_input, init) => {
+        methods.push(init?.method ?? "GET");
+        return jsonResponse(201, { id: "official-call" });
+      },
+    );
+    const run = canary.run();
+    await flush();
+
+    expect(canary.handleNotificationEnvelope(
+      notification("official-call", "establishing"),
+      "official-establishing",
+    )).toBe("accepted");
+    expect(canary.handleNotificationEnvelope(
+      notification("official-call", "ringing"),
+      "official-ringing",
+    )).toBe("accepted");
+    expect(canary.handleNotificationEnvelope(
+      notification("official-call", "established"),
+      "official-established",
+    )).toBe("accepted");
+    expect(canary.handleNotificationEnvelope(
+      deletedNotification("official-call"),
+      "official-deleted",
+    )).toBe("accepted");
+
+    await expect(run).resolves.toEqual({
+      outcome: "ended",
+      terminalCallback: true,
+    });
+    expect(methods).toEqual(["POST"]);
   });
 
   it("rejects mismatched and backward callbacks and enforces one run", async () => {
@@ -266,15 +304,40 @@ describe("CallingCanary", () => {
       "digest-ring",
     )).toBe("accepted");
     expect(active.handleNotificationEnvelope(
-      notification("other-call", "terminated"),
+      deletedNotification("other-call"),
       "digest-other",
     )).toBe("rejected");
     expect(active.handleNotificationEnvelope(
       notification("call-five", "establishing"),
       "digest-backward",
     )).toBe("rejected");
-    active.handleNotificationEnvelope(
+    expect(active.handleNotificationEnvelope({
+      value: [{
+        changeType: "updated",
+        resourceUrl: "/communications/calls/call-five/participants",
+        resourceData: { state: "established" },
+      }],
+    }, "digest-unrelated")).toBe("rejected");
+    expect(active.handleNotificationEnvelope({
+      value: [{
+        changeType: "updated",
+        resourceUrl: "/communications/calls/%2F",
+        resourceData: { state: "established" },
+      }],
+    }, "digest-malformed")).toBe("rejected");
+    expect(active.handleNotificationEnvelope({
+      value: [{
+        changeType: "updated",
+        resourceUrl: "/communications/calls/%3F",
+        resourceData: { state: "established" },
+      }],
+    }, "digest-delimiter")).toBe("rejected");
+    expect(active.handleNotificationEnvelope(
       notification("call-five", "terminated"),
+      "digest-undocumented-terminal-update",
+    )).toBe("rejected");
+    active.handleNotificationEnvelope(
+      deletedNotification("call-five"),
       "digest-end",
     );
   });
@@ -284,8 +347,17 @@ function notification(callId: string, state: string): Record<string, unknown> {
   return {
     value: [{
       changeType: "updated",
-      resource: `/communications/calls/${callId}`,
-      resourceData: { id: callId, state },
+      resourceUrl: `/communications/calls/${encodeURIComponent(callId)}`,
+      resourceData: { state },
+    }],
+  };
+}
+
+function deletedNotification(callId: string): Record<string, unknown> {
+  return {
+    value: [{
+      changeType: "deleted",
+      resourceUrl: `/communications/calls/${encodeURIComponent(callId)}`,
     }],
   };
 }

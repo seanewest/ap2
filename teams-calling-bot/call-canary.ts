@@ -35,6 +35,7 @@ type RawCallState =
   | "established"
   | "terminating"
   | "terminated";
+type UpdatedCallState = Exclude<RawCallState, "terminated">;
 
 export class CallingCanary {
   readonly #settings: CallingCanarySettings;
@@ -429,37 +430,50 @@ function exactNotification(
   const value = body.value[0];
   if (
     !isRecord(value) ||
-    value.changeType !== "updated" ||
-    typeof value.resource !== "string" ||
-    !isRecord(value.resourceData) ||
-    typeof value.resourceData.id !== "string" ||
-    !isRawCallState(value.resourceData.state)
+    typeof value.resourceUrl !== "string"
   ) {
     return undefined;
   }
-  const match = /^\/?communications\/calls\/([^/?#]+)$/.exec(value.resource);
+  const match = /^\/communications\/calls\/([^/?#]+)$/.exec(
+    value.resourceUrl,
+  );
   let resourceId: string;
   try {
     resourceId = decodeURIComponent(match?.[1] ?? "");
   } catch {
     return undefined;
   }
-  if (!match || resourceId !== value.resourceData.id) {
+  if (
+    !match ||
+    !resourceId ||
+    resourceId === "." ||
+    resourceId === ".." ||
+    /[/\\?#\u0000-\u001f\u007f]/.test(resourceId)
+  ) {
+    return undefined;
+  }
+  if (value.changeType === "deleted") {
+    return { callId: resourceId, state: "terminated" };
+  }
+  if (
+    value.changeType !== "updated" ||
+    !isRecord(value.resourceData) ||
+    !isRawCallState(value.resourceData.state)
+  ) {
     return undefined;
   }
   return {
-    callId: value.resourceData.id,
+    callId: resourceId,
     state: value.resourceData.state,
   };
 }
 
-function isRawCallState(value: unknown): value is RawCallState {
+function isRawCallState(value: unknown): value is UpdatedCallState {
   return [
     "establishing",
     "ringing",
     "established",
     "terminating",
-    "terminated",
   ].includes(value as string);
 }
 

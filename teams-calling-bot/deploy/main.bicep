@@ -42,6 +42,9 @@ param certificatePem string
 @description('Unique safe label for this one call attempt.')
 param runMarker string
 
+@description('Unique lowercase suffix and health marker for this Container App revision.')
+param revisionMarker string
+
 @description('Enable only in the reviewed post-readiness revision that may place the one call.')
 param runCanary bool = false
 
@@ -114,6 +117,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       ]
     }
     template: {
+      revisionSuffix: revisionMarker
       containers: [
         {
           name: 'calling-bot'
@@ -184,6 +188,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'TEAMS_CALLING_BOT_RUN_CANARY'
               value: string(runCanary)
+            }
+            {
+              name: 'TEAMS_CALLING_BOT_REVISION_MARKER'
+              value: revisionMarker
             }
           ]
           volumeMounts: [

@@ -12,6 +12,7 @@ export interface CallingBotConfig {
   journalPath: string;
   runMarker: string;
   runCanary: boolean;
+  revisionMarker: string;
 }
 
 export function loadCallingBotConfig(
@@ -57,6 +58,15 @@ export function loadCallingBotConfig(
   if (runCanaryValue !== "true" && runCanaryValue !== "false") {
     throw new Error("TEAMS_CALLING_BOT_RUN_CANARY must be true or false");
   }
+  const revisionMarker = required(
+    environment,
+    "TEAMS_CALLING_BOT_REVISION_MARKER",
+  );
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(revisionMarker)) {
+    throw new Error(
+      "TEAMS_CALLING_BOT_REVISION_MARKER must be a lowercase revision label",
+    );
+  }
 
   return {
     host: environment.HOST ?? "0.0.0.0",
@@ -75,6 +85,7 @@ export function loadCallingBotConfig(
     journalPath,
     runMarker,
     runCanary: runCanaryValue === "true",
+    revisionMarker,
   };
 }
 

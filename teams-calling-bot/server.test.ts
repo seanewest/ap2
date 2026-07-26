@@ -20,6 +20,7 @@ describe("calling bot HTTP routes", () => {
       return "accepted" as const;
     });
     const server = await start({
+      revisionMarker: "fixture-r1",
       tokenVerifier: {
         verify: async () => {
           order.push("verified");
@@ -45,6 +46,7 @@ describe("calling bot HTTP routes", () => {
   it("rejects invalid authentication before malformed JSON is parsed", async () => {
     const canary = { handleNotificationEnvelope: vi.fn() };
     const server = await start({
+      revisionMarker: "fixture-r1",
       tokenVerifier: { verify: async () => Promise.reject(new Error()) },
       canary,
     });
@@ -62,6 +64,7 @@ describe("calling bot HTTP routes", () => {
 
   it("caps callback bodies and exposes no mutation route", async () => {
     const server = await start({
+      revisionMarker: "fixture-r1",
       tokenVerifier: { verify: async () => undefined },
       canary: {
         handleNotificationEnvelope: vi.fn(
@@ -93,6 +96,7 @@ describe("calling bot HTTP routes", () => {
     expect((await fetch(`${base}/callbacks/calls`)).status).toBe(405);
     expect(await (await fetch(`${base}/health`)).json()).toEqual({
       status: "ok",
+      revision: "fixture-r1",
     });
   });
 });

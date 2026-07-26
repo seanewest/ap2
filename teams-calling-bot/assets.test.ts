@@ -1,7 +1,9 @@
 // @vitest-environment node
 
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { buildTeamsCallingBotPackage } from "../scripts/package-teams-calling-bot-app.js";
 
 const manifest = JSON.parse(readFileSync(
   new URL("./teams-app/manifest.template.json", import.meta.url),
@@ -46,4 +48,21 @@ describe("calling-bot deployment assets", () => {
     );
     expect(dockerfile).toContain("USER node");
   });
+
+  it("packages identical normalized bytes on repeated builds", () => {
+    const first = buildTeamsCallingBotPackage(
+      "11111111-1111-4111-8111-111111111111",
+      "calling.example.test",
+    );
+    const second = buildTeamsCallingBotPackage(
+      "11111111-1111-4111-8111-111111111111",
+      "calling.example.test",
+    );
+    expect(sha256(first)).toBe(sha256(second));
+    expect(first.equals(second)).toBe(true);
+  });
 });
+
+function sha256(value: Buffer): string {
+  return createHash("sha256").update(value).digest("hex");
+}

@@ -12,6 +12,7 @@ const environment = {
   TEAMS_CALLING_BOT_CERTIFICATE_PATH: "/run/secrets/certificate.pem",
   TEAMS_CALLING_BOT_JOURNAL_PATH: "/journal/call.jsonl",
   TEAMS_CALLING_BOT_RUN_MARKER: "ap2-call-fixture",
+  TEAMS_CALLING_BOT_REVISION_MARKER: "calling-fixture-r1",
 };
 
 describe("loadCallingBotConfig", () => {
@@ -36,5 +37,13 @@ describe("loadCallingBotConfig", () => {
       ...environment,
       TEAMS_CALLING_BOT_CALLBACK_URI: "https://calling.example.test/other",
     })).toThrow("must be an exact HTTPS /callbacks/calls URL");
+    expect(() => loadCallingBotConfig({
+      ...environment,
+      TEAMS_CALLING_BOT_REVISION_MARKER: "NOT-STABLE",
+    })).toThrow("must be a lowercase revision label");
+    expect(() => loadCallingBotConfig({
+      ...environment,
+      TEAMS_CALLING_BOT_REVISION_MARKER: "trailing-",
+    })).toThrow("must be a lowercase revision label");
   });
 });

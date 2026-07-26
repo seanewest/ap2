@@ -13,6 +13,7 @@ const DEFAULT_BODY_LIMIT = 32 * 1024;
 export interface CallingBotServerDependencies {
   tokenVerifier: CallbackTokenVerifier;
   canary: Pick<CallingCanary, "handleNotificationEnvelope">;
+  revisionMarker: string;
   bodyLimit?: number;
 }
 
@@ -33,7 +34,10 @@ async function route(
 ): Promise<void> {
   const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
   if (pathname === "/health" && request.method === "GET") {
-    sendJson(response, 200, { status: "ok" });
+    sendJson(response, 200, {
+      status: "ok",
+      revision: dependencies.revisionMarker,
+    });
     return;
   }
   if (pathname === "/callbacks/calls" && request.method !== "POST") {
