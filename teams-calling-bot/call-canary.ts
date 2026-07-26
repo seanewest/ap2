@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { performance } from "node:perf_hooks";
 import type {
   CallJournalState,
   JournalSink,
@@ -7,8 +8,7 @@ import type {
 
 const GRAPH_CALLS_URL =
   "https://graph.microsoft.com/v1.0/communications/calls";
-const RING_WINDOW_MS = 15_000;
-const CONNECTED_WINDOW_MS = 5_000;
+const CALL_WINDOW_MS = 15_000;
 const CALLBACK_WINDOW_MS = 20_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -43,8 +43,7 @@ export class CallingCanary {
   readonly #tokenProvider: AppTokenProvider;
   readonly #request: Request;
   readonly #now: () => number;
-  readonly #ringWindowMs: number;
-  readonly #connectedWindowMs: number;
+  readonly #callWindowMs: number;
   readonly #callbackWindowMs: number;
   readonly #requestTimeoutMs: number;
   readonly #notificationDigests = new Set<string>();
@@ -58,7 +57,7 @@ export class CallingCanary {
   #accessToken?: string;
   #state?: CallJournalState;
   #stateRank = -1;
-  #hangupDispatched = false;
+  #hangupPromise?: Promise<boolean>;
   #attemptedAt = 0;
 
   constructor(
@@ -68,8 +67,7 @@ export class CallingCanary {
     request: Request = fetch,
     timing: {
       now?: () => number;
-      ringWindowMs?: number;
-      connectedWindowMs?: number;
+      callWindowMs?: number;
       callbackWindowMs?: number;
       requestTimeoutMs?: number;
     } = {},
@@ -78,10 +76,8 @@ export class CallingCanary {
     this.#journal = journal;
     this.#tokenProvider = tokenProvider;
     this.#request = request;
-    this.#now = timing.now ?? Date.now;
-    this.#ringWindowMs = timing.ringWindowMs ?? RING_WINDOW_MS;
-    this.#connectedWindowMs =
-      timing.connectedWindowMs ?? CONNECTED_WINDOW_MS;
+    this.#now = timing.now ?? (() => performance.now());
+    this.#callWindowMs = timing.callWindowMs ?? CALL_WINDOW_MS;
     this.#callbackWindowMs =
       timing.callbackWindowMs ?? CALLBACK_WINDOW_MS;
     this.#requestTimeoutMs =
@@ -173,10 +169,19 @@ export class CallingCanary {
     this.#state = state;
     this.#stateRank = rank;
     this.#notify();
+    if (state !== "terminated" && this.#deadlineReached()) {
+      void this.#hangup().catch(() => {
+        // The one safety hang-up remains uncertain and is never retried.
+      });
+    }
     return "accepted";
   }
 
   async shutdown(): Promise<void> {
+    if (this.#hangupPromise) {
+      await this.#hangupPromise;
+      return;
+    }
     if (
       this.#finished ||
       !this.#callId ||
@@ -232,10 +237,7 @@ export class CallingCanary {
         httpClass: httpClass(response?.status),
         state: "uncertain",
       });
-      const remaining = Math.max(
-        0,
-        this.#ringWindowMs - (this.#now() - this.#attemptedAt),
-      );
+      const remaining = this.#remainingCallWindow();
       await this.#waitFor(() => Boolean(this.#callId), remaining);
       if (!this.#callId) {
         return { outcome: "uncertain", terminalCallback: false };
@@ -246,25 +248,13 @@ export class CallingCanary {
       return { outcome: "ended", terminalCallback: true };
     }
 
-    const remainingRing = Math.max(
-      0,
-      this.#ringWindowMs - (this.#now() - this.#attemptedAt),
-    );
+    const remainingCall = this.#remainingCallWindow();
     await this.#waitFor(
-      () => this.#state === "connected" || this.#isTerminal(),
-      remainingRing,
+      () => this.#isTerminal(),
+      remainingCall,
     );
     if (this.#isTerminal()) {
       return { outcome: "ended", terminalCallback: true };
-    }
-    if (this.#state === "connected") {
-      await this.#waitFor(
-        () => this.#isTerminal(),
-        this.#connectedWindowMs,
-      );
-      if (this.#isTerminal()) {
-        return { outcome: "ended", terminalCallback: true };
-      }
     }
 
     const hangup = await this.#hangup();
@@ -284,26 +274,36 @@ export class CallingCanary {
     };
   }
 
-  async #hangup(): Promise<boolean> {
+  #hangup(): Promise<boolean> {
+    if (this.#hangupPromise) return this.#hangupPromise;
     if (
-      this.#hangupDispatched ||
       !this.#callId ||
       !this.#callIdDigest ||
       !this.#accessToken ||
       this.#state === "terminated"
     ) {
-      return false;
+      return Promise.resolve(false);
     }
-    this.#hangupDispatched = true;
+    this.#hangupPromise = this.#performHangup(
+      this.#callId,
+      this.#callIdDigest,
+    );
+    return this.#hangupPromise;
+  }
+
+  async #performHangup(
+    callId: string,
+    callIdDigest: string,
+  ): Promise<boolean> {
     this.#append({
       phase: "hangup-attempting",
-      callIdDigest: this.#callIdDigest,
+      callIdDigest,
     });
 
     let response: Response | undefined;
     try {
       response = await this.#request(
-        `${GRAPH_CALLS_URL}/${encodeURIComponent(this.#callId)}`,
+        `${GRAPH_CALLS_URL}/${encodeURIComponent(callId)}`,
         {
           method: "DELETE",
           redirect: "error",
@@ -393,6 +393,17 @@ export class CallingCanary {
 
   #isTerminal(): boolean {
     return this.#state === "terminated";
+  }
+
+  #remainingCallWindow(): number {
+    return Math.max(
+      0,
+      this.#callWindowMs - (this.#now() - this.#attemptedAt),
+    );
+  }
+
+  #deadlineReached(): boolean {
+    return this.#createAttempted && this.#remainingCallWindow() === 0;
   }
 
   #append(event: ReducedJournalEvent): void {

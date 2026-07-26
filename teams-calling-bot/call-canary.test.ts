@@ -21,6 +21,7 @@ const SETTINGS = {
   targetUserId: "fixture-target-user",
   callbackUri: "https://calling.example.test/callbacks/calls",
 };
+const FAKE_CLOCK = { now: () => Date.now() };
 
 class MemoryJournal implements JournalSink {
   readonly entries: ReducedJournalEvent[] = [];
@@ -57,7 +58,13 @@ describe("CallingCanary", () => {
         ? jsonResponse(201, { id: "call-one" })
         : new Response(null, { status: 204 });
     });
-    const canary = new CallingCanary(SETTINGS, journal, token, request);
+    const canary = new CallingCanary(
+      SETTINGS,
+      journal,
+      token,
+      request,
+      FAKE_CLOCK,
+    );
 
     const run = canary.run();
     await flush();
@@ -74,7 +81,9 @@ describe("CallingCanary", () => {
       "digest-ringing",
     )).toBe("accepted");
 
-    await vi.advanceTimersByTimeAsync(15_000);
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(requests.filter(({ method }) => method === "DELETE")).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1);
     expect(requests.filter(({ method }) => method === "DELETE")).toHaveLength(1);
     expect(canary.handleNotificationEnvelope(
       deletedNotification("call-one"),
@@ -97,7 +106,7 @@ describe("CallingCanary", () => {
     expect(reducedEvidence).not.toContain("call-one");
   });
 
-  it("allows an answered call for at most five seconds before one hang-up", async () => {
+  it("uses the initiation deadline after an early answer", async () => {
     vi.useFakeTimers();
     const requests: string[] = [];
     const canary = new CallingCanary(
@@ -110,21 +119,62 @@ describe("CallingCanary", () => {
           ? jsonResponse(201, { id: "call-two" })
           : new Response(null, { status: 204 });
       },
+      FAKE_CLOCK,
     );
 
     const run = canary.run();
     await flush();
+    await vi.advanceTimersByTimeAsync(1_000);
     expect(canary.handleNotificationEnvelope(
       notification("call-two", "established"),
       "digest-connected",
     )).toBe("accepted");
-    await vi.advanceTimersByTimeAsync(4_999);
+    await vi.advanceTimersByTimeAsync(13_999);
     expect(requests).not.toContain("DELETE");
     await vi.advanceTimersByTimeAsync(1);
     expect(requests.filter((method) => method === "DELETE")).toHaveLength(1);
     canary.handleNotificationEnvelope(
       deletedNotification("call-two"),
       "digest-terminal",
+    );
+    await expect(run).resolves.toMatchObject({ outcome: "ended" });
+  });
+
+  it("cannot extend the deadline by answering at its boundary", async () => {
+    vi.useFakeTimers();
+    const methods: string[] = [];
+    const canary = new CallingCanary(
+      SETTINGS,
+      new MemoryJournal(),
+      new OneToken(),
+      async (_input, init) => {
+        const method = init?.method ?? "GET";
+        methods.push(method);
+        return method === "POST"
+          ? jsonResponse(201, { id: "call-boundary" })
+          : new Response(null, { status: 204 });
+      },
+      FAKE_CLOCK,
+    );
+
+    const run = canary.run();
+    await flush();
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(canary.handleNotificationEnvelope(
+      notification("call-boundary", "established"),
+      "digest-boundary",
+    )).toBe("accepted");
+    expect(methods).toEqual(["POST"]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(methods).toEqual(["POST", "DELETE"]);
+    expect(canary.handleNotificationEnvelope(
+      notification("call-boundary", "established"),
+      "digest-late-duplicate-state",
+    )).toBe("accepted");
+    expect(methods).toEqual(["POST", "DELETE"]);
+    canary.handleNotificationEnvelope(
+      deletedNotification("call-boundary"),
+      "digest-boundary-terminal",
     );
     await expect(run).resolves.toMatchObject({ outcome: "ended" });
   });
@@ -140,6 +190,7 @@ describe("CallingCanary", () => {
         methods.push(init?.method ?? "GET");
         return jsonResponse(201, { id: "call-three" });
       },
+      FAKE_CLOCK,
     );
     const run = canary.run();
     await flush();
@@ -165,6 +216,7 @@ describe("CallingCanary", () => {
         methods.push(init?.method ?? "GET");
         throw new TypeError("sanitized transport failure");
       },
+      FAKE_CLOCK,
     );
     const run = canary.run();
     await flush();
@@ -174,6 +226,47 @@ describe("CallingCanary", () => {
       terminalCallback: false,
     });
     expect(methods).toEqual(["POST"]);
+  });
+
+  it("uses a late callback only for one safety hang-up, never a second call", async () => {
+    vi.useFakeTimers();
+    const methods: string[] = [];
+    const canary = new CallingCanary(
+      SETTINGS,
+      new MemoryJournal(),
+      new OneToken(),
+      async (_input, init) => {
+        const method = init?.method ?? "GET";
+        methods.push(method);
+        if (method === "POST") {
+          throw new TypeError("ambiguous create");
+        }
+        return new Response(null, { status: 204 });
+      },
+      FAKE_CLOCK,
+    );
+
+    const run = canary.run();
+    await flush();
+    await vi.advanceTimersByTimeAsync(15_000);
+    await expect(run).resolves.toEqual({
+      outcome: "uncertain",
+      terminalCallback: false,
+    });
+    expect(methods).toEqual(["POST"]);
+
+    expect(canary.handleNotificationEnvelope(
+      notification("late-call", "establishing"),
+      "digest-late",
+    )).toBe("accepted");
+    await flush();
+    expect(methods).toEqual(["POST", "DELETE"]);
+    expect(canary.handleNotificationEnvelope(
+      notification("late-call", "ringing"),
+      "digest-later",
+    )).toBe("accepted");
+    await Promise.all([canary.shutdown(), canary.shutdown()]);
+    expect(methods).toEqual(["POST", "DELETE"]);
   });
 
   it("observes an ambiguous hang-up once without retrying mutation", async () => {
@@ -190,6 +283,7 @@ describe("CallingCanary", () => {
         if (method === "DELETE") throw new TypeError("ambiguous");
         return jsonResponse(200, { state: "terminating" });
       },
+      FAKE_CLOCK,
     );
     const run = canary.run();
     await flush();
@@ -213,6 +307,10 @@ describe("CallingCanary", () => {
   it("shares the one hang-up gate with graceful shutdown", async () => {
     vi.useFakeTimers();
     const methods: string[] = [];
+    let resolveDelete!: (response: Response) => void;
+    const deleteResponse = new Promise<Response>((resolve) => {
+      resolveDelete = resolve;
+    });
     const canary = new CallingCanary(
       SETTINGS,
       new MemoryJournal(),
@@ -220,10 +318,12 @@ describe("CallingCanary", () => {
       async (_input, init) => {
         const method = init?.method ?? "GET";
         methods.push(method);
-        return method === "POST"
-          ? jsonResponse(201, { id: "call-shutdown" })
-          : new Response(null, { status: 204 });
+        if (method === "POST") {
+          return jsonResponse(201, { id: "call-shutdown" });
+        }
+        return deleteResponse;
       },
+      FAKE_CLOCK,
     );
     const run = canary.run();
     await flush();
@@ -232,8 +332,20 @@ describe("CallingCanary", () => {
       "digest-ring",
     );
 
-    await Promise.all([canary.shutdown(), canary.shutdown()]);
+    const shutdown = Promise.all([canary.shutdown(), canary.shutdown()]);
+    await flush();
     expect(methods.filter((method) => method === "DELETE")).toHaveLength(1);
+    let settled = false;
+    void shutdown.then(() => {
+      settled = true;
+    });
+    await flush();
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(methods.filter((method) => method === "DELETE")).toHaveLength(1);
+    resolveDelete(new Response(null, { status: 204 }));
+    await shutdown;
+    expect(settled).toBe(true);
     canary.handleNotificationEnvelope(
       deletedNotification("call-shutdown"),
       "digest-terminal",
@@ -295,7 +407,7 @@ describe("CallingCanary", () => {
       new MemoryJournal(),
       new OneToken(),
       async () => jsonResponse(201, { id: "call-five" }),
-      { ringWindowMs: 60_000 },
+      { ...FAKE_CLOCK, callWindowMs: 60_000 },
     );
     void active.run();
     await flush();
