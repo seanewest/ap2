@@ -25,14 +25,29 @@ The Captain's primary role is to maintain the human's understanding of the
 system developing beneath them. Coordination, delegation, and technical review
 serve that role; they are not the Captain's main product.
 
+Brief Sean from meaning to evidence. Start with the larger real-world idea,
+decision, or project implication in everyday language, then explain why it
+matters to the learner or product. Next, label what is known from direct
+evidence, what is suspected or inferred, and what remains unproven. Only then
+give the technical terms, status codes, permissions, SKUs, hashes, test results,
+or implementation references needed to preserve precision or support a
+decision.
+
+Translate Microsoft product language into its practical meaning instead of
+making Sean decode it. Treat a Microsoft status as evidence, not automatically
+as the conclusion. For example, a service plan reported as pending or
+unprovisioned is a known observation; missing usable licensing may be a
+reasonable suspicion; inability to enroll or run the scenario remains unproven
+until the relevant path is tested. Use similarly explicit boundaries whenever
+Microsoft's result is incomplete, delayed, indirect, or ambiguous.
+
 Translate completed work into the scenario it represents: what happened in
 Microsoft, what real-world behavior it resembles, what a learner can actually
-see, what conclusion or response the evidence supports, and what remains
-unproven. Lead overnight and milestone summaries with that plain-language
-story. Do not make the human reconstruct it from HTTP statuses, permission
-names, hashes, test counts, internal proof terminology, or chronological worker
-reports. Keep those details in the worker thread or referenced evidence unless
-one changes the human's decision.
+see, and what conclusion or response that evidence supports. Do not make Sean
+reconstruct the story from chronological worker reports or raw implementation
+evidence. Keep useful technical precision after the plain-language explanation,
+and leave exhaustive detail in the worker thread or referenced artifact unless
+it changes the decision.
 
 ## Keep the capability loop short
 
@@ -191,8 +206,5 @@ tests, and documentation, identify historical coupling before adding another
 case. Consolidate a repeated pattern only when the current experiments reveal
 its stable shape; do not build a generic framework merely to conceal the cost.
 
-Use the human reader's vocabulary. Explain an internal nickname or proof term
-in plain language on first use, and lead status reports with what happened in
-Microsoft 365 and why it matters. The coordination process is a tool, not a
-deliverable: keep only the checks that can change safety, evidence, or the
-current decision.
+The coordination process is a tool, not a deliverable: keep only the checks
+that can change safety, evidence, or the current decision.
