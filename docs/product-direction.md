@@ -8,7 +8,11 @@
 
 The eventual product is a cybersecurity learning platform.
 
-A student connects a Microsoft 365 and Azure tenant. Each lab creates a controlled, realistic scenario inside that tenant—possibly based on a real security event—and teaches the student how to detect and respond using the same tools they would use in practice.
+A student connects a Microsoft 365 and Azure tenant reserved for AP2
+cybersecurity labs. That tenant must never contain personal or production work.
+Each lab creates a controlled, realistic scenario inside it—possibly based on a
+real security event—and teaches the student how to detect and respond using the
+same tools they would use in practice.
 
 The learning experience may eventually include:
 
@@ -17,6 +21,12 @@ The learning experience may eventually include:
 3. Providing video or other educational material explaining detection and response.
 
 Before building the educational content, we need to understand how to build the underlying tenant automator or simulator.
+
+Lab construction is the content boundary. AP2 may modify or delete any tenant
+content created after construction begins. This dedicated-tenant contract
+changes the cleanup risk: later lab content does not need the preservation
+guarantees required in a personal or production tenant. It does not authorize
+AP2 to act in another tenant or to treat pre-construction content as disposable.
 
 ## The simulator we are exploring
 

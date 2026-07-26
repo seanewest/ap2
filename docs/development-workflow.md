@@ -69,6 +69,10 @@ Treat documented `201`, `202`, and `204` responses as Microsoft acceptance when
 that is the contract. Do not turn every accepted operation into a synchronous
 recipient-observation loop.
 
+Tenant setup and Microsoft propagation may take more than an hour. A lab may
+also include clearly identified manual steps. Neither case should be disguised
+as a short synchronous operation or treated as automatic failure.
+
 When a later mutation depends on convergence, use deliberate stages:
 
 1. perform one mutation;
@@ -78,9 +82,10 @@ When a later mutation depends on convergence, use deliberate stages:
 5. later confirm cleanup.
 
 During Pass 3, workers can schedule those stages as separate actions. A future
-lab product should store them in a durable lab run and let a background worker
-resume them. The SPA can display recorded status or offer an explicit refresh;
-it does not need a tight polling loop.
+lab product may store readiness state in a durable lab run and use background
+checks to resume after long propagation. The SPA can display recorded status,
+manual instructions, or an explicit refresh; it does not need a tight polling
+loop. This repository does not yet provide that durable orchestration.
 
 ## Mutation-safety review
 
