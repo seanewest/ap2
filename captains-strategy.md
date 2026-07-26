@@ -77,6 +77,15 @@ Parallelize independent work whose inputs are already stable. Do not keep every
 worker occupied merely because a slot is available. Idle workers are preferable
 to speculative work that will become stale or create another review cycle.
 
+Treat a completed worker turn, merged PR, or finished milestone as a dependency
+checkpoint, not an automatic stopping condition. Before ending a phase, inspect
+the recorded objective and unresolved dependency inventory. If known work
+remains, advance its next safe, useful assignment or local action. Stop only
+when the objective is genuinely complete, the next step requires Sean or new
+authority, or an external wait leaves no independent in-scope work. This is
+continuity toward known unfinished work, not a reason to manufacture work for
+idle workers.
+
 Use dependencies, not worker count, to choose the shape of the work. A common
 safe sequence is:
 
