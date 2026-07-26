@@ -18,7 +18,7 @@ export interface CallingCanarySettings {
 }
 
 export interface AppTokenProvider {
-  getToken(): Promise<string>;
+  getToken(signal?: AbortSignal): Promise<string>;
 }
 
 export interface CallingCanaryResult {
@@ -50,8 +50,10 @@ export class CallingCanary {
   readonly #listeners = new Set<() => void>();
 
   #started = false;
+  #shutdownRequested = false;
   #createAttempted = false;
-  #finished = false;
+  #runPromise?: Promise<CallingCanaryResult>;
+  readonly #tokenAbort = new AbortController();
   #callId?: string;
   #callIdDigest?: string;
   #accessToken?: string;
@@ -112,16 +114,25 @@ export class CallingCanary {
     return digest(JSON.stringify(CallingCanary.requestBody(settings)));
   }
 
-  async run(): Promise<CallingCanaryResult> {
-    if (this.#started) throw new CallingCanaryBusyError();
+  run(): Promise<CallingCanaryResult> {
+    if (this.#started || this.#shutdownRequested) {
+      return Promise.reject(new CallingCanaryBusyError());
+    }
     this.#started = true;
+    this.#runPromise = this.#run();
+    return this.#runPromise;
+  }
 
+  async #run(): Promise<CallingCanaryResult> {
     let result: CallingCanaryResult;
     try {
-      this.#accessToken = await this.#tokenProvider.getToken();
-      if (!this.#accessToken) {
+      const accessToken = await this.#tokenProvider.getToken(
+        this.#tokenAbort.signal,
+      );
+      if (this.#shutdownRequested || !accessToken) {
         result = { outcome: "refused", terminalCallback: false };
       } else {
+        this.#accessToken = accessToken;
         result = await this.#createAndEndCall();
       }
     } catch {
@@ -130,7 +141,6 @@ export class CallingCanary {
         terminalCallback: this.#state === "terminated",
       };
     }
-    this.#finished = true;
     this.#append({
       phase: "complete",
       outcome: result.outcome,
@@ -178,19 +188,11 @@ export class CallingCanary {
   }
 
   async shutdown(): Promise<void> {
-    if (this.#hangupPromise) {
-      await this.#hangupPromise;
-      return;
-    }
-    if (
-      this.#finished ||
-      !this.#callId ||
-      !this.#accessToken ||
-      this.#state === "terminated"
-    ) {
-      return;
-    }
-    await this.#hangup();
+    this.#shutdownRequested = true;
+    this.#tokenAbort.abort();
+    this.#notify();
+    await this.#runPromise;
+    await this.#hangupPromise;
   }
 
   async #createAndEndCall(): Promise<CallingCanaryResult> {
@@ -247,18 +249,31 @@ export class CallingCanary {
     if (this.#isTerminal()) {
       return { outcome: "ended", terminalCallback: true };
     }
+    if (this.#shutdownRequested) {
+      return await this.#hangupAndFinish();
+    }
 
     const remainingCall = this.#remainingCallWindow();
     await this.#waitFor(
-      () => this.#isTerminal(),
+      () => this.#isTerminal() || this.#shutdownRequested,
       remainingCall,
     );
     if (this.#isTerminal()) {
       return { outcome: "ended", terminalCallback: true };
     }
 
+    return await this.#hangupAndFinish();
+  }
+
+  async #hangupAndFinish(): Promise<CallingCanaryResult> {
     const hangup = await this.#hangup();
     if (!hangup) {
+      return {
+        outcome: this.#isTerminal() ? "ended" : "uncertain",
+        terminalCallback: this.#isTerminal(),
+      };
+    }
+    if (this.#shutdownRequested) {
       return {
         outcome: this.#isTerminal() ? "ended" : "uncertain",
         terminalCallback: this.#isTerminal(),

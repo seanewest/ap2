@@ -16,11 +16,12 @@ class SingleAppTokenProvider implements AppTokenProvider {
     private readonly credential: ClientCertificateCredential,
   ) {}
 
-  async getToken(): Promise<string> {
+  async getToken(signal?: AbortSignal): Promise<string> {
     if (this.#called) throw new Error("Token acquisition already attempted.");
     this.#called = true;
     const result = await this.credential.getToken(
       "https://graph.microsoft.com/.default",
+      { abortSignal: signal },
     );
     if (!result?.token) throw new Error("App token is unavailable.");
     return result.token;
@@ -103,8 +104,6 @@ async function main(): Promise<void> {
     shuttingDown = true;
     gateAbort.abort();
     process.stdout.write(`Received ${signal}; shutting down.\n`);
-    const forcedExit = setTimeout(() => process.exit(1), 10_000);
-    forcedExit.unref();
     try {
       await canary?.shutdown();
       await new Promise<void>((resolve) => {
@@ -113,7 +112,6 @@ async function main(): Promise<void> {
       });
     } finally {
       journal?.close();
-      clearTimeout(forcedExit);
     }
   };
 

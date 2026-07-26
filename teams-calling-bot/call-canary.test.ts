@@ -25,8 +25,13 @@ const FAKE_CLOCK = { now: () => Date.now() };
 
 class MemoryJournal implements JournalSink {
   readonly entries: ReducedJournalEvent[] = [];
+  closed = false;
   append(event: ReducedJournalEvent): void {
+    if (this.closed) throw new Error("Journal is closed.");
     this.entries.push(event);
+  }
+  close(): void {
+    this.closed = true;
   }
 }
 
@@ -350,7 +355,149 @@ describe("CallingCanary", () => {
       deletedNotification("call-shutdown"),
       "digest-terminal",
     );
-    await expect(run).resolves.toMatchObject({ outcome: "ended" });
+    await expect(run).resolves.toMatchObject({ outcome: "uncertain" });
+  });
+
+  it("prevents create after shutdown wins before startup", async () => {
+    const journal = new MemoryJournal();
+    const token = new OneToken();
+    const request = vi.fn();
+    const canary = new CallingCanary(SETTINGS, journal, token, request);
+
+    await canary.shutdown();
+    journal.close();
+
+    await expect(canary.run()).rejects.toBeInstanceOf(CallingCanaryBusyError);
+    expect(token.calls).toBe(0);
+    expect(request).not.toHaveBeenCalled();
+    expect(journal.entries).toEqual([]);
+  });
+
+  it("drains pending token acquisition and prevents create on shutdown", async () => {
+    let resolveToken!: (token: string) => void;
+    const tokenResult = new Promise<string>((resolve) => {
+      resolveToken = resolve;
+    });
+    let tokenSignal: AbortSignal | undefined;
+    const token: AppTokenProvider = {
+      getToken: (signal) => {
+        tokenSignal = signal;
+        return tokenResult;
+      },
+    };
+    const journal = new MemoryJournal();
+    const request = vi.fn();
+    const canary = new CallingCanary(SETTINGS, journal, token, request);
+
+    const run = canary.run();
+    await flush();
+    const shutdown = Promise.all([canary.shutdown(), canary.shutdown()]);
+    expect(tokenSignal?.aborted).toBe(true);
+    let settled = false;
+    void shutdown.then(() => {
+      settled = true;
+      journal.close();
+    });
+    await flush();
+    expect(settled).toBe(false);
+
+    resolveToken("private-token");
+    await shutdown;
+    await expect(run).resolves.toEqual({
+      outcome: "refused",
+      terminalCallback: false,
+    });
+    expect(request).not.toHaveBeenCalled();
+    expect(journal.closed).toBe(true);
+    expect(journal.entries.at(-1)).toMatchObject({ phase: "complete" });
+  });
+
+  it("hangs up a late 201 before concurrent shutdown closes the journal", async () => {
+    let resolvePost!: (response: Response) => void;
+    const postResponse = new Promise<Response>((resolve) => {
+      resolvePost = resolve;
+    });
+    let resolveDelete!: (response: Response) => void;
+    const deleteResponse = new Promise<Response>((resolve) => {
+      resolveDelete = resolve;
+    });
+    const sequence: string[] = [];
+    const journal = new MemoryJournal();
+    const canary = new CallingCanary(
+      SETTINGS,
+      journal,
+      new OneToken(),
+      async (_input, init) => {
+        const method = init?.method ?? "GET";
+        sequence.push(method);
+        return method === "POST" ? postResponse : deleteResponse;
+      },
+    );
+
+    const run = canary.run();
+    await flush();
+    expect(sequence).toEqual(["POST"]);
+    const shutdown = Promise.all([
+      canary.shutdown(),
+      canary.shutdown(),
+    ]).then(() => {
+      sequence.push("CLOSE");
+      journal.close();
+    });
+    await flush();
+    expect(sequence).toEqual(["POST"]);
+
+    resolvePost(jsonResponse(201, { id: "shutdown-late-call" }));
+    await flush();
+    expect(sequence).toEqual(["POST", "DELETE"]);
+    expect(journal.closed).toBe(false);
+
+    resolveDelete(new Response(null, { status: 204 }));
+    await shutdown;
+    await expect(run).resolves.toEqual({
+      outcome: "uncertain",
+      terminalCallback: false,
+    });
+    expect(sequence).toEqual(["POST", "DELETE", "CLOSE"]);
+    expect(journal.entries.at(-1)).toMatchObject({ phase: "complete" });
+  });
+
+  it("holds shutdown through an ambiguous pending POST until the deadline", async () => {
+    vi.useFakeTimers();
+    let rejectPost!: (error: Error) => void;
+    const postResponse = new Promise<Response>((_resolve, reject) => {
+      rejectPost = reject;
+    });
+    const methods: string[] = [];
+    const journal = new MemoryJournal();
+    const canary = new CallingCanary(
+      SETTINGS,
+      journal,
+      new OneToken(),
+      async (_input, init) => {
+        methods.push(init?.method ?? "GET");
+        return postResponse;
+      },
+      FAKE_CLOCK,
+    );
+
+    const run = canary.run();
+    await flush();
+    const shutdown = canary.shutdown().then(() => journal.close());
+    rejectPost(new TypeError("ambiguous create"));
+    await flush();
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(journal.closed).toBe(false);
+    expect(methods).toEqual(["POST"]);
+    await vi.advanceTimersByTimeAsync(1);
+
+    await shutdown;
+    await expect(run).resolves.toEqual({
+      outcome: "uncertain",
+      terminalCallback: false,
+    });
+    expect(journal.closed).toBe(true);
+    expect(methods).toEqual(["POST"]);
   });
 
   it("accepts official updated states and a field-free deleted terminal", async () => {
