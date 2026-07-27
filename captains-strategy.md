@@ -3,21 +3,14 @@
 This file is role-specific guidance for the Captain. It is not a rule that
 workers should treat every review observation as a blocker.
 
-## Triage review findings
+## Apply the canonical risk hierarchy
 
-Exercise judgment before starting another fix and review cycle.
-
-| Finding | Default treatment |
-| --- | --- |
-| Breaks acceptance criteria, risks an unintended mutation, or invalidates the evidence | Block and fix |
-| Directly affects the current experiment and is extremely cheap | Fix in the current goal |
-| Low-impact defensive edge in controlled tooling | Record and continue |
-| Unrelated improvement | Separate it from the current goal |
-
-Pass 3 optimizes for architectural learning and feedback speed. Severity labels
-inform the decision but do not make it. Ask whether the finding can change the
-result of the current experiment, strand tenant state, repeat a mutation, or
-make the claimed evidence untrustworthy.
+Use the repository-wide [R0–R3 authority and HOLD
+policy](AGENTS.md#disposable-lab-authority) for retries, mutation scope,
+persistent authorization, review depth, Azure isolation, and escalation.
+Do not create narrower one-shot rules or new approval gates in an assignment.
+The Captain must challenge a blocker that protects neither a named safety
+boundary nor the learning claim, and must stop genuine R3 boundary risk.
 
 ## Maintain human comprehension
 
@@ -65,11 +58,10 @@ Do not perfect a harness whose defects are unrelated to the product. Do not
 repeat a live mutation merely to repair test presentation or evidence
 collection.
 
-Treat mutation ambiguity differently from ordinary transport trouble. If a
-mutation has an ambiguous response, fail closed and never retry it
-automatically. For an idempotent or read-only request, one bounded retry or one
-approved alternate transport is proportionate. Do not rebuild or reseal an
-entire deployment package unless its evidence expired or its inputs changed.
+Apply the canonical policy when transport, clocks, tools, or evidence packages
+need correction. Keep the existing authority when its actor, blast
+radius/external effect, cleanup boundary, and spend authority did not change.
+Do not turn a review into a chain of full re-reviews.
 
 Before a live scenario, distinguish evidence that must prove the learning
 claim from optional corroboration such as a particular UI rendering or delayed

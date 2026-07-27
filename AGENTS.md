@@ -1,5 +1,49 @@
 # AGENTS.md
 
+## Disposable-lab authority
+
+AP2 operates only in a dedicated disposable lab tenant and explicitly selected
+lab subscriptions. Safety protects the correct tenant/subscription,
+credentials, admin recovery, external parties/effects, public exposure, abuse
+limits, predating assets, and authorized spend—not preservation of disposable
+lab state.
+
+| Risk | Scope | Default authority |
+| --- | --- | --- |
+| **R0 — observe** | Read-only inspection of an authorized tenant, subscription, repository, or protected evidence | Autonomous. Use proportionate bounded retries or an alternate local transport. Fix local clock, URI, parsing, or tooling defects and continue. No sealing or independent review is required. |
+| **R1 — bounded lab change** | Reversible, marked, bounded-cost mutation of post-construction lab state with a known cleanup path | Autonomous while the persistent authorization conditions below hold. Prefer idempotent operations, reconcile before repeating an ambiguous request, and perform best-effort cleanup. |
+| **R2 — broad lab change** | Broad or destructive mutation of post-construction lab state, such as a reset or resource-group deletion | Require proven admin recovery and one focused review of the mutation-critical boundary. Do not add review chains. |
+| **R3 — boundary/high impact** | Any uncertain or changed tenant/subscription, credential or trust change, external person/effect, public exposure, admin-lockout risk, abuse-limit risk, predating asset, or spend beyond authority | Stop and require Sean's explicit decision. |
+
+Authorization persists while the objective, actor, exact tenant/subscription,
+blast radius and external effect, cleanup boundary, and spend ceiling remain
+unchanged. A clock/window refresh, harmless read retry, transport change, or
+local tool correction does not create a new approval gate. Re-review or reseal
+only the part whose actor, blast radius/external effect, cleanup boundary, or
+spend authority changed. Never replay an ambiguous non-idempotent mutation;
+reconcile it read-only first.
+
+Classify a HOLD before escalating it:
+
+| HOLD category | Treatment |
+| --- | --- |
+| Boundary risk | Stop; resolve the R3 boundary with Sean. |
+| Learning invalidation | Fix the evidence path or narrow the claim; use only the review required by its risk level. |
+| Local/tooling defect | Correct and continue under the existing authority. |
+| Optional hardening | Record separately and continue. |
+
+R0 needs no review, R1 has no mandatory independent review, R2 gets one focused
+review, and R3 goes to Sean. Do not review a review or rebuild/reseal unchanged
+artifacts. The Captain must challenge blockers and ceremony that do not protect
+a listed safety boundary or the learning claim.
+
+For isolated Azure experiments, use one unique run ID and resource group with
+AP2 marker and expiry tags. Deploy idempotently within that group and delete the
+exact group deterministically at expiry. Older marked groups are cleanup
+backlog, not a global-absence gate, unless they create a quota, cost, or naming
+conflict. Budget alerts are backup signals, not hard caps; the authorized spend
+ceiling and run stop remain controlling.
+
 ## Working principles
 
 ### Testability
@@ -31,7 +75,8 @@ When feasible, run deterministic local tests, then a local canary through the re
 
 Use incremental checks for image-only changes.
 
-Start with the decisive query. Do not add evidence-sealing ceremony unless the result is consequential or ambiguous.
+Start with the decisive query. Follow the canonical risk level instead of
+adding evidence-sealing ceremony.
 
 Reuse a verified authentication session or token cache within one controlled
 test batch when isolation does not require a fresh sign-in. Use a fresh browser
