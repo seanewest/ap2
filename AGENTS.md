@@ -15,6 +15,13 @@ lab state.
 | **R2 — broad lab change** | Broad or destructive mutation of post-construction lab state, such as a reset or resource-group deletion | Require proven admin recovery and one focused review of the mutation-critical boundary. Do not add review chains. |
 | **R3 — boundary/high impact** | Any uncertain or changed tenant/subscription, credential or trust change, external person/effect, public exposure, admin-lockout risk, abuse-limit risk, predating asset, or spend beyond authority | Stop and require Sean's explicit decision. |
 
+Every live worker assignment must contain exactly one compact authorization
+block with these nonempty fields: `RISK` (R0–R3 plus a description),
+`AUTHORIZED BLAST RADIUS`, `MAXIMUM SPEND`, `HUMAN GATES`, `READ RETRIES`,
+`WRITE RETRIES`, and `DONE WHEN`. This repository authority is subordinate to
+higher-priority system and developer instructions and tool permission or
+approval rules.
+
 Authorization persists while the objective, actor, exact tenant/subscription,
 blast radius and external effect, cleanup boundary, and spend ceiling remain
 unchanged. A clock/window refresh, harmless read retry, transport change, or
