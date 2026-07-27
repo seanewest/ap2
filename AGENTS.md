@@ -37,6 +37,15 @@ review, and R3 goes to Sean. Do not review a review or rebuild/reseal unchanged
 artifacts. The Captain must challenge blockers and ceremony that do not protect
 a listed safety boundary or the learning claim.
 
+Use Sean's time only when an action is genuinely agent-impossible—such as
+interactive authentication, physical presence, or deliberately human-only UI
+or learner-perspective evidence—or when his material judgment or authorization
+determines the result. Agents own routine admin navigation, read-only API or
+portal-equivalent verification, evidence correlation, mechanical checks, and
+all agent-executable QA, including operating the SPA. Every human checkpoint
+must state why it cannot be delegated, one exact action, the expected outcome,
+and the stop rule. Never send Sean on a multi-portal scavenger hunt.
+
 For isolated Azure experiments, use one unique run ID and resource group with
 AP2 marker and expiry tags. Deploy idempotently within that group and delete the
 exact group deterministically at expiry. Older marked groups are cleanup
@@ -105,11 +114,8 @@ Avoid overengineering.
 
 ### Autonomy and human interaction
 
-Do not create unconventional workarounds or add new complexity simply to avoid asking the human for input.
-
-Ask for input when a decision meaningfully affects the mental model or overall architecture.
-
-Agents should perform all testing and QA they can perform themselves, including operating the SPA in a browser. Involve Sean only when human judgment, a meaningful product or architecture decision, credentials or access only he has, or deliberate evaluation of the human experience is needed.
+Apply the canonical human-time boundary above. Do not create unconventional
+workarounds or new complexity to avoid a genuinely necessary checkpoint.
 
 Agent QA does not replace intentionally requested human-experience testing.
 
