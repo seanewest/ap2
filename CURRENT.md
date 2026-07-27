@@ -5,7 +5,7 @@ At each material checkpoint, the Captain checks and updates this docket against 
 ## Active
 
 - **Standalone Intune canary:** Current truth is protected local evidence, not code on `main`. The approved shape uses an East US Zone 2 Windows 11 Enterprise `Standard_D2s_v3` VM, private NIC, Bastion Basic, Entra login, and learner user-context enrollment. The non-executable typed-identity successor is on HOLD until one fresh operator CBA `/me` proves the real directory object ID separately from the certificate-user mapping; then rebuild and review fresh execution inputs before any absence read or deployment decision.
-- **Teams Call Canary:** Sean's package upload is complete and protected evidence proves one exact usable catalog publication. The first Cory-install pass stopped on a preflight request error with zero mutation; diagnose that request locally before seeking authority for another one-shot install. The current service remains call-disabled. Updated calling code and a reviewed call-disabled image are protected/branch artifacts, not merged product code.
+- **Teams Call Canary:** Sean's package upload is complete and protected evidence proves one exact usable catalog publication. The first Cory-install pass stopped on a preflight request error with zero mutation; diagnose that request locally before seeking authority for another one-shot install. Reusable Call Canary code is public in unmerged draft PR #48. Protected local artifacts separately hold the reviewed immutable image and live catalog, installation, and deployment evidence; only catalog publication is proven—installation, call-disabled deployment, call enablement, and learner-visible proof are not yet proven.
 
 ## Waiting for Sean
 
@@ -17,7 +17,7 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 - Correct and independently review the Cory installation read/transport contract locally; only then request one new bounded installation authorization.
 - After exact installation reconciliation, deploy the reviewed immutable calling image with the canary still disabled and prove health, configuration, and an empty journal before considering a call.
-- **Repository integration:** Captain/liveness guidance and the calling bot remain worker-branch changes. Review the focused guidance change first; keep the calling prototype unmerged until the upload/install/deploy/call sequence proves the product boundary, then rebase and review it against current `main`.
+- **Repository integration:** Captain/liveness guidance is in draft PR #47, and the current-main cumulative Call Canary review is complete in unmerged draft PR #48. The remaining repository work is review and merge decisions for both PRs. Separately, live readiness still requires exact Cory installation and a fresh call-disabled deployment proof before any bounded call.
 
 ## Parked
 
