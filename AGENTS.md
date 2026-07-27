@@ -62,9 +62,17 @@ Avoid overengineering.
 
 Do not create unconventional workarounds or add new complexity simply to avoid asking the human for input.
 
-Ask for input when a decision meaningfully affects the mental model or overall architecture.
+The Captain may ask Sean for manual work only when agents genuinely cannot
+perform it, such as interactive authentication, physical presence, or
+deliberately human-only UI or learner-perspective evidence, or when Sean's
+judgment or authorization materially determines the result. Agents own routine
+admin navigation, read-only API or portal-equivalent verification, evidence
+correlation, mechanical checks, and all QA they can perform, including
+operating the SPA in a browser.
 
-Agents should perform all testing and QA they can perform themselves, including operating the SPA in a browser. Involve Sean only when human judgment, a meaningful product or architecture decision, credentials or access only he has, or deliberate evaluation of the human experience is needed.
+Every human checkpoint must state why it cannot be delegated, the one exact
+action, the expected outcome, and the stop rule. Do not send Sean on
+multi-portal scavenger hunts.
 
 Agent QA does not replace intentionally requested human-experience testing.
 

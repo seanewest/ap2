@@ -10,11 +10,11 @@ At each material checkpoint, the Captain checks and updates this docket against 
 ## Waiting for Sean
 
 - **Teams chat learner investigation:** The scenario summary is merged to `main`; the retained marked chat, message, membership, and private cleanup identity are protected evidence. Sean should inspect the unexpected membership and message before a separately authorized remediation.
-- **Defender/EICAR learner investigation:** The scenario summary is merged to `main`; quarantine, message trace, hunting, and audit residue are protected tenant evidence. Sean should inspect the prevention evidence without releasing, previewing, downloading, or opening the attachment.
 - **Teams call:** After a fresh call-disabled deployment and readiness proof, Sean must be present for any separately reviewed single bounded call and its human-visible result.
 
 ## Ready next
 
+- **Defender/EICAR agent investigation:** Agents own correlation of the merged scenario's quarantine, message-trace, hunting, and audit evidence; do not release, preview, download, or open the attachment. Endpoint follow-on waits for the standalone Intune canary.
 - Deploy the reviewed immutable calling image with the canary still disabled and prove health, configuration, and an empty journal before considering a bounded live call.
 - **Repository integration:** Reusable Call Canary code is merged to `main` through PR #48. Captain/liveness guidance remains in draft PR #47; its final review and merge decision is the only remaining repository-integration action. Separately, the Call Canary still requires the call-disabled deployment and readiness proof before any bounded live gate.
 
