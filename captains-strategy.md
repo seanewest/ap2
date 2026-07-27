@@ -65,6 +65,12 @@ Do not perfect a harness whose defects are unrelated to the product. Do not
 repeat a live mutation merely to repair test presentation or evidence
 collection.
 
+Treat mutation ambiguity differently from ordinary transport trouble. If a
+mutation has an ambiguous response, fail closed and never retry it
+automatically. For an idempotent or read-only request, one bounded retry or one
+approved alternate transport is proportionate. Do not rebuild or reseal an
+entire deployment package unless its evidence expired or its inputs changed.
+
 Before a live scenario, distinguish evidence that must prove the learning
 claim from optional corroboration such as a particular UI rendering or delayed
 audit record. Keep the authorized actor session through the bounded final reads
@@ -104,28 +110,50 @@ a changed decision, or missing acceptance evidence requires it. Do not turn
 every report into another assignment, and do not duplicate a worker's technical
 investigation unless the Captain must adjudicate conflicting evidence.
 
-Ordinary worker reports should be queued while the Captain is active and start
-a new Captain turn after the current turn completes. Only urgent safety or
-mutation information should steer an active turn.
+The Captain must delegate project implementation and related bounded work
+through `assign-worker-turn-detached` to the shared peer-worker pool:
+
+| Worker | Thread |
+| --- | --- |
+| LeBron | `019f97a9-d475-7132-9ac5-207fce478e6c` |
+| Durant | `019f97ae-635f-7de3-a081-1c05f7fc6b70` |
+| Curry | `019f97ae-cc9f-76c2-ba16-24d5a2b2bf91` |
+| AD | `019f97af-2091-7b92-96fc-3fece5476a45` |
+| Wemby | `019f9813-aacc-7892-b955-76692faa0ac1` |
+
+These are durable peer threads, not Captain-owned `/root` child subagents.
+Choose workers by dependency and ownership; do not create personal subagents
+to bypass this pool.
+
+The detached command resumes the exact idle configured worker, confirms one
+labeled turn started, records its generation, and exits. The worker sends its
+exact final once through ordinary `notify-captain` before returning the same
+text locally. Ordinary reports wait while Captain is active and then start
+their own Captain turn; only immediate safety or mutation issues are urgent.
+There are no connection-held watcher terminals.
+
+The enabled one-minute overnight check is only a continuity fallback. It audits
+durable assignment delivery, reconciles stable message IDs without replay, and
+wakes Captain once only when all configured threads are idle. Before ending a
+turn, Captain must either assign the next docket item, record
+`overnight-liveness wait --reason external-input`, or disable the mode when the
+objective is complete. Use `overnight-liveness resume` when external input
+arrives; a new assignment makes an older wait stale. The tool README at
+`/home/west/codex-agent-tools/README.md` is the canonical command and failure
+contract.
 
 Judge apparent stalls by elapsed wall time and worker status, not rapid Captain
 continuations or the temporary absence of an output file.
 
-Assign app-server workers with
-`/home/west/codex-agent-tools/bin/assign-worker-turn.mjs`, supplying the exact
-idle worker thread, worktree, and required worker label. The command resumes,
-starts, and watches the turn on one connection; app-server turn notifications
-are connection-scoped, so an after-the-fact watcher is unreliable. Let the
-terminal job yield, then end the Captain turn. Do not keep the Captain turn
-alive with sleep commands or repeated thread reads.
+## Advance a durable docket
 
-The assignment command mechanically adds the worker label and concise report
-format. On normal completion it forwards the worker's actual final through
-`notify-captain`; workers should not invoke that command themselves. It queues
-an ordinary generated fallback only on failure, interruption, `systemError`,
-terminal error, a missing final response, or its single bounded deadline. This
-keeps one source of delivery for both success and failure without leaving a
-stale watcher process.
+Maintain one durable docket for the current objective: either a repository
+file or an owner-only artifact named in the current handoff. Every assignment
+and checkpoint must advance a docket item that records its owner, dependency,
+acceptance evidence, repository-integration state, blocker or wait, and next
+action. Update it before ending the checkpoint; chat history and unnamed
+scratch files are not substitutes. Do not start speculative work outside the
+docket.
 
 ## Keep reports decision-ready
 
@@ -194,6 +222,9 @@ Keep the smallest artifact that preserves the useful result:
 
 - detailed evidence belongs in a protected artifact; the capability ledger
   retains only the result and its important boundary;
+- protected local artifacts and evidence are progress, not repository
+  integration or product completion; completion requires the intended
+  code, tests, and canonical documentation to be committed and integrated;
 - temporary experiment code may be removed after the result is recorded;
 - reusable code earns continued maintenance through demonstrated scenario
   reuse or a product path that needs it;

@@ -10,7 +10,10 @@ Prefer end to end testing that uses a similar path as the product itself, when p
 
 ### Speed
 
-Use subagents when you can parallelize work.
+For Captain-led work, use the five shared peer-worker threads through the
+detached assignment process in [captains-strategy.md](captains-strategy.md).
+Those durable peer threads are not personal `/root` child subagents. The
+Captain must not create child subagents for project work.
 
 Prefer fast feedback loops.
 
