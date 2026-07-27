@@ -138,9 +138,8 @@ wakes Captain once only when all configured threads are idle. Before ending a
 turn, Captain must either assign the next docket item, record
 `overnight-liveness wait --reason external-input`, or disable the mode when the
 objective is complete. Use `overnight-liveness resume` when external input
-arrives; a new assignment makes an older wait stale. The tool README at
-`/home/west/codex-agent-tools/README.md` is the canonical command and failure
-contract.
+arrives; a new assignment makes an older wait stale. The `codex-agent-tools`
+README is the canonical command and failure contract.
 
 Judge apparent stalls by elapsed wall time and worker status, not rapid Captain
 continuations or the temporary absence of an output file.
