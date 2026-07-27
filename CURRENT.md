@@ -5,19 +5,18 @@ At each material checkpoint, the Captain checks and updates this docket against 
 ## Active
 
 - **Standalone Intune canary:** Current truth is protected local evidence, not code on `main`. The approved shape uses an East US Zone 2 Windows 11 Enterprise `Standard_D2s_v3` VM, private NIC, Bastion Basic, Entra login, and learner user-context enrollment. The non-executable typed-identity successor is on HOLD until one fresh operator CBA `/me` proves the real directory object ID separately from the certificate-user mapping; then rebuild and review fresh execution inputs before any absence read or deployment decision.
-- **Teams Call Canary:** Sean's package upload is complete and protected evidence proves one exact usable catalog publication. The first Cory-install pass stopped on a preflight request error with zero mutation; diagnose that request locally before seeking authority for another one-shot install. Reusable Call Canary code is public in unmerged draft PR #48. Protected local artifacts separately hold the reviewed immutable image and live catalog, installation, and deployment evidence; only catalog publication is proven—installation, call-disabled deployment, call enablement, and learner-visible proof are not yet proven.
+- **Teams Call Canary:** Reusable Call Canary code is merged to `main` through PR #48. Protected local artifacts separately hold the reviewed immutable image and tenant catalog, installation, and deployment evidence; that live evidence is not Git content. The remaining product gate is a fresh call-disabled deployment and readiness proof before any bounded live call; any resulting learner proof will likewise remain protected live evidence outside Git.
 
 ## Waiting for Sean
 
 - **Teams chat learner investigation:** The scenario summary is merged to `main`; the retained marked chat, message, membership, and private cleanup identity are protected evidence. Sean should inspect the unexpected membership and message before a separately authorized remediation.
 - **Defender/EICAR learner investigation:** The scenario summary is merged to `main`; quarantine, message trace, hunting, and audit residue are protected tenant evidence. Sean should inspect the prevention evidence without releasing, previewing, downloading, or opening the attachment.
-- **Teams call:** After exact Cory installation and a fresh call-disabled deployment proof, Sean must be present for any separately reviewed single bounded call and its human-visible result.
+- **Teams call:** After a fresh call-disabled deployment and readiness proof, Sean must be present for any separately reviewed single bounded call and its human-visible result.
 
 ## Ready next
 
-- Correct and independently review the Cory installation read/transport contract locally; only then request one new bounded installation authorization.
-- After exact installation reconciliation, deploy the reviewed immutable calling image with the canary still disabled and prove health, configuration, and an empty journal before considering a call.
-- **Repository integration:** Captain/liveness guidance is in draft PR #47, and the current-main cumulative Call Canary review is complete in unmerged draft PR #48. The remaining repository work is review and merge decisions for both PRs. Separately, live readiness still requires exact Cory installation and a fresh call-disabled deployment proof before any bounded call.
+- Deploy the reviewed immutable calling image with the canary still disabled and prove health, configuration, and an empty journal before considering a bounded live call.
+- **Repository integration:** Reusable Call Canary code is merged to `main` through PR #48. Captain/liveness guidance remains in draft PR #47; its final review and merge decision is the only remaining repository-integration action. Separately, the Call Canary still requires the call-disabled deployment and readiness proof before any bounded live gate.
 
 ## Parked
 
