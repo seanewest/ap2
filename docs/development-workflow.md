@@ -3,6 +3,9 @@
 This is the shared workflow for exploring Microsoft 365 and Azure capabilities
 without turning each experiment into production architecture.
 
+Risk, retry, review, and persistent-authorization decisions follow the
+canonical [R0–R3 policy](../AGENTS.md#disposable-lab-authority).
+
 ## Choose the actor first
 
 | Intended behavior | Actor |
@@ -20,22 +23,27 @@ permission, configuration, or route.
 ## Capability loop
 
 1. Run the smallest read-only query that can disprove readiness.
-2. Use one bounded direct canary to learn the real Microsoft request, response,
-   normalization, propagation, and cleanup behavior.
-3. Freeze the mutation-critical contract. Do not validate presentation details
-   that do not control safe follow-up or cleanup.
+2. Use the smallest bounded direct canary set needed to learn the real
+   Microsoft request, response, normalization, propagation, and cleanup
+   behavior.
+3. Record only the mutation-critical contract required by its risk level. Do
+   not validate presentation details that do not control safe follow-up or
+   cleanup.
 4. Implement the fixed operation with deterministic tests, typechecking, a
    production build, and the existing container fixture where relevant.
 5. Run a local browser product path only when it is likely to find a product
    integration issue. Time-box harness repair; a harness exists to save time.
-6. After review, build the API image and Pages preview concurrently when they
-   are independent.
-7. Invoke the hosted mutation once, verify its meaningful outcome, clean up,
-   and merge the reviewed tree.
+6. When the risk level requires review, perform only that focused review. Build
+   the API image and Pages preview concurrently when they are independent.
+7. Invoke the hosted path inside its authorized run, verify its meaningful
+   outcome, clean up, and merge the reviewed tree. Reconcile ambiguous
+   non-idempotent mutations before any new request; idempotent R1 work may
+   continue inside the same run identity.
 
-Avoid a second direct mutation merely because a response was normalized
-differently than expected. Reconcile the existing artifact read-only, improve
-the validator, and use the retained or marked artifact for cleanup.
+Do not repeat a non-idempotent direct mutation merely because a response was
+normalized differently than expected. Reconcile the existing artifact
+read-only, improve the validator, and use the retained or marked artifact for
+cleanup.
 
 ## Authentication feedback loops
 
@@ -75,9 +83,9 @@ as a short synchronous operation or treated as automatic failure.
 
 When a later mutation depends on convergence, use deliberate stages:
 
-1. perform one mutation;
+1. perform the bounded mutation stage;
 2. return or work on something independent;
-3. later perform one exact observation;
+3. later perform the bounded exact observations allowed by R0;
 4. perform the dependent mutation only after that observation;
 5. later confirm cleanup.
 
@@ -87,9 +95,9 @@ checks to resume after long propagation. The SPA can display recorded status,
 manual instructions, or an explicit refresh; it does not need a tight polling
 loop. This repository does not yet provide that durable orchestration.
 
-## Mutation-safety review
+## Focused R2 mutation-safety review
 
-A focused mutation-safety review checks that:
+The one focused review required for R2 checks that:
 
 - tenant, actor, fixed target, and permissions are correct;
 - an ambiguous response cannot cause an automatic duplicate mutation;
