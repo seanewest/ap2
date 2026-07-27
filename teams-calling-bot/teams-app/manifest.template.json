@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.22/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.22",
+  "version": "1.0.0",
+  "id": "{{APP_ID}}",
+  "developer": {
+    "name": "AP2",
+    "websiteUrl": "https://{{HOSTNAME}}/health",
+    "privacyUrl": "https://{{HOSTNAME}}/health",
+    "termsOfUseUrl": "https://{{HOSTNAME}}/health"
+  },
+  "name": {
+    "short": "AP2 Call Canary",
+    "full": "AP2 Teams Calling Canary"
+  },
+  "description": {
+    "short": "Dedicated AP2 one-call lab canary.",
+    "full": "A dedicated single-tenant AP2 lab bot for one bounded audio call."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#1D4ED8",
+  "bots": [
+    {
+      "botId": "{{APP_ID}}",
+      "scopes": [
+        "personal"
+      ],
+      "supportsFiles": false,
+      "isNotificationOnly": true,
+      "supportsCalling": true,
+      "supportsVideo": false
+    }
+  ],
+  "validDomains": [
+    "{{HOSTNAME}}"
+  ]
+}

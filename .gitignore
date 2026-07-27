@@ -2,6 +2,7 @@ captain-*.mjs
 node_modules/
 dist/
 dist-api/
+dist-calling-bot/
 coverage/
 .auth/
 playwright-report/

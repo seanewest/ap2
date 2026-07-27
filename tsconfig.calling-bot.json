@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": false,
+    "outDir": "dist-calling-bot",
+    "rootDir": "teams-calling-bot",
+    "types": ["node"]
+  },
+  "include": ["teams-calling-bot/**/*.ts"],
+  "exclude": ["teams-calling-bot/**/*.test.ts"]
+}

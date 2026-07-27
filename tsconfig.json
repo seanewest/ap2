@@ -23,6 +23,7 @@
     "e2e",
     "src",
     "scripts",
+    "teams-calling-bot",
     "playwright.cba.config.ts",
     "vite.config.ts",
     "vitest.config.ts"
