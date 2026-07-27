@@ -2,18 +2,15 @@
 
 At each material checkpoint, the Captain checks and updates this docket against repository state and protected evidence. Worker completion is a dependency checkpoint, not a stopping condition; advance the next safe action unless Sean, new authority, or an external wait is required.
 
-## Active
-
-- **Standalone Intune canary:** Current truth is protected local evidence, not code on `main`. The approved shape uses an East US Zone 2 Windows 11 Enterprise `Standard_D2s_v3` VM, private NIC, Bastion Basic, Entra login, and learner user-context enrollment. The lane is active under R1 authority for corrected reconciliation and isolated-deploy work; no deployment, learner sign-in, Intune enrollment, or endpoint success is claimed.
-
 ## Waiting for Sean
 
+- **Standalone Intune learner checkpoint:** The canary is deployed and reconciled in one isolated marked run, and automatic expiry deletion is active. Sean owns the single Bastion sign-in because human-visible learner evidence cannot be delegated; the expected outcome is reaching the Windows session, and the stop rule is the first authentication or access failure without configuration changes or repeated attempts. Intune enrollment and Defender onboarding are not yet proven.
 - **Teams chat remediation:** Retained-chat learner visibility passed. Remediation waits for Sean to remove only Marge; agents then perform one admin membership read. The private cleanup identity and live evidence remain protected outside Git.
 - **Teams call:** Reusable Call Canary code is merged to `main`, and call-disabled deployment/readiness passed. Live calling remains disabled; one bounded call waits for Sean's explicit GO. Protected deployment and learner evidence remain outside Git.
 
 ## Ready next
 
-- **Repository integration:** Call Canary code and Captain/liveness guidance are merged to `main`. The unified policy/docket branch is the only current repository-integration action; protected live evidence remains outside Git.
+- **Agent tooling cutover:** Sanitized reusable source is published in the private `seanewest/codex-agent-tools` repository. Agents own the separate live-installation cutover; repository publication does not prove that the installed runtime changed.
 
 ## Parked
 
