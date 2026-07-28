@@ -109,13 +109,16 @@ they are not additional tenant capabilities.
 - **Cleanup means no active AP2 artifact or effect.** It does not erase
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
   deleted-policy history.
-- A fresh subscription-scoped AVD readiness read returned
-  `Microsoft.DesktopVirtualization: NotRegistered`. Provider registration was
-  not authorized, so no host pool, application group, workspace, session host,
-  role assignment, enrollment object, Defender policy, or other run state was
-  created. The protected AVD personal-host design remains planning-only;
-  image, SKU, quota, price, RBAC, network, enrollment, and Defender contracts
-  were not refreshed past this decisive gate.
+- One reviewed direct provider request registered
+  `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
+  That provider and possible Microsoft provider-identity residue are accepted
+  and must not be removed. Fresh AVD/image/SKU/quota/price/Azure-RBAC/network
+  readiness passed, but the Dev actor lacks the Intune configuration write and
+  managed-device write permissions required to create/delete the run EDR
+  policy and delete the exact Intune device during cleanup. No host pool,
+  application group, workspace, session host, role assignment, enrollment
+  object, Defender policy, or billable resource was created; the protected AVD
+  personal-host design remains planning-only.
 - The delivered email and cancelled attendee calendar copies are intentionally
   retained. OneDrive and SharePoint deletion can retain recycle-bin content.
 - One harmless marker message remains in Cory's Inbox and was observed read.
