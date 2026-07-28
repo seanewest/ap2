@@ -13,7 +13,7 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Future endpoint automation
 
-- **Preferred future prototype:** One private Azure Virtual Desktop personal, single-session Windows 11 Enterprise host with deployment-time Entra join and Intune enrollment. The protected design remains planning evidence only; provider, image/SKU/quota, RBAC, networking, Defender policy, cost, and cleanup contracts require fresh proof before implementation.
+- **AVD personal prototype — provider gate:** A fresh read in the exact Student lab subscription returned `Microsoft.DesktopVirtualization: NotRegistered`. Provider registration was outside the authorized boundary, so the worker stopped before price/image/SKU/quota refresh or any deployment and created no run-owned state. The protected private, personal single-session Windows 11 Enterprise design remains planning evidence only. The next action requires narrow authorization to register that provider in the exact lab subscription; after it reaches `Registered`, begin a new readiness pass rather than reusing stale downstream contracts.
 - **Later shared-device alternative:** An ordinary disposable Windows VM can use a protected Windows provisioning package for deployment-time join and Intune enrollment. This remains a recorded later experiment, not an executed capability; package/token custody, user-affinity differences, renewal, and any authentication-policy exception remain material boundaries.
 
 ## Cleanup later
