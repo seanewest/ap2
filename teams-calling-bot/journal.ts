@@ -24,8 +24,14 @@ export type ReducedJournalEvent =
   | {
       phase: "create-result";
       httpClass: string;
+      httpStatus?: number;
       state: "active" | "uncertain" | "refused";
       callIdDigest?: string;
+      errorCode?: string;
+      errorMessage?: string;
+      requestId?: string;
+      clientRequestId?: string;
+      responseDate?: string;
     }
   | {
       phase: "callback";

@@ -48,6 +48,119 @@ afterEach(() => {
 });
 
 describe("CallingCanary", () => {
+  it("matches the current one-target service-hosted Graph request", () => {
+    expect(CallingCanary.requestBody(SETTINGS)).toEqual({
+      "@odata.type": "#microsoft.graph.call",
+      callbackUri: SETTINGS.callbackUri,
+      targets: [{
+        "@odata.type": "#microsoft.graph.invitationParticipantInfo",
+        identity: {
+          "@odata.type": "#microsoft.graph.identitySet",
+          user: {
+            "@odata.type": "#microsoft.graph.identity",
+            id: SETTINGS.targetUserId,
+          },
+        },
+      }],
+      requestedModalities: ["audio"],
+      mediaConfig: {
+        "@odata.type": "#microsoft.graph.serviceHostedMediaConfig",
+      },
+    });
+    const body = JSON.stringify(CallingCanary.requestBody(SETTINGS));
+    expect(body).not.toContain('"direction"');
+    expect(body).not.toContain('"subject"');
+    expect(body).not.toContain('"source"');
+    expect(body).not.toContain("removeFromDefaultAudioGroup");
+  });
+
+  it("retains bounded sanitized Graph refusal diagnostics", async () => {
+    const journal = new MemoryJournal();
+    const secretToken = "eyJheader.payload.signature";
+    const targetId = "11111111-1111-4111-8111-111111111111";
+    const requestId = "22222222-2222-4222-8222-222222222222";
+    const clientRequestId = "33333333-3333-4333-8333-333333333333";
+    const responseDate = "Tue, 28 Jul 2026 22:00:00 GMT";
+    const canary = new CallingCanary(
+      SETTINGS,
+      journal,
+      new OneToken(),
+      async () => new Response(JSON.stringify({
+        error: {
+          code: "BadRequest",
+          message:
+            `Target ${targetId} cory@example.test ${secretToken} ` +
+            "https://graph.microsoft.com/private failed",
+          innerError: {
+            "request-id": "body-request-id-must-not-win",
+          },
+        },
+        sensitiveBody: "must-not-be-retained",
+      }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "request-id": requestId,
+          "client-request-id": clientRequestId,
+          date: responseDate,
+        },
+      }),
+    );
+
+    await expect(canary.run()).resolves.toEqual({
+      outcome: "refused",
+      terminalCallback: false,
+    });
+    expect(journal.entries).toContainEqual({
+      phase: "create-result",
+      httpClass: "4xx",
+      httpStatus: 400,
+      state: "refused",
+      errorCode: "BadRequest",
+      errorMessage:
+        "Target [redacted-id] [redacted-email] [redacted-token] " +
+        "[redacted-url] failed",
+      requestId,
+      clientRequestId,
+      responseDate,
+    });
+    const retained = JSON.stringify(journal.entries);
+    expect(retained).not.toContain(targetId);
+    expect(retained).not.toContain("cory@example.test");
+    expect(retained).not.toContain(secretToken);
+    expect(retained).not.toContain("graph.microsoft.com");
+    expect(retained).not.toContain("must-not-be-retained");
+  });
+
+  it("does not retain an oversized or malformed Graph error body", async () => {
+    const journal = new MemoryJournal();
+    const canary = new CallingCanary(
+      SETTINGS,
+      journal,
+      new OneToken(),
+      async () => new Response("x".repeat(16_385), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "request-id": "safe-correlation",
+        },
+      }),
+      { ...FAKE_CLOCK, callWindowMs: 0 },
+    );
+
+    await expect(canary.run()).resolves.toEqual({
+      outcome: "uncertain",
+      terminalCallback: false,
+    });
+    expect(journal.entries).toContainEqual({
+      phase: "create-result",
+      httpClass: "5xx",
+      httpStatus: 503,
+      state: "uncertain",
+      requestId: "safe-correlation",
+    });
+  });
+
   it("rings for 15 seconds, hangs up once, and requires a terminal callback", async () => {
     vi.useFakeTimers();
     const journal = new MemoryJournal();

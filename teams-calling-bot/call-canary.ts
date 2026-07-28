@@ -11,6 +11,8 @@ const GRAPH_CALLS_URL =
 const CALL_WINDOW_MS = 15_000;
 const CALLBACK_WINDOW_MS = 20_000;
 const REQUEST_TIMEOUT_MS = 10_000;
+const MAX_GRAPH_ERROR_BYTES = 16_384;
+const MAX_GRAPH_ERROR_MESSAGE_LENGTH = 512;
 
 export interface CallingCanarySettings {
   targetUserId: string;
@@ -202,6 +204,7 @@ export class CallingCanary {
 
     let response: Response | undefined;
     let body: unknown;
+    let graphError: GraphErrorEvidence = {};
     try {
       response = await this.#request(GRAPH_CALLS_URL, {
         method: "POST",
@@ -210,7 +213,11 @@ export class CallingCanary {
         headers: this.#headers(true),
         body: JSON.stringify(CallingCanary.requestBody(this.#settings)),
       });
-      body = response.status === 201 ? await safeJson(response) : undefined;
+      if (response.status === 201) {
+        body = await safeJson(response);
+      } else {
+        graphError = await reducedGraphError(response);
+      }
     } catch {
       // A transport failure is uncertain and is never retried.
     }
@@ -220,24 +227,27 @@ export class CallingCanary {
       this.#append({
         phase: "create-result",
         httpClass: "2xx",
+        httpStatus: response.status,
         state: "active",
         callIdDigest: this.#callIdDigest,
       });
     } else if (response && response.status >= 400 && response.status < 500 &&
       ![408, 425, 429].includes(response.status)) {
-      await discard(response);
       this.#append({
         phase: "create-result",
         httpClass: "4xx",
+        httpStatus: response.status,
         state: "refused",
+        ...graphError,
       });
       return { outcome: "refused", terminalCallback: false };
     } else {
-      if (response) await discard(response);
       this.#append({
         phase: "create-result",
         httpClass: httpClass(response?.status),
+        ...(response ? { httpStatus: response.status } : {}),
         state: "uncertain",
+        ...graphError,
       });
       const remaining = this.#remainingCallWindow();
       await this.#waitFor(() => Boolean(this.#callId), remaining);
@@ -523,6 +533,158 @@ function hasCallId(value: unknown): value is { id: string } {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+interface GraphErrorEvidence {
+  errorCode?: string;
+  errorMessage?: string;
+  requestId?: string;
+  clientRequestId?: string;
+  responseDate?: string;
+}
+
+async function reducedGraphError(
+  response: Response,
+): Promise<GraphErrorEvidence> {
+  const evidence: GraphErrorEvidence = {};
+  const headerRequestId = safeCorrelationId(response.headers.get("request-id"));
+  const headerClientRequestId = safeCorrelationId(
+    response.headers.get("client-request-id"),
+  );
+  const headerDate = safeResponseDate(response.headers.get("date"));
+  if (headerRequestId) evidence.requestId = headerRequestId;
+  if (headerClientRequestId) evidence.clientRequestId = headerClientRequestId;
+  if (headerDate) evidence.responseDate = headerDate;
+
+  const text = await readLimitedText(response, MAX_GRAPH_ERROR_BYTES);
+  if (text === undefined) return evidence;
+
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return evidence;
+  }
+  if (!isRecord(body) || !isRecord(body.error)) return evidence;
+
+  const errorCode = safeErrorCode(body.error.code);
+  const errorMessage = safeErrorMessage(body.error.message);
+  if (errorCode) evidence.errorCode = errorCode;
+  if (errorMessage) evidence.errorMessage = errorMessage;
+
+  const innerError = isRecord(body.error.innerError)
+    ? body.error.innerError
+    : isRecord(body.error.innererror)
+    ? body.error.innererror
+    : undefined;
+  if (!innerError) return evidence;
+
+  if (!evidence.requestId) {
+    const requestId = safeCorrelationId(innerError["request-id"]);
+    if (requestId) evidence.requestId = requestId;
+  }
+  if (!evidence.clientRequestId) {
+    const clientRequestId = safeCorrelationId(innerError["client-request-id"]);
+    if (clientRequestId) evidence.clientRequestId = clientRequestId;
+  }
+  if (!evidence.responseDate) {
+    const responseDate = safeResponseDate(innerError.date);
+    if (responseDate) evidence.responseDate = responseDate;
+  }
+  return evidence;
+}
+
+async function readLimitedText(
+  response: Response,
+  maximumBytes: number,
+): Promise<string | undefined> {
+  const declaredLength = response.headers.get("content-length");
+  if (
+    declaredLength !== null &&
+    (!/^\d+$/.test(declaredLength) ||
+      Number(declaredLength) > maximumBytes)
+  ) {
+    await discard(response);
+    return undefined;
+  }
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      length += chunk.value.byteLength;
+      if (length > maximumBytes) {
+        await reader.cancel();
+        return undefined;
+      }
+      chunks.push(chunk.value);
+    }
+  } catch {
+    try {
+      await reader.cancel();
+    } catch {
+      // The response is intentionally not retried.
+    }
+    return undefined;
+  }
+
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function safeErrorCode(value: unknown): string | undefined {
+  return typeof value === "string" && /^[A-Za-z0-9_.-]{1,128}$/.test(value)
+    ? value
+    : undefined;
+}
+
+function safeErrorMessage(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const message = value
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\bBearer\s+\S+/gi, "[redacted-token]")
+    .replace(/\beyJ[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){1,2}\b/g, "[redacted-token]")
+    .replace(/https?:\/\/[^\s]+/gi, "[redacted-url]")
+    .replace(
+      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+      "[redacted-email]",
+    )
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+      "[redacted-id]",
+    )
+    .replace(/\+?\d[\d ().-]{8,}\d/g, "[redacted-number]")
+    .replace(/\s+/g, " ")
+    .trim();
+  return message ? message.slice(0, MAX_GRAPH_ERROR_MESSAGE_LENGTH) : undefined;
+}
+
+function safeCorrelationId(value: unknown): string | undefined {
+  return typeof value === "string" &&
+      value.length > 0 &&
+      value.length <= 128 &&
+      /^[A-Za-z0-9._-]+$/.test(value)
+    ? value
+    : undefined;
+}
+
+function safeResponseDate(value: unknown): string | undefined {
+  return typeof value === "string" &&
+      value.length > 0 &&
+      value.length <= 64 &&
+      /^[A-Za-z0-9,:+ .-]+$/.test(value) &&
+      Number.isFinite(Date.parse(value))
+    ? value
+    : undefined;
 }
 
 async function safeJson(response: Response): Promise<unknown> {
