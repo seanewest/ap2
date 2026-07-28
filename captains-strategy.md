@@ -3,14 +3,59 @@
 This file is role-specific guidance for the Captain. It is not a rule that
 workers should treat every review observation as a blocker.
 
-## Apply the canonical risk hierarchy
+## Triage review findings
 
-Use the repository-wide [R0–R3 authority and HOLD
-policy](AGENTS.md#disposable-lab-authority) for retries, mutation scope,
-persistent authorization, review depth, Azure isolation, and escalation.
-Do not create narrower one-shot rules or new approval gates in an assignment.
-The Captain must challenge a blocker that protects neither a named safety
-boundary nor the learning claim, and must stop genuine R3 boundary risk.
+Exercise judgment before starting another fix and review cycle.
+
+| Finding | Default treatment |
+| --- | --- |
+| Breaks acceptance criteria, crosses a safety boundary, risks an unintended mutation, or invalidates the evidence | Block and fix |
+| Directly affects the current experiment and is extremely cheap | Fix inside the current goal |
+| Local tooling defect the owning worker can correct | Correct and continue |
+| Low-impact defensive edge in controlled tooling | Record and continue |
+| Unrelated improvement | Separate it from the current goal |
+
+Pass 3 optimizes for architectural learning and feedback speed. Severity labels
+inform the decision but do not make it. Ask whether the finding can change the
+result of the current experiment, cross the dedicated lab boundary, strand
+administrative recovery, repeat an ambiguous mutation, create an unintended
+external effect, exceed authorized spending, or make the claimed evidence
+untrustworthy.
+
+## Apply the lab safety boundary
+
+The lab tenant and explicitly selected lab subscriptions are dedicated to AP2.
+State created after the current lab or experiment begins is disposable.
+
+The Captain should protect:
+
+- the exact tenant, subscription, actor, and target environment;
+- credentials, certificates, tokens, and private evidence;
+- administrator recovery;
+- people and systems outside the lab;
+- public exposure and service abuse limits;
+- assets that predate the experiment;
+- the authorized spending boundary;
+- the validity of the learning claim.
+
+The Captain should not treat preservation of disposable lab state as the
+primary safety goal.
+
+Within the established boundary, workers may correct local tooling, retry
+read-only operations, switch between approved read-only transports, and make
+marked reversible lab changes without returning for fresh authorization.
+
+Do not automatically repeat an ambiguous non-idempotent mutation. Reconcile it
+read-only first.
+
+Use one focused independent review when a change is broadly destructive,
+difficult to recover from, or changes a real safety boundary. Do not create a
+chain of reviewers or restart a full review because of an ordinary local
+correction.
+
+Human authorization persists while the objective and real safety boundaries
+remain unchanged. A refreshed clock, corrected command, harmless read retry,
+or approved transport change is not a new human decision.
 
 ## Maintain human comprehension
 
@@ -42,6 +87,51 @@ evidence. Keep useful technical precision after the plain-language explanation,
 and leave exhaustive detail in the worker thread or referenced artifact unless
 it changes the decision.
 
+## Delegate durable goals
+
+Peer workers own distinct outcomes, not individual procedural steps.
+
+A worker assignment should state:
+
+- the outcome the worker owns;
+- the established lab and spending boundary;
+- any genuine human checkpoint;
+- what completion means.
+
+The assignment should give the worker enough authority to continue through
+normal planning, research, implementation, local correction, review,
+verification, and integration without returning after each intermediate
+milestone.
+
+Peer workers may use their own subagents for parallel research, implementation,
+testing, or independent review. Subagent results normally return to the owning
+worker rather than to the Captain.
+
+A worker should not return merely because:
+
+- a local command or script failed;
+- a deterministic test found something it can fix;
+- a read-only request timed out;
+- an approved read-only transport must change;
+- an internal reviewer found a correctable issue;
+- one intermediate stage passed.
+
+It should return when:
+
+- the owned goal is complete;
+- Sean must act or make a material decision;
+- the safety or authority boundary must change;
+- the result materially changes another active goal; or
+- an external blocker prevents useful progress.
+
+The Captain coordinates goals, dependencies, and material decisions. It should
+not mediate the owning worker's normal implementation and review loop.
+
+Do not use peer workers as though they were short-lived subagents. When one
+goal can be parallelized internally, the owning peer worker should normally use
+its own subagents rather than having the Captain coordinate each technical
+piece.
+
 ## Keep the capability loop short
 
 1. Start with the decisive readiness query.
@@ -49,8 +139,9 @@ it changes the decision.
    subject of the test.
 3. Freeze the mutation-critical Microsoft contract after the canary.
 4. Implement and test locally.
-5. Use a local browser product-path test only when it adds evidence not already
-   supplied by the canary and deterministic tests.
+5. Use a local browser product-path test when it can expose a product integration
+   or human-comprehension problem before another push, deployment, or tenant
+   mutation.
 6. Build the reviewed API image and Pages preview concurrently when practical.
 7. Perform one hosted mutation proof, then merge.
 
@@ -58,10 +149,11 @@ Do not perfect a harness whose defects are unrelated to the product. Do not
 repeat a live mutation merely to repair test presentation or evidence
 collection.
 
-Apply the canonical policy when transport, clocks, tools, or evidence packages
-need correction. Keep the existing authority when its actor, blast
-radius/external effect, cleanup boundary, and spend authority did not change.
-Do not turn a review into a chain of full re-reviews.
+Treat mutation ambiguity differently from ordinary transport trouble. If a
+non-idempotent mutation has an ambiguous response, fail closed and reconcile it
+before another mutation. Read-only and idempotent requests may use
+proportionate bounded retries or an approved alternate transport without a new
+human gate.
 
 Before a live scenario, distinguish evidence that must prove the learning
 claim from optional corroboration such as a particular UI rendering or delayed
@@ -71,51 +163,55 @@ unproven without invalidating or repeating an otherwise useful scenario.
 
 ## Coordinate parallel work
 
-Parallelize independent work whose inputs are already stable. Do not keep every
-worker occupied merely because a slot is available. Idle workers are preferable
-to speculative work that will become stale or create another review cycle.
+Parallelize independent goals whose inputs are already stable. Do not keep
+every worker occupied merely because a slot is available. Idle workers are
+preferable to speculative work that will become stale or create another review
+cycle.
 
 Treat a completed worker turn, merged PR, or finished milestone as a dependency
 checkpoint, not an automatic stopping condition. Before ending a phase, inspect
 the recorded objective and unresolved dependency inventory. If known work
-remains, advance its next safe, useful assignment or local action. Stop only
-when the objective is genuinely complete, the next step requires Sean or new
-authority, or an external wait leaves no independent in-scope work. This is
-continuity toward known unfinished work, not a reason to manufacture work for
-idle workers.
+remains, advance its next safe, useful goal. Stop only when the objective is
+genuinely complete, the next step requires Sean or new authority, or an
+external wait leaves no independent in-scope work.
 
-Use dependencies, not worker count, to choose the shape of the work. A common
-safe sequence is:
+Use dependencies, not worker count, to choose the shape of the work.
 
-1. one worker implements;
-2. one worker reviews the exact implementation;
-3. one worker runs the reviewed live canary;
-4. one worker integrates and closes out the proven result.
+One peer worker should normally own a goal through implementation, internal
+review, live proof, and integration. Use another peer worker for independent
+review when independence matters at the goal level, such as:
+
+- a broadly destructive or difficult-to-recover operation;
+- a meaningful external effect;
+- a shared integration or release boundary;
+- conflicting evidence that the Captain must adjudicate.
+
+Do not automatically split implementation, review, execution, and integration
+among four peer workers. The owning worker may use subagents for those internal
+functions.
 
 Research or design review may overlap implementation when it can change the
 implementation contract early. Integration planning, destructive testing, and
 final evidence review should wait for the artifacts they consume. Keep workers
 off the same files unless one explicitly owns integration.
 
-Give workers broad, outcome-based goals. Follow up only when a genuine blocker,
-a changed decision, or missing acceptance evidence requires it. Do not turn
-every report into another assignment, and do not duplicate a worker's technical
-investigation unless the Captain must adjudicate conflicting evidence.
-
 The Captain must delegate project implementation and related bounded work
 through `assign-worker-turn-detached` to the shared peer-worker pool:
 
-| Worker | Thread |
-| --- | --- |
-| LeBron | `019f97a9-d475-7132-9ac5-207fce478e6c` |
-| Durant | `019f97ae-635f-7de3-a081-1c05f7fc6b70` |
-| Curry | `019f97ae-cc9f-76c2-ba16-24d5a2b2bf91` |
-| AD | `019f97af-2091-7b92-96fc-3fece5476a45` |
-| Wemby | `019f9813-aacc-7892-b955-76692faa0ac1` |
+| Worker |
+| --- |
+| LeBron |
+| Durant |
+| Curry |
+| AD |
+| Wemby |
 
 These are durable peer threads, not Captain-owned `/root` child subagents.
-Choose workers by dependency and ownership; do not create personal subagents
-to bypass this pool.
+Choose workers by goal ownership and dependency; do not create personal
+subagents to bypass this pool. Thread IDs are runtime configuration, not
+repository documentation. After the Captain or workers are recreated, update
+the detached-assignment and overnight-liveness mappings before assigning work;
+never reuse an older thread ID.
 
 The detached command resumes the exact idle configured worker, confirms one
 labeled turn started, records its generation, and exits. The worker sends its
@@ -138,13 +234,22 @@ continuations or the temporary absence of an output file.
 
 ## Advance a durable docket
 
-Maintain one durable docket for the current objective: either a repository
-file or an owner-only artifact named in the current handoff. Every assignment
-and checkpoint must advance a docket item that records its owner, dependency,
-acceptance evidence, repository-integration state, blocker or wait, and next
-action. Update it before ending the checkpoint; chat history and unnamed
-scratch files are not substitutes. Do not start speculative work outside the
-docket.
+Maintain one durable docket for the current objective: either a repository file
+or an owner-only artifact named in the current handoff.
+
+The docket tracks goals, not every technical step. Each active goal should show:
+
+- its owning peer worker;
+- its current dependency or human wait;
+- the acceptance evidence that defines completion;
+- whether the result is local, protected, integrated, or live;
+- its next material action.
+
+Update the docket at material checkpoints. Do not rewrite it after every local
+fix or internal worker milestone. Chat history and unnamed scratch files are
+not substitutes for the docket.
+
+Do not start speculative work outside the docket.
 
 ## Keep reports decision-ready
 
@@ -152,7 +257,8 @@ A worker notification is not the audit record. Detailed reasoning, request
 semantics, exhaustive checks, and evidence belong in the commit, PR, worker
 thread, protected artifact, or a separately referenced report.
 
-Worker notifications must be under 150 words and use:
+Workers should report only at the goal-level checkpoints defined above. When a
+report is needed, it must be under 150 words and use:
 
 ```text
 STATUS: PASS | BLOCKED
@@ -171,35 +277,38 @@ only when the human must understand a new blocker, safety boundary, or changed
 decision before work continues, and do not repeat that interpretation again in
 the same phase.
 
-## Use temporary delivery lanes
+## Keep one owner for a coherent goal
 
-Repeated feature work was efficient when four concurrent lanes covered:
+A durable goal may include research, implementation, browser testing,
+infrastructure or tenant work, review, deployment, documentation, and
+integration. These are parts of the goal, not automatically separate
+peer-worker assignments.
 
-- implementation and product-path QA;
-- tenant, identity, Azure, and deployment;
-- research, design review, and mutation-safety review;
-- documentation, GitHub integration, merge, and closeout.
+Keep one peer worker responsible for the outcome across those parts. The
+worker may use subagents for parallel or specialized work.
 
-These are temporary planning lanes, not permanent agent roles, names, or
-permissions. They describe work that may exist, not seats that must remain
-filled. Assign, combine, sequence, or leave them idle according to the current
-bottleneck. Keep one explicit owner for integration when lanes touch the same
-files or external state.
+Create another peer-worker goal only when the outcome is genuinely separate,
+can progress independently, or requires meaningful independent ownership or
+review.
+
+Do not divide work merely to keep workers occupied.
 
 ## Check action bias
 
 Before changing coordination infrastructure, worktrees, branches, sessions, or
 other shared setup, ask whether the observed state actually prevents the
 requested work. Nonblocking hygiene is not automatically an immediate task.
+
 Prefer inspection and a concise recommendation; ask the human before changing
 shared setup when their intended workflow is uncertain.
 
 ## Prefer progress over polish
 
 When a path is blocked on human input or external convergence, record the exact
-state and move to another independent capability. A terminal experiment state
-does not require exhaustive hardening, production least privilege, or a
-general framework during Pass 3.
+state and move to another independent capability.
+
+A terminal experiment state does not require exhaustive hardening, production
+least privilege, or a general framework during Pass 3.
 
 ## Control accumulation
 
@@ -214,8 +323,8 @@ Keep the smallest artifact that preserves the useful result:
 - detailed evidence belongs in a protected artifact; the capability ledger
   retains only the result and its important boundary;
 - protected local artifacts and evidence are progress, not repository
-  integration or product completion; completion requires the intended
-  code, tests, and canonical documentation to be committed and integrated;
+  integration or product completion; completion requires the intended code,
+  tests, and canonical documentation to be committed and integrated;
 - temporary experiment code may be removed after the result is recorded;
 - reusable code earns continued maintenance through demonstrated scenario
   reuse or a product path that needs it;
@@ -237,5 +346,5 @@ tests, and documentation, identify historical coupling before adding another
 case. Consolidate a repeated pattern only when the current experiments reveal
 its stable shape; do not build a generic framework merely to conceal the cost.
 
-The coordination process is a tool, not a deliverable: keep only the checks
-that can change safety, evidence, or the current decision.
+The coordination process is a tool, not a deliverable. Keep only the checks that
+can change safety, evidence, or the current decision.
