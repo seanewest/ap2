@@ -4,6 +4,12 @@ This isolated service implements one startup-only, non-retried 1:1 Teams audio
 call. It exposes only `GET /health` and authenticated
 `POST /callbacks/calls`. It has no public call trigger.
 
+The create request follows Microsoft Graph's current one-target,
+service-hosted peer-to-peer example. Group-call sample fields such as
+`direction`, `subject`, explicit `source`, and
+`removeFromDefaultAudioGroup` are intentionally absent. See the
+[post-canary contract decision](../docs/teams-call-canary-diagnostic.md).
+
 All deployment-specific values are required at runtime:
 
 - `TEAMS_CALLING_BOT_TENANT_ID`
@@ -36,6 +42,11 @@ read-only readiness checks, deploy a new uniquely marked revision with
 exclusive journal, acquire one token, and possibly place the call. A routing
 timeout or mismatch creates no journal and sends no Graph request; a restart
 after dispatch sees the retained journal and fails closed.
+
+A Graph refusal records only the exact HTTP status, bounded sanitized Microsoft
+error code/message, and safe request correlation. It never records the raw
+response body or token; oversized bodies and sensitive identifiers in error
+messages are discarded or redacted.
 
 Build the rootless image with `teams-calling-bot/Dockerfile`. Create a personal
 Teams app package outside Git after the dedicated app and callback hostname

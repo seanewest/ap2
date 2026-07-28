@@ -1,0 +1,107 @@
+# Teams Call Canary diagnostic
+
+This note records the post-canary contract decision. It does not authorize a
+call. The first canary retained only a definitive pre-identity `4xx` class, so
+it proves that no call existed but cannot prove a root cause.
+
+## Current one-target Graph contract
+
+Microsoft's current
+[create call](https://learn.microsoft.com/en-us/graph/api/application-post-calls?view=graph-rest-1.0)
+Example 1 is the applicable service-hosted peer-to-peer shape:
+
+| Field | Current implementation | Contract decision |
+| --- | --- | --- |
+| `@odata.type` | Present | Matches the example |
+| HTTPS `callbackUri` | Present | Required callback for call events |
+| One invitation target | Present | Required peer-to-peer target |
+| Target `identity.user.id` | Present | Fixed Cory object ID |
+| Target `displayName` | Absent | Optional presentation field |
+| `requestedModalities: ["audio"]` | Present | Audio only |
+| Service-hosted `mediaConfig` | Present | Required media configuration |
+| `callOptions` | Absent | Optional; no recording, transcription, or content sharing requested |
+
+The `direction`, `subject`, explicit application `source`, and
+`removeFromDefaultAudioGroup` fields appear in Microsoft's multi-target group
+call example, not the one-target example. `direction` is also documented as a
+read-only property on the [call
+resource](https://learn.microsoft.com/en-us/graph/api/resources/call?view=graph-rest-1.0).
+Adding that group-call shape would not be a correction to this peer-to-peer
+request and could require the broader `Calls.InitiateGroupCall.All`
+permission.
+
+`Calls.Initiate.All` remains the least-privileged application permission for
+an app-originated one-to-one call without a signed-in originator. The current
+[calling-bot registration
+contract](https://learn.microsoft.com/en-us/microsoftteams/platform/bots/calls-and-meetings/registering-calling-bot)
+also requires a calling-enabled Teams channel, HTTPS calling webhook, calling
+manifest flag, and administrator-consented permission.
+
+## Failure diagnosis and retained evidence
+
+The earlier journal intentionally discarded the response body and retained
+only `4xx`. Consequently, malformed input, a service-side eligibility or
+policy decision, and a transient bot-registration/configuration mismatch
+cannot be distinguished honestly. The suggested missing-field cause is now
+disfavored because the prior body already matches the current one-target
+example.
+
+Future create responses retain only:
+
+- the exact HTTP status;
+- a bounded Microsoft error code and sanitized message;
+- safe `request-id`, `client-request-id`, and response date correlation;
+- the existing reduced state and digested call identity, if one exists.
+
+Bodies over 16 KiB are discarded. Tokens, raw bodies, URLs, email addresses,
+UUIDs, phone-like numbers, control characters, and token-like values are not
+retained in the error message.
+
+## Live call-disabled readiness
+
+On 2026-07-28, read-only checks reconfirmed the exact dedicated app and service
+principal, sole current certificate, sole `Calls.Initiate.All`, fixed Cory
+installation, application-only bot token, Azure Bot F0 identity, calling-enabled
+Teams channel, and exact HTTPS calling webhook. Cory is Teams-only, licensed
+for Teams, and the effective global calling policy has private calling
+enabled.
+
+The diagnostic image is running only on
+`ca-ap2-call-18f4cc8ae5--diagnostic-2215`. It has one ready replica,
+`TEAMS_CALLING_BOT_RUN_CANARY=false`, the expected image/callback/target,
+trusted TLS, and a fresh absent journal. No call-enabled revision or call was
+created.
+
+## Authentic artifact options
+
+| Path | Authentic artifact | Human session | Material dependencies |
+| --- | --- | --- | --- |
+| Graph cloud-communications bot | Incoming call and possibly a native missed-call history row | No originator sign-in; Cory signed in and deliberately does not answer | Existing bot and `Calls.Initiate.All`; learner UI observation remains necessary because Graph does not promise the history row |
+| Graph bot to Cloud Voicemail | Native voicemail if this bot call is routed and a prompt is recorded | No originator sign-in; Cory must not answer | Separate longer authorization; Cory currently has voicemail enabled, `RegularVoicemail`, and a 20-second unanswered delay; actual bot-to-voicemail routing remains unproven |
+| ACS Teams Phone Extensibility | Branded service/resource-account call | No human originator; Cory signed in and does not answer | Preview surface, ACS resource and usage spend, resource account, Teams Phone/enterprise-voice and possible number/PSTN dependencies |
+| ACS as a Teams user | Native call attributed to a licensed user | Originator must authenticate and keep a custom-client session; Cory signed in and does not answer | Delegated Teams permissions, ACS resource/usage, Teams-user calling prerequisites |
+| Controlled Teams client | Native user-to-user missed call | Licensed originator signed in and confirms the call; Cory signed in and does not answer | Supported client/deep-link path, but unattended UI automation is not established as a supported calling API and is session-fragile |
+| Clearly labeled AP2 narrative | Honest application event/story | Cory signs in only to view it in Teams | Cannot be described as a Teams call, missed call, voicemail, or audit record |
+
+The ACS distinctions follow Microsoft's
+[Teams interoperability](https://learn.microsoft.com/en-us/azure/communication-services/concepts/interop/teams-interop),
+[Teams-user identity](https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/manage-teams-identity),
+and [Teams Phone Extensibility](https://learn.microsoft.com/en-us/azure/communication-services/quickstarts/tpe/teams-phone-extensibility-server-outbound-call)
+contracts. Cloud Voicemail behavior and policy values are described in
+[Cloud Voicemail setup](https://learn.microsoft.com/en-us/microsoftteams/set-up-phone-system-voicemail)
+and the
+[Teams calling policy](https://learn.microsoft.com/en-us/microsoftteams/teams-calling-policy).
+
+## Next canary
+
+Prefer one newly authorized Graph bot missed-call canary. There is no signed-in
+originator. Cory should be signed into Teams and deliberately not answer.
+Expect at most one incoming audio call and, after it ends, a possible native
+missed-call row. Stop at the existing approximately 15-second absolute
+deadline, or immediately on refusal, uncertainty, or abort; never retry. Then
+return to a newly verified literal-false revision. Sean's observed Teams UI is
+required to make the missed-call learning claim.
+
+Voicemail is a different experiment. It needs a separately authorized window
+longer than Cory's proven 20-second unanswered delay and a prompt plan; it must
+not be inferred from the 15-second canary.
