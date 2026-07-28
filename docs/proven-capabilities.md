@@ -109,6 +109,13 @@ they are not additional tenant capabilities.
 - **Cleanup means no active AP2 artifact or effect.** It does not erase
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
   deleted-policy history.
+- A fresh subscription-scoped AVD readiness read returned
+  `Microsoft.DesktopVirtualization: NotRegistered`. Provider registration was
+  not authorized, so no host pool, application group, workspace, session host,
+  role assignment, enrollment object, Defender policy, or other run state was
+  created. The protected AVD personal-host design remains planning-only;
+  image, SKU, quota, price, RBAC, network, enrollment, and Defender contracts
+  were not refreshed past this decisive gate.
 - The delivered email and cancelled attendee calendar copies are intentionally
   retained. OneDrive and SharePoint deletion can retain recycle-bin content.
 - One harmless marker message remains in Cory's Inbox and was observed read.
