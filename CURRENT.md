@@ -4,7 +4,6 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Paused human checkpoints
 
-- **Teams chat remediation:** Learner visibility passed, and the retained chat is paused before removing only Marge. If Sean performs that learner action later, an agent should make one bounded admin membership read; the message and other participants remain untouched.
 - **Teams Call Canary:** Reusable code is merged and the bot is deployed healthy with calling disabled. No call has occurred. The lane is paused before Sean's explicit GO for one bounded call.
 
 ## Tooling prerequisite
@@ -22,6 +21,11 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- The retained Teams chat learner remediation is complete. Sean removed only
+  Marge once; one exact post-action membership read proved Cory, Homer, and
+  Kobe retained and Marge absent, while protected learner evidence showed the
+  original warning message still visible. The chat and message remain for the
+  separately authorized broader cleanup pass.
 - The standalone Bastion canary expired and its isolated marked run was deleted and confirmed absent without any learner sign-in. It proved deployment and cleanup, not Intune enrollment or Defender onboarding.
 - PRs #44 and #45 are merged to `main`; their old branch/handoff actions are not current work.
 - Retained Defender/EICAR mail correlation is complete and agent-proven: the message was blocked/quarantined, Cory's Inbox contained no matching message, and no related alert or incident was found. Never release, preview, download, or open the attachment; any endpoint follow-on belongs to a future separately authorized endpoint lane.
