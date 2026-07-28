@@ -109,6 +109,15 @@ they are not additional tenant capabilities.
 - **Cleanup means no active AP2 artifact or effect.** It does not erase
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
   deleted-policy history.
+- The dedicated Teams Call Canary made its sole authorized audio-only create
+  attempt for Cory, but Microsoft Graph returned a definitive `4xx` before
+  assigning a call identity. No incoming call, callback, or hang-up occurred,
+  so Teams calling is not a proven capability and the attempt must not be
+  repeated. The service ended on one healthy, exact call-disabled replica with
+  literal `TEAMS_CALLING_BOT_RUN_CANARY=false`; its application, sole
+  `Calls.Initiate.All` grant, fixed Cory installation, protected certificate,
+  disabled revisions, exclusive reduced journal, and platform history remain
+  for separately authorized cleanup.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted
