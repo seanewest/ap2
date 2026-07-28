@@ -47,6 +47,7 @@ not mean the operation has been added to the SPA/API product path.
 | Directory-role posture | One beta Graph request expanded directory-role definitions without retaining role names or identities and found zero directory-role assignments for all four fixed simulated users. | Dev diagnostic app | Read-only; the beta response shape is not production-stable, and zero directory roles does not prove absence of workload-specific privilege |
 | Device-registration posture | One app-only metadata read found one enabled Windows device with Workplace registration and approximate activity within 30 days; no device identity or owner was retained. | Dev diagnostic app | Read-only; registration and approximate activity do not prove health, compliance, or current ownership |
 | Empty Azure resource group | Created one tagged, empty Student resource group through ARM, confirmed it contained no resources, and deleted it. | Dev diagnostic app | Later exact GET returned `404` |
+| Azure Virtual Desktop personal host | One private, direct-assigned Windows 11 Enterprise 24H2 host joined Entra and appeared as a compliant Intune MDM device before any learner sign-in. Its AVD agent became `Available`; a marker-only Intune EDR policy produced local Defender onboarding and an exact active/onboarded Defender API record, then a marker-only offboarding policy returned local state to offboarded. The host retained zero sessions throughout. | Dev diagnostic app for Azure, Intune, and Defender orchestration; independent administrator for the bounded temporary permission lifecycle and final Entra-device cleanup | Both EDR policies, the active marker group, Azure resource group, Intune record, and Entra device are absent. Both temporary Graph roles were revoked and are absent from a fresh Dev token. The approximately 64-minute billable lifecycle remained below the USD 4.66920548 eight-hour public-price forecast and USD 8 hard stop; ordinary audit, deleted-group, Intune-report, and Defender device-history residue can remain. |
 | Security group and membership | Created an inert cloud-only security group, later added Kobe, observed him as the sole member after natural propagation time, removed him, observed the group empty, and deleted it. | Dev diagnostic app | Later exact-name read returned zero |
 | User profile field | Set Kobe's `officeLocation` to an AP2 marker and later observed that marker. | Dev diagnostic app | Restored to `null`; later exact read confirmed restoration |
 | User manager | Set Cory as Kobe's manager, later observed the exact relationship, and removed it. | Dev diagnostic app | Later read confirmed no manager |
@@ -126,13 +127,13 @@ they are not additional tenant capabilities.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted
-  and must not be removed. Fresh AVD/image/SKU/quota/price/Azure-RBAC/network
-  readiness passed, but the Dev actor lacks the Intune configuration write and
-  managed-device write permissions required to create/delete the run EDR
-  policy and delete the exact Intune device during cleanup. No host pool,
-  application group, workspace, session host, role assignment, enrollment
-  object, Defender policy, or billable resource was created; the protected AVD
-  personal-host design remains planning-only.
+  and must not be removed. The completed AVD canary temporarily granted the Dev
+  actor only Intune configuration write and managed-device write, then revoked
+  the two captured assignments after cleanup. Complete assignment reads and a
+  fresh Dev token proved both roles absent. Microsoft can retain ordinary
+  provider, audit, deleted-group, Intune-report, and Defender device-history
+  residue; no active run resource, policy, group, device, enrollment record, or
+  temporary permission remains.
 - The delivered email and cancelled attendee calendar copies are intentionally
   retained. OneDrive and SharePoint deletion can retain recycle-bin content.
 - One harmless marker message remains in Cory's Inbox and was observed read.
