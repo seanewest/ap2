@@ -229,6 +229,17 @@ describe("After Party authentication UI", () => {
     expect(simulatedEmailButton()?.textContent).toBe(
       "Send one internal email: Homer → Marge",
     );
+    expect(root.textContent).toContain(
+      "Controlled Teams missed-call observation",
+    );
+    expect(root.textContent).toContain("Evidence producerAP2 instructor");
+    expect(root.textContent).toContain("Workload actorKobe lab user");
+    expect(root.textContent).toContain(
+      "Learner / observerLearner using Cory's lab Teams view",
+    );
+    expect(root.textContent).toContain(
+      "What the learner receivesOne Missed incoming call entry",
+    );
   });
 
   it("restores a signed-in account from cached state", async () => {
