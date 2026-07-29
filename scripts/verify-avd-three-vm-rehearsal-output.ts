@@ -13,18 +13,18 @@ import {
   type RehearsalOutputVerificationFailure,
   type VerifiedRehearsalOutputSummary,
 } from "../src/api/rehearsal-output-verification-contract.ts";
+import {
+  bindRehearsalPlan,
+  declareRehearsalEnvelope,
+  exactRehearsalRecord,
+  inspectBoundedRehearsalValue,
+  parseCanonicalRehearsalJson,
+  REHEARSAL_ONLY_LABEL,
+  REHEARSAL_VERIFIED_LABEL,
+  type SharedRehearsalInvariantFailure,
+} from "../src/scenarios/rehearsal-envelope-invariants.ts";
 
 const MAX_OUTPUT_BYTES = 256 * 1024;
-const SHA256 = /^[a-f0-9]{64}$/;
-const GUID =
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
-const UPN = /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/i;
-const TOKEN_LIKE =
-  /\b(?:Bearer\s+\S+|eyJ[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]+|access[_-]?token|client[_-]?secret|password)\b/i;
-const PRIVATE_PATH =
-  /(?:[A-Za-z]:\\|\/(?:home|mnt|Users|tmp|var)\/|AppData|\\\\Users\\\\)/i;
-const MARKER_LIKE = /\bap2(?:lab)?-[a-z0-9][a-z0-9-]{7,}\b/i;
-const PEM = /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----/;
 
 export type { RehearsalOutputVerificationFailure };
 
@@ -98,7 +98,7 @@ export function canonicalAvdThreeVmRehearsalOutput():
   );
   return {
     schemaVersion: 1,
-    label: "REHEARSAL_ONLY",
+    label: REHEARSAL_ONLY_LABEL,
     status: "completed",
     failure: null,
     planDigestSha256: planStage.plan.digestSha256,
@@ -117,19 +117,11 @@ export function canonicalAvdThreeVmRehearsalOutput():
 export function verifyAvdThreeVmRehearsalOutput(
   value: unknown,
 ): VerifiedRehearsalOutputSummary {
-  let serialized: string | undefined;
-  try {
-    serialized = JSON.stringify(value);
-  } catch {
-    throw new RehearsalOutputVerificationError("INPUT_SHAPE");
-  }
-  if (serialized === undefined) {
-    throw new RehearsalOutputVerificationError("INPUT_SHAPE");
-  }
-  if (Buffer.byteLength(serialized, "utf8") > MAX_OUTPUT_BYTES) {
-    throw new RehearsalOutputVerificationError("INPUT_OVERSIZED");
-  }
-  rejectUnsafeStrings(value);
+  const inputFailure = inspectBoundedRehearsalValue(
+    value,
+    MAX_OUTPUT_BYTES,
+  );
+  if (inputFailure) throw sharedFailure(inputFailure);
   let expected: AvdThreeVmRehearsalResult;
   try {
     expected = canonicalAvdThreeVmRehearsalOutput();
@@ -137,10 +129,7 @@ export function verifyAvdThreeVmRehearsalOutput(
     throw new RehearsalOutputVerificationError("PLAN_BINDING");
   }
   const output = recordLike(value, expected);
-  if (
-    output.schemaVersion !== 1 ||
-    output.label !== "REHEARSAL_ONLY"
-  ) {
+  if (output.schemaVersion !== 1) {
     throw new RehearsalOutputVerificationError("INPUT_SHAPE");
   }
 
@@ -172,16 +161,37 @@ export function verifyAvdThreeVmRehearsalOutput(
     expected.receipt?.missingCoverage,
   );
 
+  const binding = bindRehearsalPlan({
+    scenarioId: AVD_THREE_VM_SCENARIO.id,
+    expectedScenarioId: AVD_THREE_VM_SCENARIO.id,
+    manifestSchemaVersion: AVD_THREE_VM_SCENARIO.schemaVersion,
+    expectedManifestSchemaVersion: AVD_THREE_VM_SCENARIO.schemaVersion,
+    planDigestSha256: output.planDigestSha256,
+    expectedPlanDigestSha256: expected.planDigestSha256!,
+  });
+  if (!binding.ok) throw sharedFailure(binding.failure);
+  const declaration = declareRehearsalEnvelope({
+    label: output.label,
+    status: output.status,
+    failure: output.failure,
+    syntheticValues: [
+      observations.provenance,
+      ...Object.values(
+        observations.terminalInputs as Record<string, unknown>,
+      ),
+      expected.receipt?.binding.observationProvenance,
+      expected.receipt?.binding.cleanup,
+      expected.receipt?.binding.roleAbsence,
+      expected.receipt?.binding.retention,
+    ],
+    externalClaims: {
+      total: receipt.claimCount,
+      uninspected: receipt.uninspectedClaims,
+      nonUninspected: receipt.provenClaims,
+    },
+  });
+  if (!declaration.ok) throw sharedFailure(declaration.failure);
   if (
-    typeof output.planDigestSha256 !== "string" ||
-    !SHA256.test(output.planDigestSha256) ||
-    output.planDigestSha256 !== expected.planDigestSha256
-  ) {
-    throw new RehearsalOutputVerificationError("PLAN_BINDING");
-  }
-  if (
-    output.status !== "completed" ||
-    output.failure !== null ||
     JSON.stringify(stages) !== JSON.stringify(expected.stages)
   ) {
     throw new RehearsalOutputVerificationError("RUN_NONTERMINAL");
@@ -222,14 +232,14 @@ export function verifyAvdThreeVmRehearsalOutput(
   const verifiedReceipt = expected.receipt!;
   return {
     schemaVersion: 1,
-    label: "REHEARSAL_ONLY_VERIFIED",
+    label: REHEARSAL_VERIFIED_LABEL,
     status: "verified",
-    scenarioId: AVD_THREE_VM_SCENARIO.id,
-    planDigestSha256: expected.planDigestSha256!,
-    run: "terminal-complete",
+    scenarioId: binding.value.scenarioId,
+    planDigestSha256: binding.value.planDigestSha256,
+    run: declaration.value.terminalState,
     cleanup: "ordered-complete",
-    observations: "synthetic-only",
-    evidenceClaims: "all-uninspected",
+    observations: declaration.value.observationSource,
+    evidenceClaims: declaration.value.externalEvidence,
     claimCount: verifiedReceipt.claimCount,
     missingCoverageTotal: Object.values(
       verifiedReceipt.missingCoverage,
@@ -240,42 +250,9 @@ export function verifyAvdThreeVmRehearsalOutput(
 export function verifyAvdThreeVmRehearsalOutputText(
   text: string,
 ): VerifiedRehearsalOutputSummary {
-  if (Buffer.byteLength(text, "utf8") > MAX_OUTPUT_BYTES) {
-    throw new RehearsalOutputVerificationError("INPUT_OVERSIZED");
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    throw new RehearsalOutputVerificationError("NON_CANONICAL_JSON");
-  }
-  if (`${JSON.stringify(value, null, 2)}\n` !== text) {
-    throw new RehearsalOutputVerificationError("NON_CANONICAL_JSON");
-  }
-  return verifyAvdThreeVmRehearsalOutput(value);
-}
-
-function rejectUnsafeStrings(value: unknown): void {
-  if (typeof value === "string") {
-    if (
-      GUID.test(value) ||
-      UPN.test(value) ||
-      TOKEN_LIKE.test(value) ||
-      PRIVATE_PATH.test(value) ||
-      MARKER_LIKE.test(value) ||
-      PEM.test(value)
-    ) {
-      throw new RehearsalOutputVerificationError("UNSAFE_CONTENT");
-    }
-    return;
-  }
-  if (Array.isArray(value)) {
-    value.forEach(rejectUnsafeStrings);
-    return;
-  }
-  if (value !== null && typeof value === "object") {
-    Object.values(value).forEach(rejectUnsafeStrings);
-  }
+  const parsed = parseCanonicalRehearsalJson(text, MAX_OUTPUT_BYTES);
+  if (!parsed.ok) throw sharedFailure(parsed.failure);
+  return verifyAvdThreeVmRehearsalOutput(parsed.value);
 }
 
 function recordLike(
@@ -283,16 +260,11 @@ function recordLike(
   expected: unknown,
 ): Record<string, unknown> {
   const keys = objectKeys(expected);
-  if (
-    value === null ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    Object.keys(value).length !== keys.length ||
-    !Object.keys(value).every((key, index) => key === keys[index])
-  ) {
+  const record = exactRehearsalRecord(value, keys);
+  if (record === null) {
     throw new RehearsalOutputVerificationError("INPUT_SHAPE");
   }
-  return value as Record<string, unknown>;
+  return record;
 }
 
 function objectKeys(value: unknown): readonly string[] {
@@ -300,4 +272,15 @@ function objectKeys(value: unknown): readonly string[] {
     throw new RehearsalOutputVerificationError("INPUT_SHAPE");
   }
   return Object.keys(value);
+}
+
+function sharedFailure(
+  category: SharedRehearsalInvariantFailure,
+): RehearsalOutputVerificationError {
+  const mapped: RehearsalOutputVerificationFailure =
+    category === "SYNTHETIC_MISMATCH" ||
+      category === "EXTERNAL_CLAIM_MISMATCH"
+      ? "OBSERVATION_OVERCLAIM"
+      : category;
+  return new RehearsalOutputVerificationError(mapped);
 }

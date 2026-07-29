@@ -68,3 +68,9 @@ the submitted JSON, plan digest, scenario identifier, journal details, proof
 references, backend payloads, or arbitrary labels. The disclosure remains
 explicit: this network-free contract rehearsal proves no live Azure resource,
 endpoint state, learner action, cleanup, or external evidence.
+
+The outer label, canonical JSON, safe-string, plan-binding, terminal, and
+all-uninspected checks use the
+[shared rehearsal envelope invariants](rehearsal-envelope-invariants.md).
+AVD runner-journal, cleanup, observation-count, and receipt-coverage semantics
+remain local to this verifier.
