@@ -74,6 +74,10 @@ The
 which validated scenarios also have repository adapters, rehearsal
 composition, authenticated API/client support, and operator surfaces. It is a
 source-coverage view, not readiness or live proof.
+The
+[help-desk email receipt adapter](help-desk-email-receipt-adapter.md) is a
+post-run local bridge: provider acceptance proves only its operation result,
+while learner and cleanup truth require their separately owned observations.
 
 ## Work inside the lab boundary
 
