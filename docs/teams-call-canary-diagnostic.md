@@ -92,7 +92,7 @@ contracts. Cloud Voicemail behavior and policy values are described in
 and the
 [Teams calling policy](https://learn.microsoft.com/en-us/microsoftteams/teams-calling-policy).
 
-## Next canary
+## Prepared missed-call canary (historical checkpoint)
 
 Prefer one newly authorized Graph bot missed-call canary. There is no signed-in
 originator. Cory should be signed into Teams and deliberately not answer.
