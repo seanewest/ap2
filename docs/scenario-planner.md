@@ -83,3 +83,24 @@ reconnaissance manifests all pass through this same compiler. Tests also cover
 unsafe alias binding, missing cleanup/evidence/interpretation, expired or
 overlong windows, insufficient budget, unsupported responses, retention
 contradictions, deterministic digests, and raw-identifier refusal.
+
+## Authenticated API and typed client
+
+An established AP2 operator can submit the same sanitized request to
+`POST /api/scenario-plan`. The route uses the existing bearer-token verifier
+and operator policy before reading the body. It accepts only
+`application/json`, rejects unknown fields and raw identifiers, caps the
+request at 8 KiB and the response at 64 KiB, and compiles synchronously in
+memory. It has no scenario executor, transport, storage, queue, timer, retry,
+or background-work path.
+
+The typed `HttpAfterPartyApi.compileScenarioPlan` client sends the exact
+planning request and validates the bounded response contract. It maps missing
+authorization, forbidden callers, compiler refusal, oversize data, and other
+isolated failures to fixed categories; arbitrary server text is never exposed
+as a client error.
+
+A returned plan is readiness guidance only. Authentication permits access to
+the compiler, not to any operation described by the plan. The response does
+not authorize, execute, schedule, persist, or prove setup, evidence creation,
+learner activity, response, cleanup, or any other external operation.

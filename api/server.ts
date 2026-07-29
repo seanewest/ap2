@@ -43,6 +43,13 @@ import {
   OPERATION_TELEMETRY_ORDERS,
   type OperationTelemetryReader,
 } from "./operation-telemetry-collector.js";
+import {
+  SCENARIO_PLAN_MAX_REQUEST_BYTES,
+  ScenarioPlanResponseTooLargeError,
+  ScenarioPlanSafeFailureError,
+  type ScenarioPlanService,
+} from "./scenario-plan.js";
+import { ScenarioPlanError } from "../src/scenarios/scenario-plan.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -59,6 +66,7 @@ export interface ApiDependencies {
   draftProofOperation?: DraftProofOperation;
   todoTaskProofOperation?: TodoTaskProofOperation;
   operationTelemetryReader?: OperationTelemetryReader;
+  scenarioPlanService?: ScenarioPlanService;
   allowedOrigin?: string;
 }
 
@@ -118,6 +126,17 @@ async function route(
     return;
   }
 
+  if (request.method === "OPTIONS" && pathname === "/api/scenario-plan") {
+    handleProtectedPreflight(
+      request,
+      response,
+      origin,
+      ["POST"],
+      ["authorization", "content-type"],
+    );
+    return;
+  }
+
   if (
     request.method === "OPTIONS" &&
     pathname === "/api/onedrive-share-proof"
@@ -164,6 +183,10 @@ async function route(
   }
   if (request.method === "POST" && pathname === "/api/help-desk-scenario") {
     await helpDeskScenario(request, response, dependencies);
+    return;
+  }
+  if (request.method === "POST" && pathname === "/api/scenario-plan") {
+    await scenarioPlan(request, response, dependencies);
     return;
   }
 
@@ -237,6 +260,7 @@ function handleProtectedPreflight(
   response: ServerResponse,
   origin: string | undefined,
   methods: readonly ("GET" | "POST" | "DELETE")[],
+  allowedHeaders: readonly string[] = ["authorization"],
 ): void {
   const requestedHeaders = (
     request.headers["access-control-request-headers"] ?? ""
@@ -252,15 +276,22 @@ function handleProtectedPreflight(
         | "POST"
         | "DELETE",
     ) ||
-    requestedHeaders.length !== 1 ||
-    requestedHeaders[0] !== "authorization"
+    requestedHeaders.length !== allowedHeaders.length ||
+    !allowedHeaders.every((header) => requestedHeaders.includes(header))
   ) {
     sendJson(response, 403, { error: "cors_preflight_rejected" });
     return;
   }
 
   response.writeHead(204, {
-    "Access-Control-Allow-Headers": "Authorization",
+    "Access-Control-Allow-Headers": allowedHeaders
+      .map((header) =>
+        header
+          .split("-")
+          .map((part) => part[0]?.toUpperCase() + part.slice(1))
+          .join("-"),
+      )
+      .join(", "),
     "Access-Control-Allow-Methods": methods.join(", "),
     "Cache-Control": "no-store",
   });
@@ -434,6 +465,32 @@ async function handleAuthorizedRequest(
       sendJson(response, 400, { error: "invalid_operation_event_query" });
       return;
     }
+    if (error instanceof ScenarioPlanUnsupportedMediaTypeError) {
+      sendJson(response, 415, { error: "unsupported_media_type" });
+      return;
+    }
+    if (error instanceof ScenarioPlanRequestTooLargeError) {
+      sendJson(response, 413, { error: "request_too_large" });
+      return;
+    }
+    if (error instanceof ScenarioPlanInvalidBodyError) {
+      sendJson(response, 400, { error: "invalid_request_body" });
+      return;
+    }
+    if (error instanceof ScenarioPlanError) {
+      sendJson(response, 400, {
+        error: "scenario_plan_refused",
+        category: error.category,
+      });
+      return;
+    }
+    if (
+      error instanceof ScenarioPlanSafeFailureError ||
+      error instanceof ScenarioPlanResponseTooLargeError
+    ) {
+      sendJson(response, 500, { error: "scenario_plan_failed" });
+      return;
+    }
     if (error instanceof OneDriveProofConflictError) {
       sendJson(response, 409, { error: "proof_state_conflict" });
       return;
@@ -482,6 +539,61 @@ async function handleAuthorizedRequest(
       return;
     }
     throw error;
+  }
+}
+
+class ScenarioPlanUnsupportedMediaTypeError extends Error {}
+class ScenarioPlanRequestTooLargeError extends Error {}
+class ScenarioPlanInvalidBodyError extends Error {}
+
+async function scenarioPlan(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new ScenarioPlanUnsupportedMediaTypeError();
+    }
+    const service = dependencies.scenarioPlanService;
+    if (!service) {
+      throw new ScenarioPlanSafeFailureError();
+    }
+    return service.compile(await readBoundedJson(request));
+  });
+}
+
+async function readBoundedJson(request: IncomingMessage): Promise<unknown> {
+  const contentLength = request.headers["content-length"];
+  if (
+    contentLength !== undefined &&
+    (!/^(0|[1-9][0-9]*)$/.test(contentLength) ||
+      Number(contentLength) > SCENARIO_PLAN_MAX_REQUEST_BYTES)
+  ) {
+    throw new ScenarioPlanRequestTooLargeError();
+  }
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+    if (totalBytes > SCENARIO_PLAN_MAX_REQUEST_BYTES) {
+      request.resume();
+      throw new ScenarioPlanRequestTooLargeError();
+    }
+    chunks.push(buffer);
+  }
+  if (totalBytes === 0) {
+    throw new ScenarioPlanInvalidBodyError();
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+  } catch {
+    throw new ScenarioPlanInvalidBodyError();
   }
 }
 

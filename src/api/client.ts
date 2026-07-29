@@ -1,3 +1,9 @@
+import type {
+  ScenarioExecutionPlan,
+  ScenarioPlanErrorCategory,
+  ScenarioPlanningRequest,
+} from "../scenarios/scenario-plan";
+
 export interface ApiCallerIdentity {
   callerType: "delegated" | "app-only";
   tenantId: string;
@@ -218,6 +224,10 @@ export interface AfterPartyApi {
     accessToken: string,
     order?: OperationEventOrder,
   ): Promise<RecentOperationEvents>;
+  compileScenarioPlan(
+    accessToken: string,
+    request: ScenarioPlanningRequest,
+  ): Promise<ScenarioExecutionPlan>;
   sendSimulatedEmail(accessToken: string): Promise<SimulatedEmailResult>;
   sendHelpDeskScenario(accessToken: string): Promise<HelpDeskScenarioResult>;
   shareOneDriveProof(
@@ -279,6 +289,28 @@ export class ApiAccessError extends Error {
   }
 }
 
+export type ScenarioPlanClientErrorCategory =
+  | "unauthorized"
+  | "forbidden"
+  | "validation-refused"
+  | "request-too-large"
+  | "safe-failure";
+
+export class ScenarioPlanClientError extends Error {
+  readonly category: ScenarioPlanClientErrorCategory;
+  readonly refusalCategory?: ScenarioPlanErrorCategory;
+
+  constructor(
+    category: ScenarioPlanClientErrorCategory,
+    refusalCategory?: ScenarioPlanErrorCategory,
+  ) {
+    super(`Scenario plan request failed: ${category}`);
+    this.name = "ScenarioPlanClientError";
+    this.category = category;
+    this.refusalCategory = refusalCategory;
+  }
+}
+
 export class OneDriveInviteFailureError extends ApiAccessError {
   readonly diagnostic: OneDriveInviteFailure;
 
@@ -295,6 +327,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly whoAmIUrl: string;
   private readonly rehearsalStatusUrl: string;
   private readonly operationEventsUrl: string;
+  private readonly scenarioPlanUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
   private readonly oneDriveProofUrl: string;
@@ -316,6 +349,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ).toString();
     this.operationEventsUrl = new URL(
       "api/operation-events",
+      `${baseUrl}/`,
+    ).toString();
+    this.scenarioPlanUrl = new URL(
+      "api/scenario-plan",
       `${baseUrl}/`,
     ).toString();
     this.simulatedEmailUrl = new URL(
@@ -405,6 +442,84 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       order,
       events: value.events.map(copyOperationEvent),
     };
+  }
+
+  async compileScenarioPlan(
+    accessToken: string,
+    planningRequest: ScenarioPlanningRequest,
+  ): Promise<ScenarioExecutionPlan> {
+    if (!isSafeScenarioPlanningRequest(planningRequest)) {
+      throw new ScenarioPlanClientError("validation-refused");
+    }
+    const body = JSON.stringify(planningRequest);
+    if (new TextEncoder().encode(body).byteLength > 8_192) {
+      throw new ScenarioPlanClientError("request-too-large");
+    }
+
+    let response: Response;
+    try {
+      response = await this.request(this.scenarioPlanUrl, {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+    } catch {
+      throw new ScenarioPlanClientError("safe-failure");
+    }
+
+    if (response.status === 401) {
+      throw new ScenarioPlanClientError("unauthorized");
+    }
+    if (response.status === 403) {
+      throw new ScenarioPlanClientError("forbidden");
+    }
+    if (response.status === 413) {
+      throw new ScenarioPlanClientError("request-too-large");
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(
+        response.headers.get("content-type") ?? "",
+      )
+    ) {
+      throw new ScenarioPlanClientError("safe-failure");
+    }
+
+    const responseText = await readBoundedScenarioPlanResponse(response);
+    let value: unknown;
+    try {
+      value = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new ScenarioPlanClientError("safe-failure");
+    }
+    if (!response.ok) {
+      if (
+        response.status === 400 &&
+        isScenarioRecord(value) &&
+        value.error === "scenario_plan_refused" &&
+        typeof value.category === "string" &&
+        SCENARIO_PLAN_REFUSAL_CATEGORIES.includes(
+          value.category as ScenarioPlanErrorCategory,
+        )
+      ) {
+        throw new ScenarioPlanClientError(
+          "validation-refused",
+          value.category as ScenarioPlanErrorCategory,
+        );
+      }
+      throw new ScenarioPlanClientError("safe-failure");
+    }
+    if (
+      response.status !== 200 ||
+      !isSafeScenarioExecutionPlan(value, planningRequest)
+    ) {
+      throw new ScenarioPlanClientError("safe-failure");
+    }
+    return value;
   }
 
   async sendSimulatedEmail(
@@ -1178,4 +1293,391 @@ function isSafeCalendarMeetingResult(
       (attendee, index) => attendee === CALENDAR_MEETING_ATTENDEES[index],
     )
   );
+}
+
+const SCENARIO_PLAN_ACTOR_ROLES = [
+  "evidenceProducer",
+  "workloadActor",
+  "learner",
+  "detector",
+  "responder",
+  "cleanupOwner",
+] as const;
+const SCENARIO_PLAN_ROLES = [
+  "system",
+  ...SCENARIO_PLAN_ACTOR_ROLES,
+] as const;
+const SCENARIO_PLAN_PHASES = [
+  "preflight",
+  "producer-operation",
+  "authentic-evidence",
+  "learner-interpretation",
+  "optional-response",
+  "expiry",
+  "cleanup",
+  "retention",
+  "terminal-verification",
+] as const;
+const SCENARIO_PLAN_EXECUTIONS = [
+  "automated",
+  "declarative",
+  "human-only",
+  "pre-seeded-reference",
+] as const;
+const SCENARIO_PLAN_REFUSAL_CATEGORIES = [
+  "ACTOR_BINDING_INVALID",
+  "BUDGET_EXCEEDED",
+  "CLEANUP_MISSING",
+  "EXPIRY_INVALID",
+  "INPUT_INVALID",
+  "INTERPRETATION_MISSING",
+  "MANIFEST_INVALID",
+  "RAW_IDENTIFIER_REJECTED",
+  "RESPONSE_NOT_ALLOWED",
+  "RETENTION_CONFLICT",
+  "ROLE_CONFLATION",
+  "SELF_TRIGGER_UNDECLARED",
+  "TERMINAL_PROOF_MISSING",
+  "UNKNOWN_SCENARIO",
+] as const satisfies readonly ScenarioPlanErrorCategory[];
+const SAFE_SCENARIO_VALUE = /^[a-z0-9][a-z0-9._:-]{0,127}$/;
+const SAFE_SCENARIO_ALIAS = /^[a-z][a-z0-9-]{1,63}$/;
+const RAW_SCENARIO_IDENTIFIER =
+  /(?:@|[\\/]|onmicrosoft|tenant|subscription|object-?id|message-?id|userprincipal|credential|certificate|access-?token|refresh-?token|session|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i;
+
+function isSafeScenarioPlanningRequest(
+  value: unknown,
+): value is ScenarioPlanningRequest {
+  if (
+    !isScenarioRecord(value) ||
+    !hasOnlyKeys(value, [
+      "scenarioId",
+      "actorAliases",
+      "now",
+      "expiresAt",
+      "maximumBudgetUsd",
+      "selectedResponseId",
+    ]) ||
+    !isSafeScenarioValue(value.scenarioId) ||
+    !isUtcTimestamp(value.now) ||
+    !isUtcTimestamp(value.expiresAt) ||
+    Date.parse(value.expiresAt) <= Date.parse(value.now) ||
+    typeof value.maximumBudgetUsd !== "number" ||
+    !Number.isFinite(value.maximumBudgetUsd) ||
+    value.maximumBudgetUsd < 0 ||
+    value.maximumBudgetUsd > 1_000_000 ||
+    !isScenarioRecord(value.actorAliases)
+  ) {
+    return false;
+  }
+  const aliases = Object.entries(value.actorAliases);
+  if (
+    aliases.length === 0 ||
+    aliases.length > 6 ||
+    aliases.some(
+      ([role, alias]) =>
+        !SCENARIO_PLAN_ACTOR_ROLES.includes(
+          role as (typeof SCENARIO_PLAN_ACTOR_ROLES)[number],
+        ) ||
+        typeof alias !== "string" ||
+        !SAFE_SCENARIO_ALIAS.test(alias) ||
+        RAW_SCENARIO_IDENTIFIER.test(alias),
+    )
+  ) {
+    return false;
+  }
+  return (
+    value.selectedResponseId === undefined ||
+    isSafeScenarioValue(value.selectedResponseId)
+  );
+}
+
+function isSafeScenarioExecutionPlan(
+  value: unknown,
+  request: ScenarioPlanningRequest,
+): value is ScenarioExecutionPlan {
+  if (
+    !isScenarioRecord(value) ||
+    !hasExactScenarioKeys(value, [
+      "schemaVersion",
+      "kind",
+      "scenarioId",
+      "generatedAt",
+      "expiresAt",
+      "actorAliases",
+      "budget",
+      "selectedResponseId",
+      "steps",
+      "terminalProof",
+      "digestSha256",
+    ]) ||
+    value.schemaVersion !== 1 ||
+    value.kind !== "scenario-execution-plan" ||
+    value.scenarioId !== request.scenarioId ||
+    value.generatedAt !== request.now ||
+    value.expiresAt !== request.expiresAt ||
+    value.selectedResponseId !== (request.selectedResponseId ?? null) ||
+    !/^[0-9a-f]{64}$/.test(String(value.digestSha256)) ||
+    !hasMatchingScenarioAliases(value.actorAliases, request.actorAliases)
+  ) {
+    return false;
+  }
+  if (
+    !isScenarioRecord(value.budget) ||
+    !hasExactScenarioKeys(value.budget, [
+      "currency",
+      "plannedMaximum",
+      "suppliedCeiling",
+    ]) ||
+    value.budget.currency !== "USD" ||
+    value.budget.suppliedCeiling !== request.maximumBudgetUsd ||
+    typeof value.budget.plannedMaximum !== "number" ||
+    !Number.isFinite(value.budget.plannedMaximum) ||
+    value.budget.plannedMaximum < 0 ||
+    value.budget.plannedMaximum > request.maximumBudgetUsd
+  ) {
+    return false;
+  }
+  if (
+    !Array.isArray(value.steps) ||
+    value.steps.length === 0 ||
+    value.steps.length > 256 ||
+    !value.steps.every((step, index) =>
+      isSafeScenarioPlanStep(step, index + 1, request.actorAliases)
+    )
+  ) {
+    return false;
+  }
+  const proof = value.terminalProof;
+  return (
+    isScenarioRecord(proof) &&
+    hasExactScenarioKeys(proof, [
+      "cleanupOperationKeys",
+      "evidenceArtifactIds",
+      "observationOperationKeys",
+      "retainedArtifactIds",
+      "requiredResult",
+    ]) &&
+    proof.requiredResult === "reconciled" &&
+    ["cleanupOperationKeys", "evidenceArtifactIds", "observationOperationKeys",
+      "retainedArtifactIds"].every((key) =>
+        isSafeScenarioStringArray(proof[key]),
+      )
+  );
+}
+
+function isSafeScenarioPlanStep(
+  value: unknown,
+  sequence: number,
+  actorAliases: ScenarioPlanningRequest["actorAliases"],
+): boolean {
+  if (
+    !isScenarioRecord(value) ||
+    !hasOnlyKeys(value, [
+      "sequence",
+      "id",
+      "phase",
+      "owningRole",
+      "actorAlias",
+      "operationCategory",
+      "operationKey",
+      "execution",
+      "humanOnlyGate",
+      "ambiguityBehavior",
+      "recoveryBehavior",
+      "evidenceExpectation",
+      "retention",
+    ]) ||
+    value.sequence !== sequence ||
+    !isSafeScenarioValue(value.id) ||
+    !SCENARIO_PLAN_PHASES.includes(
+      value.phase as (typeof SCENARIO_PLAN_PHASES)[number],
+    ) ||
+    !SCENARIO_PLAN_ROLES.includes(
+      value.owningRole as (typeof SCENARIO_PLAN_ROLES)[number],
+    ) ||
+    !isSafeScenarioValue(value.operationCategory) ||
+    !isSafeScenarioValue(value.operationKey) ||
+    !SCENARIO_PLAN_EXECUTIONS.includes(
+      value.execution as (typeof SCENARIO_PLAN_EXECUTIONS)[number],
+    ) ||
+    typeof value.humanOnlyGate !== "boolean" ||
+    ![
+      "bounded-read-retry",
+      "fail-closed",
+      "not-applicable",
+      "stop-and-reconcile",
+    ].includes(String(value.ambiguityBehavior)) ||
+    ![
+      "none",
+      "read-only-reconcile-no-replay",
+      "retry-within-read-budget",
+      "stop-on-mismatch",
+    ].includes(String(value.recoveryBehavior))
+  ) {
+    return false;
+  }
+  const owningRole = value.owningRole as
+    (typeof SCENARIO_PLAN_ROLES)[number];
+  const expectedAlias = owningRole === "system"
+    ? undefined
+    : actorAliases[owningRole];
+  if (
+    value.actorAlias !== expectedAlias ||
+    (value.actorAlias !== undefined &&
+      (typeof value.actorAlias !== "string" ||
+        !SAFE_SCENARIO_ALIAS.test(value.actorAlias) ||
+        RAW_SCENARIO_IDENTIFIER.test(value.actorAlias)))
+  ) {
+    return false;
+  }
+  return (
+    (value.evidenceExpectation === undefined ||
+      isSafeEvidenceExpectation(value.evidenceExpectation)) &&
+    (value.retention === undefined || isSafeRetention(value.retention))
+  );
+}
+
+function hasMatchingScenarioAliases(
+  value: unknown,
+  expected: ScenarioPlanningRequest["actorAliases"],
+): boolean {
+  if (!isScenarioRecord(value)) {
+    return false;
+  }
+  const expectedRoles = SCENARIO_PLAN_ACTOR_ROLES.filter(
+    (role) => expected[role] !== undefined,
+  );
+  return (
+    Object.keys(value).length === expectedRoles.length &&
+    expectedRoles.every((role) => value[role] === expected[role])
+  );
+}
+
+function isSafeEvidenceExpectation(value: unknown): boolean {
+  return (
+    isScenarioRecord(value) &&
+    hasExactScenarioKeys(value, [
+      "artifactId",
+      "artifactKind",
+      "authenticity",
+      "evidenceMode",
+      "learnerVisibility",
+      "semanticClaims",
+    ]) &&
+    isSafeScenarioValue(value.artifactId) &&
+    isSafeScenarioValue(value.artifactKind) &&
+    isSafeScenarioValue(value.authenticity) &&
+    (value.evidenceMode === "planned" ||
+      value.evidenceMode === "pre-seeded") &&
+    isSafeScenarioValue(value.learnerVisibility) &&
+    isSafeScenarioStringArray(value.semanticClaims)
+  );
+}
+
+function isSafeRetention(value: unknown): boolean {
+  return (
+    isScenarioRecord(value) &&
+    hasOnlyKeys(value, [
+      "artifactId",
+      "disposition",
+      "cleanupOperationKey",
+    ]) &&
+    isSafeScenarioValue(value.artifactId) &&
+    isSafeScenarioValue(value.disposition) &&
+    (value.cleanupOperationKey === undefined ||
+      isSafeScenarioValue(value.cleanupOperationKey))
+  );
+}
+
+function isSafeScenarioStringArray(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= 128 &&
+    value.every(isSafeScenarioValue)
+  );
+}
+
+function isSafeScenarioValue(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    SAFE_SCENARIO_VALUE.test(value) &&
+    !RAW_SCENARIO_IDENTIFIER.test(value)
+  );
+}
+
+function isUtcTimestamp(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
+function isScenarioRecord(
+  value: unknown,
+): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasExactScenarioKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  return (
+    Object.keys(value).length === expected.length &&
+    hasOnlyKeys(value, expected)
+  );
+}
+
+async function readBoundedScenarioPlanResponse(
+  response: Response,
+): Promise<string> {
+  const declaredLength = response.headers.get("content-length");
+  if (
+    declaredLength !== null &&
+    (!/^(0|[1-9][0-9]*)$/.test(declaredLength) ||
+      Number(declaredLength) > 65_536)
+  ) {
+    throw new ScenarioPlanClientError("safe-failure");
+  }
+  try {
+    if (response.body === null) {
+      return "";
+    }
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      totalBytes += value.byteLength;
+      if (totalBytes > 65_536) {
+        await reader.cancel();
+        throw new ScenarioPlanClientError("safe-failure");
+      }
+      chunks.push(value);
+    }
+    const body = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      body.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return new TextDecoder("utf-8", { fatal: true }).decode(body);
+  } catch (error) {
+    if (error instanceof ScenarioPlanClientError) {
+      throw error;
+    }
+    throw new ScenarioPlanClientError("safe-failure");
+  }
 }

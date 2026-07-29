@@ -161,7 +161,7 @@ export function compileScenarioExecutionPlan(
   value: unknown,
   catalog: readonly unknown[] = SCENARIO_MANIFESTS,
 ): ScenarioExecutionPlan {
-  const request = parseRequest(value);
+  const request = parseScenarioPlanningRequest(value);
   const manifests = catalog.map(validatedManifest);
   if (new Set(manifests.map(({ id }) => id)).size !== manifests.length) {
     throw new ScenarioPlanError("MANIFEST_INVALID");
@@ -425,7 +425,9 @@ export function compileScenarioExecutionPlan(
   };
 }
 
-function parseRequest(value: unknown): ScenarioPlanningRequest {
+export function parseScenarioPlanningRequest(
+  value: unknown,
+): ScenarioPlanningRequest {
   if (!isRecord(value)) {
     throw new ScenarioPlanError("INPUT_INVALID");
   }
