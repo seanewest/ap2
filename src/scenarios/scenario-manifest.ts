@@ -8,7 +8,6 @@ const ACTOR_KINDS = [
   "orchestrator",
   "simulated-user",
 ] as const;
-
 const AUTHENTICATION_TRANSPORTS = [
   "application-only",
   "delegated-user",
@@ -16,10 +15,123 @@ const AUTHENTICATION_TRANSPORTS = [
   "operator-session",
   "teams-client",
 ] as const;
+const PREREQUISITE_KINDS = [
+  "evidence",
+  "identity",
+  "license",
+  "network",
+  "permission",
+  "policy",
+  "resource",
+] as const;
+const OPERATION_PHASES = [
+  "setup",
+  "evidence",
+  "response",
+  "cleanup",
+] as const;
+const OPERATION_EFFECTS = ["read", "mutation"] as const;
+const OPERATION_CAPABILITIES = [
+  "artifact.read-exact",
+  "azure.resource-group.delete",
+  "azure.three-vm.deploy",
+  "evidence-window.close",
+  "endpoint.offboard",
+  "endpoint.onboard",
+  "expiry.remove",
+  "expiry.schedule",
+  "help-desk-email.send",
+  "identity.verify",
+  "learner.inspect",
+  "mail.delete-exact",
+  "permission.grant",
+  "permission.revoke",
+  "sensitive-artifacts.prepare",
+  "sensitive-artifacts.remove",
+  "teams.audio-call.manual",
+  "teams.call-history.read",
+  "teams.history.cleanup",
+] as const;
+const RESOURCE_KINDS = [
+  "azure-resource-group",
+  "avd-personal-host",
+  "endpoint-lifecycle",
+  "ephemeral-sensitive-artifacts",
+  "expiry-schedule",
+  "linux-auxiliary-pair",
+  "shared-nat-egress",
+] as const;
+const PERMISSION_KINDS = [
+  "azure-role",
+  "delegated-scope",
+  "graph-app-role",
+  "teams-policy",
+] as const;
+const ARTIFACT_KINDS = [
+  "avd-topology",
+  "cleanup-state",
+  "endpoint-posture",
+  "outlook-email",
+  "application-recon-summary",
+  "private-network-topology",
+  "teams-missed-call",
+] as const;
+const ARTIFACT_AUTHENTICITY = [
+  "application-narrative",
+  "platform-control-plane",
+  "platform-native",
+] as const;
+const ARTIFACT_STATES = [
+  "planned",
+  "platform-accepted",
+  "observed",
+  "learner-completed",
+] as const;
+const LEARNER_VISIBILITY = ["not-proven", "observed"] as const;
+const ARTIFACT_RETENTION = ["ephemeral", "retained"] as const;
+const SEMANTIC_CLAIMS = [
+  "avd-ready",
+  "application-reconnaissance",
+  "endpoint-managed",
+  "endpoint-state-removed",
+  "expiry-removed",
+  "infrastructure-removed",
+  "outlook-email",
+  "private-three-vm-topology",
+  "permissions-revoked",
+  "teams-missed-call",
+  "teams-voicemail",
+  "sensitive-artifacts-absent",
+] as const;
+const LEARNER_COMPLETION_STATES = [
+  "not-run",
+  "available",
+  "completed",
+] as const;
+const RESPONSE_KINDS = [
+  "investigate",
+  "observe",
+  "remediate",
+  "report",
+] as const;
+const RETAINED_DISPOSITIONS = [
+  "cleanup-later",
+  "expire-automatically",
+  "retain-audit-history",
+] as const;
+
+const MAX_ACTORS = 32;
+const MAX_ITEMS = 64;
+const MAX_TEXT = 2_000;
 
 export type ScenarioActorKind = typeof ACTOR_KINDS[number];
 export type ScenarioAuthenticationTransport =
   typeof AUTHENTICATION_TRANSPORTS[number];
+export type ScenarioOperationPhase = typeof OPERATION_PHASES[number];
+export type ScenarioOperationCapability =
+  typeof OPERATION_CAPABILITIES[number];
+export type ScenarioArtifactKind = typeof ARTIFACT_KINDS[number];
+export type ScenarioSemanticClaim = typeof SEMANTIC_CLAIMS[number];
 
 export interface ScenarioActor {
   id: string;
@@ -50,8 +162,96 @@ export type ScenarioDetection =
   | { kind: "none" }
   | { kind: "independent" };
 
+export interface ScenarioPrerequisite {
+  id: string;
+  kind: typeof PREREQUISITE_KINDS[number];
+  summary: string;
+  requiredState: string;
+}
+
+export interface ScenarioOperation {
+  key: string;
+  phase: ScenarioOperationPhase;
+  capability: ScenarioOperationCapability;
+  effect: typeof OPERATION_EFFECTS[number];
+  ownerActorId: string;
+  summary: string;
+  marker?: string;
+}
+
+export interface ScenarioResource {
+  id: string;
+  kind: typeof RESOURCE_KINDS[number];
+  summary: string;
+  ownerActorId: string;
+  createOperationKey: string;
+  cleanupOperationKey: string;
+  billable: boolean;
+  expiresAt?: string;
+}
+
+interface ScenarioPermissionBase {
+  id: string;
+  kind: typeof PERMISSION_KINDS[number];
+  name: string;
+  actorId: string;
+  scope: string;
+  purpose: string;
+}
+
+export type ScenarioPermission =
+  | ScenarioPermissionBase & {
+      mode: "temporary";
+      grantOperationKey: string;
+      revocationOperationKey: string;
+      revocationOwnerActorId: string;
+    }
+  | ScenarioPermissionBase & {
+      mode: "retained";
+      retentionRationale: string;
+    };
+
+export interface ScenarioEvidenceArtifact {
+  id: string;
+  kind: ScenarioArtifactKind;
+  authenticity: typeof ARTIFACT_AUTHENTICITY[number];
+  state: typeof ARTIFACT_STATES[number];
+  learnerVisibility: typeof LEARNER_VISIBILITY[number];
+  sourceOperationKey: string;
+  claim: string;
+  semanticClaims: readonly ScenarioSemanticClaim[];
+  retention: typeof ARTIFACT_RETENTION[number];
+  observation?: {
+    operationKey: string;
+    proofReference: string;
+  };
+}
+
+export interface ScenarioLearnerContract {
+  task: string;
+  expectedInterpretation: string;
+  completionState: typeof LEARNER_COMPLETION_STATES[number];
+  evidenceArtifactIds: readonly string[];
+}
+
+export interface ScenarioResponseAction {
+  id: string;
+  kind: typeof RESPONSE_KINDS[number];
+  ownerActorId: string;
+  operationKey: string;
+  summary: string;
+}
+
+export interface ScenarioRetainedArtifact {
+  artifactId: string;
+  custodianActorId: string;
+  disposition: typeof RETAINED_DISPOSITIONS[number];
+  rationale: string;
+  cleanupOperationKey?: string;
+}
+
 export interface ScenarioManifest {
-  schemaVersion: 1;
+  schemaVersion: 2;
   id: string;
   title: string;
   summary: string;
@@ -60,10 +260,28 @@ export interface ScenarioManifest {
   authentication: readonly ScenarioAuthentication[];
   trigger: ScenarioTrigger;
   detection?: ScenarioDetection;
+  prerequisites: readonly ScenarioPrerequisite[];
+  operations: readonly ScenarioOperation[];
+  resources: readonly ScenarioResource[];
+  permissions: readonly ScenarioPermission[];
   evidence: {
     staging: string;
     learnerReceives: string;
-    learnerTask: string;
+    artifacts: readonly ScenarioEvidenceArtifact[];
+  };
+  learner: ScenarioLearnerContract;
+  responseActions: readonly ScenarioResponseAction[];
+  lifecycle: {
+    expiresAt: string;
+    cleanupOwnerActorId: string;
+    cleanupOperationKeys: readonly string[];
+    retainedArtifacts: readonly ScenarioRetainedArtifact[];
+  };
+  cost: {
+    currency: "USD";
+    laneMaximum: number;
+    conservativeDurationHours: number;
+    assumption: string;
   };
 }
 
@@ -76,50 +294,34 @@ export class ScenarioManifestError extends Error {
 
 export function parseScenarioManifest(value: unknown): ScenarioManifest {
   const manifest = record(value, "manifest");
-  if (manifest.schemaVersion !== 1) {
-    throw new ScenarioManifestError("schemaVersion must be 1.");
+  if (manifest.schemaVersion !== 2) {
+    throw new ScenarioManifestError("schemaVersion must be 2.");
   }
 
-  const actorsValue = array(manifest.actors, "actors");
-  if (actorsValue.length === 0) {
-    throw new ScenarioManifestError("actors must not be empty.");
-  }
-  const actors = actorsValue.map((actor, index) =>
-    parseActor(actor, `actors[${index}]`)
-  );
-  const actorIds = new Set<string>();
-  for (const actor of actors) {
-    if (actorIds.has(actor.id)) {
-      throw new ScenarioManifestError(`actor id '${actor.id}' is duplicated.`);
-    }
-    actorIds.add(actor.id);
-  }
+  const actors = boundedArray(manifest.actors, "actors", 1, MAX_ACTORS)
+    .map((actor, index) => parseActor(actor, `actors[${index}]`));
+  const actorIds = uniqueIds(actors, "actor");
 
   const rolesValue = record(manifest.roles, "roles");
   const roles: ScenarioRoleAssignments = {
-    evidenceProducer: text(
+    evidenceProducer: id(
       rolesValue.evidenceProducer,
       "roles.evidenceProducer",
     ),
-    workloadActor: text(rolesValue.workloadActor, "roles.workloadActor"),
-    learner: text(rolesValue.learner, "roles.learner"),
+    workloadActor: id(rolesValue.workloadActor, "roles.workloadActor"),
+    learner: id(rolesValue.learner, "roles.learner"),
     ...(rolesValue.detector === undefined
       ? {}
-      : { detector: text(rolesValue.detector, "roles.detector") }),
+      : { detector: id(rolesValue.detector, "roles.detector") }),
     ...(rolesValue.responder === undefined
       ? {}
-      : { responder: text(rolesValue.responder, "roles.responder") }),
+      : { responder: id(rolesValue.responder, "roles.responder") }),
   };
   for (const [role, actorId] of Object.entries(roles)) {
-    if (!actorIds.has(actorId)) {
-      throw new ScenarioManifestError(
-        `roles.${role} references unknown actor '${actorId}'.`,
-      );
-    }
+    reference(actorIds, actorId, `roles.${role}`, "actor");
   }
 
-  const triggerValue = record(manifest.trigger, "trigger");
-  const trigger = parseTrigger(triggerValue);
+  const trigger = parseTrigger(record(manifest.trigger, "trigger"));
   const selfConflated = roles.evidenceProducer === roles.learner;
   if (selfConflated && trigger.kind !== "self-triggered") {
     throw new ScenarioManifestError(
@@ -152,41 +354,390 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
     );
   }
 
-  const authentication = array(
+  const authentication = boundedArray(
     manifest.authentication,
     "authentication",
+    0,
+    MAX_ITEMS,
   ).map((item, index) => {
-    const authenticationValue = record(
-      item,
-      `authentication[${index}]`,
-    );
-    const actorId = text(
-      authenticationValue.actorId,
-      `authentication[${index}].actorId`,
-    );
-    if (!actorIds.has(actorId)) {
-      throw new ScenarioManifestError(
-        `authentication[${index}] references unknown actor '${actorId}'.`,
-      );
-    }
+    const path = `authentication[${index}]`;
+    const authenticationValue = record(item, path);
+    const actorId = id(authenticationValue.actorId, `${path}.actorId`);
+    reference(actorIds, actorId, `${path}.actorId`, "actor");
     return {
       actorId,
       transport: enumValue(
         authenticationValue.transport,
         AUTHENTICATION_TRANSPORTS,
-        `authentication[${index}].transport`,
+        `${path}.transport`,
       ),
-      summary: text(
-        authenticationValue.summary,
-        `authentication[${index}].summary`,
-      ),
+      summary: text(authenticationValue.summary, `${path}.summary`),
     };
   });
 
+  const prerequisites = boundedArray(
+    manifest.prerequisites,
+    "prerequisites",
+    1,
+    MAX_ITEMS,
+  ).map((item, index) => {
+    const path = `prerequisites[${index}]`;
+    const prerequisite = record(item, path);
+    return {
+      id: id(prerequisite.id, `${path}.id`),
+      kind: enumValue(
+        prerequisite.kind,
+        PREREQUISITE_KINDS,
+        `${path}.kind`,
+      ),
+      summary: text(prerequisite.summary, `${path}.summary`),
+      requiredState: text(
+        prerequisite.requiredState,
+        `${path}.requiredState`,
+      ),
+    };
+  });
+  uniqueIds(prerequisites, "prerequisite");
+
+  const operations = boundedArray(
+    manifest.operations,
+    "operations",
+    1,
+    MAX_ITEMS,
+  ).map((item, index) => {
+    const path = `operations[${index}]`;
+    const operation = record(item, path);
+    const ownerActorId = id(
+      operation.ownerActorId,
+      `${path}.ownerActorId`,
+    );
+    reference(actorIds, ownerActorId, `${path}.ownerActorId`, "actor");
+    const effect = enumValue(
+      operation.effect,
+      OPERATION_EFFECTS,
+      `${path}.effect`,
+    );
+    const marker = operation.marker === undefined
+      ? undefined
+      : text(operation.marker, `${path}.marker`);
+    if (effect === "mutation" && marker === undefined) {
+      throw new ScenarioManifestError(
+        `${path}.marker is required for a mutating operation.`,
+      );
+    }
+    return {
+      key: id(operation.key, `${path}.key`),
+      phase: enumValue(
+        operation.phase,
+        OPERATION_PHASES,
+        `${path}.phase`,
+      ),
+      capability: enumValue(
+        operation.capability,
+        OPERATION_CAPABILITIES,
+        `${path}.capability`,
+      ),
+      effect,
+      ownerActorId,
+      summary: text(operation.summary, `${path}.summary`),
+      ...(marker === undefined ? {} : { marker }),
+    };
+  });
+  uniqueIds(
+    operations.map((operation) => ({ id: operation.key })),
+    "operation key",
+  );
+  const operationByKey = new Map(
+    operations.map((operation) => [operation.key, operation]),
+  );
+
+  const resources = boundedArray(
+    manifest.resources,
+    "resources",
+    0,
+    MAX_ITEMS,
+  ).map((item, index) => {
+    const path = `resources[${index}]`;
+    const resource = record(item, path);
+    const ownerActorId = id(resource.ownerActorId, `${path}.ownerActorId`);
+    reference(actorIds, ownerActorId, `${path}.ownerActorId`, "actor");
+    const createOperationKey = id(
+      resource.createOperationKey,
+      `${path}.createOperationKey`,
+    );
+    const cleanupOperationKey = id(
+      resource.cleanupOperationKey,
+      `${path}.cleanupOperationKey`,
+    );
+    const createOperation = requireOperation(
+      operationByKey,
+      createOperationKey,
+      `${path}.createOperationKey`,
+      "setup",
+      "mutation",
+    );
+    const cleanupOperation = requireOperation(
+      operationByKey,
+      cleanupOperationKey,
+      `${path}.cleanupOperationKey`,
+      "cleanup",
+      "mutation",
+    );
+    if (
+      createOperation.ownerActorId !== ownerActorId ||
+      cleanupOperation.ownerActorId !== ownerActorId
+    ) {
+      throw new ScenarioManifestError(
+        `${path} owner must own its create and cleanup operations.`,
+      );
+    }
+    if (createOperation.marker !== cleanupOperation.marker) {
+      throw new ScenarioManifestError(
+        `${path} create and cleanup operations must use the same marker.`,
+      );
+    }
+    const billable = boolean(resource.billable, `${path}.billable`);
+    const expiresAt = resource.expiresAt === undefined
+      ? undefined
+      : timestamp(resource.expiresAt, `${path}.expiresAt`);
+    if (billable && expiresAt === undefined) {
+      throw new ScenarioManifestError(
+        `${path}.expiresAt is required for a billable resource.`,
+      );
+    }
+    return {
+      id: id(resource.id, `${path}.id`),
+      kind: enumValue(resource.kind, RESOURCE_KINDS, `${path}.kind`),
+      summary: text(resource.summary, `${path}.summary`),
+      ownerActorId,
+      createOperationKey,
+      cleanupOperationKey,
+      billable,
+      ...(expiresAt === undefined ? {} : { expiresAt }),
+    };
+  });
+  uniqueIds(resources, "resource");
+
+  const permissions = boundedArray(
+    manifest.permissions,
+    "permissions",
+    0,
+    MAX_ITEMS,
+  ).map((item, index) =>
+    parsePermission(
+      item,
+      `permissions[${index}]`,
+      actorIds,
+      operationByKey,
+    )
+  );
+  uniqueIds(permissions, "permission");
+
   const evidenceValue = record(manifest.evidence, "evidence");
+  const artifacts = boundedArray(
+    evidenceValue.artifacts,
+    "evidence.artifacts",
+    1,
+    MAX_ITEMS,
+  ).map((item, index) =>
+    parseArtifact(
+      item,
+      `evidence.artifacts[${index}]`,
+      operationByKey,
+    )
+  );
+  const artifactIds = uniqueIds(artifacts, "evidence artifact");
+  const artifactById = new Map(
+    artifacts.map((artifact) => [artifact.id, artifact]),
+  );
+
+  const learnerValue = record(manifest.learner, "learner");
+  const learnerEvidenceIds = boundedArray(
+    learnerValue.evidenceArtifactIds,
+    "learner.evidenceArtifactIds",
+    1,
+    MAX_ITEMS,
+  ).map((value, index) =>
+    id(value, `learner.evidenceArtifactIds[${index}]`)
+  );
+  uniqueStrings(learnerEvidenceIds, "learner.evidenceArtifactIds");
+  for (const [index, artifactId] of learnerEvidenceIds.entries()) {
+    reference(
+      artifactIds,
+      artifactId,
+      `learner.evidenceArtifactIds[${index}]`,
+      "evidence artifact",
+    );
+  }
+  const completionState = enumValue(
+    learnerValue.completionState,
+    LEARNER_COMPLETION_STATES,
+    "learner.completionState",
+  );
+  validateLearnerEvidence(
+    completionState,
+    learnerEvidenceIds,
+    artifactById,
+  );
+  const learner = {
+    task: text(learnerValue.task, "learner.task"),
+    expectedInterpretation: text(
+      learnerValue.expectedInterpretation,
+      "learner.expectedInterpretation",
+    ),
+    completionState,
+    evidenceArtifactIds: learnerEvidenceIds,
+  };
+
+  const responseActions = boundedArray(
+    manifest.responseActions,
+    "responseActions",
+    0,
+    MAX_ITEMS,
+  ).map((item, index) => {
+    const path = `responseActions[${index}]`;
+    const action = record(item, path);
+    const ownerActorId = id(action.ownerActorId, `${path}.ownerActorId`);
+    reference(actorIds, ownerActorId, `${path}.ownerActorId`, "actor");
+    if (
+      ownerActorId !== roles.learner &&
+      ownerActorId !== roles.responder
+    ) {
+      throw new ScenarioManifestError(
+        `${path}.ownerActorId must be the learner or assigned responder.`,
+      );
+    }
+    const operationKey = id(action.operationKey, `${path}.operationKey`);
+    const operation = requireOperation(
+      operationByKey,
+      operationKey,
+      `${path}.operationKey`,
+      "response",
+    );
+    if (operation.ownerActorId !== ownerActorId) {
+      throw new ScenarioManifestError(
+        `${path}.ownerActorId must own its response operation.`,
+      );
+    }
+    return {
+      id: id(action.id, `${path}.id`),
+      kind: enumValue(action.kind, RESPONSE_KINDS, `${path}.kind`),
+      ownerActorId,
+      operationKey,
+      summary: text(action.summary, `${path}.summary`),
+    };
+  });
+  uniqueIds(responseActions, "response action");
+
+  const lifecycleValue = record(manifest.lifecycle, "lifecycle");
+  const cleanupOwnerActorId = id(
+    lifecycleValue.cleanupOwnerActorId,
+    "lifecycle.cleanupOwnerActorId",
+  );
+  reference(
+    actorIds,
+    cleanupOwnerActorId,
+    "lifecycle.cleanupOwnerActorId",
+    "actor",
+  );
+  const cleanupOperationKeys = boundedArray(
+    lifecycleValue.cleanupOperationKeys,
+    "lifecycle.cleanupOperationKeys",
+    1,
+    MAX_ITEMS,
+  ).map((value, index) =>
+    id(value, `lifecycle.cleanupOperationKeys[${index}]`)
+  );
+  uniqueStrings(
+    cleanupOperationKeys,
+    "lifecycle.cleanupOperationKeys",
+  );
+  const cleanupOperationKeySet = new Set(cleanupOperationKeys);
+  for (const [index, operationKey] of cleanupOperationKeys.entries()) {
+    const operation = requireOperation(
+      operationByKey,
+      operationKey,
+      `lifecycle.cleanupOperationKeys[${index}]`,
+      "cleanup",
+      "mutation",
+    );
+    if (!operation.marker) {
+      throw new ScenarioManifestError(
+        `lifecycle cleanup operation '${operationKey}' must have a marker.`,
+      );
+    }
+    if (operation.ownerActorId !== cleanupOwnerActorId) {
+      throw new ScenarioManifestError(
+        `lifecycle cleanup operation '${operationKey}' must be owned by lifecycle.cleanupOwnerActorId.`,
+      );
+    }
+  }
+  for (const operation of operations) {
+    if (
+      operation.phase === "cleanup" &&
+      !cleanupOperationKeySet.has(operation.key)
+    ) {
+      throw new ScenarioManifestError(
+        `cleanup operation '${operation.key}' must be declared in lifecycle.cleanupOperationKeys.`,
+      );
+    }
+  }
+
+  const retainedArtifacts = boundedArray(
+    lifecycleValue.retainedArtifacts,
+    "lifecycle.retainedArtifacts",
+    0,
+    MAX_ITEMS,
+  ).map((item, index) =>
+    parseRetainedArtifact(
+      item,
+      `lifecycle.retainedArtifacts[${index}]`,
+      actorIds,
+      artifactById,
+      operationByKey,
+    )
+  );
+  uniqueStrings(
+    retainedArtifacts.map((artifact) => artifact.artifactId),
+    "lifecycle.retainedArtifacts artifactId",
+  );
+  validateRetainedArtifacts(artifacts, retainedArtifacts);
+
+  const costValue = record(manifest.cost, "cost");
+  if (costValue.currency !== "USD") {
+    throw new ScenarioManifestError("cost.currency must be USD.");
+  }
+  const laneMaximum = nonNegativeNumber(
+    costValue.laneMaximum,
+    "cost.laneMaximum",
+  );
+  const conservativeDurationHours = positiveNumber(
+    costValue.conservativeDurationHours,
+    "cost.conservativeDurationHours",
+  );
+  const lifecycleExpiresAt = timestamp(
+    lifecycleValue.expiresAt,
+    "lifecycle.expiresAt",
+  );
+  if (
+    resources.some((resource) =>
+      resource.expiresAt !== undefined &&
+      Date.parse(resource.expiresAt) > Date.parse(lifecycleExpiresAt)
+    )
+  ) {
+    throw new ScenarioManifestError(
+      "billable resource expiry must not exceed lifecycle.expiresAt.",
+    );
+  }
+  if (resources.some((resource) => resource.billable) && laneMaximum === 0) {
+    throw new ScenarioManifestError(
+      "cost.laneMaximum must be greater than zero when resources are billable.",
+    );
+  }
+
   return {
-    schemaVersion: 1,
-    id: text(manifest.id, "id"),
+    schemaVersion: 2,
+    id: id(manifest.id, "id"),
     title: text(manifest.title, "title"),
     summary: text(manifest.summary, "summary"),
     actors,
@@ -194,13 +745,31 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
     authentication,
     trigger,
     detection,
+    prerequisites,
+    operations,
+    resources,
+    permissions,
     evidence: {
       staging: text(evidenceValue.staging, "evidence.staging"),
       learnerReceives: text(
         evidenceValue.learnerReceives,
         "evidence.learnerReceives",
       ),
-      learnerTask: text(evidenceValue.learnerTask, "evidence.learnerTask"),
+      artifacts,
+    },
+    learner,
+    responseActions,
+    lifecycle: {
+      expiresAt: lifecycleExpiresAt,
+      cleanupOwnerActorId,
+      cleanupOperationKeys,
+      retainedArtifacts,
+    },
+    cost: {
+      currency: "USD",
+      laneMaximum,
+      conservativeDurationHours,
+      assumption: text(costValue.assumption, "cost.assumption"),
     },
   };
 }
@@ -231,66 +800,82 @@ export function createScenarioPlan(value: unknown): HTMLElement {
     createStatus(manifest.summary),
   );
 
-  const roles = document.createElement("dl");
-  roles.className = "identity-list";
+  const details = document.createElement("dl");
+  details.className = "identity-list";
   appendIdentity(
-    roles,
+    details,
     "Evidence producer",
     actorLabel(manifest.roles.evidenceProducer),
   );
   appendIdentity(
-    roles,
+    details,
     "Workload actor",
     actorLabel(manifest.roles.workloadActor),
   );
   appendIdentity(
-    roles,
+    details,
     "Learner / observer",
     actorLabel(manifest.roles.learner),
   );
   appendIdentity(
-    roles,
+    details,
     "Detector / observer",
     manifest.detection?.kind === "independent" && manifest.roles.detector
       ? actorLabel(manifest.roles.detector)
       : "Not assigned; no independent detection claim",
   );
   appendIdentity(
-    roles,
+    details,
     "Responder",
     manifest.roles.responder
       ? actorLabel(manifest.roles.responder)
-      : "Not assigned for this observation-only scenario",
+      : "Not assigned",
   );
   appendIdentity(
-    roles,
+    details,
     "Trigger model",
     manifest.trigger.kind === "staged"
       ? "Staged — the evidence producer and learner are separate"
       : `Self-triggered — ${manifest.trigger.rationale}`,
   );
-  appendIdentity(roles, "Who stages evidence", manifest.evidence.staging);
+  appendIdentity(details, "Who stages evidence", manifest.evidence.staging);
   appendIdentity(
-    roles,
+    details,
     "What the learner receives",
     manifest.evidence.learnerReceives,
   );
-  appendIdentity(roles, "Learner task", manifest.evidence.learnerTask);
+  appendIdentity(details, "Learner task", manifest.learner.task);
+  appendIdentity(
+    details,
+    "Expected interpretation",
+    manifest.learner.expectedInterpretation,
+  );
+  appendIdentity(
+    details,
+    "Learner completion",
+    manifest.learner.completionState,
+  );
+  appendIdentity(details, "Scenario expiry", manifest.lifecycle.expiresAt);
+  appendIdentity(
+    details,
+    "Maximum cost",
+    `${manifest.cost.currency} ${manifest.cost.laneMaximum}`,
+  );
   for (const authentication of manifest.authentication) {
     appendIdentity(
-      roles,
+      details,
       `Authentication — ${actorLabel(authentication.actorId)}`,
       authentication.summary,
     );
   }
-  panel.append(roles);
+  panel.append(details);
   return panel;
 }
 
 function parseActor(value: unknown, path: string): ScenarioActor {
   const actor = record(value, path);
   return {
-    id: text(actor.id, `${path}.id`),
+    id: id(actor.id, `${path}.id`),
     label: text(actor.label, `${path}.label`),
     kind: enumValue(actor.kind, ACTOR_KINDS, `${path}.kind`),
     summary: text(actor.summary, `${path}.summary`),
@@ -325,6 +910,417 @@ function parseDetection(value: unknown): ScenarioDetection {
   );
 }
 
+function parsePermission(
+  value: unknown,
+  path: string,
+  actorIds: ReadonlySet<string>,
+  operationByKey: ReadonlyMap<string, ScenarioOperation>,
+): ScenarioPermission {
+  const permission = record(value, path);
+  const actorId = id(permission.actorId, `${path}.actorId`);
+  reference(actorIds, actorId, `${path}.actorId`, "actor");
+  const base: ScenarioPermissionBase = {
+    id: id(permission.id, `${path}.id`),
+    kind: enumValue(permission.kind, PERMISSION_KINDS, `${path}.kind`),
+    name: text(permission.name, `${path}.name`),
+    actorId,
+    scope: text(permission.scope, `${path}.scope`),
+    purpose: text(permission.purpose, `${path}.purpose`),
+  };
+  if (permission.mode === "temporary") {
+    const grantOperationKey = id(
+      permission.grantOperationKey,
+      `${path}.grantOperationKey`,
+    );
+    const revocationOperationKey = id(
+      permission.revocationOperationKey,
+      `${path}.revocationOperationKey`,
+    );
+    const revocationOwnerActorId = id(
+      permission.revocationOwnerActorId,
+      `${path}.revocationOwnerActorId`,
+    );
+    reference(
+      actorIds,
+      revocationOwnerActorId,
+      `${path}.revocationOwnerActorId`,
+      "actor",
+    );
+    const grant = requireOperation(
+      operationByKey,
+      grantOperationKey,
+      `${path}.grantOperationKey`,
+      "setup",
+      "mutation",
+    );
+    const revoke = requireOperation(
+      operationByKey,
+      revocationOperationKey,
+      `${path}.revocationOperationKey`,
+      "cleanup",
+      "mutation",
+    );
+    if (revoke.ownerActorId !== revocationOwnerActorId) {
+      throw new ScenarioManifestError(
+        `${path}.revocationOwnerActorId must own the revocation operation.`,
+      );
+    }
+    if (grant.ownerActorId !== actorId) {
+      throw new ScenarioManifestError(
+        `${path}.actorId must own the temporary permission grant operation.`,
+      );
+    }
+    if (grant.marker !== revoke.marker) {
+      throw new ScenarioManifestError(
+        `${path} grant and revocation operations must use the same marker.`,
+      );
+    }
+    return {
+      ...base,
+      mode: "temporary",
+      grantOperationKey,
+      revocationOperationKey,
+      revocationOwnerActorId,
+    };
+  }
+  if (permission.mode === "retained") {
+    return {
+      ...base,
+      mode: "retained",
+      retentionRationale: text(
+        permission.retentionRationale,
+        `${path}.retentionRationale`,
+      ),
+    };
+  }
+  throw new ScenarioManifestError(
+    `${path}.mode must be temporary or retained.`,
+  );
+}
+
+function parseArtifact(
+  value: unknown,
+  path: string,
+  operationByKey: ReadonlyMap<string, ScenarioOperation>,
+): ScenarioEvidenceArtifact {
+  const artifact = record(value, path);
+  const kind = enumValue(artifact.kind, ARTIFACT_KINDS, `${path}.kind`);
+  const state = enumValue(artifact.state, ARTIFACT_STATES, `${path}.state`);
+  const learnerVisibility = enumValue(
+    artifact.learnerVisibility,
+    LEARNER_VISIBILITY,
+    `${path}.learnerVisibility`,
+  );
+  if (
+    learnerVisibility === "observed" &&
+    state !== "observed" &&
+    state !== "learner-completed"
+  ) {
+    throw new ScenarioManifestError(
+      `${path} cannot claim learner visibility from planned or platform-accepted evidence.`,
+    );
+  }
+  const sourceOperationKey = id(
+    artifact.sourceOperationKey,
+    `${path}.sourceOperationKey`,
+  );
+  requireOperation(
+    operationByKey,
+    sourceOperationKey,
+    `${path}.sourceOperationKey`,
+    "evidence",
+  );
+  const observation = artifact.observation === undefined
+    ? undefined
+    : record(artifact.observation, `${path}.observation`);
+  if (state === "observed" || state === "learner-completed") {
+    if (observation === undefined) {
+      throw new ScenarioManifestError(
+        `${path}.observation must be an object for observed evidence.`,
+      );
+    }
+    const observationOperationKey = id(
+      observation.operationKey,
+      `${path}.observation.operationKey`,
+    );
+    requireOperation(
+      operationByKey,
+      observationOperationKey,
+      `${path}.observation.operationKey`,
+      "evidence",
+      "read",
+    );
+  } else if (observation !== undefined) {
+    throw new ScenarioManifestError(
+      `${path}.observation is only allowed for observed or learner-completed evidence.`,
+    );
+  }
+  const semanticClaims = boundedArray(
+    artifact.semanticClaims,
+    `${path}.semanticClaims`,
+    1,
+    8,
+  ).map((claim, index) =>
+    enumValue(
+      claim,
+      SEMANTIC_CLAIMS,
+      `${path}.semanticClaims[${index}]`,
+    )
+  );
+  uniqueStrings(semanticClaims, `${path}.semanticClaims`);
+  validateSemanticClaims(kind, semanticClaims, path);
+  return {
+    id: id(artifact.id, `${path}.id`),
+    kind,
+    authenticity: enumValue(
+      artifact.authenticity,
+      ARTIFACT_AUTHENTICITY,
+      `${path}.authenticity`,
+    ),
+    state,
+    learnerVisibility,
+    sourceOperationKey,
+    claim: text(artifact.claim, `${path}.claim`),
+    semanticClaims,
+    retention: enumValue(
+      artifact.retention,
+      ARTIFACT_RETENTION,
+      `${path}.retention`,
+    ),
+    ...(observation === undefined
+      ? {}
+      : {
+        observation: {
+          operationKey: id(
+            observation.operationKey,
+            `${path}.observation.operationKey`,
+          ),
+          proofReference: proofReference(
+            observation.proofReference,
+            `${path}.observation.proofReference`,
+          ),
+        },
+      }),
+  };
+}
+
+function parseRetainedArtifact(
+  value: unknown,
+  path: string,
+  actorIds: ReadonlySet<string>,
+  artifactById: ReadonlyMap<string, ScenarioEvidenceArtifact>,
+  operationByKey: ReadonlyMap<string, ScenarioOperation>,
+): ScenarioRetainedArtifact {
+  const retained = record(value, path);
+  const artifactId = id(retained.artifactId, `${path}.artifactId`);
+  const artifact = artifactById.get(artifactId);
+  if (!artifact) {
+    throw new ScenarioManifestError(
+      `${path}.artifactId references unknown evidence artifact '${artifactId}'.`,
+    );
+  }
+  if (artifact.retention !== "retained") {
+    throw new ScenarioManifestError(
+      `${path}.artifactId must reference an artifact marked retained.`,
+    );
+  }
+  const custodianActorId = id(
+    retained.custodianActorId,
+    `${path}.custodianActorId`,
+  );
+  reference(
+    actorIds,
+    custodianActorId,
+    `${path}.custodianActorId`,
+    "actor",
+  );
+  const disposition = enumValue(
+    retained.disposition,
+    RETAINED_DISPOSITIONS,
+    `${path}.disposition`,
+  );
+  const cleanupOperationKey = retained.cleanupOperationKey === undefined
+    ? undefined
+    : id(retained.cleanupOperationKey, `${path}.cleanupOperationKey`);
+  if (disposition === "cleanup-later" && cleanupOperationKey === undefined) {
+    throw new ScenarioManifestError(
+      `${path}.cleanupOperationKey is required for cleanup-later disposition.`,
+    );
+  }
+  if (cleanupOperationKey !== undefined) {
+    const cleanupOperation = requireOperation(
+      operationByKey,
+      cleanupOperationKey,
+      `${path}.cleanupOperationKey`,
+      "cleanup",
+      "mutation",
+    );
+    if (cleanupOperation.ownerActorId !== custodianActorId) {
+      throw new ScenarioManifestError(
+        `${path}.custodianActorId must own the retained-artifact cleanup operation.`,
+      );
+    }
+    if (disposition === "cleanup-later") {
+      const sourceOperation = requireOperation(
+        operationByKey,
+        artifact.sourceOperationKey,
+        `${path}.artifactId source operation`,
+        "evidence",
+        "mutation",
+      );
+      if (sourceOperation.marker !== cleanupOperation.marker) {
+        throw new ScenarioManifestError(
+          `${path} source and cleanup operations must use the same marker.`,
+        );
+      }
+    }
+  }
+  return {
+    artifactId,
+    custodianActorId,
+    disposition,
+    rationale: text(retained.rationale, `${path}.rationale`),
+    ...(cleanupOperationKey === undefined ? {} : { cleanupOperationKey }),
+  };
+}
+
+function validateSemanticClaims(
+  kind: ScenarioArtifactKind,
+  claims: readonly ScenarioSemanticClaim[],
+  path: string,
+): void {
+  const allowed: Record<
+    ScenarioArtifactKind,
+    readonly ScenarioSemanticClaim[]
+  > = {
+    "application-recon-summary": ["application-reconnaissance"],
+    "outlook-email": ["outlook-email"],
+    "teams-missed-call": ["teams-missed-call"],
+    "avd-topology": ["avd-ready"],
+    "endpoint-posture": ["endpoint-managed"],
+    "private-network-topology": ["private-three-vm-topology"],
+    "cleanup-state": [
+      "endpoint-state-removed",
+      "expiry-removed",
+      "infrastructure-removed",
+      "permissions-revoked",
+      "sensitive-artifacts-absent",
+    ],
+  };
+  const unsupported = claims.find((claim) => !allowed[kind].includes(claim));
+  if (unsupported) {
+    throw new ScenarioManifestError(
+      `${path}.semanticClaims includes unsupported '${unsupported}' for ${kind}.`,
+    );
+  }
+}
+
+function validateLearnerEvidence(
+  completionState: ScenarioLearnerContract["completionState"],
+  artifactIds: readonly string[],
+  artifactById: ReadonlyMap<string, ScenarioEvidenceArtifact>,
+): void {
+  const artifacts = artifactIds.map((artifactId) => artifactById.get(artifactId)!);
+  if (
+    completionState === "available" &&
+    artifacts.some((artifact) =>
+      artifact.state !== "observed" &&
+      artifact.state !== "learner-completed" ||
+      artifact.learnerVisibility !== "observed"
+    )
+  ) {
+    throw new ScenarioManifestError(
+      "learner completionState available requires observed learner-visible evidence.",
+    );
+  }
+  if (
+    completionState === "completed" &&
+    artifacts.some((artifact) =>
+      artifact.state !== "learner-completed" ||
+      artifact.learnerVisibility !== "observed"
+    )
+  ) {
+    throw new ScenarioManifestError(
+      "learner completionState completed requires learner-completed visible evidence.",
+    );
+  }
+}
+
+function validateRetainedArtifacts(
+  artifacts: readonly ScenarioEvidenceArtifact[],
+  retainedArtifacts: readonly ScenarioRetainedArtifact[],
+): void {
+  const inventoried = new Set(
+    retainedArtifacts.map((artifact) => artifact.artifactId),
+  );
+  for (const artifact of artifacts) {
+    if (artifact.retention === "retained" && !inventoried.has(artifact.id)) {
+      throw new ScenarioManifestError(
+        `retained evidence artifact '${artifact.id}' requires a lifecycle inventory entry.`,
+      );
+    }
+    if (artifact.retention !== "retained" && inventoried.has(artifact.id)) {
+      throw new ScenarioManifestError(
+        `ephemeral evidence artifact '${artifact.id}' must not be inventoried as retained.`,
+      );
+    }
+  }
+}
+
+function requireOperation(
+  operations: ReadonlyMap<string, ScenarioOperation>,
+  operationKey: string,
+  path: string,
+  phase: ScenarioOperationPhase,
+  effect?: ScenarioOperation["effect"],
+): ScenarioOperation {
+  const operation = operations.get(operationKey);
+  if (!operation) {
+    throw new ScenarioManifestError(
+      `${path} references unknown operation '${operationKey}'.`,
+    );
+  }
+  if (operation.phase !== phase || (effect && operation.effect !== effect)) {
+    throw new ScenarioManifestError(
+      `${path} must reference a ${phase}${effect ? ` ${effect}` : ""} operation.`,
+    );
+  }
+  return operation;
+}
+
+function uniqueIds(
+  values: readonly { id: string }[],
+  kind: string,
+): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const value of values) {
+    if (ids.has(value.id)) {
+      throw new ScenarioManifestError(`${kind} id '${value.id}' is duplicated.`);
+    }
+    ids.add(value.id);
+  }
+  return ids;
+}
+
+function uniqueStrings(values: readonly string[], path: string): void {
+  if (new Set(values).size !== values.length) {
+    throw new ScenarioManifestError(`${path} must contain unique values.`);
+  }
+}
+
+function reference(
+  values: ReadonlySet<string>,
+  value: string,
+  path: string,
+  kind: string,
+): void {
+  if (!values.has(value)) {
+    throw new ScenarioManifestError(
+      `${path} references unknown ${kind} '${value}'.`,
+    );
+  }
+}
+
 function record(value: unknown, path: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new ScenarioManifestError(`${path} must be an object.`);
@@ -332,18 +1328,54 @@ function record(value: unknown, path: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function array(value: unknown, path: string): unknown[] {
+function boundedArray(
+  value: unknown,
+  path: string,
+  minimum: number,
+  maximum: number,
+): unknown[] {
   if (!Array.isArray(value)) {
     throw new ScenarioManifestError(`${path} must be an array.`);
+  }
+  if (value.length < minimum || value.length > maximum) {
+    throw new ScenarioManifestError(
+      `${path} must contain ${minimum}-${maximum} items.`,
+    );
   }
   return value;
 }
 
 function text(value: unknown, path: string): string {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new ScenarioManifestError(`${path} must be a non-empty string.`);
+  if (
+    typeof value !== "string" ||
+    value.trim() === "" ||
+    value.length > MAX_TEXT
+  ) {
+    throw new ScenarioManifestError(
+      `${path} must be a non-empty string of at most ${MAX_TEXT} characters.`,
+    );
   }
   return value;
+}
+
+function proofReference(value: unknown, path: string): string {
+  const parsed = text(value, path);
+  if (!/^canonical:[a-z0-9][a-z0-9/-]{2,199}$/.test(parsed)) {
+    throw new ScenarioManifestError(
+      `${path} must be a sanitized canonical evidence reference.`,
+    );
+  }
+  return parsed;
+}
+
+function id(value: unknown, path: string): string {
+  const parsed = text(value, path);
+  if (!/^[a-z0-9][a-z0-9._:-]{0,127}$/.test(parsed)) {
+    throw new ScenarioManifestError(
+      `${path} must be a lowercase stable identifier.`,
+    );
+  }
+  return parsed;
 }
 
 function enumValue<const Values extends readonly string[]>(
@@ -357,4 +1389,43 @@ function enumValue<const Values extends readonly string[]>(
     );
   }
   return value as Values[number];
+}
+
+function boolean(value: unknown, path: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new ScenarioManifestError(`${path} must be a boolean.`);
+  }
+  return value;
+}
+
+function nonNegativeNumber(value: unknown, path: string): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value < 0
+  ) {
+    throw new ScenarioManifestError(
+      `${path} must be a finite non-negative number.`,
+    );
+  }
+  return value;
+}
+
+function positiveNumber(value: unknown, path: string): number {
+  const parsed = nonNegativeNumber(value, path);
+  if (parsed <= 0) {
+    throw new ScenarioManifestError(`${path} must be greater than zero.`);
+  }
+  return parsed;
+}
+
+function timestamp(value: unknown, path: string): string {
+  const parsed = text(value, path);
+  if (
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(parsed) ||
+    !Number.isFinite(Date.parse(parsed))
+  ) {
+    throw new ScenarioManifestError(`${path} must be an ISO UTC timestamp.`);
+  }
+  return parsed;
 }

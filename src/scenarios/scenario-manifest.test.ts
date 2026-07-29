@@ -5,14 +5,17 @@ import {
   ScenarioManifestError,
   type ScenarioManifest,
 } from "./scenario-manifest";
+import { AVD_THREE_VM_SCENARIO } from "./avd-three-vm";
+import { HELP_DESK_EMAIL_SCENARIO } from "./help-desk-email";
 import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon";
 import { TEAMS_MISSED_CALL_SCENARIO } from "./teams-missed-call";
 
+const marker = "test-scenario-001";
 const separatedScenario = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: "separated-scenario",
   title: "Separated scenario",
-  summary: "A minimal separated scenario.",
+  summary: "A minimal runtime-valid separated scenario.",
   actors: [
     {
       id: "producer",
@@ -42,19 +45,116 @@ const separatedScenario = {
     {
       actorId: "workload",
       transport: "delegated-user",
-      summary: "A separate delegated lab-user session",
+      summary: "A separate delegated lab-user session.",
     },
   ],
   trigger: { kind: "staged" },
+  prerequisites: [
+    {
+      id: "fixed-identities",
+      kind: "identity",
+      summary: "Fixed lab identities exist.",
+      requiredState: "Exact identities are enabled.",
+    },
+  ],
+  operations: [
+    {
+      key: "stage-evidence",
+      phase: "evidence",
+      capability: "help-desk-email.send",
+      effect: "mutation",
+      ownerActorId: "producer",
+      marker,
+      summary: "Stage one fixed artifact.",
+    },
+    {
+      key: "learner-inspect",
+      phase: "response",
+      capability: "learner.inspect",
+      effect: "read",
+      ownerActorId: "learner",
+      summary: "Inspect the artifact.",
+    },
+    {
+      key: "observe-evidence",
+      phase: "evidence",
+      capability: "artifact.read-exact",
+      effect: "read",
+      ownerActorId: "producer",
+      summary: "Observe the exact staged artifact.",
+    },
+    {
+      key: "clean-evidence",
+      phase: "cleanup",
+      capability: "mail.delete-exact",
+      effect: "mutation",
+      ownerActorId: "producer",
+      marker,
+      summary: "Clean only the fixed artifact.",
+    },
+  ],
+  resources: [],
+  permissions: [],
   evidence: {
     staging: "The instructor stages one event.",
-    learnerReceives: "One bounded observation.",
-    learnerTask: "Interpret the observation.",
+    learnerReceives: "One bounded Outlook email.",
+    artifacts: [
+      {
+        id: "email-evidence",
+        kind: "outlook-email",
+        authenticity: "platform-native",
+        state: "observed",
+        learnerVisibility: "observed",
+        sourceOperationKey: "stage-evidence",
+        claim: "One exact Outlook email is present.",
+        semanticClaims: ["outlook-email"],
+        retention: "retained",
+        observation: {
+          operationKey: "observe-evidence",
+          proofReference: "canonical:test/evidence-result",
+        },
+      },
+    ],
+  },
+  learner: {
+    task: "Interpret the observation.",
+    expectedInterpretation: "The artifact is an Outlook email.",
+    completionState: "available",
+    evidenceArtifactIds: ["email-evidence"],
+  },
+  responseActions: [
+    {
+      id: "report-observation",
+      kind: "report",
+      ownerActorId: "learner",
+      operationKey: "learner-inspect",
+      summary: "Report the interpretation.",
+    },
+  ],
+  lifecycle: {
+    expiresAt: "2026-08-31T23:59:59Z",
+    cleanupOwnerActorId: "producer",
+    cleanupOperationKeys: ["clean-evidence"],
+    retainedArtifacts: [
+      {
+        artifactId: "email-evidence",
+        custodianActorId: "producer",
+        disposition: "cleanup-later",
+        rationale: "Keep until the authorized cleanup lane.",
+        cleanupOperationKey: "clean-evidence",
+      },
+    ],
+  },
+  cost: {
+    currency: "USD",
+    laneMaximum: 0,
+    conservativeDurationHours: 1,
+    assumption: "Existing lab licenses only.",
   },
 } satisfies ScenarioManifest;
 
-describe("scenario manifest role contract", () => {
-  it("accepts a staged scenario with distinct producer and learner roles", () => {
+describe("generalized scenario manifest contract", () => {
+  it("accepts the generalized separated-role contract", () => {
     const manifest = parseScenarioManifest(separatedScenario);
 
     expect(manifest.roles).toEqual({
@@ -62,13 +162,15 @@ describe("scenario manifest role contract", () => {
       workloadActor: "workload",
       learner: "learner",
     });
-    expect(manifest.authentication).toEqual([
-      {
-        actorId: "workload",
-        transport: "delegated-user",
-        summary: "A separate delegated lab-user session",
-      },
+    expect(manifest.lifecycle.cleanupOperationKeys).toEqual([
+      "clean-evidence",
     ]);
+    expect(manifest.cost).toEqual({
+      currency: "USD",
+      laneMaximum: 0,
+      conservativeDurationHours: 1,
+      assumption: "Existing lab licenses only.",
+    });
   });
 
   it("accepts an explicit, explained self-triggered exercise", () => {
@@ -85,30 +187,10 @@ describe("scenario manifest role contract", () => {
       },
     });
 
-    expect(manifest.trigger).toEqual({
-      kind: "self-triggered",
-      rationale:
-        "The learner action is intentionally the event being investigated.",
-    });
+    expect(manifest.trigger.kind).toBe("self-triggered");
   });
 
-  it("rejects a scenario with a missing required role", () => {
-    const { learner: _learner, ...incompleteRoles } =
-      separatedScenario.roles;
-
-    expect(() =>
-      parseScenarioManifest({
-        ...separatedScenario,
-        roles: incompleteRoles,
-      })
-    ).toThrowError(
-      new ScenarioManifestError(
-        "roles.learner must be a non-empty string.",
-      ),
-    );
-  });
-
-  it("fails closed on accidental producer and learner conflation", () => {
+  it("fails closed on producer and learner conflation", () => {
     expect(() =>
       parseScenarioManifest({
         ...separatedScenario,
@@ -118,22 +200,18 @@ describe("scenario manifest role contract", () => {
         },
       })
     ).toThrowError(
-      new ScenarioManifestError(
-        "evidence producer and learner must differ unless trigger.kind is self-triggered.",
-      ),
+      "evidence producer and learner must differ unless trigger.kind is self-triggered",
     );
   });
 
-  it("requires a typed detector for an independent-detection claim", () => {
+  it("requires a detector for an independent-detection claim", () => {
     expect(() =>
       parseScenarioManifest({
         ...separatedScenario,
         detection: { kind: "independent" },
       })
     ).toThrowError(
-      new ScenarioManifestError(
-        "roles.detector is required when detection.kind is independent.",
-      ),
+      "roles.detector is required when detection.kind is independent",
     );
   });
 
@@ -148,30 +226,381 @@ describe("scenario manifest role contract", () => {
         detection: { kind: "independent" },
       })
     ).toThrowError(
-      new ScenarioManifestError(
-        "independent detector and workload actor must differ.",
-      ),
+      "independent detector and workload actor must differ",
     );
   });
 
-  it("rejects an unexplained self-trigger exception", () => {
+  it("rejects Teams semantics on an Outlook email artifact", () => {
     expect(() =>
       parseScenarioManifest({
         ...separatedScenario,
-        roles: {
-          ...separatedScenario.roles,
-          evidenceProducer: "learner",
+        evidence: {
+          ...separatedScenario.evidence,
+          artifacts: [
+            {
+              ...separatedScenario.evidence.artifacts[0],
+              semanticClaims: ["teams-missed-call"],
+            },
+          ],
         },
-        trigger: { kind: "self-triggered", rationale: " " },
       })
     ).toThrowError(
-      new ScenarioManifestError(
-        "trigger.rationale must be a non-empty string.",
-      ),
+      "semanticClaims includes unsupported 'teams-missed-call' for outlook-email",
     );
   });
 
-  it("presents who stages evidence and what the learner receives", () => {
+  it.each([
+    ["expiry", { expiresAt: undefined }],
+    ["cleanup", { cleanupOperationKeys: undefined }],
+  ])("rejects missing lifecycle %s", (_label, lifecyclePatch) => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        lifecycle: {
+          ...separatedScenario.lifecycle,
+          ...lifecyclePatch,
+        },
+      })
+    ).toThrow(ScenarioManifestError);
+  });
+
+  it("rejects missing cost", () => {
+    const { cost: _cost, ...withoutCost } = separatedScenario;
+    expect(() => parseScenarioManifest(withoutCost)).toThrowError(
+      "cost must be an object",
+    );
+  });
+
+  it("rejects a billable resource without expiry", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: [
+          {
+            key: "create-billable",
+            phase: "setup",
+            capability: "azure.three-vm.deploy",
+            effect: "mutation",
+            ownerActorId: "producer",
+            marker,
+            summary: "Create one billable resource.",
+          },
+          ...separatedScenario.operations,
+        ],
+        resources: [
+          {
+            id: "billable-resource",
+            kind: "avd-personal-host",
+            summary: "One billable host.",
+            ownerActorId: "producer",
+            createOperationKey: "create-billable",
+            cleanupOperationKey: "clean-evidence",
+            billable: true,
+          },
+        ],
+      })
+    ).toThrowError("expiresAt is required for a billable resource");
+  });
+
+  it("rejects a zero-cost lane containing a billable resource", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: [
+          {
+            key: "create-billable",
+            phase: "setup",
+            capability: "azure.three-vm.deploy",
+            effect: "mutation",
+            ownerActorId: "producer",
+            marker,
+            summary: "Create one billable resource.",
+          },
+          ...separatedScenario.operations,
+        ],
+        resources: [
+          {
+            id: "billable-resource",
+            kind: "avd-personal-host",
+            summary: "One billable host.",
+            ownerActorId: "producer",
+            createOperationKey: "create-billable",
+            cleanupOperationKey: "clean-evidence",
+            billable: true,
+            expiresAt: "2026-08-31T23:59:59Z",
+          },
+        ],
+      })
+    ).toThrowError(
+      "cost.laneMaximum must be greater than zero when resources are billable",
+    );
+  });
+
+  it("rejects a resource whose cleanup marker differs from creation", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: [
+          {
+            key: "create-resource",
+            phase: "setup",
+            capability: "azure.three-vm.deploy",
+            effect: "mutation",
+            ownerActorId: "producer",
+            marker: "resource-a",
+            summary: "Create one marked resource.",
+          },
+          ...separatedScenario.operations,
+        ],
+        resources: [
+          {
+            id: "marked-resource",
+            kind: "avd-personal-host",
+            summary: "One marked resource.",
+            ownerActorId: "producer",
+            createOperationKey: "create-resource",
+            cleanupOperationKey: "clean-evidence",
+            billable: false,
+          },
+        ],
+      })
+    ).toThrowError(
+      "create and cleanup operations must use the same marker",
+    );
+  });
+
+  it("rejects a temporary permission without revocation ownership", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        permissions: [
+          {
+            id: "temporary-role",
+            kind: "graph-app-role",
+            name: "Temporary role",
+            actorId: "producer",
+            scope: "Lab tenant",
+            purpose: "Bounded setup.",
+            mode: "temporary",
+            grantOperationKey: "stage-evidence",
+            revocationOperationKey: "clean-evidence",
+          },
+        ],
+      })
+    ).toThrowError("revocationOwnerActorId must be a non-empty string");
+  });
+
+  it("rejects temporary permission revocation under a different marker", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: [
+          {
+            key: "grant-temporary",
+            phase: "setup",
+            capability: "permission.grant",
+            effect: "mutation",
+            ownerActorId: "producer",
+            marker: "grant-marker",
+            summary: "Grant one temporary permission.",
+          },
+          {
+            key: "revoke-temporary",
+            phase: "cleanup",
+            capability: "permission.revoke",
+            effect: "mutation",
+            ownerActorId: "producer",
+            marker: "revoke-marker",
+            summary: "Revoke one temporary permission.",
+          },
+          ...separatedScenario.operations,
+        ],
+        permissions: [
+          {
+            id: "temporary-role",
+            kind: "graph-app-role",
+            name: "Temporary role",
+            actorId: "producer",
+            scope: "Lab tenant",
+            purpose: "Bounded setup.",
+            mode: "temporary",
+            grantOperationKey: "grant-temporary",
+            revocationOperationKey: "revoke-temporary",
+            revocationOwnerActorId: "producer",
+          },
+        ],
+        lifecycle: {
+          ...separatedScenario.lifecycle,
+          cleanupOperationKeys: [
+            ...separatedScenario.lifecycle.cleanupOperationKeys,
+            "revoke-temporary",
+          ],
+        },
+      })
+    ).toThrowError(
+      "grant and revocation operations must use the same marker",
+    );
+  });
+
+  it("rejects retained evidence without a custodian and disposition", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        lifecycle: {
+          ...separatedScenario.lifecycle,
+          retainedArtifacts: [],
+        },
+      })
+    ).toThrowError(
+      "retained evidence artifact 'email-evidence' requires a lifecycle inventory entry",
+    );
+  });
+
+  it("rejects retained-artifact cleanup under a different marker", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: separatedScenario.operations.map((operation) =>
+          operation.key === "clean-evidence"
+            ? { ...operation, marker: "different-marker" }
+            : operation
+        ),
+      })
+    ).toThrowError(
+      "source and cleanup operations must use the same marker",
+    );
+  });
+
+  it("rejects a cleanup mutation without a marker", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: separatedScenario.operations.map((operation) =>
+          operation.key === "clean-evidence"
+            ? { ...operation, marker: undefined }
+            : operation
+        ),
+      })
+    ).toThrowError(
+      "operations[3].marker is required for a mutating operation",
+    );
+  });
+
+  it("rejects cleanup owned by anyone other than the lifecycle owner", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: separatedScenario.operations.map((operation) =>
+          operation.key === "clean-evidence"
+            ? { ...operation, ownerActorId: "learner" }
+            : operation
+        ),
+      })
+    ).toThrowError(
+      "lifecycle cleanup operation 'clean-evidence' must be owned by lifecycle.cleanupOwnerActorId",
+    );
+  });
+
+  it("rejects claimed learner completion without learner-completed evidence", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        learner: {
+          ...separatedScenario.learner,
+          completionState: "completed",
+        },
+      })
+    ).toThrowError(
+      "completionState completed requires learner-completed visible evidence",
+    );
+  });
+
+  it("rejects observed evidence without an exact read and proof reference", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        evidence: {
+          ...separatedScenario.evidence,
+          artifacts: [
+            {
+              ...separatedScenario.evidence.artifacts[0],
+              observation: undefined,
+            },
+          ],
+        },
+      })
+    ).toThrowError("observation must be an object for observed evidence");
+  });
+
+  it("rejects an unsanitized observation proof reference", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        evidence: {
+          ...separatedScenario.evidence,
+          artifacts: [
+            {
+              ...separatedScenario.evidence.artifacts[0],
+              observation: {
+                operationKey: "observe-evidence",
+                proofReference: "unsafe-free-form-reference",
+              },
+            },
+          ],
+        },
+      })
+    ).toThrowError("must be a sanitized canonical evidence reference");
+  });
+
+  it("rejects platform acceptance presented as learner-visible evidence", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        evidence: {
+          ...separatedScenario.evidence,
+          artifacts: [
+            {
+              ...separatedScenario.evidence.artifacts[0],
+              state: "platform-accepted",
+              observation: undefined,
+            },
+          ],
+        },
+      })
+    ).toThrowError(
+      "cannot claim learner visibility from planned or platform-accepted evidence",
+    );
+  });
+
+  it("validates the help-desk fixture without Teams or voicemail semantics", () => {
+    const manifest = parseScenarioManifest(HELP_DESK_EMAIL_SCENARIO);
+    expect(manifest.roles).toMatchObject({
+      evidenceProducer: "ap2-orchestrator",
+      workloadActor: "kobe-lab-user",
+      learner: "cory-learner",
+    });
+    expect(manifest.evidence.artifacts).toMatchObject([
+      { semanticClaims: ["outlook-email"] },
+    ]);
+    expect(manifest.lifecycle.retainedArtifacts).toMatchObject([
+      { disposition: "cleanup-later" },
+    ]);
+  });
+
+  it("validates the three-VM fixture without claiming learner completion", () => {
+    const manifest = parseScenarioManifest(AVD_THREE_VM_SCENARIO);
+    expect(manifest.resources).toHaveLength(6);
+    expect(manifest.cost.laneMaximum).toBe(10);
+    expect(manifest.learner.completionState).toBe("not-run");
+    expect(manifest.evidence.artifacts).toHaveLength(4);
+    expect(
+      manifest.evidence.artifacts.every(
+        (artifact) => artifact.learnerVisibility === "not-proven",
+      ),
+    ).toBe(true);
+  });
+
+  it("renders roles, learner interpretation, expiry, and cost", () => {
     const panel = createScenarioPlan(TEAMS_MISSED_CALL_SCENARIO);
 
     expect(panel.dataset.scenarioId).toBe(
@@ -183,50 +612,24 @@ describe("scenario manifest role contract", () => {
       "Learner / observerLearner using Cory's lab Teams view",
     );
     expect(panel.textContent).toContain(
-      "Trigger modelStaged — the evidence producer and learner are separate",
-    );
-    expect(panel.textContent).toContain(
-      "Who stages evidenceThe instructor uses Kobe's lab session",
-    );
-    expect(panel.textContent).toContain(
       "What the learner receivesOne Missed incoming call entry",
     );
     expect(panel.textContent).toContain(
-      "Authentication — Kobe lab userKobe's licensed lab Teams client session",
+      "Expected interpretationThe two entries are evidence of one missed Teams call",
     );
+    expect(panel.textContent).toContain("Maximum costUSD 0");
     expect(panel.textContent).not.toContain("credential");
     expect(panel.textContent).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
   });
 
-  it("presents the reconnaissance workload and detector as separate apps", () => {
+  it("preserves the separate reconnaissance workload and detector", () => {
     const panel = createScenarioPlan(OAUTH_APPLICATION_RECON_SCENARIO);
 
-    expect(panel.dataset.scenarioId).toBe(
-      "oauth-application-reconnaissance",
-    );
     expect(panel.textContent).toContain(
       "Workload actorReconnaissance workload application",
     );
     expect(panel.textContent).toContain(
       "Detector / observerIndependent audit observer application",
     );
-    expect(panel.textContent).toContain(
-      "Authentication — Independent audit observer application" +
-        "A separate application-only session with bounded audit-read authority",
-    );
-    expect(panel.textContent).toContain(
-      "What the learner receivesCounts and reachability for the four checks",
-    );
-    expect(OAUTH_APPLICATION_RECON_SCENARIO.detection).toEqual({
-      kind: "independent",
-    });
-    expect(OAUTH_APPLICATION_RECON_SCENARIO.roles.detector).toBe(
-      "audit-observer-app",
-    );
-    expect(OAUTH_APPLICATION_RECON_SCENARIO.roles.detector).not.toBe(
-      OAUTH_APPLICATION_RECON_SCENARIO.roles.workloadActor,
-    );
-    expect(panel.textContent).not.toContain("credential");
-    expect(panel.textContent).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
   });
 });

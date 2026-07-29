@@ -3,8 +3,10 @@ import {
   type ScenarioManifest,
 } from "./scenario-manifest";
 
+const marker = "ap2-application-recon-window";
+
 export const OAUTH_APPLICATION_RECON_SCENARIO = parseScenarioManifest({
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: "oauth-application-reconnaissance",
   title: "Application reconnaissance and audit observation",
   summary:
@@ -45,28 +47,140 @@ export const OAUTH_APPLICATION_RECON_SCENARIO = parseScenarioManifest({
     {
       actorId: "recon-workload-app",
       transport: "application-only",
-      summary: "A fixed lab application-only Microsoft Graph session",
+      summary: "A fixed lab application-only Microsoft Graph session.",
     },
     {
       actorId: "audit-observer-app",
       transport: "application-only",
       summary:
-        "A separate application-only session with bounded audit-read authority",
+        "A separate application-only session with bounded audit-read authority.",
     },
     {
       actorId: "security-learner",
       transport: "operator-session",
-      summary: "The learner receives sanitized scenario output only",
+      summary: "The learner receives sanitized scenario output only.",
     },
   ],
   trigger: { kind: "staged" },
   detection: { kind: "independent" },
+  prerequisites: [
+    {
+      id: "fixed-recon-applications",
+      kind: "identity",
+      summary: "The workload and audit observer are distinct fixed lab apps.",
+      requiredState: "Exact application identities and roles are verified.",
+    },
+  ],
+  operations: [
+    {
+      key: "run-bounded-recon-reads",
+      phase: "evidence",
+      capability: "artifact.read-exact",
+      effect: "read",
+      ownerActorId: "recon-workload-app",
+      summary: "Run only the four fixed read-only Graph checks.",
+    },
+    {
+      key: "observe-bounded-sign-in",
+      phase: "evidence",
+      capability: "artifact.read-exact",
+      effect: "read",
+      ownerActorId: "audit-observer-app",
+      summary: "Collect the bounded service-principal sign-in summary.",
+    },
+    {
+      key: "interpret-recon-summary",
+      phase: "response",
+      capability: "learner.inspect",
+      effect: "read",
+      ownerActorId: "security-learner",
+      summary: "Interpret the sanitized reachability and sign-in summary.",
+    },
+    {
+      key: "close-evidence-window",
+      phase: "cleanup",
+      capability: "evidence-window.close",
+      effect: "mutation",
+      ownerActorId: "recon-lab-harness",
+      marker,
+      summary: "Close the exact in-memory evidence window.",
+    },
+  ],
+  resources: [],
+  permissions: [
+    {
+      id: "recon-read-authority",
+      kind: "graph-app-role",
+      name: "Existing bounded reconnaissance reads",
+      actorId: "recon-workload-app",
+      scope: "Microsoft Graph application",
+      purpose: "Run the four fixed read-only checks.",
+      mode: "retained",
+      retentionRationale: "Existing lab application authority.",
+    },
+    {
+      id: "audit-read-authority",
+      kind: "graph-app-role",
+      name: "Existing bounded audit read",
+      actorId: "audit-observer-app",
+      scope: "Microsoft Graph application",
+      purpose: "Observe the bounded service-principal sign-in evidence.",
+      mode: "retained",
+      retentionRationale: "Existing lab observer authority.",
+    },
+  ],
   evidence: {
     staging:
-      "The lab harness runs four fixed read-only checks through the workload application, then uses the separate observer application to collect the bounded sign-in result.",
+      "The lab harness runs four fixed reads, then the separate observer collects the bounded sign-in result.",
     learnerReceives:
-      "Counts and reachability for the four checks plus a sanitized successful service-principal sign-in summary that names the producer and observer roles without secrets or internal IDs.",
-    learnerTask:
+      "Sanitized reachability counts and a successful service-principal sign-in summary without secrets or internal IDs.",
+    artifacts: [
+      {
+        id: "application-recon-summary",
+        kind: "application-recon-summary",
+        authenticity: "platform-control-plane",
+        state: "observed",
+        learnerVisibility: "observed",
+        sourceOperationKey: "run-bounded-recon-reads",
+        claim:
+          "The learner receives bounded read results plus a separately observed sign-in summary.",
+        semanticClaims: ["application-reconnaissance"],
+        retention: "ephemeral",
+        observation: {
+          operationKey: "observe-bounded-sign-in",
+          proofReference:
+            "canonical:proven-capabilities/application-reconnaissance",
+        },
+      },
+    ],
+  },
+  learner: {
+    task:
       "Explain what the application could survey, distinguish the workload actor from the detector, and state why a sign-in event does not prove each individual read.",
+    expectedInterpretation:
+      "The workload and detector are distinct, and one sign-in summary does not prove every individual Graph read.",
+    completionState: "available",
+    evidenceArtifactIds: ["application-recon-summary"],
+  },
+  responseActions: [
+    {
+      id: "report-recon-interpretation",
+      kind: "report",
+      ownerActorId: "security-learner",
+      operationKey: "interpret-recon-summary",
+      summary: "Report the bounded interpretation.",
+    },
+  ],
+  lifecycle: {
+    expiresAt: "2026-08-31T23:59:59Z",
+    cleanupOwnerActorId: "recon-lab-harness",
+    cleanupOperationKeys: ["close-evidence-window"],
+    retainedArtifacts: [],
+  },
+  cost: {
+    currency: "USD",
+    laneMaximum: 0,
+    conservativeDurationHours: 1,
+    assumption: "Existing AP2 lab applications only.",
   },
 } satisfies ScenarioManifest);
