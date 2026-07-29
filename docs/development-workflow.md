@@ -24,6 +24,15 @@ application-only sessions are not independent when they resolve to the same
 client. Environment-validation canaries may reuse a diagnostic identity only
 when they make no learner-scenario or independent-detector claim.
 
+For application-to-application scenarios, distinct client IDs alone are not
+enough. The reusable
+[distinct application identity contract](distinct-application-identity.md)
+binds exact application and service-principal identities, least role sets,
+fresh token claims and audience, tenant, marker window, evidence origin, and
+independent recovery ownership across the manifest, plan, readiness, and
+receipt. Unproven installation, cached tokens, attribution-defeating role
+overlap, or detector-generated evidence fails closed.
+
 For Azure or another platform, apply the same principle: use the identity that
 matches the behavior being tested. A development identity can prove a platform
 contract, but it does not prove that the eventual product identity or learner

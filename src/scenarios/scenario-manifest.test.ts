@@ -300,6 +300,37 @@ describe("generalized scenario manifest contract", () => {
     );
   });
 
+  it("validates the reusable application identity boundary against scenario roles and permissions", () => {
+    const canonical = structuredClone(OAUTH_APPLICATION_RECON_SCENARIO);
+    expect(parseScenarioManifest(canonical).applicationIdentityBoundary)
+      .toMatchObject({
+        producerActorId: "recon-workload-app",
+        detectorActorId: "audit-observer-app",
+        recoveryOwnerActorId: "recon-recovery-administrator",
+      });
+
+    const conflated = structuredClone(canonical);
+    conflated.applicationIdentityBoundary!.recoveryOwnerActorId =
+      "audit-observer-app";
+    expect(() => parseScenarioManifest(conflated)).toThrow(
+      "recovery, producer, and detector actors must differ",
+    );
+
+    const overlap = structuredClone(canonical);
+    overlap.applicationIdentityBoundary!.detectorPermissions = [
+      overlap.applicationIdentityBoundary!.producerPermissions[0]!,
+    ];
+    expect(() => parseScenarioManifest(overlap)).toThrow(
+      "producer and detector permissions must not overlap",
+    );
+
+    const undeclared = structuredClone(canonical);
+    undeclared.permissions = undeclared.permissions.slice(1);
+    expect(() => parseScenarioManifest(undeclared)).toThrow(
+      "permission requirements must exactly match manifest permissions",
+    );
+  });
+
   it("classifies every runnable and receipt-facing canonical role boundary", () => {
     const manifests = [
       ...SCENARIO_MANIFESTS,

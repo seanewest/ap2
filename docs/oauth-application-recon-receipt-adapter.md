@@ -22,7 +22,16 @@ impact, or audit completeness.
 Detector promotion requires a separately supplied current, untruncated exact
 service-principal sign-in match owned by the canonical detector. That event
 proves the workload token event only, not each read. The workload role cannot
-supply detector evidence. Learner visibility likewise requires a separate
+supply detector evidence. The detector observation must carry the exact
+planning request and protected readiness input from the
+[distinct application identity contract](distinct-application-identity.md).
+The adapter independently compiles the authoritative plan, reruns readiness,
+and requires its derived binding digest to equal the digest emitted by the
+bounded observer, then retains only the safe plan and binding digests. A
+detached or merely digest-shaped value cannot promote a receipt. This binds the exact manifest,
+plan, application/service-principal identities, least role assignments, fresh
+tokens, tenant, marker window, and independent recovery owner before receipt
+promotion. Learner visibility likewise requires a separate
 learner-owned observation; the canonical manifest says interpretation is
 available rather than completed, so the interpretation operation,
 interpretation claim, and response remain uninspected.

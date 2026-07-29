@@ -1,10 +1,15 @@
-import { realpathSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { ClientCertificateCredential } from "@azure/identity";
 import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   STUDENT_TENANT_ID,
 } from "../api/identity.ts";
+import {
+  verifyDistinctApplicationIdentityReadiness,
+  type ReadyApplicationIdentityBinding,
+} from "../src/scenarios/application-identity-readiness.ts";
+import { OAUTH_APPLICATION_RECON_SCENARIO } from "../src/scenarios/oauth-application-recon.ts";
 
 const GRAPH_SCOPE = "https://graph.microsoft.com/.default";
 const SIGN_INS_URL =
@@ -45,6 +50,7 @@ export interface OauthReconSigninObservation {
   observed: boolean;
   truncated: boolean;
   exactCorrelation: boolean;
+  identityBindingDigestSha256: string;
 }
 
 export function requiredObservationWindow(
@@ -66,9 +72,41 @@ export async function observeOauthReconSignin(
   window: Window,
   credential: GraphCredential,
   observerClientId: string,
+  identityBinding: ReadyApplicationIdentityBinding,
   request: typeof fetch = fetch,
 ): Promise<OauthReconSigninObservation> {
   requireDistinctObserver(observerClientId);
+  if (
+    identityBinding.status !== "ready" ||
+    identityBinding.scenarioId !==
+      OAUTH_APPLICATION_RECON_SCENARIO.id ||
+    identityBinding.roles.producer !==
+      OAUTH_APPLICATION_RECON_SCENARIO.roles.workloadActor ||
+    identityBinding.roles.detector !==
+      OAUTH_APPLICATION_RECON_SCENARIO.roles.detector ||
+    identityBinding.runtimeBinding.producer.applicationId !==
+      DEVELOPMENT_AUTOMATION_CLIENT_ID ||
+    identityBinding.runtimeBinding.producer.servicePrincipalId !==
+      DEVELOPMENT_AUTOMATION_SERVICE_PRINCIPAL_ID ||
+    identityBinding.runtimeBinding.producer.tenantId !== STUDENT_TENANT_ID ||
+    identityBinding.runtimeBinding.detector.applicationId !==
+      observerClientId.toLowerCase() ||
+    identityBinding.runtimeBinding.detector.tenantId !== STUDENT_TENANT_ID ||
+    identityBinding.runtimeBinding.evidence.sourceApplicationId !==
+      DEVELOPMENT_AUTOMATION_CLIENT_ID ||
+    identityBinding.runtimeBinding.evidence.sourceServicePrincipalId !==
+      DEVELOPMENT_AUTOMATION_SERVICE_PRINCIPAL_ID ||
+    identityBinding.runtimeBinding.evidence.observerApplicationId !==
+      observerClientId.toLowerCase() ||
+    identityBinding.runtimeBinding.evidence.marker !==
+      OAUTH_APPLICATION_RECON_SCENARIO.operations.find(
+        ({ key }) => key === "close-evidence-window",
+      )?.marker ||
+    identityBinding.runtimeBinding.evidence.windowStart !== window.start ||
+    identityBinding.runtimeBinding.evidence.windowEnd !== window.end
+  ) {
+    throw new Error("Exact application identity readiness is required.");
+  }
   let access: { token: string } | null;
   try {
     access = await credential.getToken(GRAPH_SCOPE);
@@ -132,6 +170,8 @@ export async function observeOauthReconSignin(
     observed,
     truncated: typeof nextLink === "string" || signIns.length === TOP,
     exactCorrelation,
+    identityBindingDigestSha256:
+      identityBinding.bindingDigestSha256,
   };
 }
 
@@ -258,10 +298,30 @@ function secureCertificatePath(configured: string | undefined): string {
   }
 }
 
+function secureJson(pathValue: string | undefined): unknown {
+  try {
+    if (!pathValue) throw new Error();
+    const path = realpathSync(pathValue);
+    if ((statSync(path).mode & 0o077) !== 0) throw new Error();
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    throw new Error("Identity readiness configuration is invalid.");
+  }
+}
+
 async function main(): Promise<void> {
   const window = argumentsFrom(process.argv.slice(2));
   const observerClientId = process.env.AP2_OBSERVER_CLIENT_ID ?? "";
   requireDistinctObserver(observerClientId);
+  const planDigest = process.env.AP2_SCENARIO_PLAN_DIGEST_SHA256 ?? "";
+  const identityBinding = verifyDistinctApplicationIdentityReadiness(
+    OAUTH_APPLICATION_RECON_SCENARIO,
+    planDigest,
+    secureJson(process.env.AP2_APPLICATION_IDENTITY_READINESS_PATH),
+  );
+  if (identityBinding.status !== "ready") {
+    throw new Error("Exact application identity readiness is required.");
+  }
   const credential = new ClientCertificateCredential(
     STUDENT_TENANT_ID,
     observerClientId,
@@ -273,6 +333,7 @@ async function main(): Promise<void> {
         window,
         credential,
         observerClientId,
+        identityBinding,
       ),
       null,
       2,

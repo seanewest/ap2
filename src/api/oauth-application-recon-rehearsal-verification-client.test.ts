@@ -169,7 +169,7 @@ function expected(
     planDigestSha256: output.binding!.planDigestSha256,
     fakeResultDigestSha256: output.binding!.fakeResultDigestSha256,
     outputDigestSha256:
-      "1d89edb8b710176d63026723b842d4e1e36f801b3abf058fb36dbc6617a5c9bc",
+      "5bff66e08b05f871c21c5491d85314e64add30ce89bfdab734e2b35182dc378b",
     fakeContract: "ordered-four-read-terminal-verified",
     adapter: "accepted",
     receiptVerifier: "accepted",

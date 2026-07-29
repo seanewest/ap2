@@ -6,13 +6,123 @@ import {
   OauthReconReceiptAdapterError,
   type OauthApplicationReconReceiptAdapterInput,
 } from "./oauth-application-recon-receipt-adapter.ts";
+import { compileScenarioExecutionPlan } from "./scenario-plan.ts";
+import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon.ts";
+import { verifyDistinctApplicationIdentityReadiness } from "./application-identity-readiness.ts";
+
+const GRAPH = "00000003-0000-0000-c000-000000000000";
+const PRODUCER_APP = "22222222-2222-4222-8222-222222222222";
+const PRODUCER_SP = "33333333-3333-4333-8333-333333333333";
+const DETECTOR_APP = "44444444-4444-4444-8444-444444444444";
+const DETECTOR_SP = "55555555-5555-4555-8555-555555555555";
+const TENANT = "11111111-1111-4111-8111-111111111111";
+const PLANNING_REQUEST = {
+  scenarioId: "oauth-application-reconnaissance",
+  actorAliases: {
+    evidenceProducer: "harness",
+    workloadActor: "producer",
+    learner: "learner",
+    detector: "detector",
+    cleanupOwner: "harness",
+  },
+  now: "2026-07-29T12:00:00.000Z",
+  expiresAt: "2026-07-29T13:00:00.000Z",
+  maximumBudgetUsd: 0,
+  selectedResponseId: "report-recon-interpretation",
+} as const;
+const PLAN = compileScenarioExecutionPlan(PLANNING_REQUEST);
+
+function assignment(applicationRoleId: string) {
+  return {
+    resourceApplicationId: GRAPH,
+    applicationRoleId,
+    assignment: "present-exact" as const,
+  };
+}
+
+function identityBinding() {
+  const readiness = {
+      schemaVersion: 1 as const,
+      scenarioId: "oauth-application-reconnaissance",
+      planDigestSha256: PLAN.digestSha256,
+      producer: {
+        actorId: "recon-workload-app",
+        applicationId: PRODUCER_APP,
+        servicePrincipalId: PRODUCER_SP,
+        tenantId: TENANT,
+        installation: "application-and-service-principal-present" as const,
+        assignedApplicationRoles: [
+          assignment("98830695-27a2-44f7-8c18-0c3ebc9698f6"),
+          assignment("810c84a8-4a9e-49e6-bf7d-12d183f40d01"),
+          assignment("01d4889c-1287-42c6-ac1f-5d1e02578ef6"),
+        ],
+        token: {
+          source: "fresh-after-assignment-read" as const,
+          audience: "https://graph.microsoft.com",
+          applicationId: PRODUCER_APP,
+          tenantId: TENANT,
+          assignmentSnapshotAt: "2026-07-29T12:00:00.000Z",
+          acquiredAt: "2026-07-29T12:00:01.000Z",
+        },
+      },
+      detector: {
+        actorId: "audit-observer-app",
+        applicationId: DETECTOR_APP,
+        servicePrincipalId: DETECTOR_SP,
+        tenantId: TENANT,
+        installation: "application-and-service-principal-present" as const,
+        assignedApplicationRoles: [
+          assignment("b0afded3-3588-46d8-8b3d-9842eff778da"),
+        ],
+        token: {
+          source: "fresh-after-assignment-read" as const,
+          audience: "https://graph.microsoft.com",
+          applicationId: DETECTOR_APP,
+          tenantId: TENANT,
+          assignmentSnapshotAt: "2026-07-29T12:00:00.000Z",
+          acquiredAt: "2026-07-29T12:00:02.000Z",
+        },
+      },
+      recovery: {
+        actorId: "recon-recovery-administrator",
+        principalObjectId: "66666666-6666-4666-8666-666666666666",
+        ownership: "independent-human-administrator" as const,
+      },
+      evidence: {
+        producerActorId: "recon-workload-app",
+        detectorActorId: "audit-observer-app",
+        sourceApplicationId: PRODUCER_APP,
+        sourceServicePrincipalId: PRODUCER_SP,
+        observerApplicationId: DETECTOR_APP,
+        marker: "ap2-application-recon-window",
+        windowStart: "2026-07-29T12:00:00.000Z",
+        windowEnd: "2026-07-29T12:15:00.000Z",
+        detectorGeneratedEvidence: false as const,
+        correlation: "exact-producer-token-event-in-marker-window" as const,
+      },
+  };
+  const verified = verifyDistinctApplicationIdentityReadiness(
+    OAUTH_APPLICATION_RECON_SCENARIO,
+    PLAN.digestSha256,
+    readiness,
+  );
+  if (verified.status !== "ready") {
+    throw new Error("test identity binding must be ready");
+  }
+  return {
+    observedBindingDigestSha256: verified.bindingDigestSha256,
+    planningRequest: PLANNING_REQUEST,
+    readiness,
+  };
+}
 
 function input(): OauthApplicationReconReceiptAdapterInput {
   return structuredClone(canonicalOauthApplicationReconReceiptAdapterInput());
 }
 
-function detectorObserved(): NonNullable<
-  OauthApplicationReconReceiptAdapterInput["detector"]
+function detectorObserved(): Extract<
+  OauthApplicationReconReceiptAdapterInput["detector"],
+  { state: "observed" }
 > {
   return {
     state: "observed",
@@ -24,6 +134,7 @@ function detectorObserved(): NonNullable<
     freshness: "current-bounded-window",
     collection: "complete-within-bound",
     attribution: "token-event-only",
+    identityBinding: identityBinding(),
   };
 }
 
@@ -121,6 +232,7 @@ describe("OAuth application reconnaissance receipt adapter", () => {
       observerActorId: "audit-observer-app",
       operationKey: "observe-bounded-sign-in",
       outcome: "record-match",
+      identityBindingDigestSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
     expect(verified.missingCoverage).not.toContain("detector-independent");
   });
@@ -270,6 +382,43 @@ describe("OAuth application reconnaissance receipt adapter", () => {
         value.detector = {
           ...detectorObserved(),
           attribution: "four-reads-proven",
+        };
+      },
+    },
+    {
+      name: "missing exact identity binding",
+      code: "shape",
+      mutate: (value: Record<string, unknown>) => {
+        const detector = detectorObserved() as unknown as Record<
+          string,
+          unknown
+        >;
+        delete detector.identityBinding;
+        value.detector = detector;
+      },
+    },
+    {
+      name: "mismatched exact identity binding",
+      code: "detector-mismatch",
+      mutate: (value: Record<string, unknown>) => {
+        const binding = identityBinding();
+        binding.readiness.planDigestSha256 = "f".repeat(64);
+        value.detector = {
+          ...detectorObserved(),
+          identityBinding: binding,
+        };
+      },
+    },
+    {
+      name: "observer digest detached from exact identity binding",
+      code: "detector-mismatch",
+      mutate: (value: Record<string, unknown>) => {
+        value.detector = {
+          ...detectorObserved(),
+          identityBinding: {
+            ...identityBinding(),
+            observedBindingDigestSha256: "f".repeat(64),
+          },
         };
       },
     },

@@ -6,7 +6,7 @@
   "binding": {
     "scenarioId": "oauth-application-reconnaissance",
     "manifestSchemaVersion": 2,
-    "planDigestSha256": "684176156e1922802a25500095726183ca02a89fb019f9143de53aa1be201fe7",
+    "planDigestSha256": "f42e9de96b925826282151a093359c676eefb6c02e3cd26b0430c58f58921a44",
     "fakeResultDigestSha256": "1e10c070c8c8e10d5cc179cacf523cf2156508500ac0de842eaab7218bf79080"
   },
   "stages": {

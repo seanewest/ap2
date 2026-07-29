@@ -5,6 +5,14 @@ import {
   type ScenarioEvidenceReceipt,
 } from "./scenario-evidence-receipt.ts";
 import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon.ts";
+import {
+  verifyDistinctApplicationIdentityReadiness,
+  type DistinctApplicationIdentityReadinessInput,
+} from "./application-identity-readiness.ts";
+import {
+  compileScenarioExecutionPlan,
+  type ScenarioPlanningRequest,
+} from "./scenario-plan.ts";
 import type {
   ScenarioAdapterCapabilityDeclaration,
 } from "./scenario-surface-capability.ts";
@@ -108,6 +116,11 @@ export type OauthReconDetectorObservation =
       freshness: "current-bounded-window";
       collection: "complete-within-bound";
       attribution: "token-event-only";
+      identityBinding: {
+        observedBindingDigestSha256: string;
+        planningRequest: ScenarioPlanningRequest;
+        readiness: DistinctApplicationIdentityReadinessInput;
+      };
     };
 
 export type OauthReconLearnerObservation =
@@ -140,6 +153,30 @@ export interface OauthApplicationReconReceiptAdapterInput {
   detector: OauthReconDetectorObservation;
   learner: OauthReconLearnerObservation;
   cleanup: OauthReconCleanupObservation;
+}
+
+type VerifiedOauthReconDetectorObservation =
+  | { state: "uninspected" }
+  | {
+      state: "observed";
+      observerRole: "detector";
+      workloadRole: "workloadActor";
+      operation: typeof DETECTOR_OPERATION;
+      event: "successful-service-principal-sign-in";
+      match: "exact-workload-token-event";
+      freshness: "current-bounded-window";
+      collection: "complete-within-bound";
+      attribution: "token-event-only";
+      identityBinding: {
+        contract: "distinct-application-identity/v1";
+        planDigestSha256: string;
+        bindingDigestSha256: string;
+      };
+    };
+
+interface ParsedOauthApplicationReconReceiptAdapterInput
+  extends Omit<OauthApplicationReconReceiptAdapterInput, "detector"> {
+  detector: VerifiedOauthReconDetectorObservation;
 }
 
 export type OauthReconReceiptAdapterErrorCode =
@@ -212,14 +249,40 @@ export function canonicalOauthApplicationReconReceiptAdapterInput():
 export function adaptOauthApplicationReconToReceipt(
   value: unknown,
 ): ScenarioEvidenceReceipt {
-  rejectUnsafeInput(value);
+  rejectOversizedInput(value);
+  rejectUnsafeInput(withProtectedBindingRedacted(value));
   const input = parseInput(value);
   const receipt = buildReceipt(input);
   verifyCanonicalScenarioEvidenceReceipt(receipt);
   return deepFreeze(receipt);
 }
 
-function parseInput(value: unknown): OauthApplicationReconReceiptAdapterInput {
+function withProtectedBindingRedacted(value: unknown): unknown {
+  if (!isPlainRecord(value) || !isPlainRecord(value.detector)) return value;
+  if (!Object.hasOwn(value.detector, "identityBinding")) return value;
+  return {
+    ...value,
+    detector: {
+      ...value.detector,
+      identityBinding: "verified-protected-binding",
+    },
+  };
+}
+
+function rejectOversizedInput(value: unknown): void {
+  try {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined || encoded.length > MAX_INPUT_BYTES) {
+      throw new Error();
+    }
+  } catch {
+    throw failure("unsafe-input", "input exceeds the safe bound.");
+  }
+}
+
+function parseInput(
+  value: unknown,
+): ParsedOauthApplicationReconReceiptAdapterInput {
   const input = record(value);
   exactKeys(input, [
     "schemaVersion",
@@ -342,7 +405,7 @@ function parseStep(value: unknown, index: number): OauthReconStep {
     } as OauthReconStep;
 }
 
-function parseDetector(value: unknown): OauthReconDetectorObservation {
+function parseDetector(value: unknown): VerifiedOauthReconDetectorObservation {
   const detector = record(value);
   if (detector.state === "uninspected") {
     exactKeys(detector, ["state"]);
@@ -358,6 +421,7 @@ function parseDetector(value: unknown): OauthReconDetectorObservation {
     "freshness",
     "collection",
     "attribution",
+    "identityBinding",
   ]);
   if (
     detector.observerRole === "workloadActor" ||
@@ -398,6 +462,7 @@ function parseDetector(value: unknown): OauthReconDetectorObservation {
       "detector observation does not match the canonical sign-in contract.",
     );
   }
+  const identityBinding = parseIdentityBinding(detector.identityBinding);
   return {
     state: "observed",
     observerRole: "detector",
@@ -408,6 +473,64 @@ function parseDetector(value: unknown): OauthReconDetectorObservation {
     freshness: "current-bounded-window",
     collection: "complete-within-bound",
     attribution: "token-event-only",
+    identityBinding,
+  };
+}
+
+function parseIdentityBinding(
+  value: unknown,
+): Extract<
+  VerifiedOauthReconDetectorObservation,
+  { state: "observed" }
+>["identityBinding"] {
+  let plan;
+  let binding: Record<string, unknown>;
+  try {
+    binding = record(value);
+    exactKeys(binding, [
+      "observedBindingDigestSha256",
+      "planningRequest",
+      "readiness",
+    ]);
+    plan = compileScenarioExecutionPlan(
+      binding.planningRequest as ScenarioPlanningRequest,
+    );
+  } catch {
+    throw failure(
+      "detector-mismatch",
+      "detector evidence requires the verified exact identity binding.",
+    );
+  }
+  if (plan.scenarioId !== SCENARIO_ID) {
+    throw failure(
+      "detector-mismatch",
+      "detector evidence requires the verified exact identity binding.",
+    );
+  }
+  const readiness = verifyDistinctApplicationIdentityReadiness(
+    OAUTH_APPLICATION_RECON_SCENARIO,
+    plan.digestSha256,
+    binding.readiness,
+  );
+  if (readiness.status !== "ready") {
+    throw failure(
+      "detector-mismatch",
+      "detector evidence requires the verified exact identity binding.",
+    );
+  }
+  if (
+    typeof binding.observedBindingDigestSha256 !== "string" ||
+    binding.observedBindingDigestSha256 !== readiness.bindingDigestSha256
+  ) {
+    throw failure(
+      "detector-mismatch",
+      "observer output does not match the verified identity binding.",
+    );
+  }
+  return {
+    contract: "distinct-application-identity/v1",
+    planDigestSha256: plan.digestSha256,
+    bindingDigestSha256: readiness.bindingDigestSha256,
   };
 }
 
@@ -508,7 +631,7 @@ function parseCleanup(value: unknown): OauthReconCleanupObservation {
 }
 
 function buildReceipt(
-  input: OauthApplicationReconReceiptAdapterInput,
+  input: ParsedOauthApplicationReconReceiptAdapterInput,
 ): ScenarioEvidenceReceipt {
   const manifest = OAUTH_APPLICATION_RECON_SCENARIO;
   const detectorObserved = input.detector.state === "observed";
@@ -524,6 +647,9 @@ function buildReceipt(
     "record-match",
     manifest.roles.detector!,
     DETECTOR_OPERATION,
+    input.detector.state === "observed"
+      ? input.detector.identityBinding.bindingDigestSha256
+      : undefined,
   );
   const learnerObservation = observation(
     "learner-view",
@@ -719,8 +845,17 @@ function observation(
   outcome: EvidenceReceiptObservation["outcome"],
   observerActorId: string,
   operationKey: string,
+  identityBindingDigestSha256?: string,
 ): EvidenceReceiptObservation {
-  return { source, outcome, observerActorId, operationKey };
+  return {
+    source,
+    outcome,
+    observerActorId,
+    operationKey,
+    ...(identityBindingDigestSha256 === undefined
+      ? {}
+      : { identityBindingDigestSha256 }),
+  };
 }
 
 function rejectUnsafeInput(value: unknown): void {
@@ -768,6 +903,10 @@ function rejectUnsafeInput(value: unknown): void {
     }
   };
   visit(value, 0);
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function record(value: unknown): Record<string, unknown> {
