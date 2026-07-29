@@ -128,7 +128,7 @@ describe("canonical scenario surface inventory", () => {
       ({ scenarioId }) => scenarioId === "oauth-application-reconnaissance",
     )!;
     expect(oauthRecon.surfaces.adapter.status).toBe("implemented");
-    expect(oauthRecon.surfaces.rehearsal.status).toBe("missing");
+    expect(oauthRecon.surfaces.rehearsal.status).toBe("implemented");
 
     for (
       const row of first.scenarios.filter(
