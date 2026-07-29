@@ -29,7 +29,7 @@ contain unsafe, stale, duplicate, unknown, or unsupported claims.
 | --- | --- | --- | --- | --- | --- | --- |
 | `avd-three-vm-substrate` | implemented | implemented | implemented | implemented | implemented | implemented |
 | `help-desk-email-observation` | implemented | implemented | implemented | implemented | implemented | implemented |
-| `oauth-application-reconnaissance` | implemented | implemented | implemented | implemented | missing | missing |
+| `oauth-application-reconnaissance` | implemented | implemented | implemented | implemented | implemented | implemented |
 | `private-document-evidence` | implemented | implemented | implemented | implemented | implemented | implemented |
 | `teams-missed-call-observation` | implemented | implemented | implemented | implemented | implemented | missing |
 

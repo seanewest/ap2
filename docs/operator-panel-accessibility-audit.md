@@ -16,6 +16,7 @@ cloud, workload, or Windows-host request.
 | Private-document rehearsal verification | Verify private-document rehearsal | Described input, local validation, busy/disabled form, focused live result/refusal, stale replacement |
 | Help-desk email rehearsal verification | Verify help-desk rehearsal | Described input, local validation, busy/disabled form, focused live result/refusal, stale replacement |
 | Teams missed-call rehearsal verification | Verify Teams rehearsal | Described input, local validation, busy/disabled form, duplicate blocking, focused live result/refusal, stale replacement |
+| Application-reconnaissance rehearsal verification | Verify application-reconnaissance rehearsal | Described input, local validation before authorization, busy/disabled form, duplicate blocking, focused fixed result/refusal, stale replacement |
 
 The shared browser audit fixes the viewport at 320 CSS pixels, requests reduced
 motion, checks region and action names, verifies control-before-submit keyboard

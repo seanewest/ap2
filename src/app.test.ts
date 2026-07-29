@@ -16,6 +16,7 @@ import {
   BatchFeasibilityClientError,
   HelpDeskEmailRehearsalVerificationClientError,
   OneDriveInviteFailureError,
+  OauthApplicationReconRehearsalVerificationClientError,
   PrivateDocumentRehearsalVerificationClientError,
   RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
@@ -46,6 +47,9 @@ import {
 import {
   parseTeamsMissedCallRehearsalVerificationRequest,
 } from "./api/teams-missed-call-rehearsal-verification-contract";
+import {
+  parseOauthApplicationReconRehearsalVerificationRequest,
+} from "./api/oauth-application-recon-rehearsal-verification-contract";
 import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
 import { CANONICAL_RECEIPT_FIXTURES } from "./scenarios/scenario-evidence-receipt.fixtures";
 import { verifyCanonicalScenarioEvidenceReceipt } from "./scenarios/scenario-evidence-verification";
@@ -63,6 +67,9 @@ import {
 import {
   verifyTeamsMissedCallRehearsalOutput,
 } from "../scripts/verify-teams-missed-call-rehearsal-output";
+import {
+  verifyOauthApplicationReconRehearsalOutput,
+} from "../scripts/verify-oauth-application-recon-rehearsal-output";
 
 const privateDocumentRehearsalOutput =
   parsePrivateDocumentRehearsalVerificationRequest(JSON.parse(readFileSync(
@@ -87,6 +94,17 @@ const teamsRehearsalOutput =
   )) as unknown);
 const teamsRehearsalSummary =
   verifyTeamsMissedCallRehearsalOutput(teamsRehearsalOutput);
+const oauthApplicationReconRehearsalOutput =
+  parseOauthApplicationReconRehearsalVerificationRequest(
+    JSON.parse(readFileSync(
+      resolve("scripts/fixtures/oauth-application-recon-rehearsal-output.json"),
+      "utf8",
+    )) as unknown,
+  );
+const oauthApplicationReconRehearsalSummary =
+  verifyOauthApplicationReconRehearsalOutput(
+    oauthApplicationReconRehearsalOutput,
+  );
 
 const account: AccountIdentity = {
   accountId: "student-object-id",
@@ -2256,6 +2274,150 @@ describe("After Party authentication UI", () => {
       expect(api.verifyTeamsMissedCallRehearsalOutput).toHaveBeenCalledTimes(
         reachesApi ? 1 : 0,
       );
+    },
+  );
+
+  it("verifies OAuth application-recon output only after explicit signed submission", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.verifyOauthApplicationReconRehearsalOutput.mockResolvedValue(
+      oauthApplicationReconRehearsalSummary,
+    );
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".oauth-recon-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify(oauthApplicationReconRehearsalOutput);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyOauthApplicationReconRehearsalOutput).not
+      .toHaveBeenCalled();
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.verifyOauthApplicationReconRehearsalOutput).toHaveBeenCalledWith(
+      "temporary-token",
+      oauthApplicationReconRehearsalOutput,
+    );
+    expect(panel.textContent).toContain("Network-free contract verified");
+    expect(panel.textContent).not.toContain("temporary-token");
+    expect(panel.textContent).not.toContain(
+      oauthApplicationReconRehearsalSummary.planDigestSha256,
+    );
+  });
+
+  it("refuses unsafe OAuth application-recon output before authorization", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".oauth-recon-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify({
+      ...oauthApplicationReconRehearsalOutput,
+      unsafe: ["operator", "example.invalid"].join("@"),
+    });
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+
+    expect(panel.textContent).toContain("Local validation failed");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyOauthApplicationReconRehearsalOutput).not
+      .toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new AccessTokenError("raw expired session detail"),
+      "operator session expired",
+      false,
+    ],
+    [
+      new OauthApplicationReconRehearsalVerificationClientError(
+        "unauthorized",
+      ),
+      "operator session expired",
+      true,
+    ],
+    [
+      new OauthApplicationReconRehearsalVerificationClientError("forbidden"),
+      "not authorized",
+      true,
+    ],
+    [
+      new OauthApplicationReconRehearsalVerificationClientError(
+        "validation-refused",
+        "FAKE_CONTRACT_BINDING",
+      ),
+      "inconsistent or tampered",
+      true,
+    ],
+    [
+      new OauthApplicationReconRehearsalVerificationClientError(
+        "request-too-large",
+      ),
+      "request-size limit",
+      true,
+    ],
+    [
+      new OauthApplicationReconRehearsalVerificationClientError(
+        "response-too-large",
+      ),
+      "response-size limit",
+      true,
+    ],
+    [
+      new OauthApplicationReconRehearsalVerificationClientError(
+        "safe-failure",
+      ),
+      "verification is unavailable",
+      true,
+    ],
+  ] as const)(
+    "maps typed OAuth application-recon failure without rendering detail",
+    async (failure, message, reachesApi) => {
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      authentication.acquireAccessToken.mockImplementation(async () => {
+        if (!reachesApi) throw failure;
+        return "temporary-token";
+      });
+      if (reachesApi) {
+        api.verifyOauthApplicationReconRehearsalOutput.mockRejectedValue(
+          failure,
+        );
+      }
+      await createAfterPartyApp(root, authentication, api).start();
+      const panel = root.querySelector<HTMLElement>(
+        ".oauth-recon-rehearsal-verification",
+      )!;
+      const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+      input.value = JSON.stringify(oauthApplicationReconRehearsalOutput);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+      await nextTask();
+
+      expect(panel.textContent).toContain(message);
+      expect(panel.textContent).not.toContain(failure.message);
+      expect(
+        api.verifyOauthApplicationReconRehearsalOutput,
+      ).toHaveBeenCalledTimes(reachesApi ? 1 : 0);
     },
   );
 
