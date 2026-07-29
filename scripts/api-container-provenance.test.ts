@@ -1,0 +1,301 @@
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  createApiContainerProvenance,
+  serializeApiContainerProvenance,
+  summarizeApiContainerProvenance,
+} from "./api-container-provenance.ts";
+
+const temporaryRoots: string[] = [];
+
+describe("API container provenance", () => {
+  afterEach(() => {
+    for (const root of temporaryRoots.splice(0)) {
+      rmSync(root, { force: true, recursive: true });
+    }
+  });
+
+  it("produces a deterministic bounded manifest without source or resolution contents", () => {
+    const root = fixtureRepository();
+    const first = createApiContainerProvenance(root);
+    const second = createApiContainerProvenance(root);
+
+    expect(second).toEqual(first);
+    expect(first.baseImage).toEqual({
+      classification: "mutable-version-tag",
+      reference: "mcr.microsoft.com/playwright:v1.2.3-noble",
+      runtimeComponents: "reference-bound-not-enumerated",
+    });
+    expect(first.productionComponents.count).toBe(1);
+    expect(first.productionComponents.components).toEqual([
+      {
+        integrity: "sha512-fixture",
+        name: "playwright",
+        optional: false,
+        version: "1.2.3",
+      },
+    ]);
+    const serialized = serializeApiContainerProvenance(first);
+    expect(serialized.endsWith("\n")).toBe(true);
+    expect(serialized).not.toContain("private-source-sentinel");
+    expect(serialized).not.toContain("registry.npmjs.org");
+    expect(summarizeApiContainerProvenance(first)).toEqual({
+      schemaVersion: 1,
+      label: "API_CONTAINER_PROVENANCE",
+      status: "pass",
+      baseImage: "mcr.microsoft.com/playwright:v1.2.3-noble",
+      baseClassification: "mutable-version-tag",
+      baseRuntimeComponents: "reference-bound-not-enumerated",
+      buildInputCount: 9,
+      buildInputsDigest: first.buildInputs.digest,
+      buildArtifactClassification: "resolved-during-image-build",
+      buildArtifactCount: 0,
+      buildArtifactsDigest: null,
+      lockfileDigest: first.lockfile.digest,
+      productionComponentCount: 1,
+      productionComponentsDigest: first.productionComponents.digest,
+      attestation: "not-published",
+    });
+  });
+
+  it("binds only the exact built API artifact when producing the image manifest", () => {
+    const root = fixtureRepository();
+    const first = createApiContainerProvenance(root, {
+      bindBuildArtifacts: true,
+    });
+    expect(first.buildArtifacts).toMatchObject({
+      classification: "bound-build-output",
+      count: 1,
+      files: [{
+        bytes: 24,
+        path: "dist-api/index.js",
+      }],
+    });
+
+    writeFileSync(join(root, "dist-api", "index.js"), "export const built = 2;\n");
+    const changed = createApiContainerProvenance(root, {
+      bindBuildArtifacts: true,
+    });
+    expect(changed.buildArtifacts.digest).not.toBe(first.buildArtifacts.digest);
+    expect(changed.buildInputs).toEqual(first.buildInputs);
+
+    writeFileSync(join(root, "dist-api", "index.js.map"), "{}\n");
+    expect(() =>
+      createApiContainerProvenance(root, { bindBuildArtifacts: true })
+    ).toThrow("API_CONTAINER_PROVENANCE_BUILD_ARTIFACT_SET");
+  });
+
+  it("changes only the build-input binding when copied source changes", () => {
+    const root = fixtureRepository();
+    const before = createApiContainerProvenance(root);
+    writeFileSync(join(root, "api", "index.ts"), "export const value = 2;\n");
+    const after = createApiContainerProvenance(root);
+
+    expect(after.buildInputs.digest).not.toBe(before.buildInputs.digest);
+    expect(after.lockfile).toEqual(before.lockfile);
+    expect(after.productionComponents).toEqual(before.productionComponents);
+  });
+
+  it("fails closed on base-image drift", () => {
+    const root = fixtureRepository();
+    replace(
+      join(root, "Dockerfile"),
+      "mcr.microsoft.com/playwright:v1.2.3-noble",
+      "mcr.microsoft.com/playwright:latest",
+    );
+    expect(() => createApiContainerProvenance(root)).toThrow(
+      "API_CONTAINER_PROVENANCE_BASE_DRIFT",
+    );
+  });
+
+  it("fails closed on copied-source and embedded-manifest contract drift", () => {
+    const redirectedSource = fixtureRepository();
+    replace(
+      join(redirectedSource, "Dockerfile"),
+      "COPY src/ui ./src/ui",
+      "COPY src/ui ./unmeasured-ui",
+    );
+    expect(() => createApiContainerProvenance(redirectedSource)).toThrow(
+      "API_CONTAINER_PROVENANCE_BUILD_CONTRACT",
+    );
+
+    const missingGenerator = fixtureRepository();
+    replace(
+      join(missingGenerator, "Dockerfile"),
+      "RUN node scripts/api-container-provenance.ts --output container-provenance.json\n",
+      "",
+    );
+    expect(() => createApiContainerProvenance(missingGenerator)).toThrow(
+      "API_CONTAINER_PROVENANCE_BUILD_CONTRACT",
+    );
+
+    const extraFinalCopy = fixtureRepository();
+    replace(
+      join(extraFinalCopy, "Dockerfile"),
+      "COPY --from=build /app/container-provenance.json ./container-provenance.json",
+      [
+        "COPY --from=build /app/container-provenance.json ./container-provenance.json",
+        "COPY --from=build /app/package.json ./package.json",
+      ].join("\n"),
+    );
+    expect(() => createApiContainerProvenance(extraFinalCopy)).toThrow(
+      "API_CONTAINER_PROVENANCE_BUILD_CONTRACT",
+    );
+
+    const caseAndWhitespaceEvasion = fixtureRepository();
+    replace(
+      join(caseAndWhitespaceEvasion, "Dockerfile"),
+      "COPY --from=build /app/container-provenance.json ./container-provenance.json",
+      [
+        "COPY --from=build /app/container-provenance.json ./container-provenance.json",
+        "copy\t--from=build /app/package.json ./package.json",
+      ].join("\n"),
+    );
+    expect(() => createApiContainerProvenance(caseAndWhitespaceEvasion)).toThrow(
+      "API_CONTAINER_PROVENANCE_BUILD_CONTRACT",
+    );
+  });
+
+  it("fails closed on unsafe copied residue", () => {
+    const root = fixtureRepository();
+    writeFileSync(join(root, "scripts", ".env.fixture"), "fixture=true\n");
+    expect(() => createApiContainerProvenance(root)).toThrow(
+      "API_CONTAINER_PROVENANCE_UNSAFE_INPUT",
+    );
+  });
+
+  it("fails closed on missing integrity or credentialed resolution metadata", () => {
+    const missingIntegrity = fixtureRepository();
+    mutateLock(missingIntegrity, (lock) => {
+      delete lock.packages["node_modules/playwright"]!.integrity;
+    });
+    expect(() => createApiContainerProvenance(missingIntegrity)).toThrow(
+      "API_CONTAINER_PROVENANCE_COMPONENT_METADATA",
+    );
+
+    const unsafeResolution = fixtureRepository();
+    mutateLock(unsafeResolution, (lock) => {
+      lock.packages["node_modules/playwright"]!.resolved =
+        "https://x:y@localhost/playwright.tgz";
+    });
+    expect(() => createApiContainerProvenance(unsafeResolution)).toThrow(
+      "API_CONTAINER_PROVENANCE_UNSAFE_RESOLUTION",
+    );
+  });
+
+  it("requires installed non-optional components but permits absent optional candidates", () => {
+    const missingRequired = fixtureRepository();
+    rmSync(join(missingRequired, "node_modules", "playwright"), {
+      recursive: true,
+    });
+    expect(() => createApiContainerProvenance(missingRequired)).toThrow(
+      "API_CONTAINER_PROVENANCE_REQUIRED_COMPONENT_MISSING",
+    );
+
+    const optionalAbsent = fixtureRepository();
+    mutateLock(optionalAbsent, (lock) => {
+      lock.packages["node_modules/optional-fixture"] = {
+        integrity: "sha512-optional",
+        optional: true,
+        resolved: "https://registry.npmjs.org/optional-fixture.tgz",
+        version: "1.0.0",
+      };
+    });
+    expect(createApiContainerProvenance(optionalAbsent).productionComponents.count)
+      .toBe(1);
+  });
+});
+
+function fixtureRepository(): string {
+  const root = mkdtempSync(join(tmpdir(), "ap2-container-provenance-"));
+  temporaryRoots.push(root);
+  for (const directory of [
+    "api",
+    "scripts",
+    "src/api",
+    "src/scenarios",
+    "src/ui",
+    "dist-api",
+    "node_modules/playwright",
+  ]) {
+    mkdirSync(join(root, directory), { recursive: true });
+  }
+  writeFileSync(join(root, ".dockerignore"), ".git\nnode_modules\n");
+  writeFileSync(
+    join(root, "Dockerfile"),
+    [
+      "FROM mcr.microsoft.com/playwright:v1.2.3-noble AS build",
+      "WORKDIR /app",
+      "COPY .dockerignore Dockerfile package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./",
+      "RUN npm ci",
+      "COPY api ./api",
+      "COPY scripts ./scripts",
+      "COPY src/api ./src/api",
+      "COPY src/scenarios ./src/scenarios",
+      "COPY src/ui ./src/ui",
+      "RUN npm run build:api && rm -f dist-api/*.map",
+      "RUN npm prune --omit=dev",
+      "RUN node scripts/api-container-provenance.ts --output container-provenance.json",
+      "FROM mcr.microsoft.com/playwright:v1.2.3-noble",
+      "COPY --from=build /app/dist-api ./dist-api",
+      "COPY --from=build /app/node_modules ./node_modules",
+      "COPY --from=build /app/container-provenance.json ./container-provenance.json",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(join(root, "package.json"), JSON.stringify({
+    dependencies: { playwright: "1.2.3" },
+  }));
+  writeFileSync(join(root, "package-lock.json"), JSON.stringify({
+    lockfileVersion: 3,
+    packages: {
+      "": { dependencies: { playwright: "1.2.3" } },
+      "node_modules/playwright": {
+        integrity: "sha512-fixture",
+        resolved: "https://registry.npmjs.org/playwright.tgz",
+        version: "1.2.3",
+      },
+    },
+  }));
+  for (const path of ["tsconfig.api.json", "tsconfig.json", "vite.api.config.ts"]) {
+    writeFileSync(join(root, path), "{}\n");
+  }
+  writeFileSync(join(root, "api", "index.ts"), "export const value = 1;\n");
+  writeFileSync(join(root, "dist-api", "index.js"), "export const built = 1;\n");
+  writeFileSync(
+    join(root, "scripts", "build.ts"),
+    "export const note = 'private-source-sentinel';\n",
+  );
+  writeFileSync(
+    join(root, "node_modules", "playwright", "package.json"),
+    JSON.stringify({ name: "playwright", version: "1.2.3" }),
+  );
+  return root;
+}
+
+function replace(path: string, from: string, to: string): void {
+  const current = readFileSync(path, "utf8");
+  writeFileSync(path, current.replaceAll(from, to));
+}
+
+function mutateLock(
+  root: string,
+  mutation: (lock: {
+    packages: Record<string, Record<string, unknown>>;
+  }) => void,
+): void {
+  const path = join(root, "package-lock.json");
+  const lock = JSON.parse(readFileSync(path, "utf8")) as {
+    packages: Record<string, Record<string, unknown>>;
+  };
+  mutation(lock);
+  writeFileSync(path, JSON.stringify(lock));
+}
