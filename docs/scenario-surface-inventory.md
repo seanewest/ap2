@@ -40,6 +40,21 @@ is exported; it is not a validation failure and does not invent whether the
 surface is deliberately absent or future work. No pending capability
 declarations currently exist.
 
+## Authenticated operator matrix
+
+The authenticated SPA renders a compact read-only matrix by calling the same
+`inventoryCanonicalScenarioSurfaces()` function in process. It does not copy
+the inventory declarations, fetch an API, or infer tenant, cloud, workload, or
+external readiness. The matrix shows the exact manifest/plan, adapter,
+rehearsal, offline-verifier, authenticated rehearsal-verification API/client,
+and manual-panel cells for all five canonical families.
+
+The UI labels `missing` as “Missing — not a failure” and `not-applicable` as
+“Deliberately absent.” Pending remains a separate concept, but the
+authoritative inventory currently declares no pending state. The semantic
+table is horizontally scrollable at narrow widths and contains no action,
+execution navigation, persistence, polling, or retry control.
+
 ## Authority and failure boundary
 
 The inventory consumes the validated canonical registry and the existing

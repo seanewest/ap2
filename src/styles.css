@@ -281,6 +281,80 @@ h2 {
   line-height: 1.5;
 }
 
+.scenario-surface-matrix {
+  display: grid;
+  gap: 0.8rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d4d8df;
+}
+
+.scenario-surface-matrix-legend {
+  margin: 0;
+  color: #4f596d;
+  line-height: 1.5;
+}
+
+.scenario-surface-matrix-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #c8d5e5;
+  border-radius: 0.7rem;
+}
+
+.scenario-surface-matrix-table-wrap:focus-visible {
+  outline: 0.2rem solid #86aee0;
+  outline-offset: 0.2rem;
+}
+
+.scenario-surface-matrix table {
+  width: 100%;
+  min-width: 68rem;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.scenario-surface-matrix caption {
+  padding: 0.75rem;
+  color: #4f596d;
+  font-weight: 650;
+  text-align: left;
+}
+
+.scenario-surface-matrix th,
+.scenario-surface-matrix td {
+  padding: 0.6rem;
+  border-top: 1px solid #d4d8df;
+  text-align: left;
+  vertical-align: top;
+}
+
+.scenario-surface-matrix thead th {
+  background: #eef4fb;
+}
+
+.scenario-surface-status {
+  display: block;
+  line-height: 1.35;
+}
+
+.scenario-surface-status + .scenario-surface-status {
+  margin-top: 0.35rem;
+}
+
+.scenario-surface-status.status-implemented {
+  color: #226344;
+  font-weight: 700;
+}
+
+.scenario-surface-status.status-missing {
+  color: #805024;
+  font-weight: 700;
+}
+
+.scenario-surface-status.status-not-applicable {
+  color: #667085;
+}
+
 .scenario-plan-preview {
   display: grid;
   gap: 1rem;
