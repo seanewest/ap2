@@ -46,6 +46,9 @@ import {
   InMemoryPrivateDocumentRehearsalVerificationService,
 } from "./private-document-rehearsal-verification.js";
 import {
+  InMemoryHelpDeskEmailRehearsalVerificationService,
+} from "./help-desk-email-rehearsal-verification.js";
+import {
   DelegatedGraphOneDriveShareProof,
   GRAPH_FILES_READ_WRITE_SCOPE,
   ProcessLocalOneDriveShareProofBoundary,
@@ -181,6 +184,8 @@ const server = createApiServer({
     new InMemoryRehearsalOutputVerificationService(),
   privateDocumentRehearsalVerificationService:
     new InMemoryPrivateDocumentRehearsalVerificationService(),
+  helpDeskEmailRehearsalVerificationService:
+    new InMemoryHelpDeskEmailRehearsalVerificationService(),
   multiScenarioFeasibilityService:
     new InMemoryMultiScenarioFeasibilityService(),
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
