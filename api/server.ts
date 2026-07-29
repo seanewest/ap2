@@ -128,6 +128,7 @@ import {
 import {
   PurviewAuditBoundaryRehearsalVerificationError,
 } from "../scripts/verify-purview-audit-boundary-rehearsal-output.js";
+import type { ApiRequestTelemetry } from "./api-telemetry.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -160,6 +161,7 @@ export interface ApiDependencies {
   multiScenarioFeasibilityService?: MultiScenarioFeasibilityService;
   allowedOrigin?: string;
   isShuttingDown?: () => boolean;
+  requestTelemetry?: ApiRequestTelemetry;
 }
 
 export function createApiServer(dependencies: ApiDependencies): Server {
@@ -188,7 +190,13 @@ async function route(
   const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
   const contract = findApiRouteContract(request.method, pathname);
   if (contract) responseRouteContracts.set(response, contract);
-  if (dependencies.isShuttingDown?.()) {
+  const shuttingDown = dependencies.isShuttingDown?.() === true;
+  try {
+    dependencies.requestTelemetry?.observe(response, contract, shuttingDown);
+  } catch {
+    // Request telemetry is observational and never changes API behavior.
+  }
+  if (shuttingDown) {
     sendJson(response, 503, { error: "server_shutting_down" });
     return;
   }
