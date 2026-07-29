@@ -76,3 +76,12 @@ staging and cleanup. Learner visibility stays `uninspected`. A successful
 synthetic lifecycle can prove visibility only through the canonical
 learner-owned exact evidence read with a `learner-inspection` observation.
 Interpretation, response, audit, and detection are never inferred.
+
+## Network-free rehearsal
+
+The [private-document contract rehearsal](private-document-rehearsal.md)
+composes this state machine, the canonical scenario planner, the lifecycle
+adapter, and the receipt verifier with deterministic in-memory fakes. Its
+output is always labeled `REHEARSAL_ONLY` and keeps every external evidence
+claim `uninspected`; successful synthetic learner and cleanup paths prove only
+that the local contracts remain compatible.
