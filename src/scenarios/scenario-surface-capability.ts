@@ -1,4 +1,6 @@
 export const SCENARIO_SURFACE_DECLARATION_NAMES = [
+  "authenticated-batch-feasibility-api",
+  "authenticated-batch-feasibility-client",
   "authenticated-plan-api",
   "authenticated-plan-client",
   "authenticated-rehearsal-verification-api",

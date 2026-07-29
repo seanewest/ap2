@@ -29,8 +29,27 @@ import {
 import type {
   ScenarioSurfaceCapabilityDeclaration,
 } from "../scenarios/scenario-surface-capability";
+import {
+  BATCH_FEASIBILITY_MAX_REQUEST_BYTES,
+  BATCH_FEASIBILITY_MAX_RESPONSE_BYTES,
+  isBoundedBatchFeasibilityRequest,
+  isSafeBatchFeasibilityResult,
+  type BatchFeasibilityRequest,
+} from "./multi-scenario-feasibility-contract.ts";
+import {
+  FEASIBILITY_INPUT_FAILURES,
+  type FeasibilityInputFailure,
+  type MultiScenarioFeasibilityResult,
+} from "../scenarios/multi-scenario-feasibility-contract.ts";
 
 export const SCENARIO_API_CLIENT_CAPABILITIES = [
+  {
+    schemaVersion: 1,
+    surface: "authenticated-batch-feasibility-client",
+    scenarioScope: "canonical-registry",
+    manifestSchemaVersion: 2,
+    repositoryBoundary: "contract-only",
+  },
   {
     schemaVersion: 1,
     surface: "authenticated-plan-client",
@@ -287,6 +306,10 @@ export interface AfterPartyApi {
     accessToken: string,
     output: RehearsalOutputVerificationRequest,
   ): Promise<VerifiedRehearsalOutputSummary>;
+  calculateMultiScenarioFeasibility(
+    accessToken: string,
+    request: BatchFeasibilityRequest,
+  ): Promise<MultiScenarioFeasibilityResult>;
   sendSimulatedEmail(accessToken: string): Promise<SimulatedEmailResult>;
   sendHelpDeskScenario(accessToken: string): Promise<HelpDeskScenarioResult>;
   shareOneDriveProof(
@@ -416,6 +439,31 @@ export class RehearsalOutputVerificationClientError extends Error {
   }
 }
 
+export type BatchFeasibilityClientErrorCategory =
+  | "unauthorized"
+  | "forbidden"
+  | "validation-refused"
+  | "request-too-large"
+  | "response-too-large"
+  | "safe-failure";
+
+export class BatchFeasibilityClientError extends Error {
+  readonly category: BatchFeasibilityClientErrorCategory;
+  readonly refusalCategory?:
+    | ScenarioPlanErrorCategory
+    | FeasibilityInputFailure;
+
+  constructor(
+    category: BatchFeasibilityClientErrorCategory,
+    refusalCategory?: ScenarioPlanErrorCategory | FeasibilityInputFailure,
+  ) {
+    super(`Batch feasibility request failed: ${category}`);
+    this.name = "BatchFeasibilityClientError";
+    this.category = category;
+    this.refusalCategory = refusalCategory;
+  }
+}
+
 export class OneDriveInviteFailureError extends ApiAccessError {
   readonly diagnostic: OneDriveInviteFailure;
 
@@ -435,6 +483,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly scenarioPlanUrl: string;
   private readonly scenarioEvidenceVerificationUrl: string;
   private readonly rehearsalOutputVerificationUrl: string;
+  private readonly multiScenarioFeasibilityUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
   private readonly oneDriveProofUrl: string;
@@ -468,6 +517,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ).toString();
     this.rehearsalOutputVerificationUrl = new URL(
       "api/rehearsal-output-verification",
+      `${baseUrl}/`,
+    ).toString();
+    this.multiScenarioFeasibilityUrl = new URL(
+      "api/multi-scenario-feasibility",
       `${baseUrl}/`,
     ).toString();
     this.simulatedEmailUrl = new URL(
@@ -851,6 +904,124 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       !isVerifiedRehearsalOutputSummary(value, output)
     ) {
       throw new RehearsalOutputVerificationClientError("safe-failure");
+    }
+    return value;
+  }
+
+  async calculateMultiScenarioFeasibility(
+    accessToken: string,
+    request: BatchFeasibilityRequest,
+  ): Promise<MultiScenarioFeasibilityResult> {
+    if (
+      !isBoundedBatchFeasibilityRequest(
+        request,
+        isSafeScenarioPlanningRequest,
+      )
+    ) {
+      throw new BatchFeasibilityClientError("validation-refused");
+    }
+    let body: string;
+    try {
+      body = JSON.stringify(request);
+    } catch {
+      throw new BatchFeasibilityClientError("validation-refused");
+    }
+    if (
+      new TextEncoder().encode(body).byteLength >
+      BATCH_FEASIBILITY_MAX_REQUEST_BYTES
+    ) {
+      throw new BatchFeasibilityClientError("request-too-large");
+    }
+
+    let response: Response;
+    try {
+      response = await this.request(this.multiScenarioFeasibilityUrl, {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+    } catch {
+      throw new BatchFeasibilityClientError("safe-failure");
+    }
+    if (response.status === 401) {
+      throw new BatchFeasibilityClientError("unauthorized");
+    }
+    if (response.status === 403) {
+      throw new BatchFeasibilityClientError("forbidden");
+    }
+    if (response.status === 413) {
+      throw new BatchFeasibilityClientError("request-too-large");
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(
+        response.headers.get("content-type") ?? "",
+      )
+    ) {
+      throw new BatchFeasibilityClientError("safe-failure");
+    }
+
+    let responseText: string;
+    try {
+      responseText = await readBoundedJsonResponse(
+        response,
+        BATCH_FEASIBILITY_MAX_RESPONSE_BYTES,
+      );
+    } catch (error) {
+      throw new BatchFeasibilityClientError(
+        error instanceof BoundedResponseTooLargeError
+          ? "response-too-large"
+          : "safe-failure",
+      );
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new BatchFeasibilityClientError("safe-failure");
+    }
+    if (!response.ok) {
+      if (
+        response.status === 400 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error", "category"]) &&
+        value.error === "batch_feasibility_refused" &&
+        typeof value.category === "string" &&
+        (
+          SCENARIO_PLAN_REFUSAL_CATEGORIES.includes(
+            value.category as ScenarioPlanErrorCategory,
+          ) ||
+          FEASIBILITY_INPUT_FAILURES.includes(
+            value.category as FeasibilityInputFailure,
+          )
+        )
+      ) {
+        throw new BatchFeasibilityClientError(
+          "validation-refused",
+          value.category as
+            | ScenarioPlanErrorCategory
+            | FeasibilityInputFailure,
+        );
+      }
+      if (
+        response.status === 500 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error"]) &&
+        value.error === "batch_feasibility_response_too_large"
+      ) {
+        throw new BatchFeasibilityClientError("response-too-large");
+      }
+      throw new BatchFeasibilityClientError("safe-failure");
+    }
+    if (
+      response.status !== 200 ||
+      !isSafeBatchFeasibilityResult(value, request)
+    ) {
+      throw new BatchFeasibilityClientError("safe-failure");
     }
     return value;
   }

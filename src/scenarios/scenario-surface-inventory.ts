@@ -1,6 +1,7 @@
 import { SCENARIO_RECEIPT_API_CAPABILITY } from "../../api/scenario-evidence-verification.ts";
 import { SCENARIO_PLAN_API_CAPABILITY } from "../../api/scenario-plan.ts";
 import { REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY } from "../../api/rehearsal-output-verification.ts";
+import { BATCH_FEASIBILITY_API_CAPABILITY } from "../../api/multi-scenario-feasibility.ts";
 import { AVD_MANIFEST_ADAPTER_CAPABILITY } from "../../scripts/avd-three-vm-manifest-adapter.ts";
 import { AVD_THREE_VM_REHEARSAL_CAPABILITY } from "../../scripts/avd-three-vm-rehearsal.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY } from "../../scripts/private-document-rehearsal.ts";
@@ -49,6 +50,7 @@ export const SCENARIO_INVENTORY_SURFACES = [
   "receipt",
   "adapter",
   "rehearsal",
+  "authenticated-batch-feasibility-api-client",
   "authenticated-plan-api-client",
   "authenticated-receipt-api-client",
   "authenticated-rehearsal-verification-api-client",
@@ -74,6 +76,8 @@ export type ScenarioSurfaceReason =
   | "no-applicable-adapter-declared"
   | "rehearsal-only-exported"
   | "rehearsal-not-declared"
+  | "authenticated-batch-feasibility-api-client-exported"
+  | "authenticated-batch-feasibility-api-client-missing"
   | "authenticated-plan-api-client-exported"
   | "authenticated-plan-api-client-missing"
   | "authenticated-receipt-api-client-exported"
@@ -137,6 +141,7 @@ export interface ScenarioSurfaceInventoryOptions {
 }
 
 const AUTHORITATIVE_SURFACE_DECLARATIONS = [
+  BATCH_FEASIBILITY_API_CAPABILITY,
   SCENARIO_PLAN_API_CAPABILITY,
   SCENARIO_RECEIPT_API_CAPABILITY,
   REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
@@ -589,6 +594,22 @@ function inventoryRow(
         )
         ? cell("implemented", "rehearsal-only-exported")
         : cell("missing", "rehearsal-not-declared"),
+      "authenticated-batch-feasibility-api-client": supports(
+          declarations.get("authenticated-batch-feasibility-api"),
+          manifest.id,
+        ) &&
+          supports(
+            declarations.get("authenticated-batch-feasibility-client"),
+            manifest.id,
+          )
+        ? cell(
+          "implemented",
+          "authenticated-batch-feasibility-api-client-exported",
+        )
+        : cell(
+          "missing",
+          "authenticated-batch-feasibility-api-client-missing",
+        ),
       "authenticated-plan-api-client": supports(
           declarations.get("authenticated-plan-api"),
           manifest.id,
@@ -788,6 +809,10 @@ function mapSurface(
     ScenarioSurfaceDeclarationName,
     ScenarioInventorySurface
   > = {
+    "authenticated-batch-feasibility-api":
+      "authenticated-batch-feasibility-api-client",
+    "authenticated-batch-feasibility-client":
+      "authenticated-batch-feasibility-api-client",
     "authenticated-plan-api": "authenticated-plan-api-client",
     "authenticated-plan-client": "authenticated-plan-api-client",
     "authenticated-rehearsal-verification-api":

@@ -66,6 +66,15 @@ import { RehearsalOutputVerificationError } from "../scripts/verify-avd-three-vm
 import {
   REHEARSAL_OUTPUT_MAX_REQUEST_BYTES,
 } from "../src/api/rehearsal-output-verification-contract.js";
+import {
+  BatchFeasibilityRefusalError,
+  BatchFeasibilityResponseTooLargeError,
+  BatchFeasibilitySafeFailureError,
+  type MultiScenarioFeasibilityService,
+} from "./multi-scenario-feasibility.js";
+import {
+  BATCH_FEASIBILITY_MAX_REQUEST_BYTES,
+} from "../src/api/multi-scenario-feasibility-contract.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -85,6 +94,7 @@ export interface ApiDependencies {
   scenarioPlanService?: ScenarioPlanService;
   scenarioEvidenceVerificationService?: ScenarioEvidenceVerificationService;
   rehearsalOutputVerificationService?: RehearsalOutputVerificationService;
+  multiScenarioFeasibilityService?: MultiScenarioFeasibilityService;
   allowedOrigin?: string;
 }
 
@@ -158,7 +168,8 @@ async function route(
   if (
     request.method === "OPTIONS" &&
     (pathname === "/api/scenario-evidence-verification" ||
-      pathname === "/api/rehearsal-output-verification")
+      pathname === "/api/rehearsal-output-verification" ||
+      pathname === "/api/multi-scenario-feasibility")
   ) {
     handleProtectedPreflight(
       request,
@@ -234,6 +245,13 @@ async function route(
     pathname === "/api/rehearsal-output-verification"
   ) {
     await rehearsalOutputVerification(request, response, dependencies);
+    return;
+  }
+  if (
+    request.method === "POST" &&
+    pathname === "/api/multi-scenario-feasibility"
+  ) {
+    await multiScenarioFeasibility(request, response, dependencies);
     return;
   }
 
@@ -578,6 +596,25 @@ async function handleAuthorizedRequest(
       });
       return;
     }
+    if (error instanceof BatchFeasibilityRefusalError) {
+      sendJson(response, 400, {
+        error: "batch_feasibility_refused",
+        category: error.category,
+      });
+      return;
+    }
+    if (error instanceof BatchFeasibilityResponseTooLargeError) {
+      sendJson(response, 500, {
+        error: "batch_feasibility_response_too_large",
+      });
+      return;
+    }
+    if (error instanceof BatchFeasibilitySafeFailureError) {
+      sendJson(response, 500, {
+        error: "batch_feasibility_failed",
+      });
+      return;
+    }
     if (error instanceof OneDriveProofConflictError) {
       sendJson(response, 409, { error: "proof_state_conflict" });
       return;
@@ -695,6 +732,28 @@ async function rehearsalOutputVerification(
     }
     return service.verify(
       await readBoundedJson(request, REHEARSAL_OUTPUT_MAX_REQUEST_BYTES),
+    );
+  });
+}
+
+async function multiScenarioFeasibility(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new JsonUnsupportedMediaTypeError();
+    }
+    const service = dependencies.multiScenarioFeasibilityService;
+    if (!service) {
+      throw new BatchFeasibilitySafeFailureError();
+    }
+    return service.calculate(
+      await readBoundedJson(request, BATCH_FEASIBILITY_MAX_REQUEST_BYTES),
     );
   });
 }
