@@ -73,6 +73,7 @@ import {
   createButton,
   createStatus,
 } from "./ui/elements";
+import { createPanelBoundary } from "./ui/panel-boundary";
 import { createScenarioCatalog } from "./scenarios/scenario-catalog";
 import {
   createScenarioSurfaceMatrix,
@@ -1058,9 +1059,13 @@ function createStatePanel(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
         createApiAccessPanel(state.apiAccess, apiOperationLoading),
-        createRecentOperationsPanel(
-          state.recentOperations,
-          apiOperationLoading,
+        createPanelBoundary(
+          "Recent operations",
+          () =>
+            createRecentOperationsPanel(
+              state.recentOperations,
+              apiOperationLoading,
+            ),
         ),
         createRehearsalStatusPanel(
           state.rehearsalStatus,
@@ -1085,29 +1090,60 @@ function createStatePanel(
         createContactProofPanel(contactProof, apiOperationLoading),
         ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
         ...createScenarioPlanningFlow(scenarioPlanPreviewClient),
-        createScenarioSurfaceMatrix(),
-        createBatchFeasibilityPanel({
-          registry: SCENARIO_MANIFESTS,
-          client: batchFeasibilityClient,
-        }),
-        createScenarioEvidenceVerificationPanel({
-          client: scenarioEvidenceVerificationClient,
-        }),
-        createAvdRehearsalVerificationPanel({
-          client: avdRehearsalVerificationClient,
-        }),
-        createPrivateDocumentRehearsalVerificationPanel({
-          client: privateDocumentRehearsalVerificationClient,
-        }),
-        createHelpDeskRehearsalVerificationPanel({
-          client: helpDeskRehearsalVerificationClient,
-        }),
-        createTeamsRehearsalVerificationPanel({
-          client: teamsRehearsalVerificationClient,
-        }),
-        createOauthApplicationReconRehearsalVerificationPanel({
-          client: oauthApplicationReconRehearsalVerificationClient,
-        }),
+        createPanelBoundary(
+          "Scenario surface availability",
+          createScenarioSurfaceMatrix,
+        ),
+        createPanelBoundary(
+          "Scenario batch feasibility",
+          () =>
+            createBatchFeasibilityPanel({
+              registry: SCENARIO_MANIFESTS,
+              client: batchFeasibilityClient,
+            }),
+        ),
+        createPanelBoundary(
+          "Receipt verification",
+          () =>
+            createScenarioEvidenceVerificationPanel({
+              client: scenarioEvidenceVerificationClient,
+            }),
+        ),
+        createPanelBoundary(
+          "AVD rehearsal verification",
+          () =>
+            createAvdRehearsalVerificationPanel({
+              client: avdRehearsalVerificationClient,
+            }),
+        ),
+        createPanelBoundary(
+          "Private-document rehearsal verification",
+          () =>
+            createPrivateDocumentRehearsalVerificationPanel({
+              client: privateDocumentRehearsalVerificationClient,
+            }),
+        ),
+        createPanelBoundary(
+          "Help-desk email rehearsal verification",
+          () =>
+            createHelpDeskRehearsalVerificationPanel({
+              client: helpDeskRehearsalVerificationClient,
+            }),
+        ),
+        createPanelBoundary(
+          "Teams missed-call rehearsal verification",
+          () =>
+            createTeamsRehearsalVerificationPanel({
+              client: teamsRehearsalVerificationClient,
+            }),
+        ),
+        createPanelBoundary(
+          "Application-reconnaissance rehearsal verification",
+          () =>
+            createOauthApplicationReconRehearsalVerificationPanel({
+              client: oauthApplicationReconRehearsalVerificationClient,
+            }),
+        ),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -1131,16 +1167,31 @@ function createStatePanel(
 function createScenarioPlanningFlow(
   client: ScenarioPlanPreviewClient,
 ): HTMLElement[] {
-  const preview = createScenarioPlanPreviewController({
-    registry: SCENARIO_MANIFESTS,
-    client,
-  });
-  const catalog = createScenarioCatalog(SCENARIO_MANIFESTS, {
-    onPlanPreview: (selection) => {
-      preview.selectScenario(selection);
+  let preview: ReturnType<
+    typeof createScenarioPlanPreviewController
+  > | undefined;
+  const previewElement = createPanelBoundary(
+    "Scenario plan preview",
+    () => {
+      preview = createScenarioPlanPreviewController({
+        registry: SCENARIO_MANIFESTS,
+        client,
+      });
+      return preview.element;
     },
-  });
-  return [catalog, preview.element];
+  );
+  const catalog = createPanelBoundary(
+    "Scenario catalog",
+    () =>
+      createScenarioCatalog(SCENARIO_MANIFESTS, {
+        onPlanPreview: preview
+          ? (selection) => {
+            preview?.selectScenario(selection);
+          }
+          : undefined,
+      }),
+  );
+  return [catalog, previewElement];
 }
 
 function classifyScenarioPlanPreviewFailure(

@@ -1698,6 +1698,32 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).not.toContain("temporary-token");
   });
 
+  it("contains a malformed recent-operations snapshot to that panel", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.getRecentOperationEvents.mockResolvedValue({
+      schemaVersion: 1,
+      order: "newest",
+      events: null,
+    } as unknown as RecentOperationEvents);
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    recentOperationsButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain("Recent operations unavailable");
+    expect(root.textContent).toContain("Other operator panels remain available");
+    expect(root.textContent).toContain("Scenario catalog");
+    expect(root.textContent).toContain("Scenario plan preview");
+    expect(root.textContent).toContain("Sign out");
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
   it("does not expose the scenario catalog outside the signed-in shell", async () => {
     authentication.initialize.mockResolvedValue({ kind: "signed-out" });
     const app = createAfterPartyApp(root, authentication, api);

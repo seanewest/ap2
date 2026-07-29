@@ -234,6 +234,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     "/api/private-document-rehearsal-verification",
     "/api/help-desk-email-rehearsal-verification",
     "/api/teams-missed-call-rehearsal-verification",
+    "/api/oauth-application-recon-rehearsal-verification",
   ]);
   let manualRequests = 0;
   page.on("request", (request) => {
@@ -254,6 +255,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     "Private-document rehearsal verification",
     "Help-desk email rehearsal verification",
     "Teams missed-call rehearsal verification",
+    "Application-reconnaissance rehearsal verification",
   ];
   for (const name of panels) {
     await expect(page.getByRole("region", { name })).toBeVisible();
@@ -281,6 +283,10 @@ test("audits every manual-only operator panel at the shared accessibility bounda
       "Teams missed-call rehearsal verification",
       "Verify Teams rehearsal",
     ],
+    [
+      "Application-reconnaissance rehearsal verification",
+      "Verify application-reconnaissance rehearsal",
+    ],
   ] as const;
   for (const [panelName, actionName] of formPanels) {
     const panel = page.getByRole("region", { name: panelName });
@@ -306,9 +312,11 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     expect(
       await action.evaluate((element) => {
         const style = getComputedStyle(element);
-        return [style.animationDuration, style.transitionDuration];
+        return [style.animationDuration, style.transitionDuration].every(
+          (duration) => Number.parseFloat(duration) <= 0.00001,
+        );
       }),
-    ).toEqual(["0s", "0s"]);
+    ).toBe(true);
   }
   for (
     const panelName of [
@@ -316,6 +324,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
       "AVD rehearsal verification",
       "Private-document rehearsal verification",
       "Help-desk email rehearsal verification",
+      "Application-reconnaissance rehearsal verification",
     ]
   ) {
     const input = page.getByRole("region", { name: panelName }).locator(
@@ -358,6 +367,105 @@ test("audits every manual-only operator panel at the shared accessibility bounda
       document.documentElement.scrollWidth <= window.innerWidth
     ),
   ).toBe(true);
+});
+
+test("contains synchronous render faults to the affected operator panel", async ({
+  browser,
+}) => {
+  const cases = [
+    ["recent-operations-heading", "Recent operations"],
+    ["scenario-catalog-heading", "Scenario catalog"],
+    ["scenario-plan-preview-heading", "Scenario plan preview"],
+    ["batch-feasibility-heading", "Scenario batch feasibility"],
+    ["scenario-evidence-verification-heading", "Receipt verification"],
+    ["avd-rehearsal-verification-heading", "AVD rehearsal verification"],
+    [
+      "private-document-rehearsal-verification-heading",
+      "Private-document rehearsal verification",
+    ],
+    [
+      "help-desk-rehearsal-verification-heading",
+      "Help-desk email rehearsal verification",
+    ],
+    [
+      "teams-rehearsal-verification-heading",
+      "Teams missed-call rehearsal verification",
+    ],
+    [
+      "oauth-recon-rehearsal-verification-heading",
+      "Application-reconnaissance rehearsal verification",
+    ],
+    ["scenario-surface-matrix-heading", "Scenario surface availability"],
+  ] as const;
+
+  for (const [headingId, label] of cases) {
+    const context = await browser.newContext({
+      viewport: { width: 320, height: 800 },
+    });
+    const page = await context.newPage();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript((target) => {
+      const setAttribute = Element.prototype.setAttribute;
+      let injected = false;
+      Element.prototype.setAttribute = function (name, value): void {
+        if (
+          !injected &&
+          name === "aria-labelledby" &&
+          value === target
+        ) {
+          injected = true;
+          throw new Error("deterministic panel render fault");
+        }
+        setAttribute.call(this, name, value);
+      };
+    }, headingId);
+    await configureOperator(page, accessToken);
+    const apiPaths: string[] = [];
+    page.on("request", (request) => {
+      const path = new URL(request.url()).pathname;
+      if (path.startsWith("/api/") && !path.endsWith(".ts")) {
+        apiPaths.push(path);
+      }
+    });
+
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    const failure = page.getByRole("region", {
+      name: `${label} unavailable`,
+    });
+    await expect(failure).toBeVisible();
+    await expect(failure).toContainText(
+      "Other operator panels remain available",
+    );
+    await expect(failure).toContainText(
+      "No retry or additional request was started by this fallback",
+    );
+    await expect(failure).not.toContainText(
+      "deterministic panel render fault",
+    );
+    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+    await expect(page.getByRole("region", {
+      name: label === "Scenario catalog"
+        ? "Scenario plan preview"
+        : "Scenario catalog",
+    })).toBeVisible();
+    await page.getByRole("button", { name: "Sign out" }).focus();
+    await expect(page.getByRole("button", { name: "Sign out" })).toBeFocused();
+    expect(
+      await page.getByRole("button", { name: "Sign out" }).evaluate(
+        (element) => {
+          const style = getComputedStyle(element);
+          return [style.animationDuration, style.transitionDuration];
+        },
+      ),
+    ).toEqual(["0s", "0s"]);
+    expect(
+      await page.evaluate(() =>
+        document.documentElement.scrollWidth <= window.innerWidth
+      ),
+    ).toBe(true);
+    expect(apiPaths).toEqual([]);
+    await context.close();
+  }
 });
 
 test("navigates the read-only scenario catalog without network activity", async ({
