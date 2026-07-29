@@ -124,13 +124,20 @@ describe("canonical scenario surface inventory", () => {
     expect(teams.surfaces.adapter.status).toBe("implemented");
     expect(teams.surfaces.rehearsal.status).toBe("implemented");
 
+    const oauthRecon = first.scenarios.find(
+      ({ scenarioId }) => scenarioId === "oauth-application-reconnaissance",
+    )!;
+    expect(oauthRecon.surfaces.adapter.status).toBe("implemented");
+    expect(oauthRecon.surfaces.rehearsal.status).toBe("missing");
+
     for (
       const row of first.scenarios.filter(
         ({ scenarioId }) =>
           scenarioId !== "avd-three-vm-substrate" &&
           scenarioId !== "private-document-evidence" &&
           scenarioId !== "help-desk-email-observation" &&
-          scenarioId !== "teams-missed-call-observation",
+          scenarioId !== "teams-missed-call-observation" &&
+          scenarioId !== "oauth-application-reconnaissance",
       )
     ) {
       expect(row.surfaces.adapter.status).toBe("not-applicable");

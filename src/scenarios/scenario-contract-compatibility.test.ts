@@ -518,6 +518,21 @@ describe("scenario contract compatibility checker", () => {
     ]);
   });
 
+  it("validates the canonical OAuth reconnaissance adapter input", () => {
+    const manifest = supportedManifests.find(
+      ({ id }) => id === "oauth-application-reconnaissance",
+    )!;
+    const result = checkOne(manifest, {
+      oauthReconInput: {} as never,
+    });
+
+    expect(categories(result)).toEqual(["OAUTH_RECON_ADAPTER_DRIFT"]);
+    expect(result.scenarios[0]?.adapters).toEqual([]);
+    expect(checkOne(manifest).scenarios[0]?.adapters).toEqual([
+      "oauth-application-recon",
+    ]);
+  });
+
   it("uses the private-document adapter only for its canonical fixture", () => {
     const manifest = supportedManifests.find(
       ({ id }) => id === "private-document-evidence",

@@ -15,6 +15,12 @@ import {
 } from "./private-document-receipt-adapter.ts";
 import { PRIVATE_DOCUMENT_EVIDENCE_SCENARIO } from "./private-document-evidence.ts";
 import {
+  adaptOauthApplicationReconToReceipt,
+  canonicalOauthApplicationReconReceiptAdapterInput,
+  type OauthApplicationReconReceiptAdapterInput,
+} from "./oauth-application-recon-receipt-adapter.ts";
+import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon.ts";
+import {
   adaptOperationTelemetryToReceiptCandidates,
   type TelemetryReceiptAdapterContract,
 } from "./operation-telemetry-receipt-adapter.ts";
@@ -55,6 +61,7 @@ const RAW_VALUE =
 const OUTPUT_ADAPTERS = [
   "avd-manifest",
   "help-desk-email",
+  "oauth-application-recon",
   "operation-telemetry",
   "private-document",
   "teams-missed-call",
@@ -71,6 +78,7 @@ export type CompatibilityDriftCategory =
   | "EVIDENCE_DRIFT"
   | "EXPIRY_DRIFT"
   | "HELP_DESK_ADAPTER_DRIFT"
+  | "OAUTH_RECON_ADAPTER_DRIFT"
   | "LEARNER_DRIFT"
   | "OPERATION_DRIFT"
   | "PLAN_PHASE_DRIFT"
@@ -134,6 +142,7 @@ export interface CompatibilityCheckOptions {
   planOverrides?: ReadonlyMap<string, PlanSet>;
   avdInput?: AvdManifestRunnerAdapterInput;
   helpDeskInput?: HelpDeskEmailReceiptAdapterInput;
+  oauthReconInput?: OauthApplicationReconReceiptAdapterInput;
   privateDocumentInput?: PrivateDocumentLifecycleReceiptInput;
   teamsMissedCallInput?: TeamsMissedCallReceiptAdapterInput;
   telemetryBindings?: readonly CompatibilityTelemetryBinding[];
@@ -320,6 +329,25 @@ export function checkScenarioContractCompatibility(
           scenarioFailures,
           manifest.id,
           "HELP_DESK_ADAPTER_DRIFT",
+        );
+      }
+    }
+
+    if (manifest.id === OAUTH_APPLICATION_RECON_SCENARIO.id) {
+      try {
+        verifyScenarioEvidenceReceipt(
+          adaptOauthApplicationReconToReceipt(
+            options.oauthReconInput ??
+              canonicalOauthApplicationReconReceiptAdapterInput(),
+          ),
+          manifest,
+        );
+        adapters.push("oauth-application-recon");
+      } catch {
+        addFailure(
+          scenarioFailures,
+          manifest.id,
+          "OAUTH_RECON_ADAPTER_DRIFT",
         );
       }
     }
