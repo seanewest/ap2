@@ -7,6 +7,7 @@ import { REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY } from "../../api/rehearsa
 import { BATCH_FEASIBILITY_API_CAPABILITY } from "../../api/multi-scenario-feasibility.ts";
 import { HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/help-desk-email-rehearsal-verification.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/private-document-rehearsal-verification.ts";
+import { OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/oauth-application-recon-rehearsal-verification.ts";
 import { AVD_MANIFEST_ADAPTER_CAPABILITY } from "../../scripts/avd-three-vm-manifest-adapter.ts";
 import { AVD_THREE_VM_REHEARSAL_CAPABILITY } from "../../scripts/avd-three-vm-rehearsal.ts";
 import { HELP_DESK_EMAIL_REHEARSAL_CAPABILITY } from "../../scripts/help-desk-email-rehearsal.ts";
@@ -21,6 +22,7 @@ import { TEAMS_MISSED_CALL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../s
 import { SCENARIO_API_CLIENT_CAPABILITIES } from "../api/client.ts";
 import { AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./avd-rehearsal-verification-panel.ts";
 import { HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./help-desk-rehearsal-verification-panel.ts";
+import { OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./oauth-application-recon-rehearsal-verification-panel.ts";
 import { SCENARIO_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
 import { SCENARIO_PLAN_PREVIEW_UI_CAPABILITY } from "./scenario-plan-preview.ts";
 import { SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY } from "./scenario-evidence-verification-panel.ts";
@@ -38,6 +40,7 @@ function surfaceDeclarations(): unknown[] {
   return structuredClone([
     BATCH_FEASIBILITY_API_CAPABILITY,
     HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_API_CAPABILITY,
+    OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_API_CAPABILITY,
     PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY,
     SCENARIO_PLAN_API_CAPABILITY,
     SCENARIO_RECEIPT_API_CAPABILITY,
@@ -48,6 +51,7 @@ function surfaceDeclarations(): unknown[] {
     SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY,
     AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
     HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
+    OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
     PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
     AVD_THREE_VM_REHEARSAL_CAPABILITY,
     HELP_DESK_EMAIL_REHEARSAL_CAPABILITY,
@@ -195,7 +199,7 @@ describe("canonical scenario surface inventory", () => {
     ).toBe("implemented");
     expect(
       oauthRecon.surfaces["manual-rehearsal-verification-panel"].status,
-    ).toBe("missing");
+    ).toBe("implemented");
 
     for (
       const row of first.scenarios.filter(
@@ -467,7 +471,7 @@ describe("canonical scenario surface inventory", () => {
 
   it("bounds declarations and output failures", () => {
     const tooMany = Array.from(
-      { length: 33 },
+      { length: 41 },
       () => structuredClone(SCENARIO_PLAN_API_CAPABILITY),
     );
     expect(inventoryCanonicalScenarioSurfaces({

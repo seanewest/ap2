@@ -44,6 +44,17 @@ This endpoint verifies supplied data only. It does not run the rehearsal,
 obtain evidence, acquire a token, call OAuth or Microsoft Graph, schedule
 work, persist input, or prove that external work occurred.
 
+## Manual operator panel
+
+The signed SPA exposes the same pure verifier through the manual-only
+**Application-reconnaissance rehearsal verification** panel. The panel accepts
+one sanitized PR #111 envelope, applies the authoritative 32 KiB request
+parser locally before acquiring operator authorization, and calls only the
+typed PR #121 client after deliberate **Verify** submission. It renders only
+the fixed safe summary or categorical refusal states, suppresses duplicate
+submissions and stale completions, and adds no execution, OAuth, Graph,
+persistence, retry, polling, or scheduling path.
+
 ## Claim boundary
 
 The verified summary means only that the JSON is internally consistent with

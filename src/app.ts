@@ -20,6 +20,7 @@ import {
   CONTACT_PROOF_RUN_ID,
   HelpDeskEmailRehearsalVerificationClientError,
   OneDriveInviteFailureError,
+  OauthApplicationReconRehearsalVerificationClientError,
   PrivateDocumentRehearsalVerificationClientError,
   RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
@@ -48,6 +49,9 @@ import {
 import {
   isBoundedTeamsMissedCallRehearsalRequest,
 } from "./api/teams-missed-call-rehearsal-verification-contract";
+import {
+  isBoundedOauthApplicationReconRehearsalRequest,
+} from "./api/oauth-application-recon-rehearsal-verification-contract";
 import {
   FIXED_PROOF_BY_ID,
   bindFixedProofActions,
@@ -98,6 +102,11 @@ import {
   type TeamsRehearsalPanelClient,
   type TeamsRehearsalPanelFailure,
 } from "./scenarios/teams-rehearsal-verification-panel";
+import {
+  createOauthApplicationReconRehearsalVerificationPanel,
+  type OauthApplicationReconRehearsalPanelClient,
+  type OauthApplicationReconRehearsalPanelFailure,
+} from "./scenarios/oauth-application-recon-rehearsal-verification-panel";
 import {
   createScenarioEvidenceVerificationPanel,
   type ScenarioEvidenceVerificationFailure,
@@ -277,6 +286,22 @@ export function createAfterPartyApp(
     },
     classifyError: classifyTeamsRehearsalFailure,
   };
+  const oauthApplicationReconRehearsalVerificationClient:
+    OauthApplicationReconRehearsalPanelClient = {
+      parse: (value) =>
+        isBoundedOauthApplicationReconRehearsalRequest(value)
+          ? value
+          : undefined,
+      verify: async (output) => {
+        const accessToken =
+          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+        return await api.verifyOauthApplicationReconRehearsalOutput(
+          accessToken,
+          output,
+        );
+      },
+      classifyError: classifyOauthApplicationReconRehearsalFailure,
+    };
   const batchFeasibilityClient: BatchFeasibilityPanelClient = {
     evaluate: async (request) => {
       const accessToken =
@@ -852,6 +877,7 @@ export function createAfterPartyApp(
         privateDocumentRehearsalVerificationClient,
         helpDeskRehearsalVerificationClient,
         teamsRehearsalVerificationClient,
+        oauthApplicationReconRehearsalVerificationClient,
         batchFeasibilityClient,
       ),
     );
@@ -955,6 +981,8 @@ function createShell(
     PrivateDocumentRehearsalPanelClient,
   helpDeskRehearsalVerificationClient: HelpDeskRehearsalPanelClient,
   teamsRehearsalVerificationClient: TeamsRehearsalPanelClient,
+  oauthApplicationReconRehearsalVerificationClient:
+    OauthApplicationReconRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const shell = document.createElement("main");
@@ -984,6 +1012,7 @@ function createShell(
       privateDocumentRehearsalVerificationClient,
       helpDeskRehearsalVerificationClient,
       teamsRehearsalVerificationClient,
+      oauthApplicationReconRehearsalVerificationClient,
       batchFeasibilityClient,
     ),
   );
@@ -1001,6 +1030,8 @@ function createStatePanel(
     PrivateDocumentRehearsalPanelClient,
   helpDeskRehearsalVerificationClient: HelpDeskRehearsalPanelClient,
   teamsRehearsalVerificationClient: TeamsRehearsalPanelClient,
+  oauthApplicationReconRehearsalVerificationClient:
+    OauthApplicationReconRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const panel = document.createElement("section");
@@ -1073,6 +1104,9 @@ function createStatePanel(
         }),
         createTeamsRehearsalVerificationPanel({
           client: teamsRehearsalVerificationClient,
+        }),
+        createOauthApplicationReconRehearsalVerificationPanel({
+          client: oauthApplicationReconRehearsalVerificationClient,
         }),
         createButton("Sign out", "sign-out", "secondary"),
       );
@@ -1266,6 +1300,33 @@ function classifyTeamsRehearsalFailure(
     return "session-expired";
   }
   if (!(error instanceof TeamsMissedCallRehearsalVerificationClientError)) {
+    return "unavailable";
+  }
+  switch (error.category) {
+    case "unauthorized":
+      return "session-expired";
+    case "forbidden":
+      return "unauthorized";
+    case "validation-refused":
+      return "verification-refused";
+    case "request-too-large":
+      return "request-too-large";
+    case "response-too-large":
+      return "response-too-large";
+    case "safe-failure":
+      return "unavailable";
+  }
+}
+
+function classifyOauthApplicationReconRehearsalFailure(
+  error: unknown,
+): OauthApplicationReconRehearsalPanelFailure {
+  if (error instanceof AccessTokenError) {
+    return "session-expired";
+  }
+  if (
+    !(error instanceof OauthApplicationReconRehearsalVerificationClientError)
+  ) {
     return "unavailable";
   }
   switch (error.category) {
