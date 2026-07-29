@@ -6,6 +6,8 @@ import {
   type KeyObject,
 } from "node:crypto";
 import { createServer, type Server } from "node:http";
+import { connect } from "node:net";
+import { performance } from "node:perf_hooks";
 import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   REQUIRED_APPLICATION_ROLE,
@@ -151,6 +153,25 @@ async function main(): Promise<void> {
       method: "POST",
       headers: { Origin: `https://${UNSAFE_SENTINEL}` },
     }, 403);
+    const bodyStartedAt = performance.now();
+    const partialBodyResponse = await incompleteJsonRequest(
+      apiPort,
+      delegatedProductToken,
+    );
+    const bodyReceiveTimeoutMs = Math.round(performance.now() - bodyStartedAt);
+    if (
+      bodyReceiveTimeoutMs < 14_000 ||
+      bodyReceiveTimeoutMs > 18_000 ||
+      partialBodyResponse.includes("500 Internal Server Error") ||
+      (
+        partialBodyResponse.length > 0 &&
+        !partialBodyResponse.includes("408 Request Timeout")
+      )
+    ) {
+      throw new Error(
+        `Incomplete body boundary was not categorical (${bodyReceiveTimeoutMs}ms)`,
+      );
+    }
 
     runPodman(["stop", "--time", "5", container]);
     const exitCode = runPodman(["inspect", "--format", "{{.State.ExitCode}}", container]);
@@ -172,7 +193,14 @@ async function main(): Promise<void> {
     runPodman(["rm", container]);
     containerCreated = false;
     console.log(
-      "Container build, health/auth/validation/mutation-refusal telemetry, redaction, and clean shutdown passed",
+      JSON.stringify({
+        schemaVersion: 1,
+        label: "API_CONTAINER_REQUEST_BOUNDARY",
+        status: "pass",
+        bodyReceiveTimeoutMs,
+        terminalTelemetry: "exact",
+        residue: "absent",
+      }),
     );
   } finally {
     if (containerCreated) {
@@ -329,6 +357,7 @@ function verifyStructuredLogs(logs: string, tokens: readonly string[]): void {
   expectSignature(requests, "scenario-plan-compile", "pure", 415, 1);
   expectSignature(requests, "scenario-plan-compile", "pure", 400, 1);
   expectSignature(requests, "scenario-plan-compile", "pure", 413, 1);
+  expectSignature(requests, "scenario-plan-compile", "pure", 499, 1);
   expectSignature(requests, "simulated-email-send", "bounded-mutation", 403, 1);
   if (!requests.some(({ routeOwner, status }) => routeOwner === "health" && status === 200)) {
     throw new Error("Health request telemetry was not emitted");
@@ -355,6 +384,47 @@ function verifyStructuredLogs(logs: string, tokens: readonly string[]): void {
       throw new Error("Production telemetry exposed an unsafe request value");
     }
   }
+}
+
+async function incompleteJsonRequest(
+  port: number,
+  token: string,
+): Promise<string> {
+  const socket = connect(port, "127.0.0.1");
+  socket.setEncoding("utf8");
+  let received = "";
+  socket.on("data", (chunk: string) => {
+    received += chunk;
+  });
+  await new Promise<void>((resolve, reject) => {
+    socket.once("connect", resolve);
+    socket.once("error", reject);
+  });
+  socket.write([
+    "POST /api/scenario-plan HTTP/1.1",
+    `Host: 127.0.0.1:${port}`,
+    `Authorization: Bearer ${token}`,
+    "Content-Type: application/json",
+    "Content-Length: 16",
+    "Connection: close",
+    "",
+    "{",
+  ].join("\r\n"));
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      reject(new Error("Incomplete body exceeded its hard outer timeout"));
+    }, 20_000);
+    timeout.unref();
+    const finish = (): void => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    socket.once("end", finish);
+    socket.once("close", finish);
+    socket.once("error", reject);
+  });
+  return received;
 }
 
 function expectSignature(

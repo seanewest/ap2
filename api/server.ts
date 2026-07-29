@@ -130,6 +130,12 @@ import {
 } from "../scripts/verify-purview-audit-boundary-rehearsal-output.js";
 import type { ApiRequestTelemetry } from "./api-telemetry.js";
 
+export const API_HEADERS_TIMEOUT_MS = 10_000;
+export const API_REQUEST_RECEIVE_TIMEOUT_MS = 15_000;
+export const API_CONNECTIONS_CHECKING_INTERVAL_MS = 1_000;
+export const API_INACTIVITY_TIMEOUT_MS = 120_000;
+export const API_KEEP_ALIVE_TIMEOUT_MS = 5_000;
+
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
   callerPolicy: CallerPolicy;
@@ -165,11 +171,18 @@ export interface ApiDependencies {
 }
 
 export function createApiServer(dependencies: ApiDependencies): Server {
-  return createServer((request, response) => {
+  const server = createServer({
+    headersTimeout: API_HEADERS_TIMEOUT_MS,
+    requestTimeout: API_REQUEST_RECEIVE_TIMEOUT_MS,
+    connectionsCheckingInterval: API_CONNECTIONS_CHECKING_INTERVAL_MS,
+    keepAliveTimeout: API_KEEP_ALIVE_TIMEOUT_MS,
+  }, (request, response) => {
     void route(request, response, dependencies).catch(() => {
       sendJson(response, 500, { error: "internal_server_error" });
     });
   });
+  server.setTimeout(API_INACTIVITY_TIMEOUT_MS, (socket) => socket.destroy());
+  return server;
 }
 
 const responseRouteContracts = new WeakMap<ServerResponse, ApiRouteContract>();
@@ -633,6 +646,9 @@ async function handleAuthorizedRequest(
   try {
     const claims = await dependencies.tokenVerifier.verify(token);
     const caller = authorizeClaims(claims, dependencies.callerPolicy);
+    if (response.destroyed || response.writableEnded) {
+      return;
+    }
     sendJson(response, successStatus, await operation(caller));
   } catch (error) {
     if (error instanceof CallerNotAllowedError) {
@@ -657,6 +673,10 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof JsonInvalidBodyError) {
       sendJson(response, 400, { error: "invalid_request_body" });
+      return;
+    }
+    if (error instanceof JsonRequestTimeoutError) {
+      sendJson(response, 408, { error: "request_timeout" });
       return;
     }
     if (error instanceof ScenarioPlanError) {
@@ -922,6 +942,7 @@ async function handleAuthorizedRequest(
 class JsonUnsupportedMediaTypeError extends Error {}
 class JsonRequestTooLargeError extends Error {}
 class JsonInvalidBodyError extends Error {}
+class JsonRequestTimeoutError extends Error {}
 
 async function scenarioPlan(
   request: IncomingMessage,
@@ -1129,14 +1150,24 @@ async function readBoundedJson(
 
   const chunks: Buffer[] = [];
   let totalBytes = 0;
-  for await (const chunk of request) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-    totalBytes += buffer.length;
-    if (totalBytes > maximumBytes) {
-      request.resume();
-      throw new JsonRequestTooLargeError();
+  try {
+    for await (const chunk of request) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += buffer.length;
+      if (totalBytes > maximumBytes) {
+        request.resume();
+        throw new JsonRequestTooLargeError();
+      }
+      chunks.push(buffer);
     }
-    chunks.push(buffer);
+  } catch (error) {
+    if (error instanceof JsonRequestTooLargeError) {
+      throw error;
+    }
+    if (request.aborted || request.destroyed) {
+      throw new JsonRequestTimeoutError();
+    }
+    throw error;
   }
   if (totalBytes === 0) {
     throw new JsonInvalidBodyError();
@@ -1162,6 +1193,9 @@ function sendUnauthorized(response: ServerResponse): void {
 }
 
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
+  if (response.destroyed || response.writableEnded) {
+    return;
+  }
   if (response.headersSent) {
     response.end();
     return;

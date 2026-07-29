@@ -12,7 +12,9 @@ operator authentication, or request-body parsing, so an already-active
 keep-alive connection cannot admit another pure or mutating operation.
 
 Requests admitted before the transition retain their existing bounded route
-contracts and may finish. The listener closes after those requests drain. If
+contracts and may finish. Connection closure never generically cancels an
+already-dispatched operation; operation-specific recovery remains authoritative.
+The listener closes after those requests drain. If
 they do not drain within ten seconds, the existing categorical timeout exits
 the process with status 1; the API does not retry, persist, or resume their
 work. A normal drain exits with status 0.
@@ -27,6 +29,8 @@ image. It proves:
   with the shutdown category;
 - health is no longer ready after the shutdown transition;
 - both `SIGTERM` and `SIGINT` close the listener and exit cleanly; and
+- one partial request held beyond the drain window exits nonzero with the
+  categorical forced-exit record; and
 - the test removes its containers and image.
 
 The test prints measured startup-failure, readiness, drain, and interrupt-exit

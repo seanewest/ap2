@@ -12,8 +12,14 @@ Each schema-v1 `api_request` record contains exactly:
 - the fixed route registry's `routeOwner`, `sideEffect`, and `authorization`
   categories, or the fixed `unmatched` category;
 - the terminal HTTP `status`;
-- `completed`, `refused`, `failed`, or `shutdown-refused`;
+- `completed`, `refused`, `failed`, `shutdown-refused`, or
+  `connection-closed`;
 - and an integer `durationMs` capped at 60 seconds.
+
+When the connection closes before a response finishes, the record uses the
+fixed `connection-closed` outcome and local status sentinel `499`. This
+preserves one terminal record without claiming that a response was delivered.
+See the [request deadline and cancellation boundary](api-request-deadlines.md).
 
 The telemetry observer receives only the response, resolved route contract,
 and shutdown-admission state. It never receives the request, headers, body,
