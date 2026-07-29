@@ -27,7 +27,9 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 - **Non-idempotent operation journal — shared store required:** The real
   OneDrive share/cleanup and calendar create/cancel consumers still use
-  process-local boundaries and require `maxReplicas=1`. The main API has no
+  process-local boundaries and require `minReplicas=1` and `maxReplicas=1`.
+  The explicit main-API topology-plan check and fixed Container App readiness
+  read now fail closed on replica drift. The main API has no
   production shared store, endpoint/configuration contract, storage SDK, or
   managed-identity data role. The calling bot's separate single-replica Azure
   Files journal is not a cross-replica claim store. Azure Table Storage is the

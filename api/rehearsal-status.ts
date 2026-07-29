@@ -1,7 +1,13 @@
+import {
+  API_DEPLOYMENT_REPLICA_CONTRACT,
+  requireSingleReplicaScale,
+} from "./api-replica-contract.js";
+
 export const REHEARSAL_SUBSCRIPTION_ID =
   "6d8ebd0e-017f-401e-950d-e5a35de93dc6";
 export const REHEARSAL_RESOURCE_GROUP = "rg-ap2-rehearsal";
-export const REHEARSAL_CONTAINER_APP = "ca-ap2-api";
+export const REHEARSAL_CONTAINER_APP =
+  API_DEPLOYMENT_REPLICA_CONTRACT.target;
 
 const AZURE_MANAGEMENT_SCOPE = "https://management.azure.com/.default";
 const CONTAINER_APP_API_VERSION = "2025-07-01";
@@ -77,6 +83,7 @@ function parseContainerApp(value: unknown): RehearsalStatus {
   }
 
   const runningStatus = value.properties.runningStatus;
+  const template = value.properties.template;
   if (
     typeof value.name !== "string" ||
     value.name !== REHEARSAL_CONTAINER_APP ||
@@ -84,9 +91,16 @@ function parseContainerApp(value: unknown): RehearsalStatus {
     value.location.length === 0 ||
     !isRunningStatus(runningStatus) ||
     typeof value.properties.latestReadyRevisionName !== "string" ||
-    value.properties.latestReadyRevisionName.length === 0
+    value.properties.latestReadyRevisionName.length === 0 ||
+    !isRecord(template) ||
+    !isRecord(template.scale)
   ) {
     throw new Error("Azure returned an invalid Container App");
+  }
+  try {
+    requireSingleReplicaScale(template.scale);
+  } catch {
+    throw new Error("Azure returned an unsafe Container App replica topology");
   }
 
   return {

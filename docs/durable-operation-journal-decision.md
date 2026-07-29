@@ -2,6 +2,11 @@
 
 Status: **architecture decision required**
 
+The repository's
+[single-replica fallback](api-single-replica-fallback.md) remains mandatory
+while this decision is open. This document and PR #144 define a future state
+machine; neither provides cross-replica serialization.
+
 The main AP2 API cannot replace its process-local mutation boundaries without
 choosing and provisioning a shared durable store. Its source and configuration
 currently define no such store, connection contract, dependency, deployment
