@@ -18,6 +18,7 @@ import {
   CONTACT_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
+  HelpDeskEmailRehearsalVerificationClientError,
   OneDriveInviteFailureError,
   PrivateDocumentRehearsalVerificationClientError,
   RehearsalOutputVerificationClientError,
@@ -40,6 +41,9 @@ import {
 import {
   isBoundedPrivateDocumentRehearsalRequest,
 } from "./api/private-document-rehearsal-verification-contract";
+import {
+  isBoundedHelpDeskEmailRehearsalRequest,
+} from "./api/help-desk-email-rehearsal-verification-contract";
 import {
   FIXED_PROOF_BY_ID,
   bindFixedProofActions,
@@ -77,6 +81,11 @@ import {
   type PrivateDocumentRehearsalPanelClient,
   type PrivateDocumentRehearsalPanelFailure,
 } from "./scenarios/private-document-rehearsal-verification-panel";
+import {
+  createHelpDeskRehearsalVerificationPanel,
+  type HelpDeskRehearsalPanelClient,
+  type HelpDeskRehearsalPanelFailure,
+} from "./scenarios/help-desk-rehearsal-verification-panel";
 import {
   createScenarioEvidenceVerificationPanel,
   type ScenarioEvidenceVerificationFailure,
@@ -223,6 +232,20 @@ export function createAfterPartyApp(
         );
       },
       classifyError: classifyPrivateDocumentRehearsalFailure,
+    };
+  const helpDeskRehearsalVerificationClient:
+    HelpDeskRehearsalPanelClient = {
+      parse: (value) =>
+        isBoundedHelpDeskEmailRehearsalRequest(value) ? value : undefined,
+      verify: async (output) => {
+        const accessToken =
+          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+        return await api.verifyHelpDeskEmailRehearsalOutput(
+          accessToken,
+          output,
+        );
+      },
+      classifyError: classifyHelpDeskRehearsalFailure,
     };
   const batchFeasibilityClient: BatchFeasibilityPanelClient = {
     evaluate: async (request) => {
@@ -797,6 +820,7 @@ export function createAfterPartyApp(
         scenarioEvidenceVerificationClient,
         avdRehearsalVerificationClient,
         privateDocumentRehearsalVerificationClient,
+        helpDeskRehearsalVerificationClient,
         batchFeasibilityClient,
       ),
     );
@@ -898,6 +922,7 @@ function createShell(
   avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
   privateDocumentRehearsalVerificationClient:
     PrivateDocumentRehearsalPanelClient,
+  helpDeskRehearsalVerificationClient: HelpDeskRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const shell = document.createElement("main");
@@ -925,6 +950,7 @@ function createShell(
       scenarioEvidenceVerificationClient,
       avdRehearsalVerificationClient,
       privateDocumentRehearsalVerificationClient,
+      helpDeskRehearsalVerificationClient,
       batchFeasibilityClient,
     ),
   );
@@ -940,6 +966,7 @@ function createStatePanel(
   avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
   privateDocumentRehearsalVerificationClient:
     PrivateDocumentRehearsalPanelClient,
+  helpDeskRehearsalVerificationClient: HelpDeskRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const panel = document.createElement("section");
@@ -1005,6 +1032,9 @@ function createStatePanel(
         }),
         createPrivateDocumentRehearsalVerificationPanel({
           client: privateDocumentRehearsalVerificationClient,
+        }),
+        createHelpDeskRehearsalVerificationPanel({
+          client: helpDeskRehearsalVerificationClient,
         }),
         createButton("Sign out", "sign-out", "secondary"),
       );
@@ -1148,6 +1178,31 @@ function classifyPrivateDocumentRehearsalFailure(
   if (
     !(error instanceof PrivateDocumentRehearsalVerificationClientError)
   ) {
+    return "unavailable";
+  }
+  switch (error.category) {
+    case "unauthorized":
+      return "session-expired";
+    case "forbidden":
+      return "unauthorized";
+    case "validation-refused":
+      return "verification-refused";
+    case "request-too-large":
+      return "request-too-large";
+    case "response-too-large":
+      return "response-too-large";
+    case "safe-failure":
+      return "unavailable";
+  }
+}
+
+function classifyHelpDeskRehearsalFailure(
+  error: unknown,
+): HelpDeskRehearsalPanelFailure {
+  if (error instanceof AccessTokenError) {
+    return "session-expired";
+  }
+  if (!(error instanceof HelpDeskEmailRehearsalVerificationClientError)) {
     return "unavailable";
   }
   switch (error.category) {
