@@ -178,9 +178,17 @@ async function waitForHealthy(baseUrl: string): Promise<void> {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
       const response = await fetch(`${baseUrl}/health`);
-      const health = runPodman(["inspect", "--format", "{{.State.Health.Status}}", container]);
-      if (response.ok && health.trim() === "healthy") {
-        return;
+      if (response.ok) {
+        runPodman(["healthcheck", "run", container]);
+        const health = runPodman([
+          "inspect",
+          "--format",
+          "{{.State.Health.Status}}",
+          container,
+        ]);
+        if (health.trim() === "healthy") {
+          return;
+        }
       }
     } catch {
       // The container may still be starting.

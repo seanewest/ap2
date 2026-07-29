@@ -131,6 +131,7 @@ const coryTokenProvider =
     : undefined;
 const operationTelemetryCollector =
   new InMemoryOperationTelemetryCollector();
+let shuttingDown = false;
 const calendarMeetingOperation =
   coryTokenProvider && cory
     ? new ProcessLocalCalendarMeetingBoundary(
@@ -200,6 +201,7 @@ const server = createApiServer({
     new InMemoryMultiScenarioFeasibilityService(),
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
   allowedOrigin: config.allowedOrigin,
+  isShuttingDown: () => shuttingDown,
 });
 
 server.listen(config.port, config.host, () => {
@@ -208,7 +210,6 @@ server.listen(config.port, config.host, () => {
   console.log(`AP2 API listening on ${config.host}:${port}`);
 });
 
-let shuttingDown = false;
 function shutdown(signal: string): void {
   if (shuttingDown) {
     return;
