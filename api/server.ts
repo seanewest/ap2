@@ -146,6 +146,7 @@ export interface ApiDependencies {
     OauthApplicationReconRehearsalVerificationService;
   multiScenarioFeasibilityService?: MultiScenarioFeasibilityService;
   allowedOrigin?: string;
+  isShuttingDown?: () => boolean;
 }
 
 export function createApiServer(dependencies: ApiDependencies): Server {
@@ -166,6 +167,10 @@ async function route(
   const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
   const contract = findApiRouteContract(request.method, pathname);
   if (contract) responseRouteContracts.set(response, contract);
+  if (dependencies.isShuttingDown?.()) {
+    sendJson(response, 503, { error: "server_shutting_down" });
+    return;
+  }
   const origin = request.headers.origin;
   if (origin) {
     if (!dependencies.allowedOrigin || origin !== dependencies.allowedOrigin) {
