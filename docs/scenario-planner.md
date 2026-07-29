@@ -83,10 +83,10 @@ Run it locally:
 npm run plan:scenario -- request.json
 ```
 
-The canonical help-desk email, three-VM AVD, Teams missed-call, and application
-reconnaissance manifests all pass through this same compiler. Tests also cover
-unsafe alias binding, missing cleanup/evidence/interpretation, expired or
-overlong windows, insufficient budget, unsupported responses, retention
+Every manifest in the canonical scenario registry, including newly added
+families, passes through this same compiler and compatibility suite. Tests also
+cover unsafe alias binding, missing cleanup/evidence/interpretation, expired
+or overlong windows, insufficient budget, unsupported responses, retention
 contradictions, deterministic digests, and raw-identifier refusal.
 
 ## Authenticated API and typed client

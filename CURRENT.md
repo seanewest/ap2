@@ -8,7 +8,6 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Future endpoint automation
 
-- **AVD personal prototype — Intune permission gate:** One reviewed direct registration request converged to `Microsoft.DesktopVirtualization: Registered`; provider and possible Microsoft provider-identity residue are accepted and must not be removed. Fresh East US image, `Standard_D2s_v3` zone/quota, private NAT network, stable AVD API, Azure RBAC, and conservative eight-hour USD 4.6693 price contracts passed. Deployment stopped before creating resources because the established Dev actor lacks both `DeviceManagementConfiguration.ReadWrite.All` for the run-scoped EDR policy and `DeviceManagementManagedDevices.ReadWrite.All` for exact Intune-device cleanup. Granting/admin-consenting those tenant-wide application permissions was outside the authorized boundary. No billable or run-owned state exists; after narrow permission authorization, begin a fresh enrollment/cleanup readiness pass.
 - **Later shared-device alternative — unattended WCD boundary:** The ordinary
   private-VM experiment stopped before tenant mutation, VM creation, or spend.
   No protected package existed, and Microsoft's supported bulk-token step
@@ -50,6 +49,14 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- The AVD personal-host learner lane is live-proven and closed. One fixed
+  learner completed Windows App feed and resource authentication and reached
+  the assigned Windows 11 desktop; AVD independently recorded the session and
+  its terminal disconnected state. Endpoint offboarding, resource deletion,
+  Intune and Entra cleanup, and revocation of both temporary Graph roles were
+  then proven. This is distinct from the canonical private three-VM substrate
+  canary, which did not include a learner session. See
+  [proven capabilities](docs/proven-capabilities.md).
 - The main API now refuses excess one-process work through fixed route-metadata
   lanes before authentication or body parsing. Mutations are never queued or
   retried; receive/header/keep-alive limits are explicit; and a bounded
