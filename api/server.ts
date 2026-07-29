@@ -57,6 +57,15 @@ import {
   type ScenarioEvidenceVerificationService,
 } from "./scenario-evidence-verification.js";
 import { EvidenceReceiptError } from "../src/scenarios/scenario-evidence-receipt.js";
+import {
+  RehearsalOutputVerificationResponseTooLargeError,
+  RehearsalOutputVerificationSafeFailureError,
+  type RehearsalOutputVerificationService,
+} from "./rehearsal-output-verification.js";
+import { RehearsalOutputVerificationError } from "../scripts/verify-avd-three-vm-rehearsal-output.js";
+import {
+  REHEARSAL_OUTPUT_MAX_REQUEST_BYTES,
+} from "../src/api/rehearsal-output-verification-contract.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -75,6 +84,7 @@ export interface ApiDependencies {
   operationTelemetryReader?: OperationTelemetryReader;
   scenarioPlanService?: ScenarioPlanService;
   scenarioEvidenceVerificationService?: ScenarioEvidenceVerificationService;
+  rehearsalOutputVerificationService?: RehearsalOutputVerificationService;
   allowedOrigin?: string;
 }
 
@@ -147,7 +157,8 @@ async function route(
 
   if (
     request.method === "OPTIONS" &&
-    pathname === "/api/scenario-evidence-verification"
+    (pathname === "/api/scenario-evidence-verification" ||
+      pathname === "/api/rehearsal-output-verification")
   ) {
     handleProtectedPreflight(
       request,
@@ -216,6 +227,13 @@ async function route(
     pathname === "/api/scenario-evidence-verification"
   ) {
     await scenarioEvidenceVerification(request, response, dependencies);
+    return;
+  }
+  if (
+    request.method === "POST" &&
+    pathname === "/api/rehearsal-output-verification"
+  ) {
+    await rehearsalOutputVerification(request, response, dependencies);
     return;
   }
 
@@ -541,6 +559,25 @@ async function handleAuthorizedRequest(
       });
       return;
     }
+    if (error instanceof RehearsalOutputVerificationError) {
+      sendJson(response, 400, {
+        error: "rehearsal_output_refused",
+        category: error.category,
+      });
+      return;
+    }
+    if (error instanceof RehearsalOutputVerificationResponseTooLargeError) {
+      sendJson(response, 500, {
+        error: "rehearsal_output_response_too_large",
+      });
+      return;
+    }
+    if (error instanceof RehearsalOutputVerificationSafeFailureError) {
+      sendJson(response, 500, {
+        error: "rehearsal_output_verification_failed",
+      });
+      return;
+    }
     if (error instanceof OneDriveProofConflictError) {
       sendJson(response, 409, { error: "proof_state_conflict" });
       return;
@@ -636,6 +673,28 @@ async function scenarioEvidenceVerification(
     }
     return service.verify(
       await readBoundedJson(request, SCENARIO_RECEIPT_MAX_REQUEST_BYTES),
+    );
+  });
+}
+
+async function rehearsalOutputVerification(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new JsonUnsupportedMediaTypeError();
+    }
+    const service = dependencies.rehearsalOutputVerificationService;
+    if (!service) {
+      throw new RehearsalOutputVerificationSafeFailureError();
+    }
+    return service.verify(
+      await readBoundedJson(request, REHEARSAL_OUTPUT_MAX_REQUEST_BYTES),
     );
   });
 }

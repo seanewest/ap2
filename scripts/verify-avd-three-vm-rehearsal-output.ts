@@ -9,6 +9,10 @@ import {
   type RehearsalObservationStage,
   type RehearsalRunStage,
 } from "./avd-three-vm-rehearsal.ts";
+import {
+  type RehearsalOutputVerificationFailure,
+  type VerifiedRehearsalOutputSummary,
+} from "../src/api/rehearsal-output-verification-contract.ts";
 
 const MAX_OUTPUT_BYTES = 256 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -22,17 +26,7 @@ const PRIVATE_PATH =
 const MARKER_LIKE = /\bap2(?:lab)?-[a-z0-9][a-z0-9-]{7,}\b/i;
 const PEM = /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----/;
 
-export type RehearsalOutputVerificationFailure =
-  | "CLEANUP_GAP"
-  | "INPUT_OVERSIZED"
-  | "INPUT_SHAPE"
-  | "NON_CANONICAL_JSON"
-  | "OBSERVATION_OVERCLAIM"
-  | "PLAN_BINDING"
-  | "RECEIPT_BINDING"
-  | "RECEIPT_COVERAGE"
-  | "RUN_NONTERMINAL"
-  | "UNSAFE_CONTENT";
+export type { RehearsalOutputVerificationFailure };
 
 export class RehearsalOutputVerificationError extends Error {
   readonly category: RehearsalOutputVerificationFailure;
@@ -44,19 +38,7 @@ export class RehearsalOutputVerificationError extends Error {
   }
 }
 
-export interface VerifiedRehearsalOutputSummary {
-  schemaVersion: 1;
-  label: "REHEARSAL_ONLY_VERIFIED";
-  status: "verified";
-  scenarioId: string;
-  planDigestSha256: string;
-  run: "terminal-complete";
-  cleanup: "ordered-complete";
-  observations: "synthetic-only";
-  evidenceClaims: "all-uninspected";
-  claimCount: number;
-  missingCoverageTotal: number;
-}
+export type { VerifiedRehearsalOutputSummary };
 
 export function canonicalAvdThreeVmRehearsalOutput():
   AvdThreeVmRehearsalResult {

@@ -16,6 +16,16 @@ import {
   parseScenarioEvidenceReceiptRequest,
   ScenarioEvidenceContractError,
 } from "./scenario-evidence-verification-contract.ts";
+import {
+  REHEARSAL_OUTPUT_MAX_REQUEST_BYTES,
+  REHEARSAL_OUTPUT_MAX_RESPONSE_BYTES,
+  REHEARSAL_OUTPUT_VERIFICATION_FAILURES,
+  isBoundedRehearsalOutputRequest,
+  isVerifiedRehearsalOutputSummary,
+  type RehearsalOutputVerificationFailure,
+  type RehearsalOutputVerificationRequest,
+  type VerifiedRehearsalOutputSummary,
+} from "./rehearsal-output-verification-contract.ts";
 
 export interface ApiCallerIdentity {
   callerType: "delegated" | "app-only";
@@ -245,6 +255,10 @@ export interface AfterPartyApi {
     accessToken: string,
     receipt: ScenarioEvidenceReceipt,
   ): Promise<SafeVerifiedScenarioEvidenceReceipt>;
+  verifyRehearsalOutput(
+    accessToken: string,
+    output: RehearsalOutputVerificationRequest,
+  ): Promise<VerifiedRehearsalOutputSummary>;
   sendSimulatedEmail(accessToken: string): Promise<SimulatedEmailResult>;
   sendHelpDeskScenario(accessToken: string): Promise<HelpDeskScenarioResult>;
   shareOneDriveProof(
@@ -351,6 +365,29 @@ export class ScenarioEvidenceVerificationClientError extends Error {
   }
 }
 
+export type RehearsalOutputVerificationClientErrorCategory =
+  | "unauthorized"
+  | "forbidden"
+  | "validation-refused"
+  | "request-too-large"
+  | "response-too-large"
+  | "safe-failure";
+
+export class RehearsalOutputVerificationClientError extends Error {
+  readonly category: RehearsalOutputVerificationClientErrorCategory;
+  readonly refusalCategory?: RehearsalOutputVerificationFailure;
+
+  constructor(
+    category: RehearsalOutputVerificationClientErrorCategory,
+    refusalCategory?: RehearsalOutputVerificationFailure,
+  ) {
+    super(`Rehearsal output verification request failed: ${category}`);
+    this.name = "RehearsalOutputVerificationClientError";
+    this.category = category;
+    this.refusalCategory = refusalCategory;
+  }
+}
+
 export class OneDriveInviteFailureError extends ApiAccessError {
   readonly diagnostic: OneDriveInviteFailure;
 
@@ -369,6 +406,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly operationEventsUrl: string;
   private readonly scenarioPlanUrl: string;
   private readonly scenarioEvidenceVerificationUrl: string;
+  private readonly rehearsalOutputVerificationUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
   private readonly oneDriveProofUrl: string;
@@ -398,6 +436,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ).toString();
     this.scenarioEvidenceVerificationUrl = new URL(
       "api/scenario-evidence-verification",
+      `${baseUrl}/`,
+    ).toString();
+    this.rehearsalOutputVerificationUrl = new URL(
+      "api/rehearsal-output-verification",
       `${baseUrl}/`,
     ).toString();
     this.simulatedEmailUrl = new URL(
@@ -672,6 +714,115 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       !isExactSafeVerifiedReceipt(value, parsedReceipt)
     ) {
       throw new ScenarioEvidenceVerificationClientError("safe-failure");
+    }
+    return value;
+  }
+
+  async verifyRehearsalOutput(
+    accessToken: string,
+    output: RehearsalOutputVerificationRequest,
+  ): Promise<VerifiedRehearsalOutputSummary> {
+    if (!isBoundedRehearsalOutputRequest(output)) {
+      throw new RehearsalOutputVerificationClientError(
+        "validation-refused",
+        "INPUT_SHAPE",
+      );
+    }
+    let body: string;
+    try {
+      body = JSON.stringify(output);
+    } catch {
+      throw new RehearsalOutputVerificationClientError("validation-refused");
+    }
+    if (
+      new TextEncoder().encode(body).byteLength >
+      REHEARSAL_OUTPUT_MAX_REQUEST_BYTES
+    ) {
+      throw new RehearsalOutputVerificationClientError("request-too-large");
+    }
+
+    let response: Response;
+    try {
+      response = await this.request(this.rehearsalOutputVerificationUrl, {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+    } catch {
+      throw new RehearsalOutputVerificationClientError("safe-failure");
+    }
+    if (response.status === 401) {
+      throw new RehearsalOutputVerificationClientError("unauthorized");
+    }
+    if (response.status === 403) {
+      throw new RehearsalOutputVerificationClientError("forbidden");
+    }
+    if (response.status === 413) {
+      throw new RehearsalOutputVerificationClientError("request-too-large");
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(
+        response.headers.get("content-type") ?? "",
+      )
+    ) {
+      throw new RehearsalOutputVerificationClientError("safe-failure");
+    }
+
+    let responseText: string;
+    try {
+      responseText = await readBoundedJsonResponse(
+        response,
+        REHEARSAL_OUTPUT_MAX_RESPONSE_BYTES,
+      );
+    } catch (error) {
+      throw new RehearsalOutputVerificationClientError(
+        error instanceof BoundedResponseTooLargeError
+          ? "response-too-large"
+          : "safe-failure",
+      );
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new RehearsalOutputVerificationClientError("safe-failure");
+    }
+    if (!response.ok) {
+      if (
+        response.status === 400 &&
+        isScenarioRecord(value) &&
+        value.error === "rehearsal_output_refused" &&
+        typeof value.category === "string" &&
+        REHEARSAL_OUTPUT_VERIFICATION_FAILURES.includes(
+          value.category as RehearsalOutputVerificationFailure,
+        )
+      ) {
+        throw new RehearsalOutputVerificationClientError(
+          "validation-refused",
+          value.category as RehearsalOutputVerificationFailure,
+        );
+      }
+      if (
+        response.status === 500 &&
+        isScenarioRecord(value) &&
+        value.error === "rehearsal_output_response_too_large"
+      ) {
+        throw new RehearsalOutputVerificationClientError(
+          "response-too-large",
+        );
+      }
+      throw new RehearsalOutputVerificationClientError("safe-failure");
+    }
+    if (
+      response.status !== 200 ||
+      !isVerifiedRehearsalOutputSummary(value, output)
+    ) {
+      throw new RehearsalOutputVerificationClientError("safe-failure");
     }
     return value;
   }
