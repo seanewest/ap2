@@ -16,6 +16,7 @@
     "preview:oauth-app-recon": "node scripts/preview-oauth-app-recon.ts",
     "observe:oauth-recon-signin": "node scripts/observe-oauth-recon-signin.ts",
     "plan:avd-three-vm": "node scripts/plan-avd-three-vm-lab.ts",
+    "dry-run:avd-manifest-lifecycle": "node scripts/dry-run-avd-three-vm-manifest-cli.ts",
     "package:calling-bot-app": "node scripts/package-teams-calling-bot-app.ts",
     "plan:scenario": "node scripts/compile-scenario-plan.ts",
     "report:codex": "node scripts/codex-session-report.ts",
