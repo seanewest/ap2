@@ -130,6 +130,53 @@ The service recovered to
 `ca-ap2-call-18f4cc8ae5--disabled-020613`, one healthy replica with literal
 `TEAMS_CALLING_BOT_RUN_CANARY=false`. The journal records one create attempt,
 zero callbacks, and zero hang-ups. No second call is authorized. A future
-Graph-bot attempt should require a new diagnosis of the platform's tenant
+Graph-bot attempt should require a specific repair of the platform's tenant
 authorization binding and a new explicit GO; broadening permissions or
 changing to a group-call body would not follow from this result.
+
+## Tenant-binding diagnosis
+
+Fresh authoritative reads after the `7505` refusal closed the remaining
+visible-identity gaps. The token issuer, `tid`, audience, app ID, `oid`, `sub`,
+application identity, and sole `Calls.Initiate.All` role all resolve to the
+same Student-tenant application and service principal. The subscription,
+organization, single-tenant application, enabled home-tenant service
+principal, sole Graph role assignment, and Cory's tenant-local Member identity
+also align.
+
+The Azure Bot resource is `SingleTenant`; its `msaAppId`, `msaAppTenantId`,
+generic tenant ID, endpoint, and provisioned state are exact. Its Teams
+channel is enabled for calling with the expected Graph route and webhook.
+Graph's tenant catalog exposes one published app definition, the definition's
+bot relationship returns the same application ID, and Cory has that exact
+definition installed. The local package additionally has the same manifest
+and bot IDs and `supportsCalling: true`.
+
+Microsoft's current official
+[Azure Bot contract](https://learn.microsoft.com/en-us/azure/bot-service/provision-and-publish-a-bot?view=azure-bot-service-4.0)
+and [calling-bot
+registration](https://learn.microsoft.com/en-us/microsoftteams/platform/bots/calls-and-meetings/registering-calling-bot)
+support this single-tenant configuration and the existing one-target request.
+They do not document error
+`7505`, expose the Cloud Communications service's internal calling-registration
+record, or provide a deterministic repair for stale backend registration.
+Consequently, the strongest honest diagnosis is a Microsoft-internal
+registration ambiguity after every exposed tenant binding proved exact.
+Re-saving the channel, recreating an identity, adding request fields, or
+placing another call would test hypotheses rather than correct a proven
+misbinding, so no tenant or deployment mutation was made.
+
+The current service remains on healthy revision
+`ca-ap2-call-18f4cc8ae5--disabled-020613`, with one replica and literal
+`TEAMS_CALLING_BOT_RUN_CANARY=false`. The retained `7505` request correlation
+is sufficient for Microsoft backend support. Until that produces a specific
+repair, another Graph-bot call is not technically justified.
+
+If an authentic Teams-native missed-call artifact is needed now, the smallest
+decision-ready pivot is a controlled licensed-user call: a clearly identified
+lab originator must be signed into Teams, Cory must be signed in and not
+answer, and a fresh explicit GO must authorize exactly one call. This sacrifices
+unattended service origination but avoids new infrastructure and spend. ACS
+Teams Phone server calling remains the unattended fallback, but adds an ACS
+resource and preview/resource-account/Teams Phone dependencies; it is not the
+smallest next canary.

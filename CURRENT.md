@@ -19,12 +19,15 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 - The one authorized Teams Call Canary create was submitted exactly once for
   Cory with audio-only service-hosted media. Microsoft Graph returned a
-  definitive `4xx` refusal before assigning a call identity, so no incoming
-  call, callback, or hang-up occurred and calling was not proven. Exact
-  follow-up reads found one healthy call-disabled replica with literal
-  `TEAMS_CALLING_BOT_RUN_CANARY=false`, the sole `Calls.Initiate.All` grant,
-  the fixed Cory installation, and the reduced exclusive journal containing
-  exactly that one refused attempt. Do not retry the call.
+  definitive HTTP `403` / code `7505` tenant-mismatch refusal before assigning
+  a call identity, so no incoming call, callback, or hang-up occurred and
+  calling was not proven. Exact follow-up reads proved every exposed token,
+  tenant, application, service-principal, Azure Bot, Teams channel, catalog,
+  Cory, and runtime binding while Microsoft exposes no internal calling-
+  registration read or official `7505` repair. The healthy single replica is
+  literal call-disabled. Do not retry Graph without a specific Microsoft
+  backend repair; use a separately authorized controlled licensed-user call
+  as the smallest authentic Teams-artifact pivot.
 - The retained Teams chat learner remediation is complete. Sean removed only
   Marge once; one exact post-action membership read proved Cory, Homer, and
   Kobe retained and Marge absent, while protected learner evidence showed the
