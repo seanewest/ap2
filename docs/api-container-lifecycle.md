@@ -36,3 +36,24 @@ image. It proves:
 The test prints measured startup-failure, readiness, drain, and interrupt-exit
 times for that local run. Those observations validate the lifecycle contract;
 they are not hosted-deployment readiness evidence or an orchestration SLA.
+
+## Production image boundary
+
+The API image uses the exact Playwright release and Ubuntu-family tag that
+matches the runtime `playwright` package. The local audit records the resolved
+base digest, but the Dockerfile does not freeze it: this repository has no
+multi-architecture digest-renewal process, and pinning one platform digest
+without that maintenance contract would become stale. A future digest policy
+needs an explicit automated update and review path.
+
+The final stage contains only `dist-api/index.js` and production
+`node_modules`; build source maps are removed before the stage copy. The image
+runs as `pwuser` and exposes only port 3000. The rootless production-container
+test proves compatibility with a read-only root filesystem, all capabilities
+dropped, `no-new-privileges`, the default seccomp filter, and no host/device
+mounts. Chromium receives only a bounded `/tmp` tmpfs when its local proof runs.
+
+The current rootless Podman toolchain exposes inherited OCI version/build
+labels but no embedded SBOM command or attestation. Adding SBOM generation is
+an image publication/update-pipeline decision, not a reason to invent a local
+artifact or add a scanner framework here.
