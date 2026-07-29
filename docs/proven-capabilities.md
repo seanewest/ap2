@@ -134,6 +134,14 @@ they are not additional tenant capabilities.
   for Microsoft support or separately authorized cleanup. A controlled
   licensed-user Teams call is the smallest authentic artifact pivot; it
   requires a separate originator session and fresh explicit call authority.
+- A separately authorized controlled-user canary then proved the authentic
+  Teams-native artifact path. Sean placed exactly one client call from licensed
+  fictional lab user Kobe to Cory. Cory's Calls history showed one
+  `Missed incoming` Kobe entry, and Activity showed one matching missed Teams
+  call; both clients were terminal afterward and no second call was observed.
+  This proves bounded human-assisted user-to-user artifact creation, not
+  unattended automation. Exact elapsed time and all voicemail behavior remain
+  unproven and were not inspected. The Graph-bot `7505` blocker is unchanged.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted

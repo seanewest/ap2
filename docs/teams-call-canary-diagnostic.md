@@ -180,3 +180,30 @@ unattended service origination but avoids new infrastructure and spend. ACS
 Teams Phone server calling remains the unattended fallback, but adds an ACS
 resource and preview/resource-account/Teams Phone dependencies; it is not the
 smallest next canary.
+
+## Controlled-user result
+
+On 2026-07-29, Sean used the supported Teams client path for exactly one
+authorized call from the existing licensed fictional lab user
+`kobe@corywest.onmicrosoft.com` to
+`cory@corywest.onmicrosoft.com`. Kobe's client showed the active Cory call and
+then the post-call quality prompt. Cory remained signed in and did not answer
+or dismiss. Cory's Calls history showed one Kobe West entry at 1:10 AM labeled
+`Missed incoming`, and Cory's Activity showed one `Missed call from Kobe West`
+Teams-call notification. No second call was made or observed, and neither
+client showed an active call afterward.
+
+This proves that existing licensed AP2 lab users can produce an authentic,
+learner-visible native Teams missed-call artifact through a controlled
+user-to-user client action. The exact elapsed duration was not independently
+measured; Sean reported that the call may have approached the voicemail
+threshold. No greeting or message was heard or left, and voicemail routing,
+creation, content, and absence were not inspected. Voicemail therefore remains
+unproven.
+
+The result does not prove unattended calling. It required a human to maintain
+the exact Kobe session, select the exact Cory target, start one audio call, and
+end it. This path is suitable for bounded human-assisted scenario construction
+or pre-seeding a lab artifact, but it is not an automated per-learner runtime
+capability. The application-originated Graph bot remains blocked by HTTP `403`
+/ code `7505` pending a specific Microsoft backend repair.
