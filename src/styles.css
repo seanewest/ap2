@@ -371,6 +371,7 @@ h2 {
 .scenario-evidence-verification,
 .avd-rehearsal-verification,
 .help-desk-rehearsal-verification,
+.teams-rehearsal-verification,
 .private-document-rehearsal-verification,
 .batch-feasibility {
   display: grid;
@@ -460,6 +461,8 @@ h2 {
 .avd-rehearsal-verification-form label,
 .help-desk-rehearsal-verification-form,
 .help-desk-rehearsal-verification-form label,
+.teams-rehearsal-verification-form,
+.teams-rehearsal-verification-form label,
 .private-document-rehearsal-verification-form,
 .private-document-rehearsal-verification-form label {
   display: grid;
@@ -469,6 +472,7 @@ h2 {
 .scenario-evidence-verification-form textarea,
 .avd-rehearsal-verification-form textarea,
 .help-desk-rehearsal-verification-form textarea,
+.teams-rehearsal-verification-form textarea,
 .private-document-rehearsal-verification-form textarea {
   box-sizing: border-box;
   width: 100%;
@@ -480,6 +484,7 @@ h2 {
 .scenario-evidence-verification .field-guidance,
 .avd-rehearsal-verification .field-guidance,
 .help-desk-rehearsal-verification .field-guidance,
+.teams-rehearsal-verification .field-guidance,
 .private-document-rehearsal-verification .field-guidance {
   color: #667085;
   font-size: 0.9rem;
@@ -490,6 +495,7 @@ h2 {
 .scenario-evidence-verification-output:focus-visible,
 .avd-rehearsal-verification-output:focus-visible,
 .help-desk-rehearsal-verification-output:focus-visible,
+.teams-rehearsal-verification-output:focus-visible,
 .private-document-rehearsal-verification-output:focus-visible {
   border-radius: 0.2rem;
   outline: 0.2rem solid #86aee0;
@@ -499,6 +505,7 @@ h2 {
 .scenario-evidence-verification-result,
 .avd-rehearsal-verification-result,
 .help-desk-rehearsal-verification-result,
+.teams-rehearsal-verification-result,
 .private-document-rehearsal-verification-result {
   display: grid;
   gap: 0.8rem;
@@ -508,6 +515,7 @@ h2 {
 .scenario-evidence-verification-result h4,
 .avd-rehearsal-verification-result h3,
 .help-desk-rehearsal-verification-result h3,
+.teams-rehearsal-verification-result h3,
 .private-document-rehearsal-verification-result h3 {
   margin: 0;
 }
@@ -515,6 +523,7 @@ h2 {
 .scenario-evidence-verification-summary,
 .avd-rehearsal-verification-summary,
 .help-desk-rehearsal-verification-summary,
+.teams-rehearsal-verification-summary,
 .private-document-rehearsal-verification-summary {
   display: grid;
   grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr);
@@ -525,6 +534,7 @@ h2 {
 .scenario-evidence-verification-summary dd,
 .avd-rehearsal-verification-summary dd,
 .help-desk-rehearsal-verification-summary dd,
+.teams-rehearsal-verification-summary dd,
 .private-document-rehearsal-verification-summary dd {
   margin: 0;
   overflow-wrap: anywhere;
@@ -594,6 +604,7 @@ h2 {
   .scenario-evidence-verification-summary,
   .avd-rehearsal-verification-summary,
   .help-desk-rehearsal-verification-summary,
+  .teams-rehearsal-verification-summary,
   .private-document-rehearsal-verification-summary,
   .batch-feasibility-summary,
   .batch-feasibility-row {
