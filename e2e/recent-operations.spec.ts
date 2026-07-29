@@ -10,10 +10,17 @@ import {
   STUDENT_TENANT_ID,
 } from "../api/identity";
 import { InMemoryOperationTelemetryCollector } from "../api/operation-telemetry-collector";
+import {
+  InMemoryScenarioEvidenceVerificationService,
+} from "../api/scenario-evidence-verification";
 import { InMemoryScenarioPlanService } from "../api/scenario-plan";
 import { createApiServer } from "../api/server";
 import { JoseTokenVerifier } from "../api/token-verifier";
 import { SCENARIO_MANIFESTS } from "../src/scenarios/scenarios";
+import {
+  CANONICAL_RECEIPT_FIXTURES,
+  NEGATIVE_RECEIPT_FIXTURES,
+} from "../src/scenarios/scenario-evidence-receipt.fixtures";
 
 const ISSUER = "https://fixture.invalid/operator/v2.0";
 const AUDIENCE = "api://ap2-local-fixture";
@@ -75,6 +82,8 @@ test.beforeAll(async () => {
     },
     operationTelemetryReader: collector,
     scenarioPlanService: new InMemoryScenarioPlanService(),
+    scenarioEvidenceVerificationService:
+      new InMemoryScenarioEvidenceVerificationService(),
     allowedOrigin: APP_ORIGIN,
   });
   await new Promise<void>((resolve) =>
@@ -460,6 +469,195 @@ test("distinguishes an expired session from a forbidden operator", async ({
     await preview.getByRole("button", { name: "Preview plan" }).click();
     expect((await response).status()).toBe(status);
     await expect(preview.getByText(new RegExp(message))).toBeVisible();
+    await context.close();
+  }
+});
+
+test("manually verifies one sanitized receipt through the signed local product path", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await configureOperator(page, accessToken);
+  const receipt = CANONICAL_RECEIPT_FIXTURES[0]!.receipt;
+  let verificationRequests = 0;
+  let releaseRequest!: () => void;
+  const requestGate = new Promise<void>((resolve) => {
+    releaseRequest = resolve;
+  });
+  await page.route("**/api/scenario-evidence-verification", async (route) => {
+    await requestGate;
+    await route.continue();
+  });
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/scenario-evidence-verification"
+    ) {
+      verificationRequests += 1;
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", { name: "Receipt verification" });
+  const input = panel.getByLabel("Sanitized receipt JSON");
+  const verify = panel.getByRole("button", { name: "Verify receipt" });
+  await expect(panel.getByText("No receipt submitted")).toBeVisible();
+  await input.fill(JSON.stringify(receipt));
+  expect(verificationRequests).toBe(0);
+
+  const response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/scenario-evidence-verification"
+  );
+  await verify.focus();
+  await expect(verify).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(panel.getByText("Verifying the sanitized receipt…")).toBeVisible();
+  await expect(verify).toBeDisabled();
+  releaseRequest();
+  expect((await response).status()).toBe(200);
+  expect(verificationRequests).toBe(1);
+
+  const result = panel.getByRole("region", {
+    name: "Receipt verification result",
+  });
+  await expect(result).toBeVisible();
+  await expect(result).toContainText(receipt.scenario.id);
+  await expect(result).toContainText("Manifest version");
+  await expect(result).toContainText("Deterministic claim states");
+  await expect(result).toContainText("Missing coverage categories");
+  await expect(result).not.toContainText(receipt.claims[0]!.id);
+  await expect(result).not.toContainText("proofReference");
+  await expect(panel.locator(".scenario-evidence-verification-output"))
+    .toBeFocused();
+  expect(
+    await verify.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.animationDuration, style.transitionDuration];
+    }),
+  ).toEqual(["0s", "0s"]);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+
+  await input.pressSequentially(" ");
+  await expect(result).toHaveCount(0);
+  await expect(panel.getByText("Input changed")).toBeVisible();
+  expect(verificationRequests).toBe(1);
+});
+
+test("refuses unsafe or malformed receipt input locally without authorization", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  let apiRequests = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/scenario-evidence-verification"
+    ) {
+      apiRequests += 1;
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", { name: "Receipt verification" });
+  const input = panel.getByLabel("Sanitized receipt JSON");
+  const verify = panel.getByRole("button", { name: "Verify receipt" });
+
+  await input.fill("{");
+  await verify.click();
+  await expect(panel.getByText(/exact bounded receipt JSON shape/)).toBeVisible();
+  await input.fill(JSON.stringify({
+    ...CANONICAL_RECEIPT_FIXTURES[0]!.receipt,
+    rawIdentity: "operator@example.invalid",
+  }));
+  await verify.click();
+  await expect(panel.getByText(/Receipt validation failed/)).toBeVisible();
+  expect(apiRequests).toBe(0);
+});
+
+test("distinguishes receipt verification refusal, size, and general safe failures", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", { name: "Receipt verification" });
+  const input = panel.getByLabel("Sanitized receipt JSON");
+  const verify = panel.getByRole("button", { name: "Verify receipt" });
+  const refused = NEGATIVE_RECEIPT_FIXTURES.find(
+    ({ expectedCode }) => expectedCode === "state-promotion",
+  )!;
+
+  let response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/scenario-evidence-verification"
+  );
+  await input.fill(JSON.stringify(refused.receipt));
+  await verify.click();
+  expect((await response).status()).toBe(400);
+  await expect(panel.getByText(/claims do not satisfy/)).toBeVisible();
+
+  let kind: "request-size" | "response-size" | "general" = "request-size";
+  await page.route("**/api/scenario-evidence-verification", async (route) => {
+    if (kind === "response-size") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: `"${"x".repeat(140_000)}"`,
+      });
+      return;
+    }
+    await route.fulfill({
+      status: kind === "request-size" ? 413 : 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "raw private backend payload" }),
+    });
+  });
+  await input.fill(JSON.stringify(CANONICAL_RECEIPT_FIXTURES[0]!.receipt));
+  await verify.click();
+  await expect(panel.getByText(/request-size limit/)).toBeVisible();
+  kind = "response-size";
+  await verify.click();
+  await expect(panel.getByText(/response-size limit/)).toBeVisible();
+  kind = "general";
+  await verify.click();
+  await expect(panel.getByText(/verification is unavailable/)).toBeVisible();
+  await expect(panel).not.toContainText("raw private backend payload");
+});
+
+test("distinguishes expired and forbidden receipt verification sessions", async ({
+  browser,
+}) => {
+  const cases = [
+    ["invalid-fixture-token", 401, "operator session expired"],
+    [
+      fixtureToken({
+        tid: STUDENT_TENANT_ID,
+        oid: "fixture-unapproved-operator",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      }),
+      403,
+      "not authorized",
+    ],
+  ] as const;
+  for (const [token, status, message] of cases) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await configureOperator(page, token);
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    const panel = page.getByRole("region", { name: "Receipt verification" });
+    await panel.getByLabel("Sanitized receipt JSON").fill(
+      JSON.stringify(CANONICAL_RECEIPT_FIXTURES[0]!.receipt),
+    );
+    const response = page.waitForResponse((candidate) =>
+      new URL(candidate.url()).pathname ===
+        "/api/scenario-evidence-verification"
+    );
+    await panel.getByRole("button", { name: "Verify receipt" }).click();
+    expect((await response).status()).toBe(status);
+    await expect(panel.getByText(new RegExp(message))).toBeVisible();
     await context.close();
   }
 });

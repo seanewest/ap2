@@ -12,6 +12,7 @@ import {
 import {
   ApiAccessError,
   OneDriveInviteFailureError,
+  ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
   type AfterPartyApi,
   type ApiCallerIdentity,
@@ -30,6 +31,8 @@ import {
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
 import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
+import { CANONICAL_RECEIPT_FIXTURES } from "./scenarios/scenario-evidence-receipt.fixtures";
+import { verifyCanonicalScenarioEvidenceReceipt } from "./scenarios/scenario-evidence-verification";
 import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
 
 const account: AccountIdentity = {
@@ -1618,6 +1621,7 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain("You are signed out");
     expect(root.querySelector(".scenario-catalog")).toBeNull();
     expect(root.querySelector(".scenario-plan-preview")).toBeNull();
+    expect(root.querySelector(".scenario-evidence-verification")).toBeNull();
   });
 
   it("moves a catalog scenario into bounded local preview inputs without authentication or API calls", async () => {
@@ -1694,6 +1698,130 @@ describe("After Party authentication UI", () => {
     expect(preview.textContent).toContain("Deterministic preview");
     expect(preview.textContent).not.toContain("temporary-token");
   });
+
+  it("verifies a locally validated receipt only after explicit signed submission", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    const receipt = CANONICAL_RECEIPT_FIXTURES[0]!.receipt;
+    api.verifyScenarioEvidenceReceipt.mockResolvedValue(
+      verifyCanonicalScenarioEvidenceReceipt(receipt),
+    );
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".scenario-evidence-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify(receipt);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyScenarioEvidenceReceipt).not.toHaveBeenCalled();
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.verifyScenarioEvidenceReceipt).toHaveBeenCalledOnce();
+    expect(api.verifyScenarioEvidenceReceipt).toHaveBeenCalledWith(
+      "temporary-token",
+      receipt,
+    );
+    expect(panel.textContent).toContain("Normalized verification result");
+    expect(panel.textContent).not.toContain("temporary-token");
+    expect(panel.textContent).not.toContain(receipt.claims[0]!.id);
+  });
+
+  it("refuses unsafe receipt text before acquiring operator authorization", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".scenario-evidence-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify({
+      ...CANONICAL_RECEIPT_FIXTURES[0]!.receipt,
+      rawSession: "access-token",
+    });
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+
+    expect(panel.textContent).toContain("Receipt validation failed");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyScenarioEvidenceReceipt).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new AccessTokenError("raw expired session detail"),
+      "operator session expired",
+      false,
+    ],
+    [
+      new ScenarioEvidenceVerificationClientError("forbidden"),
+      "not authorized",
+      true,
+    ],
+    [
+      new ScenarioEvidenceVerificationClientError(
+        "validation-refused",
+        "state-promotion",
+      ),
+      "claims do not satisfy",
+      true,
+    ],
+    [
+      new ScenarioEvidenceVerificationClientError("response-too-large"),
+      "response-size limit",
+      true,
+    ],
+    [
+      new ScenarioEvidenceVerificationClientError("safe-failure"),
+      "verification is unavailable",
+      true,
+    ],
+  ] as const)(
+    "maps typed receipt verification failure without rendering detail",
+    async (failure, message, reachesApi) => {
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      authentication.acquireAccessToken.mockImplementation(async () => {
+        if (!reachesApi) {
+          throw failure;
+        }
+        return "temporary-token";
+      });
+      if (reachesApi) {
+        api.verifyScenarioEvidenceReceipt.mockRejectedValue(failure);
+      }
+      await createAfterPartyApp(root, authentication, api).start();
+      const panel = root.querySelector<HTMLElement>(
+        ".scenario-evidence-verification",
+      )!;
+      const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+      input.value = JSON.stringify(CANONICAL_RECEIPT_FIXTURES[0]!.receipt);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+      await nextTask();
+
+      expect(panel.textContent).toContain(message);
+      expect(panel.textContent).not.toContain(failure.message);
+      expect(api.verifyScenarioEvidenceReceipt).toHaveBeenCalledTimes(
+        reachesApi ? 1 : 0,
+      );
+    },
+  );
 
   it.each([
     [
