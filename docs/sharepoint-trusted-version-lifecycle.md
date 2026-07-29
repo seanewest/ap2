@@ -23,9 +23,9 @@ SharePoint write. The single route invocation then:
 6. reads the supported current-item bytes and historical-version bytes, then
    binds their identities, timestamps, content, order, and file identity
    through SHA-256 digests;
-7. deletes the exact retained file, proves the folder empty, deletes that
-   exact folder, removes the expiry contract, and proves both active paths
-   absent.
+7. deletes the exact retained file, rereads and matches the exact folder
+   identity with its current eTag, proves the folder empty, deletes that exact
+   folder, removes the expiry contract, and proves both active paths absent.
 
 Every mutation records intent before the call. A transport or bounded
 server-side ambiguity triggers only an exact marker/path/content read. The
@@ -58,3 +58,19 @@ history rather than active run artifacts.
 The process-local reservation is sufficient only for the enforced
 single-replica synchronous route. A protected canary journal remains outside
 Git. This capability does not create a durable distributed lab runner.
+
+## First canary result
+
+The first marked canary reached cleanup but returned the categorical
+`cleanup-incomplete` refusal. Exact reconciliation found the active file
+absent and the retained run folder present and empty. The folder was then
+deleted once with its freshly read eTag, and independent exact reads proved
+both active paths absent. The defect was the runtime's use of the folder's
+creation-time eTag after child mutations; the lifecycle now rereads and
+matches the folder before deletion.
+
+Because the refused response did not return its version receipt, this canary
+does not establish the trusted-v1 bytes, changed-v2 bytes, or ordered-history
+claim even though cleanup is terminal. It was not replayed. Recycle-bin and
+audit records remain ordinary platform history, and detector, learner,
+restoration, and Lab claims remain unproven.
