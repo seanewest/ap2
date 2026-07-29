@@ -369,11 +369,87 @@ h2 {
 }
 
 .scenario-evidence-verification,
-.avd-rehearsal-verification {
+.avd-rehearsal-verification,
+.batch-feasibility {
   display: grid;
   gap: 1rem;
   padding-top: 1rem;
   border-top: 1px solid #d4d8df;
+}
+
+.batch-feasibility-form,
+.batch-feasibility-form fieldset,
+.batch-feasibility-form label,
+.batch-feasibility-rows,
+.batch-feasibility-row,
+.batch-feasibility-result {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.batch-feasibility-form fieldset {
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  margin: 0;
+  padding: 0.9rem;
+  border: 1px solid #d4d8df;
+  border-radius: 0.65rem;
+  min-inline-size: 0;
+}
+
+.batch-feasibility-form input,
+.batch-feasibility-form select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.batch-feasibility-form legend,
+.batch-feasibility-row-number {
+  font-weight: 700;
+}
+
+.batch-feasibility-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0.8rem;
+  border: 1px solid #d4d8df;
+  border-radius: 0.55rem;
+}
+
+.batch-feasibility-row-number,
+.batch-feasibility-result h3,
+.batch-feasibility-result h4 {
+  margin: 0;
+}
+
+.batch-feasibility-row-number,
+.batch-feasibility-row-actions {
+  grid-column: 1 / -1;
+}
+
+.batch-feasibility-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.batch-feasibility-output:focus-visible {
+  border-radius: 0.2rem;
+  outline: 0.2rem solid #86aee0;
+  outline-offset: 0.2rem;
+}
+
+.batch-feasibility-summary {
+  display: grid;
+  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+  gap: 0.45rem 1rem;
+  margin: 0;
+}
+
+.batch-feasibility-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .scenario-evidence-verification-form,
@@ -496,7 +572,9 @@ h2 {
   }
 
   .scenario-evidence-verification-summary,
-  .avd-rehearsal-verification-summary {
+  .avd-rehearsal-verification-summary,
+  .batch-feasibility-summary,
+  .batch-feasibility-row {
     grid-template-columns: 1fr;
   }
 

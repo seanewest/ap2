@@ -8,6 +8,7 @@ import {
 } from "./auth/authentication";
 import {
   ApiAccessError,
+  BatchFeasibilityClientError,
   CALENDAR_MEETING_ATTENDEES,
   CALENDAR_MEETING_END,
   CALENDAR_MEETING_ORGANIZER,
@@ -57,6 +58,11 @@ import {
   createStatus,
 } from "./ui/elements";
 import { createScenarioCatalog } from "./scenarios/scenario-catalog";
+import {
+  createBatchFeasibilityPanel,
+  type BatchFeasibilityPanelClient,
+  type BatchFeasibilityPanelFailure,
+} from "./scenarios/batch-feasibility-panel";
 import {
   createAvdRehearsalVerificationPanel,
   type AvdRehearsalVerificationFailure,
@@ -195,6 +201,17 @@ export function createAfterPartyApp(
       },
       classifyError: classifyAvdRehearsalVerificationFailure,
     };
+  const batchFeasibilityClient: BatchFeasibilityPanelClient = {
+    evaluate: async (request) => {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      return await api.calculateMultiScenarioFeasibility(
+        accessToken,
+        request,
+      );
+    },
+    classifyError: classifyBatchFeasibilityFailure,
+  };
   let contactProof: ContactProofState = {
     stage: "not-started",
     activity: "idle",
@@ -756,6 +773,7 @@ export function createAfterPartyApp(
         scenarioPlanPreviewClient,
         scenarioEvidenceVerificationClient,
         avdRehearsalVerificationClient,
+        batchFeasibilityClient,
       ),
     );
     root
@@ -854,6 +872,7 @@ function createShell(
   scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
   scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
   avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
+  batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const shell = document.createElement("main");
   shell.className = "shell";
@@ -879,6 +898,7 @@ function createShell(
       scenarioPlanPreviewClient,
       scenarioEvidenceVerificationClient,
       avdRehearsalVerificationClient,
+      batchFeasibilityClient,
     ),
   );
 
@@ -891,6 +911,7 @@ function createStatePanel(
   scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
   scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
   avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
+  batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "auth-panel";
@@ -943,6 +964,10 @@ function createStatePanel(
         createContactProofPanel(contactProof, apiOperationLoading),
         ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
         ...createScenarioPlanningFlow(scenarioPlanPreviewClient),
+        createBatchFeasibilityPanel({
+          registry: SCENARIO_MANIFESTS,
+          client: batchFeasibilityClient,
+        }),
         createScenarioEvidenceVerificationPanel({
           client: scenarioEvidenceVerificationClient,
         }),
@@ -1023,6 +1048,31 @@ function classifyScenarioEvidenceVerificationFailure(
       return "unauthorized";
     case "validation-refused":
       return "verification-refused";
+    case "request-too-large":
+      return "request-too-large";
+    case "response-too-large":
+      return "response-too-large";
+    case "safe-failure":
+      return "unavailable";
+  }
+}
+
+function classifyBatchFeasibilityFailure(
+  error: unknown,
+): BatchFeasibilityPanelFailure {
+  if (error instanceof AccessTokenError) {
+    return "session-expired";
+  }
+  if (!(error instanceof BatchFeasibilityClientError)) {
+    return "unavailable";
+  }
+  switch (error.category) {
+    case "unauthorized":
+      return "session-expired";
+    case "forbidden":
+      return "unauthorized";
+    case "validation-refused":
+      return "planner-refused";
     case "request-too-large":
       return "request-too-large";
     case "response-too-large":

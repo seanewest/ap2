@@ -11,6 +11,7 @@ import {
 } from "./auth/authentication";
 import {
   ApiAccessError,
+  BatchFeasibilityClientError,
   OneDriveInviteFailureError,
   RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
@@ -222,6 +223,7 @@ describe("After Party authentication UI", () => {
     expect(apiButton()).toBeNull();
     expect(rehearsalButton()).toBeNull();
     expect(root.querySelector(".avd-rehearsal-verification")).toBeNull();
+    expect(root.querySelector(".batch-feasibility")).toBeNull();
     expect(simulatedEmailButton()).toBeNull();
     expect(oneDriveShareButton()).toBeNull();
     expect(oneDriveVerifyButton()).toBeNull();
@@ -1708,6 +1710,127 @@ describe("After Party authentication UI", () => {
     expect(preview.textContent).toContain("Deterministic preview");
     expect(preview.textContent).not.toContain("temporary-token");
   });
+
+  it("evaluates one locally validated batch only after explicit signed submission", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.calculateMultiScenarioFeasibility.mockResolvedValue({
+      schemaVersion: 1,
+      label: "FEASIBILITY_ONLY",
+      status: "feasible",
+      planCount: 1,
+      maximumConcurrency: 1,
+      conservativeAggregateUsdCeiling: "0.00",
+      requestedSessionDurationMinutes: 10,
+      earliestExpiryMarginMinutes: 5,
+      humanGateCount: 0,
+      blockers: [],
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(".batch-feasibility")!;
+
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.calculateMultiScenarioFeasibility).not.toHaveBeenCalled();
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.calculateMultiScenarioFeasibility).toHaveBeenCalledOnce();
+    const [token, request] =
+      api.calculateMultiScenarioFeasibility.mock.calls[0]!;
+    expect(token).toBe("temporary-token");
+    expect(request.label).toBe("SCENARIO_FEASIBILITY_COMPILE_REQUEST");
+    expect(request.plans).toHaveLength(1);
+    expect(panel.textContent).toContain("arithmetically feasible");
+    expect(panel.textContent).not.toContain("temporary-token");
+    expect(panel.textContent).not.toContain(
+      request.plans[0]!.instanceAlias,
+    );
+  });
+
+  it("refuses duplicate batch aliases before acquiring operator authorization", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(".batch-feasibility")!;
+    panel.querySelector<HTMLButtonElement>("[data-action='add-scenario']")!
+      .click();
+    const aliases = panel.querySelectorAll<HTMLInputElement>(
+      "input[name='batchAlias']",
+    );
+    aliases[1]!.value = aliases[0]!.value;
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+
+    expect(panel.textContent).toContain("distinct local alias");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.calculateMultiScenarioFeasibility).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new AccessTokenError("raw expired session detail"),
+      "operator session expired",
+      false,
+    ],
+    [
+      new BatchFeasibilityClientError("forbidden"),
+      "not authorized",
+      true,
+    ],
+    [
+      new BatchFeasibilityClientError(
+        "validation-refused",
+        "BUDGET_EXCEEDED",
+      ),
+      "planner refused",
+      true,
+    ],
+    [
+      new BatchFeasibilityClientError("response-too-large"),
+      "response-size limit",
+      true,
+    ],
+    [
+      new BatchFeasibilityClientError("safe-failure"),
+      "evaluation is unavailable",
+      true,
+    ],
+  ] as const)(
+    "maps typed batch feasibility failure without rendering detail",
+    async (failure, message, reachesApi) => {
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      authentication.acquireAccessToken.mockImplementation(async () => {
+        if (!reachesApi) throw failure;
+        return "temporary-token";
+      });
+      if (reachesApi) {
+        api.calculateMultiScenarioFeasibility.mockRejectedValue(failure);
+      }
+      await createAfterPartyApp(root, authentication, api).start();
+      const panel = root.querySelector<HTMLElement>(".batch-feasibility")!;
+      panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+      await nextTask();
+
+      expect(panel.textContent).toContain(message);
+      expect(panel.textContent).not.toContain(failure.message);
+      expect(api.calculateMultiScenarioFeasibility).toHaveBeenCalledTimes(
+        reachesApi ? 1 : 0,
+      );
+    },
+  );
 
   it("verifies a locally validated receipt only after explicit signed submission", async () => {
     authentication.initialize.mockResolvedValue({

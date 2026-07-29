@@ -11,6 +11,9 @@ import {
 } from "../api/identity";
 import { InMemoryOperationTelemetryCollector } from "../api/operation-telemetry-collector";
 import {
+  InMemoryMultiScenarioFeasibilityService,
+} from "../api/multi-scenario-feasibility";
+import {
   InMemoryScenarioEvidenceVerificationService,
 } from "../api/scenario-evidence-verification";
 import {
@@ -87,6 +90,8 @@ test.beforeAll(async () => {
       },
     },
     operationTelemetryReader: collector,
+    multiScenarioFeasibilityService:
+      new InMemoryMultiScenarioFeasibilityService(),
     scenarioPlanService: new InMemoryScenarioPlanService(),
     scenarioEvidenceVerificationService:
       new InMemoryScenarioEvidenceVerificationService(),
@@ -477,6 +482,228 @@ test("distinguishes an expired session from a forbidden operator", async ({
     await preview.getByRole("button", { name: "Preview plan" }).click();
     expect((await response).status()).toBe(status);
     await expect(preview.getByText(new RegExp(message))).toBeVisible();
+    await context.close();
+  }
+});
+
+test("manually evaluates bounded scenario batches through the signed local product path", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await configureOperator(page, accessToken);
+  let requests = 0;
+  let releaseRequest!: () => void;
+  const requestGate = new Promise<void>((resolve) => {
+    releaseRequest = resolve;
+  });
+  await page.route("**/api/multi-scenario-feasibility", async (route) => {
+    await requestGate;
+    await route.continue();
+  });
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/multi-scenario-feasibility"
+    ) {
+      requests += 1;
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Scenario batch feasibility",
+  });
+  const evaluate = panel.getByRole("button", {
+    name: "Evaluate feasibility",
+  });
+  const addScenario = panel.getByRole("button", { name: "Add scenario" });
+  await addScenario.focus();
+  await page.keyboard.press("Enter");
+  const scenarios = panel.getByLabel("Canonical scenario");
+  await scenarios.nth(1).selectOption("1");
+  expect(requests).toBe(0);
+
+  let response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/multi-scenario-feasibility"
+  );
+  await evaluate.focus();
+  await expect(evaluate).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(
+    panel.getByText("Evaluating the bounded batch"),
+  ).toBeVisible();
+  await expect(evaluate).toBeDisabled();
+  releaseRequest();
+  expect((await response).status()).toBe(200);
+  expect(requests).toBe(1);
+  let result = panel.getByRole("region", {
+    name: "Batch feasibility result",
+  });
+  await expect(result).toContainText("arithmetically infeasible");
+  await expect(result).toContainText("Concurrency overrun");
+  await expect(result).not.toContainText("scenario-1");
+  await expect(panel.locator(".batch-feasibility-output")).toBeFocused();
+
+  await panel.getByLabel("Concurrency limit").fill("2");
+  await expect(result).toHaveCount(0);
+  response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/multi-scenario-feasibility"
+  );
+  await evaluate.click();
+  expect((await response).status()).toBe(200);
+  expect(requests).toBe(2);
+  result = panel.getByRole("region", {
+    name: "Batch feasibility result",
+  });
+  await expect(result).toContainText("arithmetically feasible");
+  await expect(result).toContainText("USD 0.00");
+  await expect(result).toContainText("None in this deterministic calculation");
+  await expect(result).not.toContainText("SCENARIO_FEASIBILITY");
+  expect(
+    await evaluate.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.animationDuration, style.transitionDuration];
+    }),
+  ).toEqual(["0s", "0s"]);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+
+  const moveUp = panel.getByRole("button", { name: "Move up scenario 2" });
+  await moveUp.focus();
+  await page.keyboard.press("Enter");
+  await expect(result).toHaveCount(0);
+  const remove = panel.getByRole("button", { name: "Remove scenario 2" });
+  await remove.focus();
+  await page.keyboard.press("Enter");
+  await expect(panel.locator(".batch-feasibility-row")).toHaveCount(1);
+  expect(requests).toBe(2);
+});
+
+test("refuses unsafe batch inputs locally without authorization", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  let requests = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/multi-scenario-feasibility"
+    ) {
+      requests += 1;
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Scenario batch feasibility",
+  });
+  const evaluate = panel.getByRole("button", {
+    name: "Evaluate feasibility",
+  });
+  await panel.getByRole("button", { name: "Add scenario" }).click();
+  const aliases = panel.getByLabel("Local instance alias");
+  await aliases.nth(1).fill("scenario-1");
+  await evaluate.click();
+  await expect(panel.getByText(/distinct local alias/)).toBeVisible();
+  await aliases.nth(1).fill(["user", "example.invalid"].join("@"));
+  await evaluate.click();
+  await expect(panel.getByText(/2–32 character lowercase/)).toBeVisible();
+  await aliases.nth(1).fill("scenario-2");
+  await panel.getByLabel("Aggregate budget ceiling (USD)").fill("1.001");
+  await evaluate.click();
+  await expect(panel.getByText(/bounded USD amount/)).toBeVisible();
+  expect(requests).toBe(0);
+});
+
+test("distinguishes planner refusal, size, and general safe failures", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Scenario batch feasibility",
+  });
+  const evaluate = panel.getByRole("button", {
+    name: "Evaluate feasibility",
+  });
+  let kind: "refusal" | "request-size" | "response-size" | "general" =
+    "refusal";
+  await page.route("**/api/multi-scenario-feasibility", async (route) => {
+    if (kind === "response-size") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: `"${"x".repeat(10_000)}"`,
+      });
+      return;
+    }
+    if (kind === "refusal") {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "batch_feasibility_refused",
+          category: "PLAN_INVALID",
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: kind === "request-size" ? 413 : 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "raw private backend payload" }),
+    });
+  });
+  await evaluate.click();
+  await expect(panel.getByText(/planner refused/)).toBeVisible();
+  kind = "request-size";
+  await evaluate.click();
+  await expect(panel.getByText(/request-size limit/)).toBeVisible();
+  kind = "response-size";
+  await evaluate.click();
+  await expect(panel.getByText(/response-size limit/)).toBeVisible();
+  kind = "general";
+  await evaluate.click();
+  await expect(panel.getByText(/evaluation is unavailable/)).toBeVisible();
+  await expect(panel).not.toContainText("raw private backend payload");
+});
+
+test("distinguishes expired and forbidden batch feasibility sessions", async ({
+  browser,
+}) => {
+  const cases = [
+    ["invalid-fixture-token", 401, "operator session expired"],
+    [
+      fixtureToken({
+        tid: STUDENT_TENANT_ID,
+        oid: "fixture-unapproved-operator",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      }),
+      403,
+      "not authorized",
+    ],
+  ] as const;
+  for (const [token, status, message] of cases) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await configureOperator(page, token);
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    const panel = page.getByRole("region", {
+      name: "Scenario batch feasibility",
+    });
+    const response = page.waitForResponse((candidate) =>
+      new URL(candidate.url()).pathname ===
+        "/api/multi-scenario-feasibility"
+    );
+    await panel.getByRole("button", {
+      name: "Evaluate feasibility",
+    }).click();
+    expect((await response).status()).toBe(status);
+    await expect(panel.getByText(new RegExp(message))).toBeVisible();
     await context.close();
   }
 });
