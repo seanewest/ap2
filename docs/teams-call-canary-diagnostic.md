@@ -240,6 +240,9 @@ or voicemail; the API and UI expose only the `email` platform claim, verify the
 exact Kobe token identity before Graph, accept only Graph `202`, and never
 retry inside the one API process after any attempted submission. Like the other
 Pass 3 mutations, it has no durable cross-replica exactly-once journal. This
-fallback is implemented and deterministically tested but was not
-staged in Microsoft during this lane, so delivery remains unproven until a
-separately authorized hosted rehearsal.
+fallback was later exercised through one reviewed, app-only-authorized local
+API request. Graph returned `202`, and a bounded exact read found one non-draft
+message in Cory's Inbox with the exact Kobe sender, sole Cory recipient,
+marker, and body. The retained message is protected by an exact private
+inventory for later cleanup. This proves the Outlook artifact and merged
+product contract, but not a hosted deployment of the new route.

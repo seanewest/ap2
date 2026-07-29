@@ -61,6 +61,7 @@ not mean the operation has been added to the SPA/API product path.
 | Exchange and message-trace diagnostics | Connected app-only to Exchange Online, read bounded organization configuration, and ran bounded message-trace diagnostics. The official Transport Data Platform Graph service principal also returned a successful trace read. | Dev diagnostic app and Microsoft Transport Data Platform service principal | Read-only; the Dev permissions and Exchange Administrator assignment remain |
 | Defender posture snapshot | Read the latest Microsoft Secure Score and reduced 69 controls to tenant-level and category-level score aggregates. Older score history was reported as truncated and deliberately not paged. | Dev diagnostic app | Read-only |
 | Mail folder | Created and deleted one ordinary visible top-level Cory mail folder. No message or send route was used. | c91 delegated — Cory | Exact folder absent |
+| Help-desk scenario email | One app-only authorized local API request invoked the merged fixed operation. Exact Kobe CBA submitted one marker-bound Outlook email to Cory; Graph returned `202`, and the second of three allowed marker reads found exactly one non-draft message in Cory's Inbox with the exact Kobe sender, sole Cory recipient, subject, and body. | Dev diagnostic app triggered the API; c91 delegated — Kobe was the Microsoft mail actor; c91 delegated — Cory performed the learner-mailbox read | The message is intentionally retained and privately inventoried for later cleanup; this proves Outlook email only, not a Teams call, missed call, or voicemail |
 | Disabled Inbox rule | Created and deleted one exact harmless disabled rule. | c91 delegated — Cory | Exact rule absent |
 | Outlook category | Created and deleted one exact category. | c91 delegated — Cory | Exact category absent |
 | Unsent draft | Created and deleted one exact draft while keeping send, reply, forward, and recipient routes at zero. | c91 delegated — Cory | Exact draft absent |
@@ -179,8 +180,10 @@ assigning the learner to either proof role.
   grants, and no Teams Phone resource account or Enterprise Voice prerequisite
   exists. The repository now includes a deterministic Kobe-to-Cory help-desk
   email generator as the honest non-call fallback. It is explicitly labeled as
-  Outlook email—not a Teams call, missed call, or voicemail—and has not yet
-  been exercised through the hosted product path.
+  Outlook email—not a Teams call, missed call, or voicemail. One reviewed,
+  one-shot local product-route rehearsal received Graph `202` and proved the
+  exact message in Cory's Inbox. This establishes the real workload artifact
+  and product contract, but not a hosted deployment of the new route.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted

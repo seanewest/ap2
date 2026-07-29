@@ -39,7 +39,7 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Cleanup later
 
-- Reconcile and remove only the retained Teams chat/calling artifacts during a separately authorized cleanup pass, plus temporary workload roles, broad diagnostic permissions, delegated consent, retained drafts/messages where approved, and obsolete certificates/keys. Preserve accepted audit, quarantine, transport, deleted-object, and other historical residue.
+- Reconcile and remove only the retained Teams chat/calling artifacts during a separately authorized cleanup pass, plus the privately inventoried `ap2-help-desk-email-20260729-001` Cory Inbox message, temporary workload roles, broad diagnostic permissions, delegated consent, retained drafts/messages where approved, and obsolete certificates/keys. Preserve accepted audit, quarantine, transport, deleted-object, and other historical residue.
 
 ## Closed/do not reopen
 
