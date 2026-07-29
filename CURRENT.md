@@ -117,12 +117,13 @@ At each material checkpoint, the Captain checks and updates this docket against 
   reached the live endpoint using already-retained diagnostic authority. One
   historical keyword query and one reviewed exact-path correction are now both
   terminal `succeeded`. One fresh capped page from each contained two records
-  but no exact marker-bound record satisfying the frozen producer, operation,
-  target, time, and correlation contract. Authorization stayed unchanged and
-  no content or workload mutation occurred. The capability is therefore
-  `observed-but-incomplete`; operation-level producer attribution remains
-  ambiguous, not proven. Do not repeat either search or the workload event
-  under this lane.
+  and no next link; both pages contained the same two records. Offline shape
+  analysis found the exact frozen producer application, allowed operations,
+  marker target, target type, event window, and correlation. After correcting
+  only the supported Graph record-type casing, operation-level producer
+  attribution is `live-proven`. Authorization stayed unchanged and no content
+  or workload mutation occurred. Do not repeat either search or the workload
+  event under this lane.
   See [the fail-closed audit contract](docs/purview-audit-contract.md).
 - The one authorized Teams Call Canary create was submitted exactly once for
   Cory with audio-only service-hosted media. Microsoft Graph returned a

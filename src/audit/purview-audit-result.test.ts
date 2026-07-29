@@ -59,14 +59,46 @@ describe("parsePurviewAuditCapabilityResult", () => {
     });
   });
 
-  it("accepts live proof only with operation-level attribution", () => {
-    expect(
+  it.each([
+    "sharePointFileOperation",
+    "SharePointFileOperation",
+  ])(
+    "accepts %s live proof only with operation-level attribution",
+    (recordType) => {
+      expect(
+        parsePurviewAuditCapabilityResult({
+          ...base,
+          status: "live-proven",
+          record: {
+            recordId: "audit-record",
+            recordType,
+            workload: "SharePoint",
+            operation: "FileRecycled",
+            occurredAt: "2026-07-24T10:38:59.000Z",
+            targetType: "File",
+            targetId: "sanitized-marker",
+            producerApplicationId: "producer-application",
+            correlationId: "operation-correlation",
+          },
+        }, validation),
+      ).toMatchObject({
+        status: "live-proven",
+        record: {
+          operation: "FileRecycled",
+          producerApplicationId: "producer-application",
+        },
+      });
+    },
+  );
+
+  it("rejects an unknown record-type casing", () => {
+    expect(() =>
       parsePurviewAuditCapabilityResult({
         ...base,
         status: "live-proven",
         record: {
           recordId: "audit-record",
-          recordType: "sharePointFileOperation",
+          recordType: "SHAREPOINTFILEOPERATION",
           workload: "SharePoint",
           operation: "FileRecycled",
           occurredAt: "2026-07-24T10:38:59.000Z",
@@ -75,14 +107,8 @@ describe("parsePurviewAuditCapabilityResult", () => {
           producerApplicationId: "producer-application",
           correlationId: "operation-correlation",
         },
-      }, validation),
-    ).toMatchObject({
-      status: "live-proven",
-      record: {
-        operation: "FileRecycled",
-        producerApplicationId: "producer-application",
-      },
-    });
+      }, validation)
+    ).toThrow(/supported SharePoint file-operation type/);
   });
 
   it("fails closed when detector and workload actor are conflated", () => {

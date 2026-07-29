@@ -994,7 +994,14 @@ function verifyIndependentGrounding(
     const source = artifact === undefined
       ? undefined
       : operations.get(artifact.sourceOperationKey);
-    return source?.ownerActorId === manifest.roles.workloadActor;
+    const workloadSourced =
+      source?.ownerActorId === manifest.roles.workloadActor;
+    const exactPurviewRecord =
+      artifact?.kind === "purview-audit-summary" &&
+      artifact.authenticity === "platform-control-plane" &&
+      artifact.observation?.proofReference ===
+        "canonical:purview-audit-contract/live-proven";
+    return workloadSourced || exactPurviewRecord;
   });
   if (!grounded || observation.outcome !== "record-match") {
     throw failure(

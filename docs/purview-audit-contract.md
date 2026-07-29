@@ -54,6 +54,10 @@ allowed operation, target marker, UTC window, target type, and correlation.
 Raw `auditData`, internal IDs, and target URLs are protected evidence and are
 not learner output.
 
+The parser accepts the internal `sharePointFileOperation` spelling and the
+live Graph `SharePointFileOperation` spelling, normalizing both to the same
+internal enum. Other spellings still fail closed.
+
 ## Live boundary observed
 
 A distinct fixed detector used its already-retained broad diagnostic audit
@@ -63,16 +67,17 @@ needed.
 
 Both the unique-keyword query and the separately reviewed exact-object-path
 correction later reached terminal `succeeded`. One fresh `$top=10` page from
-each returned two records without a next link, but neither contained an exact
-marker-bound record satisfying the frozen producer application, operation,
-target type, event window, and correlation contract. The outcome is therefore
-`observed-but-incomplete`: Graph Audit Search and distinct app-only observation
-are supported and live-reachable, while operation-level producer correlation
-remains ambiguous and unproven. Do not substitute the earlier
-service-principal sign-in proof or infer application identity or artifact
-absence from the unmatched pages.
+each returned two records without a next link. The pages contained the same two
+records; offline shape analysis found the exact frozen producer application,
+allowed operations, marker-bearing target, target type, event window, and
+correlation in both. The original classifier missed them only because live
+Graph returned `SharePointFileOperation` while the internal contract compared
+`sharePointFileOperation`. After narrow enum normalization, operation-level
+producer attribution is `live-proven`. Do not substitute the earlier
+service-principal sign-in proof or generalize these exact records into content
+collection, learner visibility, or every workload operation.
 
 The canonical post-run
 [scenario evidence receipt](scenario-evidence-receipts.md) preserves these as
 separate rows: surface reachability and detector separation are proven, while
-producer attribution remains `ambiguous`.
+exact operation-level producer attribution is also proven.
