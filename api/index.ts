@@ -1,9 +1,14 @@
 import { ManagedIdentityCredential } from "@azure/identity";
 import {
+  CALENDAR_MEETING_RUN_ID,
   DelegatedGraphCalendarMeetingOperation,
   GRAPH_CALENDARS_READ_WRITE_SCOPE,
   ProcessLocalCalendarMeetingBoundary,
 } from "./calendar-meeting.js";
+import {
+  OperationTelemetry,
+  StructuredConsoleOperationTelemetrySink,
+} from "./operation-telemetry.js";
 import { DelegatedGraphCategoryProof } from "./category-proof.js";
 import {
   DelegatedGraphContactProof,
@@ -103,7 +108,15 @@ const coryTokenProvider =
 const calendarMeetingOperation =
   coryTokenProvider && cory
     ? new ProcessLocalCalendarMeetingBoundary(
-        new DelegatedGraphCalendarMeetingOperation(coryTokenProvider, cory),
+        new DelegatedGraphCalendarMeetingOperation(
+          coryTokenProvider,
+          cory,
+          fetch,
+          new OperationTelemetry(
+            CALENDAR_MEETING_RUN_ID,
+            new StructuredConsoleOperationTelemetrySink(),
+          ),
+        ),
       )
     : undefined;
 const contactProofOperation =

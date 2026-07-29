@@ -227,6 +227,11 @@ assigning the learner to either proof role.
   contract, but implementation is blocked on a production shared-store choice;
   see the
   [durable operation journal decision](durable-operation-journal-decision.md).
+- The repository now has deterministic local product-path proof for bounded
+  [operation telemetry](operation-telemetry.md) on calendar create, cleanup,
+  and read-only recovery. Its structured console seam records only hashed
+  correlation and enum/status/duration state; it is not a durable store or a
+  claim that hosted telemetry has been observed.
 - Simulated-user MSAL caches exist only in API process memory. The first
   request after a restart may launch an isolated headless CBA browser; later
   consented scopes can be acquired silently while that replica remains alive.
