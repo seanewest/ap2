@@ -103,7 +103,8 @@ every workload read.
 `purview-audit-boundary.ts` is a receipt-facing canonical manifest for the
 already-completed PR #73 audit boundary. It is not registered as a runnable UI
 scenario: the surface and distinct detector are proven, while operation
-attribution remains licensing or latency blocked.
+attribution remains ambiguous after two successful but unmatched bounded
+result pages.
 
 The manifest remains a pre-run plan, not post-run proof. Post-run truth belongs
 in a separate
