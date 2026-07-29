@@ -342,6 +342,43 @@ describe("scenario evidence receipts", () => {
     );
   });
 
+  it("does not extend platform acceptance grounding to other artifact kinds", () => {
+    const fixture = CANONICAL_RECEIPT_FIXTURES[0]!;
+    const manifest = structuredClone(fixture.manifest);
+    const receipt = copy(fixture.receipt);
+    const expected = manifest.evidence.artifacts[0]!;
+    expected.state = "platform-accepted";
+    expected.learnerVisibility = "not-proven";
+    delete expected.observation;
+    manifest.learner.completionState = "not-run";
+    const artifact = receipt.claims.find(
+      (row) => row.id === "artifact-cory-help-desk-email",
+    )!;
+    artifact.observation = {
+      source: "local-reconciliation",
+      outcome: "exact-reconciliation",
+      observerActorId: "ap2-orchestrator",
+      operationKey: "send-help-desk-email",
+    };
+
+    expectReceiptError(
+      () => verifyScenarioEvidenceReceipt(receipt, manifest),
+      "ungrounded-claim",
+    );
+  });
+
+  it("does not extend receipt-only visibility grounding to other artifact kinds", () => {
+    const fixture = CANONICAL_RECEIPT_FIXTURES[0]!;
+    const manifest = structuredClone(fixture.manifest);
+    manifest.evidence.artifacts[0]!.learnerVisibility = "not-proven";
+    manifest.learner.completionState = "not-run";
+
+    expectReceiptError(
+      () => verifyScenarioEvidenceReceipt(fixture.receipt, manifest),
+      "unsupported-visibility",
+    );
+  });
+
   it("returns a deterministic sanitized claim table", () => {
     const fixture = CANONICAL_RECEIPT_FIXTURES[3]!;
     const reversed = copy(fixture.receipt);

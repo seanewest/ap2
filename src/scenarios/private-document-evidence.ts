@@ -1,7 +1,7 @@
 import {
   parseScenarioManifest,
   type ScenarioManifest,
-} from "./scenario-manifest";
+} from "./scenario-manifest.ts";
 
 const marker = "ap2-private-document-fixture";
 
@@ -108,6 +108,24 @@ export const PRIVATE_DOCUMENT_EVIDENCE_SCENARIO = parseScenarioManifest({
       effect: "read",
       ownerActorId: "document-learner",
       summary: "Attempt one bounded exact learner metadata or content read.",
+    },
+    {
+      key: "reconcile-private-document-cleanup",
+      phase: "evidence",
+      capability: "artifact.read-exact",
+      effect: "read",
+      ownerActorId: "document-producer",
+      summary:
+        "Reconcile exact producer-side folder, file, permission, and retention absence after cleanup.",
+    },
+    {
+      key: "reconcile-private-document-learner-access",
+      phase: "evidence",
+      capability: "artifact.read-exact",
+      effect: "read",
+      ownerActorId: "document-learner",
+      summary:
+        "Reconcile exact learner access absence after the direct permission is removed.",
     },
     {
       key: "inspect-private-document",

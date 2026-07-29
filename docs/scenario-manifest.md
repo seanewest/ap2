@@ -110,4 +110,7 @@ contract. A distinct producer stages one private harmless text artifact and
 one direct learner-only read grant, then removes the permission, file, and
 empty run folder. The canary reached producer-side platform acceptance but did
 not prove learner visibility, so the fixture remains `platform-accepted`,
-`not-proven`, and `not-run`, with no audit or detection claim.
+`not-proven`, and `not-run`, with no audit or detection claim. Separate
+producer and learner terminal-read operations let post-run receipts ground
+cleanup and learner-access absence without treating a deletion response as
+absence proof.

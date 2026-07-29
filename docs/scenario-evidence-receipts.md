@@ -15,6 +15,14 @@ produce only candidate operation rows from bounded lifecycle events. It cannot
 auto-complete a receipt or supply artifact, learner, cleanup, retention, or
 terminal proof.
 
+The pure local
+[private-document lifecycle adapter](private-document-evidence.md#scenario-receipt-adapter)
+maps only its exact categorical one-shot journal and terminal absence summary.
+It can complete the canonical private-document receipt because that lifecycle
+contains artifact, learner-read, ordered cleanup, and fresh-session terminal
+evidence. It still cannot infer learner interpretation, response, audit, or
+detection.
+
 ## Receipt shape
 
 `verifyScenarioEvidenceReceipt` accepts only schema version 1. A receipt
@@ -81,10 +89,13 @@ gaps; honest `uninspected` rows preserve a known gap without inventing proof.
 
 ## Claim grounding
 
-Artifact proof must use the artifact's manifest observation and match its kind
-and authenticity. Learner visibility requires a learner inspection and a
-manifest artifact whose visibility was observed. Learner interpretation
-requires manifest completion.
+Artifact proof must match the manifest kind and authenticity. Observed
+artifacts use their manifest observation. The canonical `private-document`
+platform-accepted artifact can use only exact local reconciliation of its
+source operation while every folder, file, and permission staging operation is
+separately proven; this does not promote learner visibility. Learner visibility
+requires a learner inspection through a learner-owned exact evidence read.
+Learner interpretation still requires manifest completion.
 
 Producer attribution requires an independent detector record match for an
 authentic artifact whose source operation belongs to the workload actor.
@@ -106,6 +117,7 @@ no protected run data:
 | Teams missed call | The platform-native missed-call artifact and call are proven through a human-operated path. Unattended automation, voicemail, and retained-history cleanup remain uninspected. |
 | Application reconnaissance | Workload execution, distinct detector, exact producer attribution, and the authentic summary are separate proven rows. Learner interpretation and ephemeral retention cleanup remain uninspected. |
 | Purview boundary | App-only surface reachability and detector separation are proven. Operation-level producer attribution remains `licensing-or-latency-blocked`; learner visibility and local-window cleanup remain uninspected. |
+| Private document | Exact producer-side folder, file, and direct-permission reconciliation proves platform-accepted staging. Ordered cleanup plus three fresh-session terminal rounds prove active-state absence. Learner visibility remains uninspected unless the exact learner-owned evidence read records learner inspection. Interpretation, response, audit, and detection remain unclaimed. |
 
 Each fixture has a paired negative form that attempts one forbidden promotion.
 Tests also cover missing observation, raw identifiers, unsupported visibility,

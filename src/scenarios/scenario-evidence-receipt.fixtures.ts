@@ -2,6 +2,7 @@ import { AVD_THREE_VM_SCENARIO } from "./avd-three-vm";
 import { HELP_DESK_EMAIL_SCENARIO } from "./help-desk-email";
 import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon";
 import { PURVIEW_AUDIT_BOUNDARY_SCENARIO } from "./purview-audit-boundary";
+import { PRIVATE_DOCUMENT_EVIDENCE_SCENARIO } from "./private-document-evidence";
 import {
   type EvidenceReceiptClaim,
   type EvidenceReceiptErrorCode,
@@ -878,4 +879,5 @@ export const RECEIPT_MANIFESTS = [
   TEAMS_MISSED_CALL_SCENARIO,
   OAUTH_APPLICATION_RECON_SCENARIO,
   PURVIEW_AUDIT_BOUNDARY_SCENARIO,
+  PRIVATE_DOCUMENT_EVIDENCE_SCENARIO,
 ] as const;
