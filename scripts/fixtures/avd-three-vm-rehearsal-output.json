@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "label": "REHEARSAL_ONLY",
+  "status": "completed",
+  "failure": null,
+  "planDigestSha256": "9ef8b6f8e4c5c033c58100ae21765e1cc17562355b1ebd751c1ddd8b81824664",
+  "stages": {
+    "plan": "compiled",
+    "run": "completed",
+    "observation": "collected",
+    "receipt": "verified-incomplete"
+  },
+  "runnerJournal": {
+    "entries": 37,
+    "duplicateWrites": 0,
+    "transitions": {
+      "intent": 11,
+      "succeeded": 11,
+      "failed": 0,
+      "ambiguous": 0,
+      "reconciled": 8,
+      "reconciliation-blocked": 7
+    }
+  },
+  "observations": {
+    "status": "collected",
+    "provenance": "synthetic",
+    "evidence": {
+      "proven": 4,
+      "notObserved": 1,
+      "failedOrMissing": 0
+    },
+    "terminalInputs": {
+      "cleanup": "synthetic-supplied",
+      "roleAbsence": "synthetic-supplied",
+      "retention": "synthetic-supplied"
+    }
+  },
+  "receipt": {
+    "status": "verified-incomplete",
+    "verified": true,
+    "binding": {
+      "planDigestSha256": "9ef8b6f8e4c5c033c58100ae21765e1cc17562355b1ebd751c1ddd8b81824664",
+      "runStatus": "completed",
+      "observationProvenance": "synthetic",
+      "cleanup": "synthetic-supplied",
+      "roleAbsence": "synthetic-supplied",
+      "retention": "synthetic-supplied"
+    },
+    "claimCount": 39,
+    "provenClaims": 0,
+    "uninspectedClaims": 39,
+    "missingCoverage": {
+      "operations": 14,
+      "artifacts": 4,
+      "learner": 5,
+      "responses": 1,
+      "cleanup": 5,
+      "retention": 4,
+      "terminalProof": 6
+    }
+  }
+}
