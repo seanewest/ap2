@@ -95,7 +95,7 @@ selector. It does not authenticate, call the planning API, or perform work.
 Only the separate `Preview plan` action may make one planning request.
 
 The separate Purview audit capability is labeled as a read-only boundary, not
-invented as a fifth registry scenario or treated as an execution receipt.
+invented as an additional registry scenario or treated as an execution receipt.
 Application reconnaissance retains its narrower registry claim: the workload
 and observer are distinct, while one sign-in or audit record does not prove
 every workload read.
