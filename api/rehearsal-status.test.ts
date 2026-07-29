@@ -23,6 +23,9 @@ describe("Azure rehearsal status provider", () => {
         properties: {
           runningStatus: "Running",
           latestReadyRevisionName: "ca-ap2-api--revision",
+          template: {
+            scale: { minReplicas: 1, maxReplicas: 1, rules: [] },
+          },
           configuration: { secrets: ["must-not-escape"] },
         },
       }),
@@ -85,5 +88,32 @@ describe("Azure rehearsal status provider", () => {
         ),
       ).getStatus(),
     ).rejects.toThrow("invalid Container App");
+  });
+
+  it.each([
+    ["missing scale", undefined],
+    ["two replicas", { minReplicas: 1, maxReplicas: 2 }],
+    ["zero minimum", { minReplicas: 0, maxReplicas: 1 }],
+  ])("refuses %s topology", async (_name, scale) => {
+    await expect(
+      new AzureRehearsalStatusProvider(
+        { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+        vi.fn<typeof fetch>().mockResolvedValue(
+          Response.json({
+            name: REHEARSAL_CONTAINER_APP,
+            location: "East US",
+            properties: {
+              runningStatus: "Running",
+              latestReadyRevisionName: "ca-ap2-api--revision",
+              template: scale === undefined ? {} : { scale },
+            },
+          }),
+        ),
+      ).getStatus(),
+    ).rejects.toThrow(
+      scale === undefined
+        ? "invalid Container App"
+        : "unsafe Container App replica topology",
+    );
   });
 });

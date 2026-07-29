@@ -205,9 +205,11 @@ encryption, locking, eviction, revocation handling, and cross-replica design.
 The API's process-local admission boundary derives its fail-fast concurrency
 lanes from the authoritative route side-effect metadata. It never queues or
 retries a bounded mutation, and it does not claim client-rate or multi-replica
-protection. Keep ingress connection/rate controls and `maxReplicas=1` as
-deployment requirements until a durable journal and explicit distributed
-admission architecture exist. See
+protection. Keep ingress connection/rate controls and both `minReplicas=1` and
+`maxReplicas=1` as deployment requirements until a durable journal and
+explicit distributed admission architecture exist. The explicit topology-plan
+contract and authoritative readiness read enforce the
+[single-replica fallback](api-single-replica-fallback.md). See
 [API process-local backpressure](api-abuse-backpressure.md).
 
 ## Eventual consistency

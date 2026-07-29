@@ -47,9 +47,11 @@ policy. After authorization, the production API uses its runtime managed
 identity to read only Container App `ca-ap2-api` in resource group
 `rg-ap2-rehearsal` and Student subscription
 `6d8ebd0e-017f-401e-950d-e5a35de93dc6`. It returns only the app name, region,
-running status, and latest ready revision. Deployment must grant that managed
-identity read access to the target; this repository does not assign Azure
-roles.
+running status, and latest ready revision. The read fails closed unless the ARM
+resource also reports `minReplicas=1` and `maxReplicas=1`; scale data is not
+returned. Deployment must grant that managed identity read access to the
+target; this repository does not assign Azure roles. See the
+[single-replica fallback](api-single-replica-fallback.md).
 
 ## One internal email
 
@@ -137,7 +139,8 @@ One process-local boundary serializes share and cleanup across operator and
 Dev-app callers. Concurrent requests receive
 `proof_operation_busy`. This is rehearsal-only coordination: it has no durable
 lock, database, queue, or cross-replica protection. The live proof therefore
-requires Container Apps `maxReplicas=1`. Replacing this boundary is blocked on
+requires Container Apps `minReplicas=1` and `maxReplicas=1`. Replacing this
+boundary is blocked on
 the shared-store choice recorded in the
 [durable operation journal decision](durable-operation-journal-decision.md);
 do not substitute container-local or filesystem state.
@@ -197,7 +200,8 @@ automatic lookup runs.
 A process-local busy/completed boundary serializes create and cancel across
 operator and Dev-app callers. It has no database, queue, or durable lock; the
 narrow read-only lookup is used only by an explicit Cancel after process state
-loss. The live proof therefore requires `maxReplicas=1`. The same
+loss. The live proof therefore requires `minReplicas=1` and `maxReplicas=1`.
+The same
 [durable operation journal decision](durable-operation-journal-decision.md)
 applies to this production-wired consumer.
 

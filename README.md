@@ -58,8 +58,10 @@ Both must be issued in immutable Student tenant
 kept distinct. Authorized callers can also use `GET /api/rehearsal-status`.
 That operation uses the API's runtime managed identity to read the fixed
 Student rehearsal Container App and returns only its name, region, running
-status, and latest ready revision. See [API identity](docs/api-identity.md) for the
-fixed target and the Dev-app command.
+status, and latest ready revision. The read fails closed unless ARM reports
+both minimum and maximum replicas as exactly one. See
+[API identity](docs/api-identity.md) for the fixed target and the Dev-app
+command.
 
 `POST /api/simulated-email` uses the same caller policy, then signs the fixed
 Homer test user in through headless Microsoft CBA and makes one Graph

@@ -76,7 +76,10 @@ settles.
 The repository has no main-API ingress or Container Apps infrastructure
 definition, so it cannot truthfully enforce client rate, connection count,
 aggregate replicas, or upstream queueing. Deployment must keep
-`maxReplicas=1` while mutation ownership and token caches remain process-local.
+`minReplicas=1` and `maxReplicas=1` while mutation ownership and token caches
+remain process-local. The repository's
+[single-replica fallback](api-single-replica-fallback.md) rejects explicit
+topology-plan or read-only readiness drift.
 Ingress must independently bound connection creation, header/body bytes,
 request rate, and aggregate concurrent requests before traffic reaches the
 container. Any upstream overload response must be fixed and must not

@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "target": "ca-ap2-api",
+  "minReplicas": 1,
+  "maxReplicas": 1
+}
