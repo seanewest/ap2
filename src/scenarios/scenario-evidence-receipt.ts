@@ -238,7 +238,7 @@ export function verifyScenarioEvidenceReceipt(
   manifestValue: ScenarioManifest,
 ): VerifiedScenarioEvidenceReceipt {
   const manifest = parseScenarioManifest(manifestValue);
-  const receipt = parseReceipt(value);
+  const receipt = parseScenarioEvidenceReceipt(value);
   verifyScenario(receipt, manifest);
   verifyRoles(receipt, manifest);
   verifyClaims(receipt, manifest);
@@ -295,7 +295,9 @@ export function formatVerifiedClaimTable(
   return [header, ...rows].join("\n");
 }
 
-function parseReceipt(value: unknown): ScenarioEvidenceReceipt {
+export function parseScenarioEvidenceReceipt(
+  value: unknown,
+): ScenarioEvidenceReceipt {
   const receipt = object(value, "shape");
   exactKeys(receipt, ["schemaVersion", "scenario", "roles", "claims"]);
   if (receipt.schemaVersion !== 1) {

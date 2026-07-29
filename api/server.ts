@@ -50,6 +50,13 @@ import {
   type ScenarioPlanService,
 } from "./scenario-plan.js";
 import { ScenarioPlanError } from "../src/scenarios/scenario-plan.js";
+import {
+  SCENARIO_RECEIPT_MAX_REQUEST_BYTES,
+  ScenarioEvidenceVerificationResponseTooLargeError,
+  ScenarioEvidenceVerificationSafeFailureError,
+  type ScenarioEvidenceVerificationService,
+} from "./scenario-evidence-verification.js";
+import { EvidenceReceiptError } from "../src/scenarios/scenario-evidence-receipt.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -67,6 +74,7 @@ export interface ApiDependencies {
   todoTaskProofOperation?: TodoTaskProofOperation;
   operationTelemetryReader?: OperationTelemetryReader;
   scenarioPlanService?: ScenarioPlanService;
+  scenarioEvidenceVerificationService?: ScenarioEvidenceVerificationService;
   allowedOrigin?: string;
 }
 
@@ -139,6 +147,20 @@ async function route(
 
   if (
     request.method === "OPTIONS" &&
+    pathname === "/api/scenario-evidence-verification"
+  ) {
+    handleProtectedPreflight(
+      request,
+      response,
+      origin,
+      ["POST"],
+      ["authorization", "content-type"],
+    );
+    return;
+  }
+
+  if (
+    request.method === "OPTIONS" &&
     pathname === "/api/onedrive-share-proof"
   ) {
     handleProtectedPreflight(request, response, origin, [
@@ -187,6 +209,13 @@ async function route(
   }
   if (request.method === "POST" && pathname === "/api/scenario-plan") {
     await scenarioPlan(request, response, dependencies);
+    return;
+  }
+  if (
+    request.method === "POST" &&
+    pathname === "/api/scenario-evidence-verification"
+  ) {
+    await scenarioEvidenceVerification(request, response, dependencies);
     return;
   }
 
@@ -465,15 +494,15 @@ async function handleAuthorizedRequest(
       sendJson(response, 400, { error: "invalid_operation_event_query" });
       return;
     }
-    if (error instanceof ScenarioPlanUnsupportedMediaTypeError) {
+    if (error instanceof JsonUnsupportedMediaTypeError) {
       sendJson(response, 415, { error: "unsupported_media_type" });
       return;
     }
-    if (error instanceof ScenarioPlanRequestTooLargeError) {
+    if (error instanceof JsonRequestTooLargeError) {
       sendJson(response, 413, { error: "request_too_large" });
       return;
     }
-    if (error instanceof ScenarioPlanInvalidBodyError) {
+    if (error instanceof JsonInvalidBodyError) {
       sendJson(response, 400, { error: "invalid_request_body" });
       return;
     }
@@ -489,6 +518,27 @@ async function handleAuthorizedRequest(
       error instanceof ScenarioPlanResponseTooLargeError
     ) {
       sendJson(response, 500, { error: "scenario_plan_failed" });
+      return;
+    }
+    if (error instanceof EvidenceReceiptError) {
+      sendJson(response, 400, {
+        error: "scenario_evidence_receipt_refused",
+        category: error.code,
+      });
+      return;
+    }
+    if (
+      error instanceof ScenarioEvidenceVerificationResponseTooLargeError
+    ) {
+      sendJson(response, 500, {
+        error: "scenario_evidence_receipt_response_too_large",
+      });
+      return;
+    }
+    if (error instanceof ScenarioEvidenceVerificationSafeFailureError) {
+      sendJson(response, 500, {
+        error: "scenario_evidence_receipt_failed",
+      });
       return;
     }
     if (error instanceof OneDriveProofConflictError) {
@@ -542,9 +592,9 @@ async function handleAuthorizedRequest(
   }
 }
 
-class ScenarioPlanUnsupportedMediaTypeError extends Error {}
-class ScenarioPlanRequestTooLargeError extends Error {}
-class ScenarioPlanInvalidBodyError extends Error {}
+class JsonUnsupportedMediaTypeError extends Error {}
+class JsonRequestTooLargeError extends Error {}
+class JsonInvalidBodyError extends Error {}
 
 async function scenarioPlan(
   request: IncomingMessage,
@@ -556,24 +606,51 @@ async function scenarioPlan(
       request.headers["content-type"] !== "application/json" ||
       request.headers["content-encoding"] !== undefined
     ) {
-      throw new ScenarioPlanUnsupportedMediaTypeError();
+      throw new JsonUnsupportedMediaTypeError();
     }
     const service = dependencies.scenarioPlanService;
     if (!service) {
       throw new ScenarioPlanSafeFailureError();
     }
-    return service.compile(await readBoundedJson(request));
+    return service.compile(
+      await readBoundedJson(request, SCENARIO_PLAN_MAX_REQUEST_BYTES),
+    );
   });
 }
 
-async function readBoundedJson(request: IncomingMessage): Promise<unknown> {
+async function scenarioEvidenceVerification(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new JsonUnsupportedMediaTypeError();
+    }
+    const service = dependencies.scenarioEvidenceVerificationService;
+    if (!service) {
+      throw new ScenarioEvidenceVerificationSafeFailureError();
+    }
+    return service.verify(
+      await readBoundedJson(request, SCENARIO_RECEIPT_MAX_REQUEST_BYTES),
+    );
+  });
+}
+
+async function readBoundedJson(
+  request: IncomingMessage,
+  maximumBytes: number,
+): Promise<unknown> {
   const contentLength = request.headers["content-length"];
   if (
     contentLength !== undefined &&
     (!/^(0|[1-9][0-9]*)$/.test(contentLength) ||
-      Number(contentLength) > SCENARIO_PLAN_MAX_REQUEST_BYTES)
+      Number(contentLength) > maximumBytes)
   ) {
-    throw new ScenarioPlanRequestTooLargeError();
+    throw new JsonRequestTooLargeError();
   }
 
   const chunks: Buffer[] = [];
@@ -581,19 +658,19 @@ async function readBoundedJson(request: IncomingMessage): Promise<unknown> {
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     totalBytes += buffer.length;
-    if (totalBytes > SCENARIO_PLAN_MAX_REQUEST_BYTES) {
+    if (totalBytes > maximumBytes) {
       request.resume();
-      throw new ScenarioPlanRequestTooLargeError();
+      throw new JsonRequestTooLargeError();
     }
     chunks.push(buffer);
   }
   if (totalBytes === 0) {
-    throw new ScenarioPlanInvalidBodyError();
+    throw new JsonInvalidBodyError();
   }
   try {
     return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
   } catch {
-    throw new ScenarioPlanInvalidBodyError();
+    throw new JsonInvalidBodyError();
   }
 }
 
