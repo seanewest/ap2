@@ -137,7 +137,10 @@ One process-local boundary serializes share and cleanup across operator and
 Dev-app callers. Concurrent requests receive
 `proof_operation_busy`. This is rehearsal-only coordination: it has no durable
 lock, database, queue, or cross-replica protection. The live proof therefore
-requires Container Apps `maxReplicas=1`.
+requires Container Apps `maxReplicas=1`. Replacing this boundary is blocked on
+the shared-store choice recorded in the
+[durable operation journal decision](durable-operation-journal-decision.md);
+do not substitute container-local or filesystem state.
 
 ## One calendar rehearsal
 
@@ -194,7 +197,9 @@ automatic lookup runs.
 A process-local busy/completed boundary serializes create and cancel across
 operator and Dev-app callers. It has no database, queue, or durable lock; the
 narrow read-only lookup is used only by an explicit Cancel after process state
-loss. The live proof therefore requires `maxReplicas=1`.
+loss. The live proof therefore requires `maxReplicas=1`. The same
+[durable operation journal decision](durable-operation-journal-decision.md)
+applies to this production-wired consumer.
 
 Production enables the calendar operation only when the existing Homer/shared
 client configuration and all three Cory settings are present:

@@ -24,6 +24,19 @@ At each material checkpoint, the Captain checks and updates this docket against 
   the repository's fail-closed readiness gate and a headless private-VM
   executor. See [the shared-device package contract](docs/shared-device-provisioning-package.md).
 
+## API durability decision
+
+- **Non-idempotent operation journal — shared store required:** The real
+  OneDrive share/cleanup and calendar create/cancel consumers still use
+  process-local boundaries and require `maxReplicas=1`. The main API has no
+  production shared store, endpoint/configuration contract, storage SDK, or
+  managed-identity data role. The calling bot's separate single-replica Azure
+  Files journal is not a cross-replica claim store. Azure Table Storage is the
+  smallest supported fit, but selecting/provisioning it is a material
+  persistence architecture decision. Do not substitute memory or filesystem
+  state. See the
+  [durable operation journal decision](docs/durable-operation-journal-decision.md).
+
 ## Cleanup later
 
 - Reconcile and remove only the retained Teams chat/calling artifacts during a separately authorized cleanup pass, plus temporary workload roles, broad diagnostic permissions, delegated consent, retained drafts/messages where approved, and obsolete certificates/keys. Preserve accepted audit, quarantine, transport, deleted-object, and other historical residue.
