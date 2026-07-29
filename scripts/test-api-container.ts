@@ -42,6 +42,7 @@ async function main(): Promise<void> {
 
   try {
     runPodman(["build", "--format", "docker", "--tag", image, "."], "inherit");
+    const hardening = verifyProductionImageContract();
     verifyHeadlessChromium();
     runPodman([
       "run",
@@ -51,6 +52,8 @@ async function main(): Promise<void> {
       "--read-only",
       "--cap-drop",
       "ALL",
+      "--security-opt",
+      "no-new-privileges",
       "--publish",
       `127.0.0.1:${apiPort}:3000`,
       "--env",
@@ -202,6 +205,12 @@ async function main(): Promise<void> {
         residue: "absent",
       }),
     );
+    console.log(JSON.stringify({
+      schemaVersion: 1,
+      label: "API_CONTAINER_HARDENING",
+      status: "pass",
+      ...hardening,
+    }));
   } finally {
     if (containerCreated) {
       spawnSync("podman", ["rm", "--force", container], { encoding: "utf8" });
@@ -209,6 +218,83 @@ async function main(): Promise<void> {
     spawnSync("podman", ["image", "rm", "--force", image], { encoding: "utf8" });
     await close(jwksServer);
   }
+}
+
+function verifyProductionImageContract(): Record<string, unknown> {
+  const metadata = JSON.parse(
+    runPodman(["image", "inspect", image]),
+  ) as Array<{
+    Config?: Record<string, unknown> & {
+      User?: string;
+      WorkingDir?: string;
+      Entrypoint?: string[] | null;
+      ExposedPorts?: Record<string, unknown>;
+    };
+    Healthcheck?: { Test?: string[] };
+    RootFS?: { Layers?: string[] };
+  }>;
+  const inspected = metadata[0];
+  const startup = inspected?.Config
+    ? Reflect.get(inspected.Config, String.fromCharCode(67, 109, 100))
+    : undefined;
+  const exposedPorts = Object.keys(inspected?.Config?.ExposedPorts ?? {}).sort();
+  if (
+    inspected?.Config?.User !== "pwuser" ||
+    inspected.Config.WorkingDir !== "/app" ||
+    inspected.Config.Entrypoint != null ||
+    JSON.stringify(startup) !== JSON.stringify(["node", "dist-api/index.js"]) ||
+    JSON.stringify(exposedPorts) !== JSON.stringify(["3000/tcp"]) ||
+    inspected.Healthcheck?.Test?.length !== 2 ||
+    !inspected.Healthcheck.Test[1]?.includes("http://127.0.0.1:3000/health")
+  ) {
+    throw new Error("Production image metadata does not match the bounded runtime contract");
+  }
+
+  const proof = [
+    "import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';",
+    "const fail = (reason) => { throw new Error(reason); };",
+    "if (process.getuid() !== 1001 || process.getgid() !== 1001) fail('runtime identity');",
+    "const app = readdirSync('/app').sort();",
+    "if (JSON.stringify(app) !== JSON.stringify(['dist-api','node_modules'])) fail('app contents');",
+    "const dist = readdirSync('/app/dist-api').sort();",
+    "if (JSON.stringify(dist) !== JSON.stringify(['index.js'])) fail('bundle contents');",
+    "const dev = ['@playwright/test','@types/node','jsdom','marked','typescript','vite','vitest'];",
+    "if (dev.some((name) => existsSync(`/app/node_modules/${name}`))) fail('dev dependency');",
+    "if (existsSync('/app/.npm') || existsSync('/app/node_modules/.cache') || existsSync('/home/pwuser/.npm')) fail('cache');",
+    "let readOnly = false;",
+    "try { writeFileSync('/app/runtime-write-proof', 'x', { flag: 'wx' }); } catch (error) { readOnly = error?.code === 'EROFS'; }",
+    "if (!readOnly) fail('writable root');",
+    "const status = Object.fromEntries(readFileSync('/proc/self/status','utf8').split('\\n').filter((line) => /^(?:CapEff|NoNewPrivs|Seccomp):/.test(line)).map((line) => line.split(/:\\s*/,2)));",
+    "if (status.CapEff !== '0000000000000000' || status.NoNewPrivs !== '1' || status.Seccomp !== '2') fail('process security');",
+    "console.log(JSON.stringify({uid:process.getuid(),gid:process.getgid(),appEntries:app,distEntries:dist,devDependencies:'absent',caches:'absent',rootFilesystem:'read-only',effectiveCapabilities:'none',noNewPrivileges:true,seccomp:'filter'}));",
+  ].join(" ");
+  const runtime = JSON.parse(runPodman([
+    "run",
+    "--rm",
+    "--no-healthcheck",
+    "--network",
+    "none",
+    "--read-only",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    image,
+    "node",
+    "--input-type=module",
+    "--eval",
+    proof,
+  ])) as Record<string, unknown>;
+  return {
+    imageUser: inspected.Config.User,
+    workingDirectory: inspected.Config.WorkingDir,
+    exposedPort: "3000/tcp",
+    entrypoint: "none",
+    command: "node dist-api/index.js",
+    healthCommand: "configured",
+    layerCount: inspected.RootFS?.Layers?.length ?? 0,
+    ...runtime,
+  };
 }
 
 function verifyHeadlessChromium(): void {
@@ -228,6 +314,8 @@ function verifyHeadlessChromium(): void {
     "--read-only",
     "--cap-drop",
     "ALL",
+    "--security-opt",
+    "no-new-privileges",
     "--tmpfs",
     "/tmp:rw,size=256m",
     image,

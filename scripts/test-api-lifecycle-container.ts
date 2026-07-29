@@ -315,6 +315,8 @@ function startConfiguredContainer(
     "--read-only",
     "--cap-drop",
     "ALL",
+    "--security-opt",
+    "no-new-privileges",
     "--publish",
     `127.0.0.1:${apiPort}:3000`,
     "--env",

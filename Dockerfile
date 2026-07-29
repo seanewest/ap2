@@ -8,7 +8,7 @@ COPY scripts ./scripts
 COPY src/api ./src/api
 COPY src/scenarios ./src/scenarios
 COPY src/ui ./src/ui
-RUN npm run build:api
+RUN npm run build:api && rm -f dist-api/*.map
 RUN npm prune --omit=dev
 
 FROM mcr.microsoft.com/playwright:v1.61.1-noble
