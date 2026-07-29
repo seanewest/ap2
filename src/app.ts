@@ -21,6 +21,7 @@ import {
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
+  type HelpDeskScenarioResult,
   type OneDriveInviteFailure,
   type OneDriveProofResult,
   type RehearsalStatus,
@@ -66,6 +67,13 @@ type SimulatedEmailState =
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
 
+type HelpDeskScenarioState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "success"; result: HelpDeskScenarioResult }
+  | { kind: "cancelled" }
+  | { kind: "error"; message: string };
+
 type OneDriveProofStage =
   | "not-started"
   | "uncertain"
@@ -108,6 +116,7 @@ type ViewState =
       apiAccess: ApiAccessState;
       rehearsalStatus: RehearsalStatusState;
       simulatedEmail: SimulatedEmailState;
+      helpDeskScenario: HelpDeskScenarioState;
       oneDriveProof: OneDriveProofState;
       calendarMeeting: CalendarMeetingState;
       fixedProofs: FixedProofStates;
@@ -295,6 +304,43 @@ export function createAfterPartyApp(
           : "The internal email could not be submitted. Try again.";
       setSignedInPatch(account, {
         simulatedEmail: { kind: "error", message },
+      });
+    }
+  };
+
+  const sendHelpDeskScenario = async (): Promise<void> => {
+    if (
+      state.kind !== "signed-in" ||
+      state.helpDeskScenario.kind !== "idle" ||
+      isApiOperationBusy(state, contactProof)
+    ) {
+      return;
+    }
+    const account = state.account;
+    setSignedInPatch(account, {
+      helpDeskScenario: { kind: "loading" },
+    });
+
+    try {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      const result = await api.sendHelpDeskScenario(accessToken);
+      setSignedInPatch(account, {
+        helpDeskScenario: { kind: "success", result },
+      });
+    } catch (error) {
+      if (error instanceof AccessTokenCancelledError) {
+        setSignedInPatch(account, {
+          helpDeskScenario: { kind: "cancelled" },
+        });
+        return;
+      }
+      const message =
+        error instanceof AccessTokenError || error instanceof ApiAccessError
+          ? error.message
+          : "The help desk email was not confirmed. Do not repeat it.";
+      setSignedInPatch(account, {
+        helpDeskScenario: { kind: "error", message },
       });
     }
   };
@@ -614,6 +660,9 @@ export function createAfterPartyApp(
       .querySelector<HTMLButtonElement>("[data-action='send-simulated-email']")
       ?.addEventListener("click", () => void sendSimulatedEmail());
     root
+      .querySelector<HTMLButtonElement>("[data-action='send-help-desk-scenario']")
+      ?.addEventListener("click", () => void sendHelpDeskScenario());
+    root
       .querySelector<HTMLButtonElement>("[data-action='share-onedrive-proof']")
       ?.addEventListener("click", () => void runOneDriveProofAction("share"));
     root
@@ -657,6 +706,7 @@ export function createAfterPartyApp(
               apiAccess: { kind: "idle" },
               rehearsalStatus: { kind: "idle" },
               simulatedEmail: { kind: "idle" },
+              helpDeskScenario: { kind: "idle" },
               oneDriveProof: {
                 stage: readOneDriveStage(storage, startup.account),
                 activity: "idle",
@@ -739,6 +789,10 @@ function createStatePanel(
           state.simulatedEmail,
           apiOperationLoading,
         ),
+        createHelpDeskScenarioPanel(
+          state.helpDeskScenario,
+          apiOperationLoading,
+        ),
         createOneDriveProofPanel(
           state.oneDriveProof,
           apiOperationLoading,
@@ -810,6 +864,51 @@ function createSimulatedEmailPanel(
       "send-simulated-email",
       "primary",
       apiOperationLoading || state.kind === "success",
+    ),
+  );
+  return panel;
+}
+
+function createHelpDeskScenarioPanel(
+  state: HelpDeskScenarioState,
+  apiOperationLoading: boolean,
+): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "api-access";
+  panel.append(
+    createStatus(
+      "Prepared Outlook email action: one clearly labeled AP2 help desk email from Kobe to Cory. This is not a Teams call, missed call, or voicemail.",
+      "notice",
+    ),
+  );
+
+  if (state.kind === "loading") {
+    panel.setAttribute("aria-busy", "true");
+    panel.append(createStatus("Submitting the help desk email once…"));
+  } else if (state.kind === "success") {
+    panel.append(
+      createStatus(
+        "Microsoft accepted the email request (202). Delivery is not confirmed.",
+      ),
+      createHelpDeskScenarioResultList(state.result),
+    );
+  } else if (state.kind === "cancelled") {
+    panel.append(
+      createStatus(
+        "The help desk email request was cancelled. No acceptance was recorded.",
+        "notice",
+      ),
+    );
+  } else if (state.kind === "error") {
+    panel.append(createStatus(state.message, "error"));
+  }
+
+  panel.append(
+    createButton(
+      "Create one help desk email: Kobe → Cory",
+      "send-help-desk-scenario",
+      "primary",
+      apiOperationLoading || state.kind !== "idle",
     ),
   );
   return panel;
@@ -1200,6 +1299,19 @@ function createSimulatedEmailResultList(
   return list;
 }
 
+function createHelpDeskScenarioResultList(
+  result: HelpDeskScenarioResult,
+): HTMLDListElement {
+  const list = document.createElement("dl");
+  list.className = "identity-list";
+  appendIdentity(list, "Artifact", "Outlook email");
+  appendIdentity(list, "Sender", result.sender);
+  appendIdentity(list, "Recipient", result.recipient);
+  appendIdentity(list, "Subject", result.subject);
+  appendIdentity(list, "Platform claim", "Email only");
+  return list;
+}
+
 function isCurrentSignedInAccount(
   state: ViewState,
   account: AccountIdentity,
@@ -1215,6 +1327,7 @@ function isApiOperationBusy(
     state.apiAccess.kind === "loading" ||
     state.rehearsalStatus.kind === "loading" ||
     state.simulatedEmail.kind === "loading" ||
+    state.helpDeskScenario.kind === "loading" ||
     state.oneDriveProof.activity !== "idle" ||
     state.calendarMeeting.activity !== "idle" ||
     hasBusyFixedProof(state.fixedProofs) ||

@@ -456,6 +456,48 @@ describe("HTTP After Party API client", () => {
     expect(JSON.stringify(result)).not.toContain("response-must-not-escape");
   });
 
+  it("posts one fixed help desk scenario and retains only the email claim", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(
+        {
+          accepted: true,
+          artifact: "outlook-email",
+          sender: "kobe@corywest.onmicrosoft.com",
+          recipient: "cory@corywest.onmicrosoft.com",
+          subject:
+            "AP2 help desk follow-up [ap2-help-desk-email-20260729-001]",
+          platformClaims: ["email"],
+          messageId: "must-not-escape",
+        },
+        { status: 202 },
+      ),
+    );
+
+    const result = await new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    ).sendHelpDeskScenario("sensitive-access-token");
+
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/help-desk-scenario",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+      }),
+    );
+    expect(result).toEqual({
+      accepted: true,
+      artifact: "outlook-email",
+      sender: "kobe@corywest.onmicrosoft.com",
+      recipient: "cory@corywest.onmicrosoft.com",
+      subject: "AP2 help desk follow-up [ap2-help-desk-email-20260729-001]",
+      platformClaims: ["email"],
+    });
+    expect(JSON.stringify(result)).not.toContain("messageId");
+    expect(JSON.stringify(result)).not.toContain("sensitive-access-token");
+  });
+
   it.each([
     [
       "shareOneDriveProof",

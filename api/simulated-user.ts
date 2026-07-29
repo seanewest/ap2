@@ -19,6 +19,12 @@ export const CORY_USER_PRINCIPAL_NAME =
   "cory@corywest.onmicrosoft.com";
 export const KOBE_USER_PRINCIPAL_NAME =
   "kobe@corywest.onmicrosoft.com";
+export const KOBE_IDENTITY: SimulatedUserIdentity = {
+  tenantId: STUDENT_TENANT_ID,
+  objectId: "646cb944-5637-4410-bfc6-f338598e5804",
+  displayName: "Kobe West",
+  userPrincipalName: KOBE_USER_PRINCIPAL_NAME,
+};
 
 export function coryIdentity(objectId: string): SimulatedUserIdentity {
   return {

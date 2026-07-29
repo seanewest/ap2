@@ -25,6 +25,21 @@ export interface SimulatedEmailResult {
   subject: string;
 }
 
+export const HELP_DESK_SCENARIO_SENDER =
+  "kobe@corywest.onmicrosoft.com";
+export const HELP_DESK_SCENARIO_RECIPIENT =
+  "cory@corywest.onmicrosoft.com";
+export const HELP_DESK_SCENARIO_SUBJECT =
+  "AP2 help desk follow-up [ap2-help-desk-email-20260729-001]";
+export interface HelpDeskScenarioResult {
+  accepted: true;
+  artifact: "outlook-email";
+  sender: typeof HELP_DESK_SCENARIO_SENDER;
+  recipient: typeof HELP_DESK_SCENARIO_RECIPIENT;
+  subject: typeof HELP_DESK_SCENARIO_SUBJECT;
+  platformClaims: readonly ["email"];
+}
+
 export const CONTACT_PROOF_DISPLAY_NAME = "AP2 Kobe Contact Proof";
 export const CONTACT_PROOF_EMAIL = "kobe@corywest.onmicrosoft.com";
 export const CONTACT_PROOF_RUN_ID = "ap2-contact-20260724-001";
@@ -156,6 +171,7 @@ export interface AfterPartyApi {
   checkAccess(accessToken: string): Promise<ApiCallerIdentity>;
   getRehearsalStatus(accessToken: string): Promise<RehearsalStatus>;
   sendSimulatedEmail(accessToken: string): Promise<SimulatedEmailResult>;
+  sendHelpDeskScenario(accessToken: string): Promise<HelpDeskScenarioResult>;
   shareOneDriveProof(
     accessToken: string,
   ): Promise<Extract<OneDriveProofResult, { state: "configured" }>>;
@@ -231,6 +247,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly whoAmIUrl: string;
   private readonly rehearsalStatusUrl: string;
   private readonly simulatedEmailUrl: string;
+  private readonly helpDeskScenarioUrl: string;
   private readonly oneDriveProofUrl: string;
   private readonly calendarMeetingUrl: string;
   private readonly calendarMeetingCancelUrl: string;
@@ -250,6 +267,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ).toString();
     this.simulatedEmailUrl = new URL(
       "api/simulated-email",
+      `${baseUrl}/`,
+    ).toString();
+    this.helpDeskScenarioUrl = new URL(
+      "api/help-desk-scenario",
       `${baseUrl}/`,
     ).toString();
     this.oneDriveProofUrl = new URL(
@@ -331,6 +352,28 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       sender: value.sender,
       recipient: value.recipient,
       subject: value.subject,
+    };
+  }
+
+  async sendHelpDeskScenario(
+    accessToken: string,
+  ): Promise<HelpDeskScenarioResult> {
+    const value = await this.getAuthorizedJson(
+      this.helpDeskScenarioUrl,
+      accessToken,
+      "POST",
+      202,
+    );
+    if (!isSafeHelpDeskScenarioResult(value)) {
+      throw new ApiAccessError();
+    }
+    return {
+      accepted: true,
+      artifact: "outlook-email",
+      sender: value.sender,
+      recipient: value.recipient,
+      subject: value.subject,
+      platformClaims: ["email"],
     };
   }
 
@@ -827,6 +870,25 @@ function isSafeSimulatedEmailResult(
     result.sender === SIMULATED_EMAIL_SENDER &&
     result.recipient === SIMULATED_EMAIL_RECIPIENT &&
     result.subject === SIMULATED_EMAIL_SUBJECT
+  );
+}
+
+function isSafeHelpDeskScenarioResult(
+  value: unknown,
+): value is HelpDeskScenarioResult {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const result = value as Record<string, unknown>;
+  return (
+    result.accepted === true &&
+    result.artifact === "outlook-email" &&
+    result.sender === HELP_DESK_SCENARIO_SENDER &&
+    result.recipient === HELP_DESK_SCENARIO_RECIPIENT &&
+    result.subject === HELP_DESK_SCENARIO_SUBJECT &&
+    Array.isArray(result.platformClaims) &&
+    result.platformClaims.length === 1 &&
+    result.platformClaims[0] === "email"
   );
 }
 
