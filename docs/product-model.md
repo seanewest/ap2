@@ -70,3 +70,9 @@ private-file exfiltration story. That example clarifies why a lab needs a
 connected evidence chain and an intentional learner decision. It is not a
 published AP2 lab, and this repository does not claim that its possible
 signals, pedagogy, or end-to-end execution are complete.
+
+The proposed
+[unexpected SharePoint document-change investigation](sharepoint-document-change-lab-readiness.md)
+has also been audited against the complete-lab boundary. Its historical
+overwrite, recovery, and audit-attribution conclusions do not yet connect
+through a repeatable learner-visible product path, so it is not published.
