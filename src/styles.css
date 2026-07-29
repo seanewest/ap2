@@ -272,6 +272,93 @@ h2 {
   line-height: 1.5;
 }
 
+.scenario-plan-preview {
+  display: grid;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d4d8df;
+}
+
+.scenario-plan-preview-form,
+.scenario-plan-preview-controls {
+  display: grid;
+  gap: 1rem;
+}
+
+.scenario-plan-preview-form label,
+.scenario-plan-preview-form fieldset {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.scenario-plan-preview-form fieldset {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  padding: 0.9rem;
+  border: 1px solid #c8d5e5;
+  border-radius: 0.65rem;
+}
+
+.scenario-plan-preview-form legend {
+  padding: 0 0.35rem;
+  font-weight: 750;
+}
+
+.scenario-plan-preview-form input,
+.scenario-plan-preview-form select {
+  min-width: 0;
+  padding: 0.6rem;
+  border: 1px solid #8d99aa;
+  border-radius: 0.35rem;
+  background: #fff;
+  color: #1d2633;
+}
+
+.scenario-plan-preview-form :is(input, select):focus-visible {
+  outline: 0.2rem solid #86aee0;
+  outline-offset: 0.15rem;
+}
+
+.scenario-plan-preview-output {
+  min-height: 2.5rem;
+}
+
+.scenario-plan-preview-result {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #abc9b8;
+  border-radius: 0.8rem;
+  background: #f4fbf7;
+}
+
+.scenario-plan-preview-summary,
+.scenario-plan-preview-step {
+  display: grid;
+  grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
+  gap: 0.4rem 0.8rem;
+  margin: 0.6rem 0 0;
+}
+
+.scenario-plan-preview-summary dd,
+.scenario-plan-preview-step dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.scenario-plan-preview-steps,
+.scenario-plan-preview-limitations {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.6rem 0 0;
+  padding-left: 1.4rem;
+}
+
+.scenario-plan-preview-steps h5 {
+  margin: 0;
+  font-size: 1rem;
+}
+
 .identity-list {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -305,6 +392,12 @@ h2 {
   }
 
   .scenario-catalog-list {
+    grid-template-columns: 1fr;
+  }
+
+  .scenario-plan-preview-form fieldset,
+  .scenario-plan-preview-summary,
+  .scenario-plan-preview-step {
     grid-template-columns: 1fr;
   }
 
