@@ -58,6 +58,11 @@ export interface ScenarioPlanPreviewOptions {
   registry: readonly unknown[];
   client: ScenarioPlanPreviewClient;
   now?: () => Date;
+  onPlanAccepted?: (
+    request: ScenarioPlanningRequest,
+    plan: ScenarioExecutionPlan,
+  ) => void;
+  onPlanInvalidated?: () => void;
 }
 
 export interface ScenarioPlanPreviewController {
@@ -137,6 +142,7 @@ export function createScenarioPlanPreviewController(
   let revision = 0;
   let loading = false;
   const clearOutput = (message?: string): void => {
+    options.onPlanInvalidated?.();
     revision += 1;
     output.replaceChildren(createStatus(
       message ??
@@ -179,6 +185,7 @@ export function createScenarioPlanPreviewController(
     }
     revision += 1;
     loading = false;
+    options.onPlanInvalidated?.();
     scenarioSelect.value = String(matches[0]!.index);
     rebuildControls();
     setLoading(form, submit, false);
@@ -204,6 +211,7 @@ export function createScenarioPlanPreviewController(
       return;
     }
     const submittedRevision = revision;
+    options.onPlanInvalidated?.();
     setLoading(form, submit, true);
     loading = true;
     output.replaceChildren(createStatus(
@@ -214,6 +222,9 @@ export function createScenarioPlanPreviewController(
         return;
       }
       const failure = validatePlanForDisplay(plan, manifest);
+      if (failure === undefined) {
+        options.onPlanAccepted?.(request, plan);
+      }
       output.replaceChildren(
         failure
           ? createStatus(failureMessage(failure), "error")

@@ -2826,6 +2826,84 @@ describe("After Party authentication UI", () => {
     expect(panel.textContent).not.toContain(receipt.claims[0]!.id);
   });
 
+  it("projects one accepted help-desk plan and receipt into a control-free learner briefing", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.compileScenarioPlan.mockImplementation(async (_token, request) =>
+      compileScenarioExecutionPlan(request)
+    );
+    const receipt = CANONICAL_RECEIPT_FIXTURES.find(({ receipt }) =>
+      receipt.scenario.id === "help-desk-email-observation"
+    )!.receipt;
+    api.verifyScenarioEvidenceReceipt.mockResolvedValue(
+      verifyCanonicalScenarioEvidenceReceipt(receipt),
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    const preview = root.querySelector<HTMLElement>(
+      ".scenario-plan-preview",
+    )!;
+    const scenario = preview.querySelector<HTMLSelectElement>(
+      "select[name='scenario']",
+    )!;
+    scenario.value = "1";
+    scenario.dispatchEvent(new Event("change", { bubbles: true }));
+    const learnerAlias = preview.querySelector<HTMLInputElement>(
+      "input[name='alias-learner']",
+    )!;
+    learnerAlias.value = "learner-cory";
+    learnerAlias.dispatchEvent(new Event("input", { bubbles: true }));
+    const response = preview.querySelector<HTMLSelectElement>(
+      "select[name='selectedResponse']",
+    )!;
+    response.value = "0";
+    response.dispatchEvent(new Event("change", { bubbles: true }));
+    preview.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+    expect(preview.textContent).toContain("Deterministic preview");
+
+    const verification = root.querySelector<HTMLElement>(
+      ".scenario-evidence-verification",
+    )!;
+    const input = verification.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify(receipt);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    verification.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+    verification.querySelector<HTMLButtonElement>(
+      ".scenario-evidence-verification-result button",
+    )!.click();
+
+    const briefing = root.querySelector<HTMLElement>(
+      ".learner-evidence-briefing-route",
+    )!;
+    expect(briefing).not.toBeNull();
+    expect(briefing.textContent).toContain("Outlook email");
+    expect(briefing.textContent).toContain("Evidence producerAP2 orchestrator");
+    expect(briefing.textContent).toContain(
+      "LearnerLearner using Cory's mailbox",
+    );
+    expect(briefing.textContent).toContain(
+      "canonical:proven-capabilities/help-desk-email",
+    );
+    expect(root.querySelector(".auth-panel")).toBeNull();
+    expect(root.querySelectorAll(
+      "button, form, input, textarea, select, [data-action]",
+    )).toHaveLength(0);
+    expect(briefing.textContent).not.toContain(receipt.claims[0]!.id);
+    expect(api.compileScenarioPlan).toHaveBeenCalledOnce();
+    expect(api.verifyScenarioEvidenceReceipt).toHaveBeenCalledOnce();
+
+    await app.start();
+    expect(root.querySelector(".learner-evidence-briefing-route")).toBeNull();
+    expect(root.querySelector(".auth-panel")).not.toBeNull();
+  });
+
   it("refuses unsafe receipt text before acquiring operator authorization", async () => {
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",

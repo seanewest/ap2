@@ -2939,7 +2939,7 @@ export function isSafeScenarioPlanningRequest(
   );
 }
 
-function isSafeScenarioExecutionPlan(
+export function isSafeScenarioExecutionPlan(
   value: unknown,
   request: ScenarioPlanningRequest,
 ): value is ScenarioExecutionPlan {

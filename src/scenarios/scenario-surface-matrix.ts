@@ -33,6 +33,10 @@ const MATRIX_COLUMNS = [
     label: "Manual panel",
     surfaces: ["manual-rehearsal-verification-panel"],
   },
+  {
+    label: "Learner briefing",
+    surfaces: ["learner-evidence-ui"],
+  },
 ] as const satisfies readonly {
   label: string;
   surfaces: readonly ScenarioInventorySurface[];

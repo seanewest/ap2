@@ -951,7 +951,7 @@ test("renders the authoritative scenario surface matrix without network activity
   await expect(matrix).toBeVisible();
   await expect(matrix.getByRole("table")).toHaveCount(1);
   await expect(matrix.getByRole("row")).toHaveCount(6);
-  await expect(matrix.getByRole("columnheader")).toHaveCount(7);
+  await expect(matrix.getByRole("columnheader")).toHaveCount(8);
   await expect(matrix.getByRole("rowheader")).toHaveCount(5);
   await expect(matrix.getByText(
     /product-source surface availability only/,
@@ -977,6 +977,7 @@ test("renders the authoritative scenario surface matrix without network activity
         "offline-rehearsal-verifier",
         "authenticated-rehearsal-verification-api-client",
         "manual-rehearsal-verification-panel",
+        "learner-evidence-ui",
       ] as const
     ) {
       const expected = row.surfaces[surface].status === "implemented"
@@ -1537,6 +1538,77 @@ test("manually verifies one sanitized receipt through the signed local product p
   await expect(result).toHaveCount(0);
   await expect(panel.getByText("Input changed")).toBeVisible();
   expect(verificationRequests).toBe(1);
+});
+
+test("opens one signed-operator prepared learner briefing without producer controls or another request", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-07-29T07:00:00Z"));
+  await configureOperator(page, accessToken);
+  const apiPaths: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith("/api/")) {
+      apiPaths.push(path);
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+
+  await page.getByRole("button", {
+    name: "Use Kobe help-desk email for Cory in plan preview",
+  }).click();
+  const preview = page.getByRole("region", {
+    name: "Scenario plan preview",
+  });
+  await preview.locator("input[name='alias-learner']").fill("learner-cory");
+  await preview.getByLabel("Optional response").selectOption("0");
+  await preview.getByRole("button", { name: "Preview plan" }).click();
+  await expect(preview.getByText("Deterministic preview")).toBeVisible();
+
+  const receipt = CANONICAL_RECEIPT_FIXTURES.find(({ receipt }) =>
+    receipt.scenario.id === "help-desk-email-observation"
+  )!.receipt;
+  const verification = page.getByRole("region", {
+    name: "Receipt verification",
+  });
+  await verification.getByLabel("Sanitized receipt JSON").fill(
+    JSON.stringify(receipt),
+  );
+  await verification.getByRole("button", { name: "Verify receipt" }).click();
+  await expect(
+    verification.getByText("Normalized verification result"),
+  ).toBeVisible();
+  const requestsBeforeOpen = [...apiPaths];
+  await verification.getByRole("button", {
+    name: "Open learner evidence briefing",
+  }).click();
+
+  const briefing = page.getByRole("main", {
+    name: "Kobe help-desk email for Cory",
+  });
+  await expect(briefing).toBeVisible();
+  await expect(briefing).toContainText("Evidence typeOutlook email");
+  await expect(briefing).toContainText("Evidence producerAP2 orchestrator");
+  await expect(briefing).toContainText(
+    "LearnerLearner using Cory's mailbox",
+  );
+  await expect(briefing).toContainText(
+    "canonical:proven-capabilities/help-desk-email",
+  );
+  await expect(briefing.locator(
+    "button, form, input, textarea, select, [data-action]",
+  )).toHaveCount(0);
+  await expect(page.locator(".auth-panel")).toHaveCount(0);
+  await expect(briefing).not.toContainText(receipt.claims[0]!.id);
+  expect(apiPaths).toEqual(requestsBeforeOpen);
+  expect(apiPaths.filter((path) => path === "/api/scenario-plan")).toHaveLength(
+    1,
+  );
+  expect(
+    apiPaths.filter((path) =>
+      path === "/api/scenario-evidence-verification"
+    ),
+  ).toHaveLength(1);
 });
 
 test("refuses unsafe or malformed receipt input locally without authorization", async ({
