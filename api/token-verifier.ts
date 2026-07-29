@@ -4,6 +4,8 @@ import {
   type JWTVerifyGetKey,
 } from "jose";
 
+export const API_JWKS_TIMEOUT_MS = 5_000;
+
 export interface TokenVerifier {
   verify(token: string): Promise<Readonly<Record<string, unknown>>>;
 }
@@ -65,7 +67,9 @@ export function createRemoteTokenVerifier(
   return new JoseTokenVerifier({
     issuer: config.issuer,
     audience: config.audience,
-    keyResolver: createRemoteJWKSet(jwksUrl),
+    keyResolver: createRemoteJWKSet(jwksUrl, {
+      timeoutDuration: API_JWKS_TIMEOUT_MS,
+    }),
     now: config.now,
   });
 }

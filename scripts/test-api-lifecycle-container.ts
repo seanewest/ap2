@@ -19,6 +19,7 @@ const KEY_ID = "api-lifecycle-key";
 const image = `ap2-api-lifecycle-test:${process.pid}`;
 const primaryContainer = `ap2-api-lifecycle-term-${process.pid}`;
 const interruptContainer = `ap2-api-lifecycle-int-${process.pid}`;
+const forcedContainer = `ap2-api-lifecycle-forced-${process.pid}`;
 const failedContainer = `ap2-api-lifecycle-failed-${process.pid}`;
 const listenerFailedContainer =
   `ap2-api-lifecycle-listener-failed-${process.pid}`;
@@ -211,10 +212,60 @@ async function main(): Promise<void> {
       throw new Error(`SIGINT shutdown was not clean (exit ${interruptExit})`);
     }
     runPodman(["rm", interruptContainer]);
+
+    const forcedPort = await reservePort();
+    startConfiguredContainer(forcedContainer, forcedPort, jwksPort);
+    await waitForHealthy(forcedContainer, forcedPort);
+    const forcedSocket = connect(forcedPort, "127.0.0.1");
+    await withTimeout(
+      new Promise<void>((resolve, reject) => {
+        forcedSocket.once("connect", resolve);
+        forcedSocket.once("error", reject);
+      }),
+      5_000,
+      "The forced-shutdown request could not connect",
+    ).catch((error: unknown) => {
+      forcedSocket.destroy();
+      throw error;
+    });
+    forcedSocket.removeAllListeners("error");
+    forcedSocket.on("error", () => undefined);
+    forcedSocket.write([
+      "POST /api/scenario-plan HTTP/1.1",
+      `Host: 127.0.0.1:${forcedPort}`,
+      `Authorization: Bearer ${token}`,
+      "Content-Type: application/json",
+      "Content-Length: 16",
+      "Connection: close",
+      "",
+      "{",
+    ].join("\r\n"));
+    await delay(500);
+    const forcedStartedAt = performance.now();
+    runPodman(["kill", "--signal", "TERM", forcedContainer]);
+    const forcedExit = waitForContainer(forcedContainer);
+    timings.forcedExitMs = elapsed(forcedStartedAt);
+    forcedSocket.destroy();
+    const forcedLogs = containerLogs(forcedContainer);
+    if (
+      forcedExit === 0 ||
+      timings.forcedExitMs < 9_000 ||
+      timings.forcedExitMs > 12_000 ||
+      !hasLifecycleEvent(forcedLogs, {
+        state: "forced-exit",
+        reason: "drain-timeout",
+      })
+    ) {
+      throw new Error(
+        `Held request did not reach the forced shutdown boundary (exit ${forcedExit})`,
+      );
+    }
+    runPodman(["rm", forcedContainer]);
   } finally {
     for (const name of [
       primaryContainer,
       interruptContainer,
+      forcedContainer,
       failedContainer,
       listenerFailedContainer,
     ]) {
@@ -229,6 +280,7 @@ async function main(): Promise<void> {
   for (const name of [
     primaryContainer,
     interruptContainer,
+    forcedContainer,
     failedContainer,
     listenerFailedContainer,
   ]) {

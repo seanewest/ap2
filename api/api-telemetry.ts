@@ -9,12 +9,14 @@ import type {
 export const API_REQUEST_TELEMETRY_SCHEMA_VERSION = 1;
 export const API_REQUEST_CORRELATION_PATTERN = /^r1_[0-9a-f]{24}$/;
 export const MAX_API_REQUEST_DURATION_MS = 60_000;
+export const API_CONNECTION_CLOSED_STATUS = 499;
 
 export type ApiRequestOutcome =
   | "completed"
   | "refused"
   | "failed"
-  | "shutdown-refused";
+  | "shutdown-refused"
+  | "connection-closed";
 
 export interface ApiRequestTelemetryEvent {
   schemaVersion: typeof API_REQUEST_TELEMETRY_SCHEMA_VERSION;
@@ -63,8 +65,11 @@ export class StructuredConsoleApiRequestTelemetry
     const correlationId = safeCorrelation(this.#correlation);
     if (!correlationId) return;
     const startedAt = safeNow(this.#clock);
-    response.once("finish", () => {
-      const status = safeStatus(response.statusCode);
+    let emitted = false;
+    const emit = (status: number, outcome?: ApiRequestOutcome): void => {
+      if (emitted) return;
+      emitted = true;
+      const safeTerminalStatus = safeStatus(status);
       const event: ApiRequestTelemetryEvent = Object.freeze({
         schemaVersion: API_REQUEST_TELEMETRY_SCHEMA_VERSION,
         event: "api_request",
@@ -72,8 +77,8 @@ export class StructuredConsoleApiRequestTelemetry
         routeOwner: contract?.ownerKey ?? "unmatched",
         sideEffect: contract?.sideEffect ?? "unmatched",
         authorization: contract?.authorization ?? "unmatched",
-        status,
-        outcome: requestOutcome(status, shuttingDown),
+        status: safeTerminalStatus,
+        outcome: outcome ?? requestOutcome(safeTerminalStatus, shuttingDown),
         durationMs: elapsed(startedAt, safeNow(this.#clock)),
       });
       try {
@@ -81,6 +86,12 @@ export class StructuredConsoleApiRequestTelemetry
       } catch {
         // Request telemetry is observational and never changes API behavior.
       }
+    };
+    response.once("finish", () => {
+      emit(response.statusCode);
+    });
+    response.once("close", () => {
+      emit(API_CONNECTION_CLOSED_STATUS, "connection-closed");
     });
   }
 }
