@@ -6,10 +6,10 @@ bounded direct canary against the Student tenant. Unit tests, deployment alone,
 and code that has not touched Microsoft are not counted as live proof.
 
 A capability rehearsal or environment-validation canary proves a platform
-contract. It is not automatically a learner scenario. Source-backed learner
-scenarios additionally name the evidence producer, workload actor,
-learner/observer, and optional responder, and explain what evidence the learner
-receives.
+contract. It is not automatically a learner lab. Source-backed capability
+manifests additionally preserve the evidence producer, workload actor,
+learner/observer, and optional responder needed for safe orchestration. Those
+internal roles do not by themselves create a learner story.
 
 Actor shorthand:
 
@@ -76,16 +76,16 @@ production-shaped local SPA, rootless API container, operator CBA, and Cory
 CBA before their hosted proofs. Those runs corroborate the same product paths;
 they are not additional tenant capabilities.
 
-## Attack-inspired scenarios
+## Source-backed capability building blocks
 
-The validated source-backed registry contains exactly the scenarios listed
-below. This table is checked against the canonical manifest registry rather
-than maintained as a separate scenario list. Scenario cards are plans and
-perform no tenant operation merely by rendering. The learner-evidence column
-describes the manifest contract and its current boundary; it does not claim
-that a learner completed the scenario:
+The validated source-backed registry contains exactly the capability building
+blocks listed below. This table is checked against the canonical manifest
+registry rather than maintained as a separate list. Each entry is an atomic
+ingredient, not a learner lab. Cards perform no tenant operation merely by
+rendering. The learner-evidence column describes the capability contract and
+its current boundary; it does not claim that a learner completed a lab:
 
-| Scenario | Evidence producer / orchestrator | Workload actor | Learner / observer | Responder | Learner receives |
+| Capability building block | Evidence producer / orchestrator | Workload actor | Learner / observer | Responder | Learner receives |
 | --- | --- | --- | --- | --- | --- |
 | Controlled Teams missed-call observation | AP2 instructor, who owns the one-attempt staging boundary | Kobe lab user through a separate licensed Teams client session | Learner using Cory's lab Teams view | None; observation only | One `Missed incoming` call entry and one matching Teams activity item to correlate without returning the call |
 | Application reconnaissance and audit observation | AP2 reconnaissance lab harness, which owns the bounded window | Dev diagnostic app through an application-only Graph session | Security learner receiving sanitized output | None; observation only | Counts and reachability for four fixed reads plus a successful service-principal sign-in summary collected through a distinct audit observer application |

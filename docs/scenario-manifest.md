@@ -1,9 +1,13 @@
-# Scenario manifest contract
+# Capability orchestration manifest
 
-The scenario manifest is the runtime-validated boundary between a scenario
-author and the AP2 orchestrator/learner UI. It is a plan and evidence contract,
+The schema-v2 scenario manifest is the runtime-validated orchestration
+boundary for one reusable capability building block. It is not a complete
+learner lab. It is a plan and evidence contract,
 not proof that setup ran. Microsoft API acceptance, resource readiness, and a
-planned learner task cannot be presented as learner evidence.
+planned learner task cannot be presented as learner evidence. The separate
+[learner-lab product model](product-model.md) requires a coherent story and a
+connected evidence chain across at least two building blocks before anything
+is published as a lab.
 
 `parseScenarioManifest` accepts only schema version 2 and validates these
 bounded sections:
@@ -101,33 +105,26 @@ contract to produce a deterministic sanitized readiness plan. The planner is
 not an executor and its output is not evidence that any external operation
 occurred.
 
-## Authenticated read-only catalog
+## Authenticated catalogs
 
-The signed-in operator shell renders `SCENARIO_MANIFESTS` through a compact
-Scenario catalog. Each entry is revalidated with `parseScenarioManifest` at
-render time; validation failure produces one fixed safe error and no scenario
-details. The catalog has no network fetch, loading loop, persistence, polling,
-or execution control.
+The signed-in shell first renders the separate Lab catalog. Its published
+registry is intentionally empty, and its runtime validator prevents an
+incomplete learning contract from appearing as a lab.
 
-Cards use only validated labels and summaries for purpose, actor-role
-separation, producer operation, artifact authenticity and visibility, learner
-task and interpretation, optional response, prerequisites and human
-gates, setup/cleanup/retention, expiry, cost ceiling, and current
-limitations. Canonical IDs, operation keys, markers, proof references, and raw
-payloads are not rendered.
+The shell then renders `SCENARIO_MANIFESTS` through a compact Capability
+building-block catalog. Each entry is revalidated with
+`parseScenarioManifest` at render time; validation failure produces one fixed
+safe error and no partial details. Cards translate the contract into
+learner-facing evidence, story-account, and proof-boundary language. Internal
+producer/workload roles, trigger, authentication, response ownership,
+retention, cleanup, expiry, and cost remain in the orchestration contract and
+are not rendered as learner content. The catalog has no network fetch, loading
+loop, persistence, polling, planning handoff, or execution control. Canonical
+IDs, operation keys, markers, proof references, and raw payloads are not
+rendered.
 
-Each card can populate the existing plan-preview form with that exact
-in-memory canonical scenario and schema version. This is a local navigation
-action only: it resets the form to registry-derived aliases, budget, expiry,
-and response choices, clears any stale result, and moves focus to the scenario
-selector. It does not authenticate, call the planning API, or perform work.
-Only the separate `Preview plan` action may make one planning request.
-
-The separate Purview audit capability is labeled as a read-only boundary, not
-invented as an additional registry scenario or treated as an execution receipt.
-Application reconnaissance retains its narrower registry claim: the workload
-and observer are distinct, while one sign-in or audit record does not prove
-every workload read.
+The separate plan-preview panel remains an operator orchestration tool. Only
+its explicit `Preview plan` action may make one planning request.
 
 Role separation compares actor IDs, never display labels, actor kinds, or
 authentication transport names. Those fields describe the contract but cannot

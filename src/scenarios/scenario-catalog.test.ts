@@ -1,100 +1,93 @@
 import { describe, expect, it } from "vitest";
-import {
-  createScenarioCatalog,
-  type ScenarioCatalogOptions,
-} from "./scenario-catalog";
+import { createScenarioCatalog } from "./scenario-catalog";
 import { SCENARIO_MANIFESTS } from "./scenarios";
 
 function render(
   registry: readonly unknown[] = SCENARIO_MANIFESTS,
-  options: ScenarioCatalogOptions = {},
 ): HTMLElement {
-  const catalog = createScenarioCatalog(registry, options);
+  const catalog = createScenarioCatalog(registry);
   document.body.replaceChildren(catalog);
   return catalog;
 }
 
-describe("Scenario catalog", () => {
-  it("renders one compact card per canonical validated scenario", () => {
+describe("Capability building-block catalog", () => {
+  it("labels every validated entry as an ingredient rather than a lab", () => {
     const catalog = render();
     const cards = [...catalog.querySelectorAll<HTMLElement>(
-      ".scenario-catalog-card",
+      ".capability-catalog-card",
     )];
-    expect(cards).toHaveLength(SCENARIO_MANIFESTS.length);
-    expect(cards.map((card) => card.querySelector("h3")?.textContent)).toEqual(
-      SCENARIO_MANIFESTS.map(({ title }) => title),
+    expect(catalog.querySelector("h2")?.textContent).toBe(
+      "Capability building blocks",
     );
-    expect(cards.map((card) =>
-      card.querySelector(".scenario-catalog-purpose")?.textContent
-    )).toEqual(SCENARIO_MANIFESTS.map(({ summary }) => summary));
+    expect(catalog.textContent).toContain(
+      "tested ingredients that can contribute evidence to a future lab",
+    );
+    expect(cards).toHaveLength(SCENARIO_MANIFESTS.length);
+    for (const card of cards) {
+      expect(card.textContent).toContain(
+        "Capability building block — not a lab",
+      );
+      expect(card.textContent).toContain("Why this is not a lab");
+    }
   });
 
-  it("shows fixed role, evidence, learner, lifecycle, cost, and limitation labels", () => {
+  it("renders only plain learner, story-account, evidence, and proof-boundary fields", () => {
     const catalog = render();
-    const card = scenarioCard(
+    const teams = capabilityCard(
       catalog,
-      "Application reconnaissance and audit observation",
+      "Controlled Teams missed-call observation",
     );
-    card.querySelector("details")!.open = true;
-
-    const labels = [...card.querySelectorAll("dt")].map(
+    teams.querySelector("details")!.open = true;
+    const labels = [...teams.querySelectorAll("dt")].map(
       ({ textContent }) => textContent,
     );
-    for (const label of [
-      "Evidence producer",
-      "Workload actor",
-      "Learner",
-      "Detector",
-      "Responder",
-      "Producer operation",
-      "Learner observes",
-      "Task",
-      "Expected interpretation",
-      "Trigger",
-      "Setup",
-      "Human-only gates",
-      "Prerequisites",
-      "Expires",
-      "Cleanup owner",
-      "Cleanup boundary",
-      "Retention",
-      "Maximum cost",
-    ]) {
-      expect(labels).toContain(label);
-    }
-    expect(card.textContent).toContain(
-      "Reconnaissance workload application",
+    expect(labels).toEqual([
+      "Human learner",
+      "Evidence recipient or workspace",
+      "Simulated story accounts",
+      "Learner-facing evidence",
+      "Evidence type",
+      "Current proof boundary",
+    ]);
+    expect(teams.textContent).toContain(
+      "fictional identities in the story, not the human learner",
     );
-    expect(card.textContent).toContain(
-      "Independent audit observer application",
+    expect(teams.textContent).toContain(
+      "Not defined by this atomic building block",
     );
-    expect(card.textContent).toContain("Platform Control Plane");
-    expect(card.textContent).toContain(
-      "one sign-in summary does not prove every individual Graph read",
+    expect(teams.textContent).toContain(
+      "complete story, a connected multi-signal evidence chain",
+    );
+    expect(teams.textContent).not.toMatch(
+      /workload actor|evidence producer|trigger|retention|cleanup|responder|operation key|authentication|maximum cost|expires/i,
     );
   });
 
-  it("renders help desk, AVD, Teams, application recon, and Purview boundaries honestly", () => {
+  it("does not upgrade platform readiness or an observed artifact into a complete lab", () => {
     const catalog = render();
-    for (const title of [
-      "Kobe help-desk email for Cory",
-      "Private three-VM AVD lab substrate",
-      "Controlled Teams missed-call observation",
-      "Application reconnaissance and audit observation",
-      "Purview audit boundary",
-    ]) {
-      expect(catalog.textContent).toContain(title);
-    }
-    expect(catalog.textContent).toContain(
-      "not a catalog scenario or execution receipt",
+    const avd = capabilityCard(
+      catalog,
+      "Private three-VM AVD substrate",
     );
-    const avd = scenarioCard(catalog, "Private three-VM AVD lab substrate");
+    avd.querySelector("details")!.open = true;
     expect(avd.textContent).toContain(
-      "this canary did not prove a learner session or completed task",
+      "A learner-facing view is not proven for every artifact",
+    );
+
+    const teams = capabilityCard(
+      catalog,
+      "Controlled Teams missed-call observation",
+    );
+    teams.querySelector("details")!.open = true;
+    expect(teams.textContent).toContain(
+      "A learner-facing view has been observed for this atomic capability",
+    );
+    expect(teams.textContent).toContain(
+      "still does not prove a complete lab",
     );
   });
 
-  it("never renders canonical IDs, markers, proof references, or mutation controls", () => {
+  it("never renders orchestration identifiers, markers, references, or controls", () => {
     const catalog = render();
     for (const manifest of SCENARIO_MANIFESTS) {
       expect(catalog.outerHTML).not.toContain(manifest.id);
@@ -115,7 +108,7 @@ describe("Scenario catalog", () => {
       "button, a, form, input, select, textarea, [data-action]",
     )).toHaveLength(0);
     expect(catalog.textContent).not.toMatch(
-      /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i,
+      /marker|journal|protected|control-plane|proof reference|operation key/i,
     );
     expect(
       [...catalog.querySelectorAll("summary")].map(({ textContent }) =>
@@ -124,63 +117,36 @@ describe("Scenario catalog", () => {
     ).toEqual(
       Array.from(
         { length: SCENARIO_MANIFESTS.length },
-        () => "View catalog details",
+        () => "See building-block details",
       ),
     );
   });
 
-  it("offers one explicit local preview handoff without rendering identifiers", () => {
-    const selections: unknown[] = [];
-    const catalog = render(SCENARIO_MANIFESTS, {
-      onPlanPreview: (selection) => selections.push(selection),
-    });
-    const actions = [...catalog.querySelectorAll<HTMLButtonElement>(
-      ".scenario-catalog-plan-link",
-    )];
-    expect(actions).toHaveLength(SCENARIO_MANIFESTS.length);
-    expect(actions.map(({ textContent }) => textContent)).toEqual(
-      SCENARIO_MANIFESTS.map(() => "Use in plan preview"),
-    );
-    expect(actions.map((action) => action.getAttribute("aria-label"))).toEqual(
-      SCENARIO_MANIFESTS.map(({ title }) =>
-        `Use ${title} in plan preview`
-      ),
-    );
-    actions[2]!.click();
-    expect(selections).toEqual([{
-      scenarioId: SCENARIO_MANIFESTS[2].id,
-      schemaVersion: SCENARIO_MANIFESTS[2].schemaVersion,
-    }]);
-    expect(catalog.outerHTML).not.toContain(SCENARIO_MANIFESTS[2].id);
-    expect(catalog.querySelector("form, input, select, textarea, [data-action]"))
-      .toBeNull();
-  });
-
-  it("fails closed without leaking validation details", () => {
+  it("fails closed without leaking invalid registry details", () => {
     const catalog = render([{
       schemaVersion: 2,
       title: "raw invalid title",
       marker: "raw-private-marker",
     }]);
     expect(catalog.textContent).toContain(
-      "Scenario catalog unavailable: canonical registry validation failed.",
+      "Capability catalog unavailable",
     );
     expect(catalog.textContent).not.toContain("raw invalid title");
     expect(catalog.textContent).not.toContain("raw-private-marker");
-    expect(catalog.querySelectorAll(".scenario-catalog-card")).toHaveLength(0);
-    expect(catalog.querySelectorAll("details")).toHaveLength(0);
-    expect(catalog.querySelectorAll("button")).toHaveLength(0);
+    expect(catalog.querySelectorAll(".capability-catalog-card")).toHaveLength(
+      0,
+    );
   });
 });
 
-function scenarioCard(catalog: HTMLElement, title: string): HTMLElement {
+function capabilityCard(catalog: HTMLElement, title: string): HTMLElement {
   const card = [...catalog.querySelectorAll<HTMLElement>(
-    ".scenario-catalog-card",
+    ".capability-catalog-card",
   )].find((candidate) =>
     candidate.querySelector("h3")?.textContent === title
   );
   if (!card) {
-    throw new Error(`Scenario card '${title}' is missing.`);
+    throw new Error(`Capability card '${title}' is missing.`);
   }
   return card;
 }

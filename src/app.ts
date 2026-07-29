@@ -89,6 +89,10 @@ import {
 import { createPanelBoundary } from "./ui/panel-boundary";
 import { createScenarioCatalog } from "./scenarios/scenario-catalog";
 import {
+  createLabCatalog,
+  LEARNER_LAB_CATALOG,
+} from "./labs/lab-catalog";
+import {
   createScenarioSurfaceMatrix,
 } from "./scenarios/scenario-surface-matrix";
 import {
@@ -1281,6 +1285,23 @@ function createStatePanel(
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
+        createPanelBoundary(
+          "Lab catalog",
+          () =>
+            createLabCatalog(LEARNER_LAB_CATALOG, {
+              knownCapabilityIds: new Set(
+                SCENARIO_MANIFESTS.map(({ id }) => id),
+              ),
+            }),
+        ),
+        createPanelBoundary(
+          "Capability building blocks",
+          () => createScenarioCatalog(SCENARIO_MANIFESTS),
+        ),
+        createStatus(
+          "The remaining panels are operator and orchestration tools. They validate, plan, rehearse, or inspect capabilities; they are not learner labs.",
+          "notice",
+        ),
         createApiAccessPanel(state.apiAccess, apiOperationLoading),
         createPanelBoundary(
           "Recent operations",
@@ -1417,33 +1438,17 @@ function createScenarioPlanningFlow(
   ) => void,
   onPlanInvalidated?: () => void,
 ): HTMLElement[] {
-  let preview: ReturnType<
-    typeof createScenarioPlanPreviewController
-  > | undefined;
   const previewElement = createPanelBoundary(
     "Scenario plan preview",
-    () => {
-      preview = createScenarioPlanPreviewController({
+    () =>
+      createScenarioPlanPreviewController({
         registry: SCENARIO_MANIFESTS,
         client,
         onPlanAccepted,
         onPlanInvalidated,
-      });
-      return preview.element;
-    },
+      }).element,
   );
-  const catalog = createPanelBoundary(
-    "Scenario catalog",
-    () =>
-      createScenarioCatalog(SCENARIO_MANIFESTS, {
-        onPlanPreview: preview
-          ? (selection) => {
-            preview?.selectScenario(selection);
-          }
-          : undefined,
-      }),
-  );
-  return [catalog, previewElement];
+  return [previewElement];
 }
 
 function classifyScenarioPlanPreviewFailure(

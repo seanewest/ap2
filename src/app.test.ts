@@ -58,7 +58,6 @@ import {
 import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
 import { CANONICAL_RECEIPT_FIXTURES } from "./scenarios/scenario-evidence-receipt.fixtures";
 import { verifyCanonicalScenarioEvidenceReceipt } from "./scenarios/scenario-evidence-verification";
-import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
 import {
   canonicalAvdThreeVmRehearsalOutput,
   verifyAvdThreeVmRehearsalOutput,
@@ -363,26 +362,22 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain(
       "Controlled Teams missed-call observation",
     );
-    expect(root.textContent).toContain("Evidence producerAP2 instructor");
-    expect(root.textContent).toContain("Workload actorKobe lab user");
     expect(root.textContent).toContain(
-      "LearnerLearner using Cory's lab Teams view",
+      "Capability building block — not a lab",
     );
     expect(root.textContent).toContain(
-      "Learner observesOne Missed incoming call entry",
+      "No complete labs are published yet",
     );
     expect(root.textContent).toContain(
-      "Application reconnaissance and audit observation",
+      "Human learnerNot defined by this atomic building block",
     );
     expect(root.textContent).toContain(
-      "Workload actorReconnaissance workload application",
+      "Evidence recipient or workspaceLearner using Cory's lab Teams view",
     );
-    expect(root.textContent).toContain(
-      "DetectorIndependent audit observer application",
-    );
-    expect(root.textContent).toContain(
-      "Authentication — Independent audit observer application" +
-        "Application Only. A separate application-only session with bounded audit-read authority",
+    expect(
+      root.querySelector(".capability-catalog")?.textContent,
+    ).not.toMatch(
+      /Workload actor|Evidence producer|Cleanup owner|Cleanup boundary|Retention|Trigger/,
     );
   });
 
@@ -1833,24 +1828,26 @@ describe("After Party authentication UI", () => {
 
     expect(root.textContent).toContain("Recent operations unavailable");
     expect(root.textContent).toContain("Other operator panels remain available");
-    expect(root.textContent).toContain("Scenario catalog");
+    expect(root.textContent).toContain("Lab catalog");
+    expect(root.textContent).toContain("Capability building blocks");
     expect(root.textContent).toContain("Scenario plan preview");
     expect(root.textContent).toContain("Sign out");
     expect(root.textContent).not.toContain("temporary-token");
   });
 
-  it("does not expose the scenario catalog outside the signed-in shell", async () => {
+  it("does not expose learner or capability catalogs outside the signed-in shell", async () => {
     authentication.initialize.mockResolvedValue({ kind: "signed-out" });
     const app = createAfterPartyApp(root, authentication, api);
     await app.start();
 
     expect(root.textContent).toContain("You are signed out");
+    expect(root.querySelector(".lab-catalog")).toBeNull();
     expect(root.querySelector(".scenario-catalog")).toBeNull();
     expect(root.querySelector(".scenario-plan-preview")).toBeNull();
     expect(root.querySelector(".scenario-evidence-verification")).toBeNull();
   });
 
-  it("moves a catalog scenario into bounded local preview inputs without authentication or API calls", async () => {
+  it("keeps learner-facing catalogs read-only and the operator preview separate", async () => {
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",
       account,
@@ -1858,34 +1855,27 @@ describe("After Party authentication UI", () => {
     });
     await createAfterPartyApp(root, authentication, api).start();
 
-    const manifest = SCENARIO_MANIFESTS[2];
-    const action = [...root.querySelectorAll<HTMLButtonElement>(
-      ".scenario-catalog-plan-link",
-    )][2]!;
-    action.click();
-
+    const labCatalog = root.querySelector<HTMLElement>(".lab-catalog")!;
+    const capabilityCatalog = root.querySelector<HTMLElement>(
+      ".capability-catalog",
+    )!;
     const preview = root.querySelector<HTMLElement>(
       ".scenario-plan-preview",
     )!;
-    const scenario = preview.querySelector<HTMLSelectElement>(
-      "select[name='scenario']",
-    )!;
-    expect(scenario.value).toBe("2");
-    expect(document.activeElement).toBe(scenario);
-    expect(preview.textContent).toContain(
-      `Selected ${manifest.title}, registry version ${manifest.schemaVersion}`,
-    );
+    expect(labCatalog.querySelectorAll(
+      "button, a, form, input, select, textarea, [data-action]",
+    )).toHaveLength(0);
+    expect(capabilityCatalog.querySelectorAll(
+      "button, a, form, input, select, textarea, [data-action]",
+    )).toHaveLength(0);
     expect(
-      preview.querySelector<HTMLInputElement>(
-        "input[name='maximumBudgetUsd']",
-      )!.value,
-    ).toBe(String(manifest.cost.laneMaximum));
-    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
-    expect(api.compileScenarioPlan).not.toHaveBeenCalled();
-
-    action.click();
-    expect(scenario.value).toBe("2");
-    expect(document.activeElement).toBe(scenario);
+      labCatalog.compareDocumentPosition(capabilityCatalog) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+    expect(
+      capabilityCatalog.compareDocumentPosition(preview) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
     expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
     expect(api.compileScenarioPlan).not.toHaveBeenCalled();
   });

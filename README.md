@@ -4,11 +4,16 @@ AP2 is a TypeScript SPA and API used to explore bounded Microsoft 365 and Azure
 lab operations. Operators sign in through the multitenant `After Party
 Exploratory` application, then explicitly trigger fixed rehearsal actions.
 
+The product distinguishes reusable
+[capability building blocks from complete learner labs](docs/product-model.md).
+No complete labs are currently published.
+
 ## Architecture
 
 See:
 
 - [Product direction and Pass 3 charter](docs/product-direction.md)
+- [Capabilities and learner labs](docs/product-model.md)
 - [Identities](docs/identities.md)
 - [Proven capabilities](docs/proven-capabilities.md)
 - [Pass 3 development workflow](docs/development-workflow.md)
