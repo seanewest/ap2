@@ -50,6 +50,13 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- Bounded operation telemetry now has a pure fail-closed bridge to candidate
+  post-run receipt operation rows. It preserves completed, refused, ambiguous,
+  reconciled, unresolved, and uninspected lifecycle strength while always
+  leaving artifact, detector, learner, response, cleanup, retention, and
+  terminal proof to separate observations. No API, UI, persistence, or
+  external execution is included. See
+  [the telemetry receipt adapter](docs/operation-telemetry-receipt-adapter.md).
 - Post-run scenario truth now has a runtime-validated sanitized receipt
   contract over the generalized manifest. It requires exact role bindings and
   terminal categorical rows for operations, artifacts, independent
