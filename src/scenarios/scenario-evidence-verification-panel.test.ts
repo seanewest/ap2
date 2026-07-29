@@ -203,6 +203,9 @@ describe("Scenario evidence verification panel", () => {
     expect(panel.querySelector<HTMLButtonElement>("button")!.disabled).toBe(
       true,
     );
+    expect(panel.querySelector("form")?.getAttribute("aria-busy")).toBe(
+      "true",
+    );
 
     input(panel).value += " ";
     input(panel).dispatchEvent(new Event("input", { bubbles: true }));
@@ -214,6 +217,9 @@ describe("Scenario evidence verification panel", () => {
     expect(panel.textContent).not.toContain("Normalized verification result");
     expect(panel.querySelector<HTMLButtonElement>("button")!.disabled).toBe(
       false,
+    );
+    expect(panel.querySelector("form")?.getAttribute("aria-busy")).toBe(
+      "false",
     );
   });
 

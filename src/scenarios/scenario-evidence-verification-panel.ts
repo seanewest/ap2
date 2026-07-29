@@ -140,6 +140,7 @@ export function createScenarioEvidenceVerificationPanel(
     const submittedRevision = revision;
     loading = true;
     submit.disabled = true;
+    form.setAttribute("aria-busy", "true");
     show(createStatus("Verifying the sanitized receipt…"));
     void options.client.verify(parsed).then((result) => {
       if (revision !== submittedRevision) {
@@ -160,6 +161,7 @@ export function createScenarioEvidenceVerificationPanel(
     }).finally(() => {
       loading = false;
       submit.disabled = false;
+      form.setAttribute("aria-busy", "false");
     });
   });
 

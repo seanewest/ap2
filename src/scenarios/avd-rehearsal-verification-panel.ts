@@ -113,6 +113,7 @@ export function createAvdRehearsalVerificationPanel<TInput extends object>(
     const submittedRevision = revision;
     loading = true;
     submit.disabled = true;
+    form.setAttribute("aria-busy", "true");
     show(createStatus("Verifying the network-free rehearsal output…"));
     void options.client.verify(parsed).then((result) => {
       if (revision !== submittedRevision) {
@@ -133,6 +134,7 @@ export function createAvdRehearsalVerificationPanel<TInput extends object>(
     }).finally(() => {
       loading = false;
       submit.disabled = false;
+      form.setAttribute("aria-busy", "false");
     });
   });
   return section;

@@ -188,6 +188,133 @@ test("manually loads sanitized recent operations through the local product path"
   expect(readRequests).toBe(1);
 });
 
+test("audits every manual-only operator panel at the shared accessibility boundary", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await configureOperator(page, accessToken);
+  const manualApiPaths = new Set([
+    "/api/operation-events",
+    "/api/scenario-plan",
+    "/api/multi-scenario-feasibility",
+    "/api/scenario-evidence-verification",
+    "/api/rehearsal-output-verification",
+    "/api/private-document-rehearsal-verification",
+  ]);
+  let manualRequests = 0;
+  page.on("request", (request) => {
+    if (manualApiPaths.has(new URL(request.url()).pathname)) {
+      manualRequests += 1;
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+
+  const panels = [
+    "Recent operations",
+    "Scenario catalog",
+    "Scenario plan preview",
+    "Scenario batch feasibility",
+    "Receipt verification",
+    "AVD rehearsal verification",
+    "Private-document rehearsal verification",
+  ];
+  for (const name of panels) {
+    await expect(page.getByRole("region", { name })).toBeVisible();
+  }
+  expect(manualRequests).toBe(0);
+  const refreshOperations = page.getByRole("region", {
+    name: "Recent operations",
+  }).getByRole("button", { name: "Refresh recent operations" });
+  await expect(refreshOperations).toBeVisible();
+
+  const formPanels = [
+    ["Scenario plan preview", "Preview plan"],
+    ["Scenario batch feasibility", "Evaluate feasibility"],
+    ["Receipt verification", "Verify receipt"],
+    ["AVD rehearsal verification", "Verify rehearsal output"],
+    [
+      "Private-document rehearsal verification",
+      "Verify private-document rehearsal",
+    ],
+  ] as const;
+  for (const [panelName, actionName] of formPanels) {
+    const panel = page.getByRole("region", { name: panelName });
+    const action = panel.getByRole("button", { name: actionName });
+    await expect(action).toBeVisible();
+    expect(await panel.locator("[aria-live='polite']").count()).toBeGreaterThan(
+      0,
+    );
+    expect(
+      await panel.locator("form").evaluate((form) => {
+        const actionElement = form.querySelector("button[type='submit']");
+        const firstControl = form.querySelector("input, select, textarea");
+        return Boolean(
+          actionElement &&
+            firstControl &&
+            (
+              firstControl.compareDocumentPosition(actionElement) &
+              Node.DOCUMENT_POSITION_FOLLOWING
+            ),
+        );
+      }),
+    ).toBe(true);
+    expect(
+      await action.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return [style.animationDuration, style.transitionDuration];
+      }),
+    ).toEqual(["0s", "0s"]);
+  }
+  for (
+    const panelName of [
+      "Receipt verification",
+      "AVD rehearsal verification",
+      "Private-document rehearsal verification",
+    ]
+  ) {
+    const input = page.getByRole("region", { name: panelName }).locator(
+      "textarea",
+    );
+    const descriptionId = await input.getAttribute("aria-describedby");
+    expect(descriptionId).toBeTruthy();
+    await expect(page.locator(`#${descriptionId}`)).not.toBeEmpty();
+  }
+
+  const catalogAction = page.getByRole("region", {
+    name: "Scenario catalog",
+  }).getByRole("button", { name: /Use .* in plan preview/ }).first();
+  expect(await catalogAction.getAttribute("aria-describedby")).toBeTruthy();
+  for (const action of [refreshOperations, catalogAction]) {
+    expect(
+      await action.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return [style.animationDuration, style.transitionDuration];
+      }),
+    ).toEqual(["0s", "0s"]);
+  }
+  await catalogAction.focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("region", { name: "Scenario plan preview" })
+      .getByLabel("Canonical scenario"),
+  ).toBeFocused();
+  expect(manualRequests).toBe(0);
+
+  for (const [panelName, actionName] of formPanels.slice(2)) {
+    const panel = page.getByRole("region", { name: panelName });
+    await panel.getByRole("button", { name: actionName }).focus();
+    await page.keyboard.press("Enter");
+    await expect(panel.locator("[aria-live='polite']")).toBeFocused();
+  }
+  expect(manualRequests).toBe(0);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+});
+
 test("navigates the read-only scenario catalog without network activity", async ({
   page,
 }) => {
