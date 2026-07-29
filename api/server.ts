@@ -44,14 +44,12 @@ import {
   type OperationTelemetryReader,
 } from "./operation-telemetry-collector.js";
 import {
-  SCENARIO_PLAN_MAX_REQUEST_BYTES,
   ScenarioPlanResponseTooLargeError,
   ScenarioPlanSafeFailureError,
   type ScenarioPlanService,
 } from "./scenario-plan.js";
 import { ScenarioPlanError } from "../src/scenarios/scenario-plan.js";
 import {
-  SCENARIO_RECEIPT_MAX_REQUEST_BYTES,
   ScenarioEvidenceVerificationResponseTooLargeError,
   ScenarioEvidenceVerificationSafeFailureError,
   type ScenarioEvidenceVerificationService,
@@ -64,17 +62,11 @@ import {
 } from "./rehearsal-output-verification.js";
 import { RehearsalOutputVerificationError } from "../scripts/verify-avd-three-vm-rehearsal-output.js";
 import {
-  REHEARSAL_OUTPUT_MAX_REQUEST_BYTES,
-} from "../src/api/rehearsal-output-verification-contract.js";
-import {
   BatchFeasibilityRefusalError,
   BatchFeasibilityResponseTooLargeError,
   BatchFeasibilitySafeFailureError,
   type MultiScenarioFeasibilityService,
 } from "./multi-scenario-feasibility.js";
-import {
-  BATCH_FEASIBILITY_MAX_REQUEST_BYTES,
-} from "../src/api/multi-scenario-feasibility-contract.js";
 import {
   PrivateDocumentRehearsalVerificationResponseTooLargeError,
   PrivateDocumentRehearsalVerificationSafeFailureError,
@@ -84,7 +76,6 @@ import {
   PrivateDocumentRehearsalVerificationError,
 } from "../scripts/verify-private-document-rehearsal-output.js";
 import {
-  PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
   PrivateDocumentRehearsalContractError,
 } from "../src/api/private-document-rehearsal-verification-contract.js";
 import {
@@ -96,9 +87,14 @@ import {
   HelpDeskEmailRehearsalVerificationError,
 } from "../scripts/verify-help-desk-email-rehearsal-output.js";
 import {
-  HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
   HelpDeskEmailRehearsalContractError,
 } from "../src/api/help-desk-email-rehearsal-verification-contract.js";
+import {
+  apiRouteContractsForPath,
+  findApiRouteContract,
+  type ApiRouteContract,
+  type ApiRouteOwnerKey,
+} from "../src/api/api-route-contract.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -134,12 +130,16 @@ export function createApiServer(dependencies: ApiDependencies): Server {
   });
 }
 
+const responseRouteContracts = new WeakMap<ServerResponse, ApiRouteContract>();
+
 async function route(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
 ): Promise<void> {
   const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+  const contract = findApiRouteContract(request.method, pathname);
+  if (contract) responseRouteContracts.set(response, contract);
   const origin = request.headers.origin;
   if (origin) {
     if (!dependencies.allowedOrigin || origin !== dependencies.allowedOrigin) {
@@ -150,222 +150,143 @@ async function route(
     response.setHeader("Vary", "Origin");
   }
 
-  if (
-    request.method === "OPTIONS" &&
-    (pathname === "/api/whoami" ||
-      pathname === "/api/rehearsal-status" ||
-      pathname === "/api/operation-events")
-  ) {
-    handleProtectedPreflight(request, response, origin, ["GET"]);
-    return;
-  }
-
-  if (
-    request.method === "OPTIONS" &&
-    (pathname === "/api/contact-proof" ||
-      pathname === "/api/inbox-rule-proof" ||
-      pathname === "/api/category-proof" ||
-      pathname === "/api/sharepoint-file-proof" ||
-      pathname === "/api/draft-proof" ||
-      pathname === "/api/todo-task-proof")
-  ) {
-    handleProtectedPreflight(request, response, origin, ["POST", "DELETE"]);
-    return;
-  }
-
-  if (
-    request.method === "OPTIONS" &&
-    (pathname === "/api/simulated-email" ||
-      pathname === "/api/help-desk-scenario")
-  ) {
-    handleProtectedPreflight(request, response, origin, ["POST"]);
-    return;
-  }
-
-  if (request.method === "OPTIONS" && pathname === "/api/scenario-plan") {
-    handleProtectedPreflight(
-      request,
-      response,
-      origin,
-      ["POST"],
-      ["authorization", "content-type"],
+  if (request.method === "OPTIONS") {
+    const preflight = apiRouteContractsForPath(pathname).filter(
+      ({ authorization }) => authorization === "operator",
     );
+    if (preflight.length > 0) {
+      handleProtectedPreflight(
+        request,
+        response,
+        origin,
+        [...new Set(preflight.map(({ method }) => method))],
+        [
+          "authorization",
+          ...(preflight.some(({ requestContent }) =>
+              requestContent === "json"
+            )
+            ? ["content-type"]
+            : []),
+        ],
+      );
+      return;
+    }
+  }
+  if (!contract) {
+    sendJson(response, 404, { error: "not_found" });
     return;
   }
 
-  if (
-    request.method === "OPTIONS" &&
-    (pathname === "/api/scenario-evidence-verification" ||
-      pathname === "/api/rehearsal-output-verification" ||
-      pathname === "/api/private-document-rehearsal-verification" ||
-      pathname === "/api/help-desk-email-rehearsal-verification" ||
-      pathname === "/api/multi-scenario-feasibility")
-  ) {
-    handleProtectedPreflight(
-      request,
-      response,
-      origin,
-      ["POST"],
-      ["authorization", "content-type"],
-    );
-    return;
+  switch (contract.ownerKey) {
+    case "health":
+      sendJson(response, 200, { status: "ok" });
+      return;
+    case "whoami":
+      await whoAmI(request, response, dependencies);
+      return;
+    case "rehearsal-status":
+      await rehearsalStatus(request, response, dependencies);
+      return;
+    case "operation-events":
+      await operationEvents(request, response, dependencies);
+      return;
+    case "simulated-email-send":
+      await simulatedEmail(request, response, dependencies);
+      return;
+    case "help-desk-scenario-send":
+      await helpDeskScenario(request, response, dependencies);
+      return;
+    case "scenario-plan-compile":
+      await scenarioPlan(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "scenario-receipt-verify":
+      await scenarioEvidenceVerification(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "avd-rehearsal-verify":
+      await rehearsalOutputVerification(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "private-document-rehearsal-verify":
+      await privateDocumentRehearsalVerification(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "help-desk-email-rehearsal-verify":
+      await helpDeskEmailRehearsalVerification(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "batch-feasibility-calculate":
+      await multiScenarioFeasibility(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "onedrive-proof-create":
+      await oneDriveShareProof(request, response, dependencies, "share");
+      return;
+    case "onedrive-proof-remove":
+      await oneDriveShareProof(request, response, dependencies, "remove");
+      return;
+    case "calendar-meeting-create":
+      await calendarMeeting(request, response, dependencies, "create");
+      return;
+    case "calendar-meeting-cancel":
+      await calendarMeeting(request, response, dependencies, "cancel");
+      return;
+    case "contact-proof-create":
+    case "inbox-rule-proof-create":
+    case "category-proof-create":
+    case "sharepoint-file-proof-create":
+    case "draft-proof-create":
+    case "todo-task-proof-create":
+      await fixedProof(
+        request,
+        response,
+        dependencies,
+        contract.ownerKey,
+        "create",
+      );
+      return;
+    case "contact-proof-remove":
+    case "inbox-rule-proof-remove":
+    case "category-proof-remove":
+    case "sharepoint-file-proof-remove":
+    case "draft-proof-remove":
+    case "todo-task-proof-remove":
+      await fixedProof(
+        request,
+        response,
+        dependencies,
+        contract.ownerKey,
+        "remove",
+      );
+      return;
+    default:
+      assertNeverOwner(contract.ownerKey);
   }
-
-  if (
-    request.method === "OPTIONS" &&
-    pathname === "/api/onedrive-share-proof"
-  ) {
-    handleProtectedPreflight(request, response, origin, [
-      "POST",
-      "DELETE",
-    ]);
-    return;
-  }
-
-  if (
-    request.method === "OPTIONS" &&
-    (pathname === "/api/calendar-meeting" ||
-      pathname === "/api/calendar-meeting/cancel")
-  ) {
-    handleProtectedPreflight(request, response, origin, ["POST"]);
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/health") {
-    sendJson(response, 200, { status: "ok" });
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/api/whoami") {
-    await whoAmI(request, response, dependencies);
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/api/rehearsal-status") {
-    await rehearsalStatus(request, response, dependencies);
-    return;
-  }
-
-  if (request.method === "GET" && pathname === "/api/operation-events") {
-    await operationEvents(request, response, dependencies);
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/simulated-email") {
-    await simulatedEmail(request, response, dependencies);
-    return;
-  }
-  if (request.method === "POST" && pathname === "/api/help-desk-scenario") {
-    await helpDeskScenario(request, response, dependencies);
-    return;
-  }
-  if (request.method === "POST" && pathname === "/api/scenario-plan") {
-    await scenarioPlan(request, response, dependencies);
-    return;
-  }
-  if (
-    request.method === "POST" &&
-    pathname === "/api/scenario-evidence-verification"
-  ) {
-    await scenarioEvidenceVerification(request, response, dependencies);
-    return;
-  }
-  if (
-    request.method === "POST" &&
-    pathname === "/api/rehearsal-output-verification"
-  ) {
-    await rehearsalOutputVerification(request, response, dependencies);
-    return;
-  }
-  if (
-    request.method === "POST" &&
-    pathname === "/api/private-document-rehearsal-verification"
-  ) {
-    await privateDocumentRehearsalVerification(
-      request,
-      response,
-      dependencies,
-    );
-    return;
-  }
-  if (
-    request.method === "POST" &&
-    pathname === "/api/help-desk-email-rehearsal-verification"
-  ) {
-    await helpDeskEmailRehearsalVerification(request, response, dependencies);
-    return;
-  }
-  if (
-    request.method === "POST" &&
-    pathname === "/api/multi-scenario-feasibility"
-  ) {
-    await multiScenarioFeasibility(request, response, dependencies);
-    return;
-  }
-
-  if (
-    request.method === "POST" &&
-    pathname === "/api/onedrive-share-proof"
-  ) {
-    await oneDriveShareProof(request, response, dependencies, "share");
-    return;
-  }
-
-  if (
-    (request.method === "POST" || request.method === "DELETE") &&
-    (pathname === "/api/contact-proof" ||
-      pathname === "/api/inbox-rule-proof" ||
-      pathname === "/api/category-proof" ||
-      pathname === "/api/sharepoint-file-proof" ||
-      pathname === "/api/draft-proof" ||
-      pathname === "/api/todo-task-proof")
-  ) {
-    const action = request.method === "POST" ? "create" : "remove";
-    const operation = {
-      "/api/contact-proof": dependencies.contactProofOperation,
-      "/api/inbox-rule-proof": dependencies.inboxRuleProofOperation,
-      "/api/category-proof": dependencies.categoryProofOperation,
-      "/api/sharepoint-file-proof": dependencies.sharePointFileProofOperation,
-      "/api/draft-proof": dependencies.draftProofOperation,
-      "/api/todo-task-proof": dependencies.todoTaskProofOperation,
-    }[pathname];
-    await handleAuthorizedRequest(
-      request,
-      response,
-      dependencies,
-      () => {
-        if (!operation) {
-          throw new Error("Fixed proof operation is not configured");
-        }
-        return operation[action]();
-      },
-      action === "create" ? 201 : 200,
-    );
-    return;
-  }
-
-  if (
-    request.method === "DELETE" &&
-    pathname === "/api/onedrive-share-proof"
-  ) {
-    await oneDriveShareProof(request, response, dependencies, "remove");
-    return;
-  }
-
-  if (request.method === "POST" && pathname === "/api/calendar-meeting") {
-    await calendarMeeting(request, response, dependencies, "create");
-    return;
-  }
-
-  if (
-    request.method === "POST" &&
-    pathname === "/api/calendar-meeting/cancel"
-  ) {
-    await calendarMeeting(request, response, dependencies, "cancel");
-    return;
-  }
-
-  sendJson(response, 404, { error: "not_found" });
 }
 
 function handleProtectedPreflight(
@@ -525,6 +446,70 @@ async function oneDriveShareProof(
     },
     action === "share" ? 201 : 200,
   );
+}
+
+type FixedProofOperation =
+  | ContactProofOperation
+  | InboxRuleProofOperation
+  | CategoryProofOperation
+  | SharePointFileProofOperation
+  | DraftProofOperation
+  | TodoTaskProofOperation;
+
+type FixedProofOwnerKey = Extract<
+  ApiRouteOwnerKey,
+  | `${"contact" | "inbox-rule" | "category" | "sharepoint-file" | "draft" | "todo-task"}-proof-create`
+  | `${"contact" | "inbox-rule" | "category" | "sharepoint-file" | "draft" | "todo-task"}-proof-remove`
+>;
+
+async function fixedProof(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+  ownerKey: FixedProofOwnerKey,
+  action: "create" | "remove",
+): Promise<void> {
+  const operation = fixedProofOperation(dependencies, ownerKey);
+  await handleAuthorizedRequest(
+    request,
+    response,
+    dependencies,
+    () => {
+      if (!operation) {
+        throw new Error("Fixed proof operation is not configured");
+      }
+      return operation[action]();
+    },
+    action === "create" ? 201 : 200,
+  );
+}
+
+function fixedProofOperation(
+  dependencies: ApiDependencies,
+  ownerKey: FixedProofOwnerKey,
+): FixedProofOperation | undefined {
+  switch (ownerKey) {
+    case "contact-proof-create":
+    case "contact-proof-remove":
+      return dependencies.contactProofOperation;
+    case "inbox-rule-proof-create":
+    case "inbox-rule-proof-remove":
+      return dependencies.inboxRuleProofOperation;
+    case "category-proof-create":
+    case "category-proof-remove":
+      return dependencies.categoryProofOperation;
+    case "sharepoint-file-proof-create":
+    case "sharepoint-file-proof-remove":
+      return dependencies.sharePointFileProofOperation;
+    case "draft-proof-create":
+    case "draft-proof-remove":
+      return dependencies.draftProofOperation;
+    case "todo-task-proof-create":
+    case "todo-task-proof-remove":
+      return dependencies.todoTaskProofOperation;
+    default:
+      return assertNeverOwner(ownerKey);
+  }
 }
 
 async function calendarMeeting(
@@ -775,6 +760,7 @@ async function scenarioPlan(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
+  maximumBytes: number,
 ): Promise<void> {
   await handleAuthorizedRequest(request, response, dependencies, async () => {
     if (
@@ -787,9 +773,7 @@ async function scenarioPlan(
     if (!service) {
       throw new ScenarioPlanSafeFailureError();
     }
-    return service.compile(
-      await readBoundedJson(request, SCENARIO_PLAN_MAX_REQUEST_BYTES),
-    );
+    return service.compile(await readBoundedJson(request, maximumBytes));
   });
 }
 
@@ -797,6 +781,7 @@ async function scenarioEvidenceVerification(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
+  maximumBytes: number,
 ): Promise<void> {
   await handleAuthorizedRequest(request, response, dependencies, async () => {
     if (
@@ -809,9 +794,7 @@ async function scenarioEvidenceVerification(
     if (!service) {
       throw new ScenarioEvidenceVerificationSafeFailureError();
     }
-    return service.verify(
-      await readBoundedJson(request, SCENARIO_RECEIPT_MAX_REQUEST_BYTES),
-    );
+    return service.verify(await readBoundedJson(request, maximumBytes));
   });
 }
 
@@ -819,6 +802,7 @@ async function rehearsalOutputVerification(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
+  maximumBytes: number,
 ): Promise<void> {
   await handleAuthorizedRequest(request, response, dependencies, async () => {
     if (
@@ -831,9 +815,7 @@ async function rehearsalOutputVerification(
     if (!service) {
       throw new RehearsalOutputVerificationSafeFailureError();
     }
-    return service.verify(
-      await readBoundedJson(request, REHEARSAL_OUTPUT_MAX_REQUEST_BYTES),
-    );
+    return service.verify(await readBoundedJson(request, maximumBytes));
   });
 }
 
@@ -841,6 +823,7 @@ async function privateDocumentRehearsalVerification(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
+  maximumBytes: number,
 ): Promise<void> {
   await handleAuthorizedRequest(request, response, dependencies, async () => {
     if (
@@ -853,12 +836,7 @@ async function privateDocumentRehearsalVerification(
     if (!service) {
       throw new PrivateDocumentRehearsalVerificationSafeFailureError();
     }
-    return service.verify(
-      await readBoundedJson(
-        request,
-        PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
-      ),
-    );
+    return service.verify(await readBoundedJson(request, maximumBytes));
   });
 }
 
@@ -866,6 +844,7 @@ async function helpDeskEmailRehearsalVerification(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
+  maximumBytes: number,
 ): Promise<void> {
   await handleAuthorizedRequest(request, response, dependencies, async () => {
     if (
@@ -878,12 +857,7 @@ async function helpDeskEmailRehearsalVerification(
     if (!service) {
       throw new HelpDeskEmailRehearsalVerificationSafeFailureError();
     }
-    return service.verify(
-      await readBoundedJson(
-        request,
-        HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
-      ),
-    );
+    return service.verify(await readBoundedJson(request, maximumBytes));
   });
 }
 
@@ -891,6 +865,7 @@ async function multiScenarioFeasibility(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
+  maximumBytes: number,
 ): Promise<void> {
   await handleAuthorizedRequest(request, response, dependencies, async () => {
     if (
@@ -903,9 +878,7 @@ async function multiScenarioFeasibility(
     if (!service) {
       throw new BatchFeasibilitySafeFailureError();
     }
-    return service.calculate(
-      await readBoundedJson(request, BATCH_FEASIBILITY_MAX_REQUEST_BYTES),
-    );
+    return service.calculate(await readBoundedJson(request, maximumBytes));
   });
 }
 
@@ -961,10 +934,32 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
     response.end();
     return;
   }
+  const routeContract = responseRouteContracts.get(response);
+  const maximumBytes = status >= 400
+    ? routeContract?.errorMaxBytes
+    : routeContract?.responseMaxBytes;
+  const serialized = JSON.stringify(body);
+  let payload = serialized ?? JSON.stringify({ error: "invalid_response" });
+  if (serialized === undefined) status = 500;
+  if (
+    maximumBytes !== undefined &&
+    Buffer.byteLength(payload, "utf8") > maximumBytes
+  ) {
+    const wasError = status >= 400;
+    status = 500;
+    payload = JSON.stringify({
+      error: wasError ? "error_response_too_large" : "response_too_large",
+    });
+  }
   response.writeHead(status, {
     "Cache-Control": "no-store",
     "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": Buffer.byteLength(payload, "utf8"),
     "X-Content-Type-Options": "nosniff",
   });
-  response.end(JSON.stringify(body));
+  response.end(payload);
+}
+
+function assertNeverOwner(value: never): never {
+  throw new Error(`Unhandled API route owner: ${String(value)}`);
 }

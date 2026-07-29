@@ -201,6 +201,10 @@ describe("API route evidence ledger", () => {
       "request",
       test.request("GET", "https://api.example.test/not-an-api-route"),
     );
+    test.emit(
+      "request",
+      test.request("POST", "https://api.example.test/api/undeclared"),
+    );
 
     await expect(test.ledger.snapshot()).resolves.toEqual([]);
   });

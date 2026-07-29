@@ -3,6 +3,7 @@ import type {
   Request as PlaywrightRequest,
   Response as PlaywrightResponse,
 } from "@playwright/test";
+import { findApiRouteContract } from "../src/api/api-route-contract.ts";
 
 type SafeValue = string | number | boolean;
 
@@ -113,7 +114,10 @@ export class ApiRouteLedger {
 
   #recordRequest(request: PlaywrightRequest): void {
     const url = new URL(request.url());
-    if (url.origin !== this.#apiOrigin || !url.pathname.startsWith("/api/")) {
+    if (
+      url.origin !== this.#apiOrigin ||
+      findApiRouteContract(request.method(), url.pathname) === undefined
+    ) {
       return;
     }
     const startedAtMs = this.#clock.monotonicMs();

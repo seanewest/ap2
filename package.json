@@ -9,6 +9,7 @@
     "calling-bot": "node dist-calling-bot/index.js",
     "build:calling-bot": "tsc -p tsconfig.calling-bot.json",
     "check:windows-host-boundary": "node scripts/check-windows-host-boundary.ts",
+    "check:api-routes": "node scripts/check-api-route-contracts.ts",
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/build-docs.ts && npm run build:api && npm run build:calling-bot",
     "check:rehearsal-status": "node scripts/check-rehearsal-status.ts",

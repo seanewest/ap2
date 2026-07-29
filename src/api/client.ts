@@ -17,8 +17,6 @@ import {
   ScenarioEvidenceContractError,
 } from "./scenario-evidence-verification-contract.ts";
 import {
-  REHEARSAL_OUTPUT_MAX_REQUEST_BYTES,
-  REHEARSAL_OUTPUT_MAX_RESPONSE_BYTES,
   REHEARSAL_OUTPUT_VERIFICATION_FAILURES,
   isBoundedRehearsalOutputRequest,
   isVerifiedRehearsalOutputSummary,
@@ -30,8 +28,6 @@ import type {
   ScenarioSurfaceCapabilityDeclaration,
 } from "../scenarios/scenario-surface-capability";
 import {
-  BATCH_FEASIBILITY_MAX_REQUEST_BYTES,
-  BATCH_FEASIBILITY_MAX_RESPONSE_BYTES,
   isBoundedBatchFeasibilityRequest,
   isSafeBatchFeasibilityResult,
   type BatchFeasibilityRequest,
@@ -42,8 +38,6 @@ import {
   type MultiScenarioFeasibilityResult,
 } from "../scenarios/multi-scenario-feasibility-contract.ts";
 import {
-  PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
-  PRIVATE_DOCUMENT_REHEARSAL_MAX_RESPONSE_BYTES,
   PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_FAILURES,
   isBoundedPrivateDocumentRehearsalRequest,
   isVerifiedPrivateDocumentRehearsalSummary,
@@ -52,8 +46,6 @@ import {
   type VerifiedPrivateDocumentRehearsalSummary,
 } from "./private-document-rehearsal-verification-contract.ts";
 import {
-  HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
-  HELP_DESK_EMAIL_REHEARSAL_MAX_RESPONSE_BYTES,
   HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_FAILURES,
   isBoundedHelpDeskEmailRehearsalRequest,
   isVerifiedHelpDeskEmailRehearsalSummary,
@@ -61,6 +53,10 @@ import {
   type HelpDeskEmailRehearsalVerificationRequest,
   type VerifiedHelpDeskEmailRehearsalSummary,
 } from "./help-desk-email-rehearsal-verification-contract.ts";
+import {
+  apiRouteContract,
+  type ApiRouteOwnerKey,
+} from "./api-route-contract.ts";
 
 export const SCENARIO_API_CLIENT_CAPABILITIES = [
   {
@@ -551,6 +547,7 @@ export class OneDriveInviteFailureError extends ApiAccessError {
 }
 
 export class HttpAfterPartyApi implements AfterPartyApi {
+  private readonly baseUrl: string;
   private readonly whoAmIUrl: string;
   private readonly rehearsalStatusUrl: string;
   private readonly operationEventsUrl: string;
@@ -562,93 +559,52 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly multiScenarioFeasibilityUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
-  private readonly oneDriveProofUrl: string;
   private readonly calendarMeetingUrl: string;
   private readonly calendarMeetingCancelUrl: string;
-  private readonly contactProofUrl: string;
-  private readonly inboxRuleProofUrl: string;
-  private readonly categoryProofUrl: string;
-  private readonly sharePointFileProofUrl: string;
-  private readonly draftProofUrl: string;
-  private readonly todoTaskProofUrl: string;
   private readonly request: typeof fetch;
 
   constructor(baseUrl: string, request: typeof fetch = fetch) {
-    this.whoAmIUrl = new URL("api/whoami", `${baseUrl}/`).toString();
-    this.rehearsalStatusUrl = new URL(
-      "api/rehearsal-status",
-      `${baseUrl}/`,
-    ).toString();
-    this.operationEventsUrl = new URL(
-      "api/operation-events",
-      `${baseUrl}/`,
-    ).toString();
-    this.scenarioPlanUrl = new URL(
-      "api/scenario-plan",
-      `${baseUrl}/`,
-    ).toString();
-    this.scenarioEvidenceVerificationUrl = new URL(
-      "api/scenario-evidence-verification",
-      `${baseUrl}/`,
-    ).toString();
-    this.rehearsalOutputVerificationUrl = new URL(
-      "api/rehearsal-output-verification",
-      `${baseUrl}/`,
-    ).toString();
-    this.privateDocumentRehearsalVerificationUrl = new URL(
-      "api/private-document-rehearsal-verification",
-      `${baseUrl}/`,
-    ).toString();
-    this.helpDeskEmailRehearsalVerificationUrl = new URL(
-      "api/help-desk-email-rehearsal-verification",
-      `${baseUrl}/`,
-    ).toString();
-    this.multiScenarioFeasibilityUrl = new URL(
-      "api/multi-scenario-feasibility",
-      `${baseUrl}/`,
-    ).toString();
-    this.simulatedEmailUrl = new URL(
-      "api/simulated-email",
-      `${baseUrl}/`,
-    ).toString();
-    this.helpDeskScenarioUrl = new URL(
-      "api/help-desk-scenario",
-      `${baseUrl}/`,
-    ).toString();
-    this.oneDriveProofUrl = new URL(
-      "api/onedrive-share-proof",
-      `${baseUrl}/`,
-    ).toString();
-    this.calendarMeetingUrl = new URL(
-      "api/calendar-meeting",
-      `${baseUrl}/`,
-    ).toString();
-    this.calendarMeetingCancelUrl = new URL(
-      "api/calendar-meeting/cancel",
-      `${baseUrl}/`,
-    ).toString();
-    this.contactProofUrl = new URL(
-      "api/contact-proof",
-      `${baseUrl}/`,
-    ).toString();
-    this.inboxRuleProofUrl = new URL("api/inbox-rule-proof", `${baseUrl}/`)
-      .toString();
-    this.categoryProofUrl = new URL("api/category-proof", `${baseUrl}/`)
-      .toString();
-    this.sharePointFileProofUrl = new URL(
-      "api/sharepoint-file-proof",
-      `${baseUrl}/`,
-    ).toString();
-    this.draftProofUrl = new URL("api/draft-proof", `${baseUrl}/`).toString();
-    this.todoTaskProofUrl = new URL(
-      "api/todo-task-proof",
-      `${baseUrl}/`,
-    ).toString();
+    this.baseUrl = baseUrl;
+    this.whoAmIUrl = routeUrl(baseUrl, "whoami");
+    this.rehearsalStatusUrl = routeUrl(baseUrl, "rehearsal-status");
+    this.operationEventsUrl = routeUrl(baseUrl, "operation-events");
+    this.scenarioPlanUrl = routeUrl(baseUrl, "scenario-plan-compile");
+    this.scenarioEvidenceVerificationUrl = routeUrl(
+      baseUrl,
+      "scenario-receipt-verify",
+    );
+    this.rehearsalOutputVerificationUrl = routeUrl(
+      baseUrl,
+      "avd-rehearsal-verify",
+    );
+    this.privateDocumentRehearsalVerificationUrl = routeUrl(
+      baseUrl,
+      "private-document-rehearsal-verify",
+    );
+    this.helpDeskEmailRehearsalVerificationUrl = routeUrl(
+      baseUrl,
+      "help-desk-email-rehearsal-verify",
+    );
+    this.multiScenarioFeasibilityUrl = routeUrl(
+      baseUrl,
+      "batch-feasibility-calculate",
+    );
+    this.simulatedEmailUrl = routeUrl(baseUrl, "simulated-email-send");
+    this.helpDeskScenarioUrl = routeUrl(baseUrl, "help-desk-scenario-send");
+    this.calendarMeetingUrl = routeUrl(baseUrl, "calendar-meeting-create");
+    this.calendarMeetingCancelUrl = routeUrl(
+      baseUrl,
+      "calendar-meeting-cancel",
+    );
     this.request = request.bind(globalThis);
   }
 
   async checkAccess(accessToken: string): Promise<ApiCallerIdentity> {
-    const value = await this.getAuthorizedJson(this.whoAmIUrl, accessToken);
+    const value = await this.getAuthorizedJson(
+      this.whoAmIUrl,
+      accessToken,
+      "whoami",
+    );
     if (!isSafeCallerIdentity(value)) {
       throw new ApiAccessError();
     }
@@ -663,6 +619,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     const value = await this.getAuthorizedJson(
       this.rehearsalStatusUrl,
       accessToken,
+      "rehearsal-status",
     );
     if (!isSafeRehearsalStatus(value)) {
       throw new ApiAccessError();
@@ -685,7 +642,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     }
     const url = new URL(this.operationEventsUrl);
     url.searchParams.set("order", order);
-    const value = await this.getAuthorizedJson(url.toString(), accessToken);
+    const value = await this.getAuthorizedJson(
+      url.toString(),
+      accessToken,
+      "operation-events",
+    );
     if (!isSafeRecentOperationEvents(value) || value.order !== order) {
       throw new ApiAccessError();
     }
@@ -700,18 +661,21 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
     planningRequest: ScenarioPlanningRequest,
   ): Promise<ScenarioExecutionPlan> {
+    const contract = apiRouteContract("scenario-plan-compile");
     if (!isSafeScenarioPlanningRequest(planningRequest)) {
       throw new ScenarioPlanClientError("validation-refused");
     }
     const body = JSON.stringify(planningRequest);
-    if (new TextEncoder().encode(body).byteLength > 8_192) {
+    if (
+      new TextEncoder().encode(body).byteLength > contract.requestMaxBytes
+    ) {
       throw new ScenarioPlanClientError("request-too-large");
     }
 
     let response: Response;
     try {
       response = await this.request(this.scenarioPlanUrl, {
-        method: "POST",
+        method: contract.method,
         credentials: "omit",
         redirect: "error",
         headers: {
@@ -743,7 +707,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
     let responseText: string;
     try {
-      responseText = await readBoundedJsonResponse(response, 65_536);
+      responseText = await readBoundedJsonResponse(
+        response,
+        contract.responseMaxBytes,
+      );
     } catch {
       throw new ScenarioPlanClientError("safe-failure");
     }
@@ -783,6 +750,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
     receipt: ScenarioEvidenceReceipt,
   ): Promise<SafeVerifiedScenarioEvidenceReceipt> {
+    const contract = apiRouteContract("scenario-receipt-verify");
     let parsedReceipt: ScenarioEvidenceReceipt;
     try {
       parsedReceipt = parseScenarioEvidenceReceiptRequest(receipt);
@@ -796,14 +764,16 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ScenarioEvidenceVerificationClientError("safe-failure");
     }
     const body = JSON.stringify(receipt);
-    if (new TextEncoder().encode(body).byteLength > 131_072) {
+    if (
+      new TextEncoder().encode(body).byteLength > contract.requestMaxBytes
+    ) {
       throw new ScenarioEvidenceVerificationClientError("request-too-large");
     }
 
     let response: Response;
     try {
       response = await this.request(this.scenarioEvidenceVerificationUrl, {
-        method: "POST",
+        method: contract.method,
         credentials: "omit",
         redirect: "error",
         headers: {
@@ -834,7 +804,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
     let responseText: string;
     try {
-      responseText = await readBoundedJsonResponse(response, 131_072);
+      responseText = await readBoundedJsonResponse(
+        response,
+        contract.responseMaxBytes,
+      );
     } catch (error) {
       throw new ScenarioEvidenceVerificationClientError(
         error instanceof BoundedResponseTooLargeError
@@ -887,6 +860,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
     output: RehearsalOutputVerificationRequest,
   ): Promise<VerifiedRehearsalOutputSummary> {
+    const contract = apiRouteContract("avd-rehearsal-verify");
     if (!isBoundedRehearsalOutputRequest(output)) {
       throw new RehearsalOutputVerificationClientError(
         "validation-refused",
@@ -901,7 +875,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     }
     if (
       new TextEncoder().encode(body).byteLength >
-      REHEARSAL_OUTPUT_MAX_REQUEST_BYTES
+      contract.requestMaxBytes
     ) {
       throw new RehearsalOutputVerificationClientError("request-too-large");
     }
@@ -909,7 +883,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     let response: Response;
     try {
       response = await this.request(this.rehearsalOutputVerificationUrl, {
-        method: "POST",
+        method: contract.method,
         credentials: "omit",
         redirect: "error",
         headers: {
@@ -942,7 +916,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     try {
       responseText = await readBoundedJsonResponse(
         response,
-        REHEARSAL_OUTPUT_MAX_RESPONSE_BYTES,
+        contract.responseMaxBytes,
       );
     } catch (error) {
       throw new RehearsalOutputVerificationClientError(
@@ -996,6 +970,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
     output: PrivateDocumentRehearsalVerificationRequest,
   ): Promise<VerifiedPrivateDocumentRehearsalSummary> {
+    const contract = apiRouteContract("private-document-rehearsal-verify");
     if (!isBoundedPrivateDocumentRehearsalRequest(output)) {
       throw new PrivateDocumentRehearsalVerificationClientError(
         "validation-refused",
@@ -1012,7 +987,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     }
     if (
       new TextEncoder().encode(body).byteLength >
-      PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES
+      contract.requestMaxBytes
     ) {
       throw new PrivateDocumentRehearsalVerificationClientError(
         "request-too-large",
@@ -1024,7 +999,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       response = await this.request(
         this.privateDocumentRehearsalVerificationUrl,
         {
-          method: "POST",
+          method: contract.method,
           credentials: "omit",
           redirect: "error",
           headers: {
@@ -1066,7 +1041,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     try {
       responseText = await readBoundedJsonResponse(
         response,
-        PRIVATE_DOCUMENT_REHEARSAL_MAX_RESPONSE_BYTES,
+        contract.responseMaxBytes,
       );
     } catch (error) {
       throw new PrivateDocumentRehearsalVerificationClientError(
@@ -1129,6 +1104,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
     output: HelpDeskEmailRehearsalVerificationRequest,
   ): Promise<VerifiedHelpDeskEmailRehearsalSummary> {
+    const contract = apiRouteContract("help-desk-email-rehearsal-verify");
     if (!isBoundedHelpDeskEmailRehearsalRequest(output)) {
       throw new HelpDeskEmailRehearsalVerificationClientError(
         "validation-refused",
@@ -1144,8 +1120,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       );
     }
     if (
-      new TextEncoder().encode(body).byteLength >
-      HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES
+      new TextEncoder().encode(body).byteLength > contract.requestMaxBytes
     ) {
       throw new HelpDeskEmailRehearsalVerificationClientError(
         "request-too-large",
@@ -1157,7 +1132,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       response = await this.request(
         this.helpDeskEmailRehearsalVerificationUrl,
         {
-          method: "POST",
+          method: contract.method,
           credentials: "omit",
           redirect: "error",
           headers: {
@@ -1193,7 +1168,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     try {
       responseText = await readBoundedJsonResponse(
         response,
-        HELP_DESK_EMAIL_REHEARSAL_MAX_RESPONSE_BYTES,
+        contract.responseMaxBytes,
       );
     } catch (error) {
       throw new HelpDeskEmailRehearsalVerificationClientError(
@@ -1249,6 +1224,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
     request: BatchFeasibilityRequest,
   ): Promise<MultiScenarioFeasibilityResult> {
+    const contract = apiRouteContract("batch-feasibility-calculate");
     if (
       !isBoundedBatchFeasibilityRequest(
         request,
@@ -1265,7 +1241,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     }
     if (
       new TextEncoder().encode(body).byteLength >
-      BATCH_FEASIBILITY_MAX_REQUEST_BYTES
+      contract.requestMaxBytes
     ) {
       throw new BatchFeasibilityClientError("request-too-large");
     }
@@ -1273,7 +1249,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     let response: Response;
     try {
       response = await this.request(this.multiScenarioFeasibilityUrl, {
-        method: "POST",
+        method: contract.method,
         credentials: "omit",
         redirect: "error",
         headers: {
@@ -1306,7 +1282,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     try {
       responseText = await readBoundedJsonResponse(
         response,
-        BATCH_FEASIBILITY_MAX_RESPONSE_BYTES,
+        contract.responseMaxBytes,
       );
     } catch (error) {
       throw new BatchFeasibilityClientError(
@@ -1369,7 +1345,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     const value = await this.getAuthorizedJson(
       this.simulatedEmailUrl,
       accessToken,
-      "POST",
+      "simulated-email-send",
       202,
     );
     if (!isSafeSimulatedEmailResult(value)) {
@@ -1390,7 +1366,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     const value = await this.getAuthorizedJson(
       this.helpDeskScenarioUrl,
       accessToken,
-      "POST",
+      "help-desk-scenario-send",
       202,
     );
     if (!isSafeHelpDeskScenarioResult(value)) {
@@ -1411,7 +1387,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   ): Promise<Extract<OneDriveProofResult, { state: "configured" }>> {
     const result = await this.oneDriveProofRequest(
       accessToken,
-      "POST",
+      "onedrive-proof-create",
       201,
       "configured",
     );
@@ -1429,7 +1405,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   ): Promise<Extract<OneDriveProofResult, { state: "removed" }>> {
     const result = await this.oneDriveProofRequest(
       accessToken,
-      "DELETE",
+      "onedrive-proof-remove",
       200,
       "removed",
     );
@@ -1442,7 +1418,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     const value = await this.getAuthorizedJson(
       this.calendarMeetingUrl,
       accessToken,
-      "POST",
+      "calendar-meeting-create",
       201,
       "calendar",
     );
@@ -1467,7 +1443,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     const value = await this.getAuthorizedJson(
       this.calendarMeetingCancelUrl,
       accessToken,
-      "POST",
+      "calendar-meeting-cancel",
       202,
       "calendar",
     );
@@ -1488,9 +1464,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
   ): Promise<Extract<ContactProofResult, { state: "configured" }>> {
     return this.fixedProofRequest(
-      this.contactProofUrl,
       accessToken,
-      "POST",
+      "contact-proof-create",
       201,
       "configured",
       isSafeContactProofResult,
@@ -1501,9 +1476,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     accessToken: string,
   ): Promise<Extract<ContactProofResult, { state: "removed" }>> {
     return this.fixedProofRequest(
-      this.contactProofUrl,
       accessToken,
-      "DELETE",
+      "contact-proof-remove",
       200,
       "removed",
       isSafeContactProofResult,
@@ -1514,14 +1488,18 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     R extends { state: string },
     S extends R["state"],
   >(
-    url: string,
     accessToken: string,
-    method: "POST" | "DELETE",
+    ownerKey: ApiRouteOwnerKey,
     status: number,
     state: S,
     validate: (value: unknown) => value is R,
   ): Promise<Extract<R, { state: S }>> {
-    const value = await this.getAuthorizedJson(url, accessToken, method, status);
+    const value = await this.getAuthorizedJson(
+      routeUrl(this.baseUrl, ownerKey),
+      accessToken,
+      ownerKey,
+      status,
+    );
     if (!validate(value) || value.state !== state) {
       throw new ApiAccessError();
     }
@@ -1530,9 +1508,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async createInboxRuleProof(accessToken: string) {
     return this.fixedProofRequest(
-      this.inboxRuleProofUrl,
       accessToken,
-      "POST",
+      "inbox-rule-proof-create",
       201,
       "configured",
       isSafeInboxRuleProofResult,
@@ -1541,9 +1518,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async removeInboxRuleProof(accessToken: string) {
     return this.fixedProofRequest(
-      this.inboxRuleProofUrl,
       accessToken,
-      "DELETE",
+      "inbox-rule-proof-remove",
       200,
       "removed",
       isSafeInboxRuleProofResult,
@@ -1552,9 +1528,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async createCategoryProof(accessToken: string) {
     return this.fixedProofRequest(
-      this.categoryProofUrl,
       accessToken,
-      "POST",
+      "category-proof-create",
       201,
       "configured",
       isSafeCategoryProofResult,
@@ -1563,9 +1538,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async removeCategoryProof(accessToken: string) {
     return this.fixedProofRequest(
-      this.categoryProofUrl,
       accessToken,
-      "DELETE",
+      "category-proof-remove",
       200,
       "removed",
       isSafeCategoryProofResult,
@@ -1574,9 +1548,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async createSharePointFileProof(accessToken: string) {
     await this.fixedProofRequest(
-      this.sharePointFileProofUrl,
       accessToken,
-      "POST",
+      "sharepoint-file-proof-create",
       201,
       "configured",
       isSafeSharePointFileProofResult,
@@ -1586,9 +1559,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async removeSharePointFileProof(accessToken: string) {
     await this.fixedProofRequest(
-      this.sharePointFileProofUrl,
       accessToken,
-      "DELETE",
+      "sharepoint-file-proof-remove",
       200,
       "removed",
       isSafeSharePointFileProofResult,
@@ -1598,9 +1570,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async createDraftProof(accessToken: string) {
     await this.fixedProofRequest(
-      this.draftProofUrl,
       accessToken,
-      "POST",
+      "draft-proof-create",
       201,
       "configured",
       isSafeDraftProofResult,
@@ -1610,9 +1581,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async removeDraftProof(accessToken: string) {
     await this.fixedProofRequest(
-      this.draftProofUrl,
       accessToken,
-      "DELETE",
+      "draft-proof-remove",
       200,
       "removed",
       isSafeDraftProofResult,
@@ -1622,9 +1592,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async createTodoTaskProof(accessToken: string) {
     await this.fixedProofRequest(
-      this.todoTaskProofUrl,
       accessToken,
-      "POST",
+      "todo-task-proof-create",
       201,
       "configured",
       isSafeTodoTaskProofResult,
@@ -1634,9 +1603,8 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   async removeTodoTaskProof(accessToken: string) {
     await this.fixedProofRequest(
-      this.todoTaskProofUrl,
       accessToken,
-      "DELETE",
+      "todo-task-proof-remove",
       200,
       "removed",
       isSafeTodoTaskProofResult,
@@ -1646,14 +1614,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
 
   private async oneDriveProofRequest<T extends OneDriveProofResult["state"]>(
     accessToken: string,
-    method: "POST" | "DELETE",
+    ownerKey: "onedrive-proof-create" | "onedrive-proof-remove",
     expectedStatus: number,
     expectedState: T,
   ): Promise<Extract<OneDriveProofResult, { state: T }>> {
     const value = await this.getAuthorizedJson(
-      this.oneDriveProofUrl,
+      routeUrl(this.baseUrl, ownerKey),
       accessToken,
-      method,
+      ownerKey,
       expectedStatus,
       expectedState === "configured"
         ? "onedrive-invite"
@@ -1668,12 +1636,13 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private async getAuthorizedJson(
     url: string,
     accessToken: string,
-    method = "GET",
+    ownerKey: ApiRouteOwnerKey,
     expectedStatus?: number,
     failureContext?: "onedrive-invite" | "calendar",
   ): Promise<unknown> {
     let response: Response;
     try {
+      const method = apiRouteContract(ownerKey).method;
       response = await this.request(url, {
         method,
         credentials: "omit",
@@ -1764,6 +1733,13 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     }
     return value;
   }
+}
+
+function routeUrl(baseUrl: string, ownerKey: ApiRouteOwnerKey): string {
+  return new URL(
+    apiRouteContract(ownerKey).path.slice(1),
+    `${baseUrl}/`,
+  ).toString();
 }
 
 async function readOneDriveInviteFailure(

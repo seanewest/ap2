@@ -1274,6 +1274,52 @@ describe("local API", () => {
     });
   });
 
+  it("enforces the declared success and error response bounds", async () => {
+    oneDriveShareProofOperation.share.mockResolvedValueOnce({
+      ...oneDriveResults.configured,
+      path: "x".repeat(9_000),
+    });
+    const successResponse = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/onedrive-share-proof",
+      "POST",
+    );
+    expect(successResponse.status).toBe(500);
+    await expect(successResponse.json()).resolves.toEqual({
+      error: "response_too_large",
+    });
+
+    oneDriveShareProofOperation.share.mockRejectedValueOnce(
+      new OneDriveInviteFailureError({
+        state: "file-created-sharing-failed",
+        stage: "invite",
+        upstreamStatus: 400,
+        graphErrorCode: "x".repeat(5_000),
+        clientRequestId: "fixture-correlation",
+        responseShape: "graph-error",
+      }),
+    );
+    const errorResponse = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/onedrive-share-proof",
+      "POST",
+    );
+    expect(errorResponse.status).toBe(500);
+    await expect(errorResponse.json()).resolves.toEqual({
+      error: "error_response_too_large",
+    });
+  });
+
   it.each([
     [
       "another tenant",
