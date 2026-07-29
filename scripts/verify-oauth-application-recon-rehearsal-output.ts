@@ -23,6 +23,9 @@ import {
   compileScenarioExecutionPlan,
   type ScenarioExecutionPlan,
 } from "../src/scenarios/scenario-plan.ts";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.ts";
 const MAX_OUTPUT_BYTES = 32 * 1024;
 const SCENARIO_ID = "oauth-application-reconnaissance";
 const RUN_OPERATION = "run-bounded-recon-reads";
@@ -48,6 +51,15 @@ const EXTERNAL_CLAIMS = [
   "revocation",
   "externalImpact",
 ] as const;
+
+export const OAUTH_APPLICATION_RECON_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "offline-rehearsal-verifier",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: [SCENARIO_ID],
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type OauthApplicationReconRehearsalVerificationFailure =
   | SharedRehearsalInvariantFailure

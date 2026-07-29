@@ -4,6 +4,19 @@ import {
   type RehearsalOutputVerificationRequest,
   type VerifiedRehearsalOutputSummary,
 } from "../api/rehearsal-output-verification-contract";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "./scenario-surface-capability";
+
+export const AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "manual-rehearsal-verification-panel",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: ["avd-three-vm-substrate"],
+  routeOwnerKey: "avd-rehearsal-verify",
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type SafeAvdRehearsalVerificationSummary =
   VerifiedRehearsalOutputSummary;

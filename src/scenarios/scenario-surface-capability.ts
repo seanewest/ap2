@@ -1,3 +1,5 @@
+import type { ApiRouteOwnerKey } from "../api/api-route-contract.ts";
+
 export const SCENARIO_SURFACE_DECLARATION_NAMES = [
   "authenticated-batch-feasibility-api",
   "authenticated-batch-feasibility-client",
@@ -7,6 +9,8 @@ export const SCENARIO_SURFACE_DECLARATION_NAMES = [
   "authenticated-rehearsal-verification-client",
   "authenticated-receipt-api",
   "authenticated-receipt-client",
+  "manual-rehearsal-verification-panel",
+  "offline-rehearsal-verifier",
   "operator-catalog-ui",
   "operator-plan-preview-ui",
   "operator-receipt-verify-ui",
@@ -23,6 +27,7 @@ export interface ScenarioSurfaceCapabilityDeclaration {
   manifestSchemaVersion: 2;
   repositoryBoundary: "contract-only";
   scenarioIds?: readonly string[];
+  routeOwnerKey?: ApiRouteOwnerKey;
 }
 
 export const SCENARIO_ADAPTER_NAMES = [

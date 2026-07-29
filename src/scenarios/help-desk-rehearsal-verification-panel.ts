@@ -4,6 +4,19 @@ import {
   type HelpDeskEmailRehearsalVerificationRequest,
   type VerifiedHelpDeskEmailRehearsalSummary,
 } from "../api/help-desk-email-rehearsal-verification-contract";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "./scenario-surface-capability";
+
+export const HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "manual-rehearsal-verification-panel",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: ["help-desk-email-observation"],
+  routeOwnerKey: "help-desk-email-rehearsal-verify",
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type SafeHelpDeskRehearsalSummary =
   VerifiedHelpDeskEmailRehearsalSummary;

@@ -95,6 +95,7 @@ export const SCENARIO_API_CLIENT_CAPABILITIES = [
     manifestSchemaVersion: 2,
     repositoryBoundary: "contract-only",
     scenarioIds: ["avd-three-vm-substrate"],
+    routeOwnerKey: "avd-rehearsal-verify",
   },
   {
     schemaVersion: 1,
@@ -103,6 +104,7 @@ export const SCENARIO_API_CLIENT_CAPABILITIES = [
     manifestSchemaVersion: 2,
     repositoryBoundary: "contract-only",
     scenarioIds: ["private-document-evidence"],
+    routeOwnerKey: "private-document-rehearsal-verify",
   },
   {
     schemaVersion: 1,
@@ -111,6 +113,7 @@ export const SCENARIO_API_CLIENT_CAPABILITIES = [
     manifestSchemaVersion: 2,
     repositoryBoundary: "contract-only",
     scenarioIds: ["help-desk-email-observation"],
+    routeOwnerKey: "help-desk-email-rehearsal-verify",
   },
   {
     schemaVersion: 1,
@@ -119,6 +122,7 @@ export const SCENARIO_API_CLIENT_CAPABILITIES = [
     manifestSchemaVersion: 2,
     repositoryBoundary: "contract-only",
     scenarioIds: ["teams-missed-call-observation"],
+    routeOwnerKey: "teams-missed-call-rehearsal-verify",
   },
 ] as const satisfies readonly ScenarioSurfaceCapabilityDeclaration[];
 

@@ -21,6 +21,7 @@ export const TEAMS_MISSED_CALL_REHEARSAL_VERIFICATION_API_CAPABILITY = {
   manifestSchemaVersion: 2,
   repositoryBoundary: "contract-only",
   scenarioIds: ["teams-missed-call-observation"],
+  routeOwnerKey: "teams-missed-call-rehearsal-verify",
 } as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type TeamsMissedCallRehearsalVerifier = (

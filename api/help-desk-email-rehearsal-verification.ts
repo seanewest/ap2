@@ -21,6 +21,7 @@ export const HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_API_CAPABILITY = {
   manifestSchemaVersion: 2,
   repositoryBoundary: "contract-only",
   scenarioIds: ["help-desk-email-observation"],
+  routeOwnerKey: "help-desk-email-rehearsal-verify",
 } as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type HelpDeskEmailRehearsalVerifier = (

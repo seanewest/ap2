@@ -5,16 +5,27 @@ import { SCENARIO_RECEIPT_API_CAPABILITY } from "../../api/scenario-evidence-ver
 import { SCENARIO_PLAN_API_CAPABILITY } from "../../api/scenario-plan.ts";
 import { REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY } from "../../api/rehearsal-output-verification.ts";
 import { BATCH_FEASIBILITY_API_CAPABILITY } from "../../api/multi-scenario-feasibility.ts";
+import { HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/help-desk-email-rehearsal-verification.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/private-document-rehearsal-verification.ts";
 import { AVD_MANIFEST_ADAPTER_CAPABILITY } from "../../scripts/avd-three-vm-manifest-adapter.ts";
 import { AVD_THREE_VM_REHEARSAL_CAPABILITY } from "../../scripts/avd-three-vm-rehearsal.ts";
 import { HELP_DESK_EMAIL_REHEARSAL_CAPABILITY } from "../../scripts/help-desk-email-rehearsal.ts";
+import { OAUTH_APPLICATION_RECON_REHEARSAL_CAPABILITY } from "../../scripts/oauth-application-recon-rehearsal.ts";
+import { OAUTH_APPLICATION_RECON_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-oauth-application-recon-rehearsal-output.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY } from "../../scripts/private-document-rehearsal.ts";
+import { TEAMS_MISSED_CALL_REHEARSAL_CAPABILITY } from "../../scripts/teams-missed-call-rehearsal.ts";
+import { AVD_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-avd-three-vm-rehearsal-output.ts";
+import { HELP_DESK_EMAIL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-help-desk-email-rehearsal-output.ts";
+import { PRIVATE_DOCUMENT_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-private-document-rehearsal-output.ts";
+import { TEAMS_MISSED_CALL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-teams-missed-call-rehearsal-output.ts";
 import { SCENARIO_API_CLIENT_CAPABILITIES } from "../api/client.ts";
+import { AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./avd-rehearsal-verification-panel.ts";
+import { HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./help-desk-rehearsal-verification-panel.ts";
 import { SCENARIO_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
 import { SCENARIO_PLAN_PREVIEW_UI_CAPABILITY } from "./scenario-plan-preview.ts";
 import { SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY } from "./scenario-evidence-verification-panel.ts";
 import { PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY } from "./private-document-receipt-adapter.ts";
+import { PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./private-document-rehearsal-verification-panel.ts";
 import {
   formatScenarioSurfaceInventory,
   inventoryCanonicalScenarioSurfaces,
@@ -26,6 +37,7 @@ import { SCENARIO_MANIFESTS } from "./scenarios.ts";
 function surfaceDeclarations(): unknown[] {
   return structuredClone([
     BATCH_FEASIBILITY_API_CAPABILITY,
+    HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_API_CAPABILITY,
     PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY,
     SCENARIO_PLAN_API_CAPABILITY,
     SCENARIO_RECEIPT_API_CAPABILITY,
@@ -34,9 +46,19 @@ function surfaceDeclarations(): unknown[] {
     SCENARIO_CATALOG_UI_CAPABILITY,
     SCENARIO_PLAN_PREVIEW_UI_CAPABILITY,
     SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY,
+    AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
+    HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
+    PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
     AVD_THREE_VM_REHEARSAL_CAPABILITY,
     HELP_DESK_EMAIL_REHEARSAL_CAPABILITY,
+    OAUTH_APPLICATION_RECON_REHEARSAL_CAPABILITY,
     PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY,
+    TEAMS_MISSED_CALL_REHEARSAL_CAPABILITY,
+    AVD_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
+    HELP_DESK_EMAIL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
+    OAUTH_APPLICATION_RECON_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
+    PRIVATE_DOCUMENT_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
+    TEAMS_MISSED_CALL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
   ]);
 }
 
@@ -89,10 +111,16 @@ describe("canonical scenario surface inventory", () => {
     )!;
     expect(avd.surfaces.adapter.status).toBe("implemented");
     expect(avd.surfaces.rehearsal.status).toBe("implemented");
+    expect(avd.surfaces["offline-rehearsal-verifier"].status).toBe(
+      "implemented",
+    );
     expect(
       avd.surfaces[
         "authenticated-rehearsal-verification-api-client"
       ].status,
+    ).toBe("implemented");
+    expect(
+      avd.surfaces["manual-rehearsal-verification-panel"].status,
     ).toBe("implemented");
 
     const privateDocument = first.scenarios.find(
@@ -100,6 +128,9 @@ describe("canonical scenario surface inventory", () => {
     )!;
     expect(privateDocument.surfaces.adapter.status).toBe("implemented");
     expect(privateDocument.surfaces.rehearsal.status).toBe("implemented");
+    expect(
+      privateDocument.surfaces["offline-rehearsal-verifier"].status,
+    ).toBe("implemented");
     expect(
       privateDocument.surfaces["authenticated-receipt-api-client"],
     ).toEqual({
@@ -111,29 +142,60 @@ describe("canonical scenario surface inventory", () => {
         "authenticated-rehearsal-verification-api-client"
       ].status,
     ).toBe("implemented");
+    expect(
+      privateDocument.surfaces["manual-rehearsal-verification-panel"].status,
+    ).toBe("implemented");
 
     const helpDesk = first.scenarios.find(
       ({ scenarioId }) => scenarioId === "help-desk-email-observation",
     )!;
     expect(helpDesk.surfaces.adapter.status).toBe("implemented");
     expect(helpDesk.surfaces.rehearsal.status).toBe("implemented");
+    expect(helpDesk.surfaces["offline-rehearsal-verifier"].status).toBe(
+      "implemented",
+    );
+    expect(
+      helpDesk.surfaces[
+        "authenticated-rehearsal-verification-api-client"
+      ].status,
+    ).toBe("implemented");
+    expect(
+      helpDesk.surfaces["manual-rehearsal-verification-panel"].status,
+    ).toBe("implemented");
 
     const teams = first.scenarios.find(
       ({ scenarioId }) => scenarioId === "teams-missed-call-observation",
     )!;
     expect(teams.surfaces.adapter.status).toBe("implemented");
     expect(teams.surfaces.rehearsal.status).toBe("implemented");
+    expect(teams.surfaces["offline-rehearsal-verifier"].status).toBe(
+      "implemented",
+    );
     expect(
       teams.surfaces[
         "authenticated-rehearsal-verification-api-client"
       ].status,
     ).toBe("implemented");
+    expect(
+      teams.surfaces["manual-rehearsal-verification-panel"].status,
+    ).toBe("missing");
 
     const oauthRecon = first.scenarios.find(
       ({ scenarioId }) => scenarioId === "oauth-application-reconnaissance",
     )!;
     expect(oauthRecon.surfaces.adapter.status).toBe("implemented");
     expect(oauthRecon.surfaces.rehearsal.status).toBe("implemented");
+    expect(oauthRecon.surfaces["offline-rehearsal-verifier"].status).toBe(
+      "implemented",
+    );
+    expect(
+      oauthRecon.surfaces[
+        "authenticated-rehearsal-verification-api-client"
+      ].status,
+    ).toBe("missing");
+    expect(
+      oauthRecon.surfaces["manual-rehearsal-verification-panel"].status,
+    ).toBe("missing");
 
     for (
       const row of first.scenarios.filter(
@@ -284,6 +346,80 @@ describe("canonical scenario surface inventory", () => {
         (row) => row.surfaces["operator-verify-ui"].status === "missing",
       ),
     ).toBe(true);
+
+    const unknownSurface = surfaceDeclarations();
+    Object.assign(unknownSurface[0] as object, {
+      surface: "unknown-surface",
+    });
+    expect(failureCodes({
+      surfaceDeclarations: unknownSurface,
+    })).toContain("DECLARATION_SHAPE");
+
+    const wrongOwner = surfaceDeclarations();
+    const unsupportedOwner = structuredClone(
+      AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
+    ) as unknown as Record<string, unknown>;
+    unsupportedOwner.scenarioIds = ["teams-missed-call-observation"];
+    wrongOwner.push(unsupportedOwner);
+    const wrongOwnerResult = inventoryCanonicalScenarioSurfaces({
+      surfaceDeclarations: wrongOwner,
+    });
+    expect(wrongOwnerResult.failures.map(({ code }) => code)).toContain(
+      "UNSUPPORTED_SURFACE_CLAIM",
+    );
+    expect(
+      wrongOwnerResult.scenarios.find(
+        ({ scenarioId }) => scenarioId === "teams-missed-call-observation",
+      )?.surfaces["manual-rehearsal-verification-panel"].status,
+    ).toBe("missing");
+  });
+
+  it("fails closed on authenticated verifier and panel route drift", () => {
+    const clientDrift = surfaceDeclarations();
+    const avdClient = clientDrift.find(
+      (candidate) =>
+        (candidate as { surface?: unknown; scenarioIds?: unknown }).surface ===
+          "authenticated-rehearsal-verification-client" &&
+        JSON.stringify(
+            (candidate as { scenarioIds?: unknown }).scenarioIds,
+          ) === JSON.stringify(["avd-three-vm-substrate"]),
+    ) as Record<string, unknown>;
+    avdClient.routeOwnerKey = "private-document-rehearsal-verify";
+    const clientResult = inventoryCanonicalScenarioSurfaces({
+      surfaceDeclarations: clientDrift,
+    });
+    expect(clientResult.failures.map(({ code }) => code)).toContain(
+      "ROUTE_BINDING_MISMATCH",
+    );
+    expect(
+      clientResult.scenarios.find(
+        ({ scenarioId }) => scenarioId === "avd-three-vm-substrate",
+      )?.surfaces[
+        "authenticated-rehearsal-verification-api-client"
+      ].status,
+    ).toBe("missing");
+
+    const panelDrift = surfaceDeclarations();
+    const privatePanel = panelDrift.find(
+      (candidate) =>
+        (candidate as { surface?: unknown; scenarioIds?: unknown }).surface ===
+          "manual-rehearsal-verification-panel" &&
+        JSON.stringify(
+            (candidate as { scenarioIds?: unknown }).scenarioIds,
+          ) === JSON.stringify(["private-document-evidence"]),
+    ) as Record<string, unknown>;
+    privatePanel.routeOwnerKey = "avd-rehearsal-verify";
+    const panelResult = inventoryCanonicalScenarioSurfaces({
+      surfaceDeclarations: panelDrift,
+    });
+    expect(panelResult.failures.map(({ code }) => code)).toContain(
+      "ROUTE_BINDING_MISMATCH",
+    );
+    expect(
+      panelResult.scenarios.find(
+        ({ scenarioId }) => scenarioId === "private-document-evidence",
+      )?.surfaces["manual-rehearsal-verification-panel"].status,
+    ).toBe("missing");
   });
 
   it("rejects unsupported adapter claims and adapter contract drift", () => {

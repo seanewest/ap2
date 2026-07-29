@@ -26,10 +26,22 @@ import {
   type TeamsMissedCallRehearsalResult,
   type TeamsMissedCallSyntheticBranch,
 } from "./teams-missed-call-rehearsal.ts";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.ts";
 
 const MAX_OUTPUT_BYTES = 32 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/;
 const SCENARIO_ID = "teams-missed-call-observation";
+export const TEAMS_MISSED_CALL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "offline-rehearsal-verifier",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: [SCENARIO_ID],
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
+
 export type TeamsMissedCallRehearsalVerificationFailure =
   | SharedRehearsalInvariantFailure
   | "ADAPTER_REFUSED"
