@@ -66,3 +66,8 @@ is `not-proven`. Reduced evidence remains with the AP2 orchestrator.
 
 The controlled Teams missed-call fixture is also migrated to schema version 2.
 Its native Teams semantic claim remains distinct from the Outlook fixture.
+
+The [local scenario planner](scenario-planner.md) consumes this validated
+contract to produce a deterministic sanitized readiness plan. The planner is
+not an executor and its output is not evidence that any external operation
+occurred.

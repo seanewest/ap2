@@ -66,6 +66,9 @@ The [scenario manifest contract](scenario-manifest.md) is the executable
 authoring boundary for those migrated scenarios. It binds setup, evidence,
 learner interpretation, response, cleanup, retention, permissions, expiry, and
 cost; runtime validation must pass before the UI consumes a manifest.
+The [local scenario planner](scenario-planner.md) can compile that contract
+into a deterministic sanitized readiness plan. Planning remains local and does
+not prove or execute external activity.
 
 ## Work inside the lab boundary
 
