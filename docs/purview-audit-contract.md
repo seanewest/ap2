@@ -15,13 +15,35 @@ The supported AP2 surface is Microsoft Graph v1 Purview Audit Search:
 
 The API supports application-only access. For a SharePoint-only detector, the
 narrowest application permission is
-`AuditLogsQuery-SharePoint.Read.All`; it requires administrator consent.
+`AuditLogsQuery-SharePoint.Read.All`
+(`91c64a47-a524-4fce-9bf3-3d569a344ecf`); it requires administrator consent.
 `AuditLogsQuery.Read.All` reaches every supported workload and is not the
 least-privileged product grant.
 
+Application-only Graph authorization has no signed-in user to place in a
+Purview role group. The supported contract is the consented Graph application
+permission. Purview's Audit Reader and Audit Manager role groups govern people
+using the portal, export, cmdlet, or delegated path; the least-privileged
+delegated alternative combines the delegated
+`AuditLogsQuery-SharePoint.Read.All` scope
+(`30630b65-ed12-4a81-9130-e3a964109fae`) with the **View-Only Audit Logs**
+role, normally through **Audit Reader**. **Audit Manager** also works but adds
+the broader **Audit Logs** role and audit-settings authority.
+
+Audit Search Graph API is included in both Audit (Standard) and Audit
+(Premium). Standard retains ordinary audit records for 180 days. Premium adds
+longer retention and higher Management Activity API bandwidth; neither is
+needed merely to make Graph Audit Search application-only. Readiness still
+fails closed when the tenant's audit availability or unified-audit ingestion
+state is unknown or unavailable.
+
 Microsoft documents SharePoint audit availability as typically 60–90 minutes
-after an event, without a guaranteed maximum. A query job is retained as
-normal audit-search history; Graph documents no delete method for it.
+after an event, without a guaranteed maximum. Search execution can take much
+longer for broad workloads, so a submitted query is not a synchronous result.
+Completed search jobs are normally visible in audit-search history for 30
+days. The Graph v1 resource exposes list, create, get, and list-record methods,
+but no delete method, so the product must accept that service-managed history
+before submitting a query.
 
 Official references:
 
@@ -29,8 +51,50 @@ Official references:
 - [List audit records](https://learn.microsoft.com/en-us/graph/api/security-auditlogquery-list-records?view=graph-rest-1.0)
 - [Audit record resource](https://learn.microsoft.com/en-us/graph/api/resources/security-auditlogrecord?view=graph-rest-1.0)
 - [Microsoft Graph permissions](https://learn.microsoft.com/en-us/graph/permissions-reference)
+- [Get started with Purview Audit permissions](https://learn.microsoft.com/en-us/purview/audit-get-started)
+- [Purview Audit Standard and Premium](https://learn.microsoft.com/en-us/purview/audit-solutions-overview)
 - [Management Activity API schema](https://learn.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema)
 - [Audit search and latency](https://learn.microsoft.com/en-us/purview/audit-search)
+- [Microsoft Graph throttling](https://learn.microsoft.com/en-us/graph/throttling)
+
+## Bounded readiness plan
+
+`src/audit/purview-audit-readiness.ts` is a pure application-only planner for
+one marker-bound SharePoint file operation. It performs no authentication,
+tenant read, search, poll, export, or write. It emits a plan only when all of
+these are exact:
+
+- Global Microsoft 365 service, Audit Standard or Premium, and enabled unified
+  audit ingestion;
+- distinct producer and detector application IDs;
+- the exact singleton workload-specific application permission, with no
+  coexisting broad audit-query permission;
+- one safe local marker, one allowed file operation, and a canonical, nonzero
+  UTC event window no wider than 30 minutes.
+
+The planner deliberately does not emit delegated readiness. A controlled-human
+or delegated implementation must separately bind the signed-in observer actor,
+not merely its client application, and then verify View-Only Audit Logs or
+Audit Logs RBAC. Until that actor contract exists, delegated input fails
+closed.
+
+The plan fixes `sharePointFileOperation`, `SharePoint`, one operation, and the
+marker keyword. It caps result inspection at one `$top=10` page. A next link is
+therefore `observed-but-incomplete`, never absence. HTTP 429 requires honoring
+`Retry-After` on a separately authorized read; it never authorizes replay of
+the query POST. An ambiguous POST must be reconciled by one exact display-name
+match before any new write.
+
+A `201` means only that Microsoft accepted a search job. `succeeded` means only
+that the search completed. Live proof still requires the existing result
+parser to match the exact producer application, operation, marker-bearing
+target, target type, UTC window, and correlation. Empty, paginated, throttled,
+failed, or attribution-incomplete results cannot be promoted.
+
+The same Graph surface documents an Entra-specific application permission,
+`AuditLogsQuery-Entra.Read.All`, but AP2 does not infer a directory-marker
+contract from that permission. A directory operation needs its own frozen
+operation and marker-bearing record field before it can use this planner.
 
 ## Fail-closed result model
 
@@ -64,6 +128,14 @@ A distinct fixed detector used its already-retained broad diagnostic audit
 permission to search for one historical, already-cleaned file rehearsal
 performed by the API managed identity. No permission or workload mutation was
 needed.
+
+Fresh read-only metadata reconfirmed the detector and producer are distinct,
+the detector token and service-principal assignment contain exactly the
+retained `AuditLogsQuery.Read.All` audit role, and the narrower SharePoint-only
+role is not currently assigned. The prior successful retained searches prove
+the tenant's application-only endpoint availability, not least-privilege
+deployment readiness. Replacing the broad diagnostic role requires separate
+grant/revoke authority and is not part of this contract discovery.
 
 Both the unique-keyword query and the separately reviewed exact-object-path
 correction later reached terminal `succeeded`. One fresh `$top=10` page from
