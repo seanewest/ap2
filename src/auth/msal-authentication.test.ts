@@ -12,6 +12,7 @@ import {
 } from "./authentication";
 import {
   MsalAuthentication,
+  MSAL_BROWSER_CONFIGURATION,
   mapAccountIdentity,
   normalizeAccessTokenError,
   normalizeAuthenticationError,
@@ -20,6 +21,18 @@ import {
 import { API_ACCESS_SCOPES } from "../api/config";
 
 describe("MSAL authentication adapter", () => {
+  it("keeps the operator token cache in memory only", () => {
+    expect(MSAL_BROWSER_CONFIGURATION.cache).toEqual({
+      cacheLocation: "memoryStorage",
+    });
+    expect(JSON.stringify(MSAL_BROWSER_CONFIGURATION.cache)).not.toContain(
+      "localStorage",
+    );
+    expect(JSON.stringify(MSAL_BROWSER_CONFIGURATION.cache)).not.toContain(
+      "sessionStorage",
+    );
+  });
+
   it("maps only understandable identity fields for the UI", () => {
     const account = {
       localAccountId: "operator-object-id",
@@ -97,6 +110,136 @@ describe("MSAL authentication adapter", () => {
     });
   });
 
+  it("deduplicates concurrent acquisition for the exact account and scopes", async () => {
+    const account = fixtureAccount();
+    const client = fakeClient(account);
+    const deferred = createDeferred<AuthenticationResult>();
+    client.acquireTokenSilent.mockReturnValue(deferred.promise);
+    const authentication = new MsalAuthentication(client);
+    await authentication.initialize();
+
+    const first = authentication.acquireAccessToken(API_ACCESS_SCOPES);
+    const second = authentication.acquireAccessToken(API_ACCESS_SCOPES);
+    expect(client.acquireTokenSilent).toHaveBeenCalledOnce();
+
+    deferred.resolve({ accessToken: "shared-access-token" } as AuthenticationResult);
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      "shared-access-token",
+      "shared-access-token",
+    ]);
+    expect(client.acquireTokenPopup).not.toHaveBeenCalled();
+  });
+
+  it("bounds a concurrent request with a different scope", async () => {
+    const account = fixtureAccount();
+    const client = fakeClient(account);
+    const deferred = createDeferred<AuthenticationResult>();
+    client.acquireTokenSilent.mockReturnValue(deferred.promise);
+    const authentication = new MsalAuthentication(client);
+    await authentication.initialize();
+
+    const first = authentication.acquireAccessToken(API_ACCESS_SCOPES);
+    await expect(
+      authentication.acquireAccessToken(["api://fixture/other"]),
+    ).rejects.toEqual(
+      new AccessTokenError("Another API access request is already in progress."),
+    );
+    deferred.resolve({ accessToken: "shared-access-token" } as AuthenticationResult);
+    await expect(first).resolves.toBe("shared-access-token");
+    expect(client.acquireTokenSilent).toHaveBeenCalledOnce();
+  });
+
+  it("clears the session before logout and refuses a stale token completion", async () => {
+    const account = fixtureAccount();
+    const client = fakeClient(account);
+    const deferred = createDeferred<AuthenticationResult>();
+    client.acquireTokenSilent.mockReturnValue(deferred.promise);
+    const authentication = new MsalAuthentication(client);
+    await authentication.initialize();
+
+    const pending = authentication.acquireAccessToken(API_ACCESS_SCOPES);
+    await authentication.signOut();
+    expect(client.setActiveAccount).toHaveBeenLastCalledWith(null);
+    expect(client.logoutRedirect).toHaveBeenCalledWith({
+      account,
+      postLogoutRedirectUri: "http://localhost:3000/",
+    });
+    await expect(
+      authentication.acquireAccessToken(API_ACCESS_SCOPES),
+    ).rejects.toEqual(new AccessTokenError("Sign in before checking API access."));
+
+    deferred.resolve({ accessToken: "stale-access-token" } as AuthenticationResult);
+    await expect(pending).rejects.toEqual(
+      new AccessTokenError("The operator session changed."),
+    );
+  });
+
+  it("does not open interactive fallback for a session invalidated by logout", async () => {
+    const account = fixtureAccount();
+    const client = fakeClient(account);
+    const deferred = createDeferred<AuthenticationResult>();
+    client.acquireTokenSilent.mockReturnValue(deferred.promise);
+    const authentication = new MsalAuthentication(client);
+    await authentication.initialize();
+
+    const pending = authentication.acquireAccessToken(API_ACCESS_SCOPES);
+    await authentication.signOut();
+    deferred.reject(
+      new InteractionRequiredAuthError(
+        "interaction_required",
+        "stale-correlation-id",
+      ),
+    );
+
+    await expect(pending).rejects.toEqual(
+      new AccessTokenError("The operator session changed."),
+    );
+    expect(client.acquireTokenPopup).not.toHaveBeenCalled();
+  });
+
+  it("invalidates an old account acquisition when a redirect selects a new user", async () => {
+    const firstAccount = fixtureAccount();
+    const secondAccount = {
+      ...fixtureAccount(),
+      homeAccountId: "second-home-id",
+      localAccountId: "second-object-id",
+      username: "second@example.com",
+    };
+    const client = fakeClient(firstAccount);
+    const deferred = createDeferred<AuthenticationResult>();
+    client.acquireTokenSilent.mockReturnValueOnce(deferred.promise)
+      .mockResolvedValueOnce({
+        accessToken: "second-access-token",
+      } as AuthenticationResult);
+    const authentication = new MsalAuthentication(client);
+    await authentication.initialize();
+    const first = authentication.acquireAccessToken(API_ACCESS_SCOPES);
+
+    client.handleRedirectPromise.mockResolvedValueOnce({
+      account: secondAccount,
+    } as AuthenticationResult);
+    await expect(authentication.initialize()).resolves.toMatchObject({
+      kind: "signed-in",
+      account: { accountId: "second-object-id" },
+      source: "redirect",
+    });
+    deferred.resolve({ accessToken: "first-access-token" } as AuthenticationResult);
+    await expect(first).rejects.toEqual(
+      new AccessTokenError("The operator session changed."),
+    );
+    await expect(
+      authentication.acquireAccessToken(API_ACCESS_SCOPES),
+    ).resolves.toBe("second-access-token");
+  });
+
+  it("starts a reloaded adapter signed out when no account is cached", async () => {
+    const client = fakeClient(null);
+    await expect(new MsalAuthentication(client).initialize()).resolves.toEqual({
+      kind: "signed-out",
+    });
+    expect(client.setActiveAccount).toHaveBeenCalledWith(null);
+  });
+
   it("normalizes cancellation from the interactive API access request", async () => {
     const account = fixtureAccount();
     const client = fakeClient(account);
@@ -143,7 +286,8 @@ function fixtureAccount(): AccountInfo {
 function fakeClient(account: AccountInfo | null) {
   return {
     initialize: vi.fn(async () => undefined),
-    handleRedirectPromise: vi.fn(async () => null),
+    handleRedirectPromise:
+      vi.fn<MsalClient["handleRedirectPromise"]>(async () => null),
     getActiveAccount: vi.fn(() => null),
     getAllAccounts: vi.fn(() => (account ? [account] : [])),
     setActiveAccount: vi.fn(),
@@ -152,4 +296,18 @@ function fakeClient(account: AccountInfo | null) {
     acquireTokenSilent: vi.fn(),
     acquireTokenPopup: vi.fn(),
   } satisfies MsalClient;
+}
+
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(reason: unknown): void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
 }
