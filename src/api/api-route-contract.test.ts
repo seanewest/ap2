@@ -33,6 +33,10 @@ import {
   HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
   HELP_DESK_EMAIL_REHEARSAL_MAX_RESPONSE_BYTES,
 } from "./help-desk-email-rehearsal-verification-contract.ts";
+import {
+  OAUTH_APPLICATION_RECON_REHEARSAL_MAX_REQUEST_BYTES,
+  OAUTH_APPLICATION_RECON_REHEARSAL_MAX_RESPONSE_BYTES,
+} from "./oauth-application-recon-rehearsal-verification-contract.ts";
 
 const EXPECTED_PURE_OWNERS = [
   "scenario-plan-compile",
@@ -40,6 +44,7 @@ const EXPECTED_PURE_OWNERS = [
   "avd-rehearsal-verify",
   "private-document-rehearsal-verify",
   "help-desk-email-rehearsal-verify",
+  "oauth-application-recon-rehearsal-verify",
   "batch-feasibility-calculate",
 ] as const;
 
@@ -108,6 +113,10 @@ describe("authoritative API route contracts", () => {
     expect(bounds("help-desk-email-rehearsal-verify")).toEqual([
       HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
       HELP_DESK_EMAIL_REHEARSAL_MAX_RESPONSE_BYTES,
+    ]);
+    expect(bounds("oauth-application-recon-rehearsal-verify")).toEqual([
+      OAUTH_APPLICATION_RECON_REHEARSAL_MAX_REQUEST_BYTES,
+      OAUTH_APPLICATION_RECON_REHEARSAL_MAX_RESPONSE_BYTES,
     ]);
     expect(bounds("batch-feasibility-calculate")).toEqual([
       BATCH_FEASIBILITY_MAX_REQUEST_BYTES,

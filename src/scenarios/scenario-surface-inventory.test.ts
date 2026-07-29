@@ -192,7 +192,7 @@ describe("canonical scenario surface inventory", () => {
       oauthRecon.surfaces[
         "authenticated-rehearsal-verification-api-client"
       ].status,
-    ).toBe("missing");
+    ).toBe("implemented");
     expect(
       oauthRecon.surfaces["manual-rehearsal-verification-panel"].status,
     ).toBe("missing");

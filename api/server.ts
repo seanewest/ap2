@@ -106,6 +106,17 @@ import {
 import {
   TeamsMissedCallRehearsalContractError,
 } from "../src/api/teams-missed-call-rehearsal-verification-contract.js";
+import {
+  OauthApplicationReconRehearsalVerificationResponseTooLargeError,
+  OauthApplicationReconRehearsalVerificationSafeFailureError,
+  type OauthApplicationReconRehearsalVerificationService,
+} from "./oauth-application-recon-rehearsal-verification.js";
+import {
+  OauthApplicationReconRehearsalVerificationError,
+} from "../scripts/verify-oauth-application-recon-rehearsal-output.js";
+import {
+  OauthApplicationReconRehearsalContractError,
+} from "../src/api/oauth-application-recon-rehearsal-verification-contract.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -131,6 +142,8 @@ export interface ApiDependencies {
     HelpDeskEmailRehearsalVerificationService;
   teamsMissedCallRehearsalVerificationService?:
     TeamsMissedCallRehearsalVerificationService;
+  oauthApplicationReconRehearsalVerificationService?:
+    OauthApplicationReconRehearsalVerificationService;
   multiScenarioFeasibilityService?: MultiScenarioFeasibilityService;
   allowedOrigin?: string;
 }
@@ -251,6 +264,14 @@ async function route(
       return;
     case "teams-missed-call-rehearsal-verify":
       await teamsMissedCallRehearsalVerification(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "oauth-application-recon-rehearsal-verify":
+      await oauthApplicationReconRehearsalVerification(
         request,
         response,
         dependencies,
@@ -730,6 +751,34 @@ async function handleAuthorizedRequest(
       });
       return;
     }
+    if (
+      error instanceof OauthApplicationReconRehearsalVerificationError ||
+      error instanceof OauthApplicationReconRehearsalContractError
+    ) {
+      sendJson(response, 400, {
+        error: "oauth_application_recon_rehearsal_refused",
+        category: error.category,
+      });
+      return;
+    }
+    if (
+      error instanceof
+        OauthApplicationReconRehearsalVerificationResponseTooLargeError
+    ) {
+      sendJson(response, 500, {
+        error: "oauth_application_recon_rehearsal_response_too_large",
+      });
+      return;
+    }
+    if (
+      error instanceof
+        OauthApplicationReconRehearsalVerificationSafeFailureError
+    ) {
+      sendJson(response, 500, {
+        error: "oauth_application_recon_rehearsal_verification_failed",
+      });
+      return;
+    }
     if (error instanceof BatchFeasibilityRefusalError) {
       sendJson(response, 400, {
         error: "batch_feasibility_refused",
@@ -925,6 +974,28 @@ async function teamsMissedCallRehearsalVerification(
     const service = dependencies.teamsMissedCallRehearsalVerificationService;
     if (!service) {
       throw new TeamsMissedCallRehearsalVerificationSafeFailureError();
+    }
+    return service.verify(await readBoundedJson(request, maximumBytes));
+  });
+}
+
+async function oauthApplicationReconRehearsalVerification(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+  maximumBytes: number,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new JsonUnsupportedMediaTypeError();
+    }
+    const service =
+      dependencies.oauthApplicationReconRehearsalVerificationService;
+    if (!service) {
+      throw new OauthApplicationReconRehearsalVerificationSafeFailureError();
     }
     return service.verify(await readBoundedJson(request, maximumBytes));
   });
