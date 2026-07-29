@@ -102,6 +102,11 @@ composes the receipt-facing Purview manifest with a synthetic deduplicated
 detector observation. Its verified receipt exercises categorical contract
 composition while its shared envelope keeps every audit, workload, learner,
 response, cleanup, retention, and impact claim externally uninspected.
+Its
+[authenticated verification API and typed client](purview-audit-boundary-rehearsal-verification-api.md)
+invoke only the authoritative offline verifier. Authorization precedes the
+bounded body read, and fixed safe responses cannot promote contract
+verification into external Purview, workload, learner, or cleanup proof.
 
 ## Work inside the lab boundary
 

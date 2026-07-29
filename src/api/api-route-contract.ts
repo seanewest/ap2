@@ -174,6 +174,17 @@ export const API_ROUTE_CONTRACTS = [
   ),
   route(
     "POST",
+    "/api/purview-audit-boundary-rehearsal-verification",
+    "purview-audit-boundary-rehearsal-verify",
+    {
+      ...jsonRequest(32_768),
+      responseMaxBytes: 4_096,
+      errorMaxBytes: 1_024,
+      ...PURE,
+    },
+  ),
+  route(
+    "POST",
     "/api/multi-scenario-feasibility",
     "batch-feasibility-calculate",
     {

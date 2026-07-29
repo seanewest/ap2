@@ -117,6 +117,17 @@ import {
 import {
   OauthApplicationReconRehearsalContractError,
 } from "../src/api/oauth-application-recon-rehearsal-verification-contract.js";
+import {
+  PurviewAuditBoundaryRehearsalContractError,
+} from "../src/api/purview-audit-boundary-rehearsal-verification-contract.js";
+import {
+  PurviewAuditBoundaryRehearsalVerificationResponseTooLargeError,
+  PurviewAuditBoundaryRehearsalVerificationSafeFailureError,
+  type PurviewAuditBoundaryRehearsalVerificationService,
+} from "./purview-audit-boundary-rehearsal-verification.js";
+import {
+  PurviewAuditBoundaryRehearsalVerificationError,
+} from "../scripts/verify-purview-audit-boundary-rehearsal-output.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -144,6 +155,8 @@ export interface ApiDependencies {
     TeamsMissedCallRehearsalVerificationService;
   oauthApplicationReconRehearsalVerificationService?:
     OauthApplicationReconRehearsalVerificationService;
+  purviewAuditBoundaryRehearsalVerificationService?:
+    PurviewAuditBoundaryRehearsalVerificationService;
   multiScenarioFeasibilityService?: MultiScenarioFeasibilityService;
   allowedOrigin?: string;
   isShuttingDown?: () => boolean;
@@ -277,6 +290,14 @@ async function route(
       return;
     case "oauth-application-recon-rehearsal-verify":
       await oauthApplicationReconRehearsalVerification(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "purview-audit-boundary-rehearsal-verify":
+      await purviewAuditBoundaryRehearsalVerification(
         request,
         response,
         dependencies,
@@ -784,6 +805,34 @@ async function handleAuthorizedRequest(
       });
       return;
     }
+    if (
+      error instanceof PurviewAuditBoundaryRehearsalVerificationError ||
+      error instanceof PurviewAuditBoundaryRehearsalContractError
+    ) {
+      sendJson(response, 400, {
+        error: "purview_audit_boundary_rehearsal_refused",
+        category: error.category,
+      });
+      return;
+    }
+    if (
+      error instanceof
+        PurviewAuditBoundaryRehearsalVerificationResponseTooLargeError
+    ) {
+      sendJson(response, 500, {
+        error: "purview_audit_boundary_rehearsal_response_too_large",
+      });
+      return;
+    }
+    if (
+      error instanceof
+        PurviewAuditBoundaryRehearsalVerificationSafeFailureError
+    ) {
+      sendJson(response, 500, {
+        error: "purview_audit_boundary_rehearsal_verification_failed",
+      });
+      return;
+    }
     if (error instanceof BatchFeasibilityRefusalError) {
       sendJson(response, 400, {
         error: "batch_feasibility_refused",
@@ -1001,6 +1050,28 @@ async function oauthApplicationReconRehearsalVerification(
       dependencies.oauthApplicationReconRehearsalVerificationService;
     if (!service) {
       throw new OauthApplicationReconRehearsalVerificationSafeFailureError();
+    }
+    return service.verify(await readBoundedJson(request, maximumBytes));
+  });
+}
+
+async function purviewAuditBoundaryRehearsalVerification(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+  maximumBytes: number,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new JsonUnsupportedMediaTypeError();
+    }
+    const service =
+      dependencies.purviewAuditBoundaryRehearsalVerificationService;
+    if (!service) {
+      throw new PurviewAuditBoundaryRehearsalVerificationSafeFailureError();
     }
     return service.verify(await readBoundedJson(request, maximumBytes));
   });
