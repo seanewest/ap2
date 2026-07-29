@@ -54,6 +54,62 @@ health URLs. Auxiliary health and management proof uses Linux Run Command,
 cloud-init state, VM Agent state, and Trusted Launch metadata. No human
 desktop session is required.
 
+## Lifecycle runner
+
+[`scripts/avd-three-vm-runner.ts`](../../scripts/avd-three-vm-runner.ts)
+turns this topology into a transport-independent lifecycle. A scenario supplies
+its fixed scope at runtime; the repository does not embed tenant, subscription,
+learner, token, credential, or protected-run identifiers. The pure planner
+rejects malformed or reused markers, scope mismatches, unsupported topology,
+insufficient quota, public VM IPs, incorrect temporary roles, missing expiry or
+ownership, learner-session overclaims, and a public-rate cost bound above the
+lane ceiling.
+
+The frozen plan records exact marker-derived resource names, dependencies,
+ownership, journal location, cost, and cleanup graph. The runner creates and
+verifies expiry before any billable submission, writes intent before every
+mutation, records its definite or ambiguous outcome, and requires an exact
+adapter read to reconcile ambiguity without replay. The control phase precedes
+compute because the registration token is a stable input; after ARM completion,
+independent AVD, Intune, Defender, private-probe, and zero-session observations
+run concurrently.
+
+Cleanup verifies every stage before proceeding: Defender offboarding while the
+host lives, endpoint policy/group/device removal, Azure deletion, Entra
+residue removal, exact temporary-role revocation with fresh-token proof, expiry
+removal, and sensitive-artifact removal. Interfaces cover Azure, Graph,
+Defender, the local timer, filesystem, clock, and journal; deterministic tests
+use only fakes and perform no shell or network access.
+
+The sanitized dry-run command accepts the fixed scope through environment
+variables and prints no identity values:
+
+```console
+AP2_EXPECTED_TENANT_ID=... AP2_TENANT_ID=... \
+AP2_EXPECTED_SUBSCRIPTION_ID=... AP2_SUBSCRIPTION_ID=... \
+AP2_EXPECTED_AVD_LEARNER=... AP2_AVD_LEARNER=... \
+AP2_READINESS_OBSERVED_AT=... \
+AP2_WINDOWS_IMAGE=MicrosoftWindowsDesktop:windows-11:win11-24h2-ent:... \
+AP2_LINUX_IMAGE=Canonical:ubuntu-24_04-lts:server:... \
+AP2_WINDOWS_QUOTA=1 AP2_LINUX_QUOTA=2 \
+npm run plan:avd-three-vm -- \
+  --marker ap2lab-YYYYMMDDTHHMMSSZ-abcdef \
+  --planned-at 2026-01-01T00:00:00Z \
+  --expiry 2026-01-01T08:00:00Z
+```
+
+The reduced replay fixture preserves only terminal booleans, distinct evidence
+states, and the observed `$3.07872603` upper bound. It contains no protected
+run identifier or raw platform object.
+
+Observed and expected scope values are separate inputs so a mismatch cannot
+validate itself. Image versions, quota, and their observation timestamp must
+come from a fresh readiness read; the CLI does not invent mutation-ready
+values. Definite deployment or readiness failure enters the same exact
+pre-read cleanup graph, while an ambiguous write remains paused until an exact
+read reconciles it. Temporary-role absence requires captured assignment IDs, a
+complete unpaged read, and a fresh token with exact tenant, actor, and audience.
+
 ## Cost contract
 
 [`scripts/avd-three-vm-cost.ts`](../../scripts/avd-three-vm-cost.ts) uses
@@ -69,9 +125,9 @@ shared disk is mounted. Refresh every rate before a live run.
 ## Cleanup contract
 
 Offboard the Windows endpoint while it is alive. Then delete only the captured
-run-owned Intune policies/group/device and Entra device, delete the exact
-resource group, reconcile absence, revoke captured temporary Graph roles, and
-prove their absence with a fresh Dev token. Disable and remove expiry units
-only after Azure absence, then permanently remove exact run credentials,
-caches, and trashed expiry artifacts. Provider registration and ordinary
-platform history remain.
+run-owned Intune policies/group/device, delete the exact resource group and
+reconcile its absence, and remove the run-owned Entra residue. Revoke captured
+temporary Graph roles and prove their absence with a fresh Dev token. Disable
+and remove expiry units only after Azure absence, then permanently remove exact
+run credentials, caches, and trashed expiry artifacts. Provider registration
+and ordinary platform history remain.
