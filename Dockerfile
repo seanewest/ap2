@@ -1,9 +1,11 @@
 FROM mcr.microsoft.com/playwright:v1.61.1-noble AS build
 
 WORKDIR /app
-COPY package.json package-lock.json tsconfig.json tsconfig.api.json ./
+COPY package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./
 RUN npm ci
 COPY api ./api
+COPY src/scenarios ./src/scenarios
+COPY src/ui ./src/ui
 RUN npm run build:api
 RUN npm prune --omit=dev
 

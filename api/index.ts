@@ -32,6 +32,7 @@ import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { GraphSharePointFileProof } from "./sharepoint-file-proof.js";
 import { createApiServer } from "./server.js";
+import { InMemoryScenarioPlanService } from "./scenario-plan.js";
 import {
   DelegatedGraphOneDriveShareProof,
   GRAPH_FILES_READ_WRITE_SCOPE,
@@ -161,6 +162,7 @@ const server = createApiServer({
   draftProofOperation,
   todoTaskProofOperation,
   operationTelemetryReader: operationTelemetryCollector,
+  scenarioPlanService: new InMemoryScenarioPlanService(),
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
   allowedOrigin: config.allowedOrigin,
 });

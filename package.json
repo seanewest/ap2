@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "api": "node dist-api/index.js",
-    "build:api": "tsc -p tsconfig.api.json",
+    "build:api": "vite build --config vite.api.config.ts",
     "calling-bot": "node dist-calling-bot/index.js",
     "build:calling-bot": "tsc -p tsconfig.calling-bot.json",
     "dev": "vite",
