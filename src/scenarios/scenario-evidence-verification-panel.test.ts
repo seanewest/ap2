@@ -29,9 +29,11 @@ function client(
 
 function render(
   verificationClient = client(),
+  onLearnerBriefing?: (receipt: ScenarioEvidenceReceipt) => boolean,
 ): HTMLElement {
   const panel = createScenarioEvidenceVerificationPanel({
     client: verificationClient,
+    onLearnerBriefing,
   });
   document.body.replaceChildren(panel);
   return panel;
@@ -171,6 +173,48 @@ describe("Scenario evidence verification panel", () => {
     expect(document.activeElement).toBe(
       panel.querySelector(".scenario-evidence-verification-output"),
     );
+  });
+
+  it("offers one explicit help-desk briefing action only after successful verification", async () => {
+    const onLearnerBriefing = vi.fn(() => true);
+    const panel = render(client(), onLearnerBriefing);
+    setInput(panel, JSON.stringify(RECEIPT));
+    submit(panel);
+    await settle();
+
+    expect(onLearnerBriefing).not.toHaveBeenCalled();
+    panel.querySelector<HTMLButtonElement>(
+      ".scenario-evidence-verification-result button",
+    )!.click();
+    expect(onLearnerBriefing).toHaveBeenCalledOnce();
+    expect(onLearnerBriefing).toHaveBeenCalledWith(RECEIPT);
+  });
+
+  it("renders a fixed refusal when the accepted plan no longer matches", async () => {
+    const panel = render(client(), () => false);
+    setInput(panel, JSON.stringify(RECEIPT));
+    submit(panel);
+    await settle();
+
+    panel.querySelector<HTMLButtonElement>(
+      ".scenario-evidence-verification-result button",
+    )!.click();
+    expect(panel.textContent).toContain(
+      "accepted plan, receipt, learner, evidence, action, or time window no longer matches",
+    );
+  });
+
+  it("does not offer a learner briefing for another canonical scenario", async () => {
+    const receipt = CANONICAL_RECEIPT_FIXTURES.find(({ receipt }) =>
+      receipt.scenario.id !== "help-desk-email-observation"
+    )!.receipt;
+    const panel = render(client(), vi.fn(() => true));
+    setInput(panel, JSON.stringify(receipt));
+    submit(panel);
+    await settle();
+
+    expect(panel.textContent).toContain("Normalized verification result");
+    expect(panel.textContent).not.toContain("Open learner evidence briefing");
   });
 
   it("clears completed output when input changes", async () => {

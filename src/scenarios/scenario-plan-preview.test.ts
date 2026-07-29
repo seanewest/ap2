@@ -29,11 +29,16 @@ function client(
 function render(
   previewClient = client(),
   registry: readonly unknown[] = SCENARIO_MANIFESTS,
+  callbacks: Pick<
+    Parameters<typeof createScenarioPlanPreview>[0],
+    "onPlanAccepted" | "onPlanInvalidated"
+  > = {},
 ): HTMLElement {
   const preview = createScenarioPlanPreview({
     registry,
     client: previewClient,
     now: () => new Date(NOW),
+    ...callbacks,
   });
   document.body.replaceChildren(preview);
   return preview;
@@ -135,6 +140,29 @@ describe("Scenario plan preview", () => {
         textContent
       ),
     ).toEqual(["Preview plan"]);
+  });
+
+  it("retains only an accepted plan and invalidates it before any input change or resubmission", async () => {
+    const onPlanAccepted = vi.fn();
+    const onPlanInvalidated = vi.fn();
+    const preview = render(client(), SCENARIO_MANIFESTS, {
+      onPlanAccepted,
+      onPlanInvalidated,
+    });
+    const initialInvalidations = onPlanInvalidated.mock.calls.length;
+
+    submit(preview);
+    await settle();
+    expect(onPlanAccepted).toHaveBeenCalledOnce();
+    expect(onPlanInvalidated).toHaveBeenCalledTimes(initialInvalidations + 1);
+
+    preview.querySelector<HTMLInputElement>(
+      "input[name='alias-learner']",
+    )!.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(onPlanInvalidated).toHaveBeenCalledTimes(initialInvalidations + 2);
+
+    submit(preview);
+    expect(onPlanInvalidated).toHaveBeenCalledTimes(initialInvalidations + 3);
   });
 
   it("renders the deterministic safe plan without raw schema identifiers", async () => {

@@ -427,6 +427,35 @@ h2 {
   min-height: 2.5rem;
 }
 
+.learner-evidence-briefing-route {
+  display: grid;
+  width: min(100% - 2rem, 52rem);
+  gap: 1rem;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  border: 1px solid #abc9b8;
+  border-radius: 0.9rem;
+  background: #f4fbf7;
+}
+
+.learner-evidence-briefing-route h1,
+.learner-evidence-briefing-route h2,
+.learner-evidence-briefing-route p {
+  margin: 0;
+}
+
+.learner-evidence-briefing-summary {
+  display: grid;
+  grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
+  gap: 0.4rem 0.8rem;
+  margin: 0;
+}
+
+.learner-evidence-briefing-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .scenario-plan-preview-result {
   display: grid;
   gap: 1rem;
@@ -712,6 +741,7 @@ h2 {
 
   .scenario-plan-preview-form fieldset,
   .scenario-plan-preview-summary,
+  .learner-evidence-briefing-summary,
   .scenario-plan-preview-step {
     grid-template-columns: 1fr;
   }

@@ -9,6 +9,7 @@ export const SCENARIO_SURFACE_DECLARATION_NAMES = [
   "authenticated-rehearsal-verification-client",
   "authenticated-receipt-api",
   "authenticated-receipt-client",
+  "learner-evidence-briefing-ui",
   "manual-rehearsal-verification-panel",
   "offline-rehearsal-verifier",
   "operator-catalog-ui",

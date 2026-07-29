@@ -43,6 +43,13 @@ import { withApiSupportReference } from "./api/support-reference";
 import {
   isBoundedRehearsalOutputRequest,
 } from "./api/rehearsal-output-verification-contract";
+import type {
+  ScenarioEvidenceReceipt,
+} from "./scenarios/scenario-evidence-receipt";
+import type {
+  ScenarioExecutionPlan,
+  ScenarioPlanningRequest,
+} from "./scenarios/scenario-plan";
 import {
   isBoundedPrivateDocumentRehearsalRequest,
 } from "./api/private-document-rehearsal-verification-contract";
@@ -131,6 +138,14 @@ import {
 } from "./scenarios/scenario-plan-preview";
 import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
 import {
+  LEARNER_BRIEFING_EXPECTED_ALIAS,
+  buildLearnerEvidenceBriefing,
+  type LearnerEvidenceBriefing,
+} from "./scenarios/learner-evidence-briefing";
+import {
+  createLearnerEvidenceBriefingRoute,
+} from "./scenarios/learner-evidence-briefing-route";
+import {
   createOperatorSupportBundleSession,
   type OperatorSupportBundleSession,
 } from "./support/operator-support-bundle";
@@ -216,6 +231,7 @@ type ViewState =
       calendarMeeting: CalendarMeetingState;
       fixedProofs: FixedProofStates;
     }
+  | { kind: "learner-briefing"; briefing: LearnerEvidenceBriefing }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
 
@@ -234,6 +250,7 @@ export function createAfterPartyApp(
   supportBundleExporter?: OperatorSupportBundleExporter,
 ): AfterPartyApp {
   let state: ViewState = { kind: "initial" };
+  let latestScenarioPlan: ScenarioExecutionPlan | undefined;
   const operatorSupportBundle = createOperatorSupportBundleSession();
   const scenarioPlanPreviewClient: ScenarioPlanPreviewClient = {
     preview: async (request) => {
@@ -422,6 +439,9 @@ export function createAfterPartyApp(
   };
 
   const setState = (nextState: ViewState): void => {
+    if (nextState.kind !== "learner-briefing") {
+      latestScenarioPlan = undefined;
+    }
     state = nextState;
     render();
   };
@@ -463,6 +483,7 @@ export function createAfterPartyApp(
     setState({ kind: "processing", message: "Signing out…" });
     try {
       await authentication.signOut();
+      latestScenarioPlan = undefined;
       operatorSupportBundle.clear();
       setState({ kind: "signed-out" });
     } catch (error) {
@@ -1023,6 +1044,35 @@ export function createAfterPartyApp(
         batchFeasibilityClient,
         operatorSupportBundle,
         supportBundleExporter,
+        (_request, plan) => {
+          latestScenarioPlan = plan;
+        },
+        () => {
+          latestScenarioPlan = undefined;
+        },
+        (receipt) => {
+          if (
+            state.kind !== "signed-in" ||
+            latestScenarioPlan === undefined
+          ) {
+            return false;
+          }
+          try {
+            const briefing = buildLearnerEvidenceBriefing({
+              schemaVersion: 1,
+              plan: latestScenarioPlan,
+              receipt,
+              expectedLearnerAlias: LEARNER_BRIEFING_EXPECTED_ALIAS,
+              now: new Date().toISOString(),
+            });
+            latestScenarioPlan = undefined;
+            setState({ kind: "learner-briefing", briefing });
+            return true;
+          } catch {
+            latestScenarioPlan = undefined;
+            return false;
+          }
+        },
       ),
     );
     root
@@ -1072,6 +1122,7 @@ export function createAfterPartyApp(
   };
 
   const start = async (): Promise<void> => {
+    latestScenarioPlan = undefined;
     setState({
       kind: "processing",
       message: "Completing Microsoft sign-in…",
@@ -1132,7 +1183,16 @@ function createShell(
   batchFeasibilityClient: BatchFeasibilityPanelClient,
   operatorSupportBundle: OperatorSupportBundleSession,
   supportBundleExporter?: OperatorSupportBundleExporter,
+  onPlanAccepted?: (
+    request: ScenarioPlanningRequest,
+    plan: ScenarioExecutionPlan,
+  ) => void,
+  onPlanInvalidated?: () => void,
+  onLearnerBriefing?: (receipt: ScenarioEvidenceReceipt) => boolean,
 ): HTMLElement {
+  if (state.kind === "learner-briefing") {
+    return createLearnerEvidenceBriefingRoute(state.briefing);
+  }
   const shell = document.createElement("main");
   shell.className = "shell";
 
@@ -1165,6 +1225,9 @@ function createShell(
       batchFeasibilityClient,
       operatorSupportBundle,
       supportBundleExporter,
+      onPlanAccepted,
+      onPlanInvalidated,
+      onLearnerBriefing,
     ),
   );
 
@@ -1188,6 +1251,12 @@ function createStatePanel(
   batchFeasibilityClient: BatchFeasibilityPanelClient,
   operatorSupportBundle: OperatorSupportBundleSession,
   supportBundleExporter?: OperatorSupportBundleExporter,
+  onPlanAccepted?: (
+    request: ScenarioPlanningRequest,
+    plan: ScenarioExecutionPlan,
+  ) => void,
+  onPlanInvalidated?: () => void,
+  onLearnerBriefing?: (receipt: ScenarioEvidenceReceipt) => boolean,
 ): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "auth-panel";
@@ -1243,7 +1312,11 @@ function createStatePanel(
         ),
         createContactProofPanel(contactProof, apiOperationLoading),
         ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
-        ...createScenarioPlanningFlow(scenarioPlanPreviewClient),
+        ...createScenarioPlanningFlow(
+          scenarioPlanPreviewClient,
+          onPlanAccepted,
+          onPlanInvalidated,
+        ),
         createPanelBoundary(
           "Scenario surface availability",
           createScenarioSurfaceMatrix,
@@ -1261,6 +1334,7 @@ function createStatePanel(
           () =>
             createScenarioEvidenceVerificationPanel({
               client: scenarioEvidenceVerificationClient,
+              onLearnerBriefing,
             }),
         ),
         createPanelBoundary(
@@ -1328,6 +1402,8 @@ function createStatePanel(
         createButton("Try sign-in again", "sign-in", "primary"),
       );
       break;
+    case "learner-briefing":
+      break;
   }
 
   return panel;
@@ -1335,6 +1411,11 @@ function createStatePanel(
 
 function createScenarioPlanningFlow(
   client: ScenarioPlanPreviewClient,
+  onPlanAccepted?: (
+    request: ScenarioPlanningRequest,
+    plan: ScenarioExecutionPlan,
+  ) => void,
+  onPlanInvalidated?: () => void,
 ): HTMLElement[] {
   let preview: ReturnType<
     typeof createScenarioPlanPreviewController
@@ -1345,6 +1426,8 @@ function createScenarioPlanningFlow(
       preview = createScenarioPlanPreviewController({
         registry: SCENARIO_MANIFESTS,
         client,
+        onPlanAccepted,
+        onPlanInvalidated,
       });
       return preview.element;
     },

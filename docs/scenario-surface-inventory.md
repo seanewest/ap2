@@ -25,13 +25,13 @@ contain unsafe, stale, duplicate, unknown, or unsupported claims.
 
 ## Current rehearsal-family coverage
 
-| Scenario | Manifest / plan / receipt | Adapter | `REHEARSAL_ONLY` pipeline | Offline verifier | Authenticated rehearsal verification API/client | Manual-only rehearsal panel |
-| --- | --- | --- | --- | --- | --- | --- |
-| `avd-three-vm-substrate` | implemented | implemented | implemented | implemented | implemented | implemented |
-| `help-desk-email-observation` | implemented | implemented | implemented | implemented | implemented | implemented |
-| `oauth-application-reconnaissance` | implemented | implemented | implemented | implemented | implemented | implemented |
-| `private-document-evidence` | implemented | implemented | implemented | implemented | implemented | implemented |
-| `teams-missed-call-observation` | implemented | implemented | implemented | implemented | implemented | missing |
+| Scenario | Manifest / plan / receipt | Adapter | `REHEARSAL_ONLY` pipeline | Offline verifier | Authenticated rehearsal verification API/client | Manual-only rehearsal panel | Learner briefing |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `avd-three-vm-substrate` | implemented | implemented | implemented | implemented | implemented | implemented | missing |
+| `help-desk-email-observation` | implemented | implemented | implemented | implemented | implemented | implemented | implemented |
+| `oauth-application-reconnaissance` | implemented | implemented | implemented | implemented | implemented | implemented | missing |
+| `private-document-evidence` | implemented | implemented | implemented | implemented | implemented | implemented | missing |
+| `teams-missed-call-observation` | implemented | implemented | implemented | implemented | implemented | missing | missing |
 
 The table describes source availability only. In particular, `implemented`
 never means that a tenant operation, learner observation, cleanup, detection,
@@ -47,7 +47,7 @@ The authenticated SPA renders a compact read-only matrix by calling the same
 the inventory declarations, fetch an API, or infer tenant, cloud, workload, or
 external readiness. The matrix shows the exact manifest/plan, adapter,
 rehearsal, offline-verifier, authenticated rehearsal-verification API/client,
-and manual-panel cells for all five canonical families.
+manual-panel, and learner-briefing cells for all five canonical families.
 
 The UI labels `missing` as “Missing — not a failure” and `not-applicable` as
 “Deliberately absent.” Pending remains a separate concept, but the

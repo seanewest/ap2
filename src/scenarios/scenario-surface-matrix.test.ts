@@ -47,6 +47,7 @@ describe("scenario surface availability matrix", () => {
       "Offline verifier",
       "Authenticated verification API / client",
       "Manual panel",
+      "Learner briefing",
     ]);
     expect(panel.querySelector("[data-surface='receipt']")).toBeNull();
     expect(panel.querySelector("[data-surface='operator-read-ui']")).toBeNull();
@@ -91,7 +92,7 @@ describe("scenario surface availability matrix", () => {
     expect(panel.querySelector("caption")?.textContent).toContain(
       "every canonical scenario family",
     );
-    expect(panel.querySelectorAll("thead th[scope='col']")).toHaveLength(7);
+    expect(panel.querySelectorAll("thead th[scope='col']")).toHaveLength(8);
     expect(panel.querySelectorAll("tbody th[scope='row']")).toHaveLength(5);
     expect(
       panel.querySelector(".scenario-surface-matrix-table-wrap")

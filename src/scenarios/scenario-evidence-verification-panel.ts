@@ -52,6 +52,7 @@ export interface ScenarioEvidenceVerificationPanelClient {
 
 export interface ScenarioEvidenceVerificationPanelOptions {
   client: ScenarioEvidenceVerificationPanelClient;
+  onLearnerBriefing?: (receipt: ScenarioEvidenceReceipt) => boolean;
 }
 
 export function createScenarioEvidenceVerificationPanel(
@@ -149,7 +150,11 @@ export function createScenarioEvidenceVerificationPanel(
       if (revision !== submittedRevision) {
         return;
       }
-      show(createVerificationResult(result), true);
+      show(createVerificationResult(
+        result,
+        parsed,
+        options.onLearnerBriefing,
+      ), true);
     }).catch((error: unknown) => {
       if (revision !== submittedRevision) {
         return;
@@ -230,6 +235,8 @@ function hasUnsafeReceiptIdentifier(
 
 function createVerificationResult(
   result: SafeVerifiedScenarioEvidenceReceipt,
+  receipt: ScenarioEvidenceReceipt,
+  onLearnerBriefing?: (receipt: ScenarioEvidenceReceipt) => boolean,
 ): HTMLElement {
   const resultSection = document.createElement("section");
   resultSection.className = "scenario-evidence-verification-result";
@@ -306,6 +313,30 @@ function createVerificationResult(
       "notice",
     ),
   );
+  if (
+    onLearnerBriefing !== undefined &&
+    result.scenarioId === "help-desk-email-observation"
+  ) {
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "primary";
+    open.textContent = "Open learner evidence briefing";
+    open.addEventListener("click", () => {
+      let opened = false;
+      try {
+        opened = onLearnerBriefing(receipt);
+      } catch {
+        // Keep the fixed refusal below.
+      }
+      if (!opened) {
+        resultSection.append(createStatus(
+          "The learner briefing was refused because the accepted plan, receipt, learner, evidence, action, or time window no longer matches.",
+          "error",
+        ));
+      }
+    });
+    resultSection.append(open);
+  }
   return resultSection;
 }
 

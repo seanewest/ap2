@@ -39,6 +39,7 @@ import {
 } from "./oauth-application-recon-receipt-adapter.ts";
 import { SCENARIO_PLAN_PREVIEW_UI_CAPABILITY } from "./scenario-plan-preview.ts";
 import { SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY } from "./scenario-evidence-verification-panel.ts";
+import { LEARNER_EVIDENCE_BRIEFING_UI_CAPABILITY } from "./learner-evidence-briefing-route.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./private-document-rehearsal-verification-panel.ts";
 import { PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY } from "./private-document-receipt-adapter.ts";
 import {
@@ -82,6 +83,7 @@ export const SCENARIO_INVENTORY_SURFACES = [
   "authenticated-receipt-api-client",
   "authenticated-rehearsal-verification-api-client",
   "manual-rehearsal-verification-panel",
+  "learner-evidence-ui",
   "operator-read-ui",
   "operator-preview-ui",
   "operator-verify-ui",
@@ -116,6 +118,8 @@ export type ScenarioSurfaceReason =
   | "authenticated-rehearsal-verification-api-client-missing"
   | "manual-rehearsal-verification-panel-exported"
   | "manual-rehearsal-verification-panel-missing"
+  | "learner-evidence-ui-exported"
+  | "learner-evidence-ui-missing"
   | "operator-catalog-exported"
   | "operator-catalog-missing"
   | "operator-plan-preview-exported"
@@ -186,6 +190,7 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
   SCENARIO_CATALOG_UI_CAPABILITY,
   SCENARIO_PLAN_PREVIEW_UI_CAPABILITY,
   SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY,
+  LEARNER_EVIDENCE_BRIEFING_UI_CAPABILITY,
   AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
   HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
   OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
@@ -781,6 +786,12 @@ function inventoryRow(
           "missing",
           "manual-rehearsal-verification-panel-missing",
         ),
+      "learner-evidence-ui": supports(
+          declarations.get("learner-evidence-briefing-ui"),
+          manifest.id,
+        )
+        ? cell("implemented", "learner-evidence-ui-exported")
+        : cell("missing", "learner-evidence-ui-missing"),
       "operator-read-ui": supports(
           declarations.get("operator-catalog-ui"),
           manifest.id,
@@ -1015,6 +1026,7 @@ function mapSurface(
       "authenticated-rehearsal-verification-api-client",
     "authenticated-receipt-api": "authenticated-receipt-api-client",
     "authenticated-receipt-client": "authenticated-receipt-api-client",
+    "learner-evidence-briefing-ui": "learner-evidence-ui",
     "manual-rehearsal-verification-panel":
       "manual-rehearsal-verification-panel",
     "offline-rehearsal-verifier": "offline-rehearsal-verifier",

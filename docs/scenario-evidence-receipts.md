@@ -9,6 +9,10 @@ The receipt does not perform tenant work, inspect protected evidence, or prove
 that an external operation happened. The external observation remains the
 proof; the receipt preserves its bounded meaning for product code and learners.
 
+The bounded [learner evidence briefing](learner-evidence-briefing.md) projects
+one accepted help-desk plan and verified receipt into a control-free learner
+view. It does not create evidence or expose producer operations.
+
 The optional pure local
 [operation telemetry adapter](operation-telemetry-receipt-adapter.md) can
 produce only candidate operation rows from bounded lifecycle events. It cannot
