@@ -144,7 +144,15 @@ At each material checkpoint, the Captain checks and updates this docket against 
 - Microsoft Graph v1 Purview Audit Search is officially supported for
   application-only SharePoint observation, with
   `AuditLogsQuery-SharePoint.Read.All` as the product-minimum application
-  permission. A fixed detector distinct from the API managed-identity producer
+  permission. A pure readiness planner now binds that exact permission,
+  producer/detector separation, Audit Standard/Premium availability, unified
+  audit ingestion, a 30-minute marker window, one operation, one `$top=10`
+  result page, throttling, ambiguous write reconciliation, and
+  service-retained search history. It performs no tenant action and never
+  promotes query acceptance or completion into proof. Delegated access remains
+  a documented controlled-human alternative until it binds the signed-in
+  observer separately from client transport.
+  A fixed detector distinct from the API managed-identity producer
   reached the live endpoint using already-retained diagnostic authority. One
   historical keyword query and one reviewed exact-path correction are now both
   terminal `succeeded`. One fresh capped page from each contained two records
