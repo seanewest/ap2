@@ -191,6 +191,9 @@ describe("AVD rehearsal verification panel", () => {
     expect(panel.querySelector<HTMLButtonElement>("button")!.disabled).toBe(
       true,
     );
+    expect(panel.querySelector("form")?.getAttribute("aria-busy")).toBe(
+      "true",
+    );
     input(panel).value += " ";
     input(panel).dispatchEvent(new Event("input", { bubbles: true }));
     expect(panel.textContent).toContain("pending response will be ignored");
@@ -201,6 +204,9 @@ describe("AVD rehearsal verification panel", () => {
     expect(panel.textContent).not.toContain("Network-free contract verified");
     expect(panel.querySelector<HTMLButtonElement>("button")!.disabled).toBe(
       false,
+    );
+    expect(panel.querySelector("form")?.getAttribute("aria-busy")).toBe(
+      "false",
     );
   });
 

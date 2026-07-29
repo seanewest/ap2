@@ -127,6 +127,7 @@ export function createScenarioPlanPreviewController(
   const output = document.createElement("div");
   output.className = "scenario-plan-preview-output";
   output.setAttribute("aria-live", "polite");
+  output.tabIndex = -1;
   form.append(scenarioField, controls, submit);
   section.append(form, output);
 
@@ -196,6 +197,7 @@ export function createScenarioPlanPreviewController(
     const request = buildRequest(form, manifest, options.now ?? (() => new Date()));
     if (typeof request === "string") {
       output.replaceChildren(createStatus(request, "error"));
+      output.focus();
       return;
     }
     const submittedRevision = revision;
@@ -214,6 +216,7 @@ export function createScenarioPlanPreviewController(
           ? createStatus(failureMessage(failure), "error")
           : createPlanResult(plan, manifest),
       );
+      output.focus();
     }).catch((error: unknown) => {
       if (revision !== submittedRevision) {
         return;
@@ -225,6 +228,7 @@ export function createScenarioPlanPreviewController(
         // Keep the fixed general failure.
       }
       output.replaceChildren(createStatus(failureMessage(failure), "error"));
+      output.focus();
     }).finally(() => {
       if (revision === submittedRevision) {
         loading = false;

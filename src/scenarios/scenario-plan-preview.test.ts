@@ -244,6 +244,9 @@ describe("Scenario plan preview", () => {
     expiry.value = "0";
     submit(preview);
     expect(preview.textContent).toContain("Expiry must be greater than zero");
+    expect(document.activeElement).toBe(
+      preview.querySelector(".scenario-plan-preview-output"),
+    );
 
     expiry.value = "1";
     const response = preview.querySelector<HTMLSelectElement>(
@@ -255,6 +258,9 @@ describe("Scenario plan preview", () => {
     response.value = "999";
     submit(preview);
     expect(preview.textContent).toContain("not supported");
+    expect(document.activeElement).toBe(
+      preview.querySelector(".scenario-plan-preview-output"),
+    );
     expect(previewClient.preview).not.toHaveBeenCalled();
   });
 
@@ -272,6 +278,9 @@ describe("Scenario plan preview", () => {
     expect(
       preview.querySelector<HTMLButtonElement>("button")!.disabled,
     ).toBe(true);
+    expect(preview.querySelector("form")?.getAttribute("aria-busy")).toBe(
+      "true",
+    );
     for (const control of preview.querySelectorAll<
       HTMLInputElement | HTMLSelectElement
     >("input, select")) {
@@ -284,6 +293,12 @@ describe("Scenario plan preview", () => {
     expect(
       preview.querySelector<HTMLButtonElement>("button")!.disabled,
     ).toBe(false);
+    expect(preview.querySelector("form")?.getAttribute("aria-busy")).toBe(
+      "false",
+    );
+    expect(document.activeElement).toBe(
+      preview.querySelector(".scenario-plan-preview-output"),
+    );
     expect(previewClient.preview).toHaveBeenCalledOnce();
     submit(preview);
     await settle();
