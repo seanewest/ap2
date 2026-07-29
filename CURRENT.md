@@ -50,6 +50,13 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- The authoritative offline Purview rehearsal verifier is exposed through one
+  pure operator-only API route and browser-safe typed client. The route registry
+  enforces auth-before-body, fixed request/response bounds, and zero external
+  effects; the service imports the verifier directly and returns only its fixed
+  safe summary. No pipeline, synthetic detector, audit, UI, or persistence path
+  is included. See
+  [the Purview verification API](docs/purview-audit-boundary-rehearsal-verification-api.md).
 - The receipt-facing Purview audit boundary now has a pure network-free
   `REHEARSAL_ONLY` pipeline. It compiles the exact manifest in isolation,
   deduplicates a fixed synthetic two-page observation to one categorical

@@ -62,6 +62,14 @@ import {
   type VerifiedOauthApplicationReconRehearsalSummary,
 } from "./oauth-application-recon-rehearsal-verification-contract.ts";
 import {
+  PURVIEW_AUDIT_BOUNDARY_REHEARSAL_VERIFICATION_FAILURES,
+  isBoundedPurviewAuditBoundaryRehearsalRequest,
+  isVerifiedPurviewAuditBoundaryRehearsalSummary,
+  type PurviewAuditBoundaryRehearsalVerificationFailure,
+  type PurviewAuditBoundaryRehearsalVerificationRequest,
+  type VerifiedPurviewAuditBoundaryRehearsalSummary,
+} from "./purview-audit-boundary-rehearsal-verification-contract.ts";
+import {
   apiRouteContract,
   type ApiRouteOwnerKey,
 } from "./api-route-contract.ts";
@@ -391,6 +399,10 @@ export interface AfterPartyApi {
     accessToken: string,
     output: OauthApplicationReconRehearsalVerificationRequest,
   ): Promise<VerifiedOauthApplicationReconRehearsalSummary>;
+  verifyPurviewAuditBoundaryRehearsalOutput?(
+    accessToken: string,
+    output: PurviewAuditBoundaryRehearsalVerificationRequest,
+  ): Promise<VerifiedPurviewAuditBoundaryRehearsalSummary>;
   calculateMultiScenarioFeasibility(
     accessToken: string,
     request: BatchFeasibilityRequest,
@@ -586,6 +598,23 @@ export class OauthApplicationReconRehearsalVerificationClientError
   }
 }
 
+export class PurviewAuditBoundaryRehearsalVerificationClientError
+  extends Error {
+  readonly category: RehearsalOutputVerificationClientErrorCategory;
+  readonly refusalCategory?:
+    PurviewAuditBoundaryRehearsalVerificationFailure;
+
+  constructor(
+    category: RehearsalOutputVerificationClientErrorCategory,
+    refusalCategory?: PurviewAuditBoundaryRehearsalVerificationFailure,
+  ) {
+    super(`Purview audit-boundary rehearsal verification failed: ${category}`);
+    this.name = "PurviewAuditBoundaryRehearsalVerificationClientError";
+    this.category = category;
+    this.refusalCategory = refusalCategory;
+  }
+}
+
 export type BatchFeasibilityClientErrorCategory =
   | "unauthorized"
   | "forbidden"
@@ -635,6 +664,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly helpDeskEmailRehearsalVerificationUrl: string;
   private readonly teamsMissedCallRehearsalVerificationUrl: string;
   private readonly oauthApplicationReconRehearsalVerificationUrl: string;
+  private readonly purviewAuditBoundaryRehearsalVerificationUrl: string;
   private readonly multiScenarioFeasibilityUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
@@ -682,6 +712,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     this.oauthApplicationReconRehearsalVerificationUrl = routeUrl(
       baseUrl,
       "oauth-application-recon-rehearsal-verify",
+    );
+    this.purviewAuditBoundaryRehearsalVerificationUrl = routeUrl(
+      baseUrl,
+      "purview-audit-boundary-rehearsal-verify",
     );
     this.request = request.bind(globalThis);
   }
@@ -1573,6 +1607,145 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       !isVerifiedOauthApplicationReconRehearsalSummary(value, output)
     ) {
       throw new OauthApplicationReconRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    return value;
+  }
+
+  async verifyPurviewAuditBoundaryRehearsalOutput(
+    accessToken: string,
+    output: PurviewAuditBoundaryRehearsalVerificationRequest,
+  ): Promise<VerifiedPurviewAuditBoundaryRehearsalSummary> {
+    const contract = apiRouteContract(
+      "purview-audit-boundary-rehearsal-verify",
+    );
+    if (!isBoundedPurviewAuditBoundaryRehearsalRequest(output)) {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "validation-refused",
+        "INPUT_SHAPE",
+      );
+    }
+    let body: string;
+    try {
+      body = JSON.stringify(output);
+    } catch {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "validation-refused",
+      );
+    }
+    if (
+      new TextEncoder().encode(body).byteLength > contract.requestMaxBytes
+    ) {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await this.request(
+        this.purviewAuditBoundaryRehearsalVerificationUrl,
+        {
+          method: contract.method,
+          credentials: "omit",
+          redirect: "error",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body,
+        },
+      );
+    } catch {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (response.status === 401) {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "unauthorized",
+      );
+    }
+    if (response.status === 403) {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "forbidden",
+      );
+    }
+    if (response.status === 413) {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(
+        response.headers.get("content-type") ?? "",
+      )
+    ) {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+
+    let responseText: string;
+    try {
+      responseText = await readBoundedJsonResponse(
+        response,
+        contract.responseMaxBytes,
+      );
+    } catch (error) {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        error instanceof BoundedResponseTooLargeError
+          ? "response-too-large"
+          : "safe-failure",
+      );
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (!response.ok) {
+      if (
+        response.status === 400 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error", "category"]) &&
+        value.error === "purview_audit_boundary_rehearsal_refused" &&
+        typeof value.category === "string" &&
+        PURVIEW_AUDIT_BOUNDARY_REHEARSAL_VERIFICATION_FAILURES.includes(
+          value.category as
+            PurviewAuditBoundaryRehearsalVerificationFailure,
+        )
+      ) {
+        throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+          "validation-refused",
+          value.category as
+            PurviewAuditBoundaryRehearsalVerificationFailure,
+        );
+      }
+      if (
+        response.status === 500 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error"]) &&
+        value.error ===
+          "purview_audit_boundary_rehearsal_response_too_large"
+      ) {
+        throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+          "response-too-large",
+        );
+      }
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (
+      response.status !== 200 ||
+      !isVerifiedPurviewAuditBoundaryRehearsalSummary(value, output)
+    ) {
+      throw new PurviewAuditBoundaryRehearsalVerificationClientError(
         "safe-failure",
       );
     }
