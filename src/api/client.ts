@@ -54,6 +54,14 @@ import {
   type VerifiedHelpDeskEmailRehearsalSummary,
 } from "./help-desk-email-rehearsal-verification-contract.ts";
 import {
+  OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_FAILURES,
+  isBoundedOauthApplicationReconRehearsalRequest,
+  isVerifiedOauthApplicationReconRehearsalSummary,
+  type OauthApplicationReconRehearsalVerificationFailure,
+  type OauthApplicationReconRehearsalVerificationRequest,
+  type VerifiedOauthApplicationReconRehearsalSummary,
+} from "./oauth-application-recon-rehearsal-verification-contract.ts";
+import {
   apiRouteContract,
   type ApiRouteOwnerKey,
 } from "./api-route-contract.ts";
@@ -123,6 +131,15 @@ export const SCENARIO_API_CLIENT_CAPABILITIES = [
     repositoryBoundary: "contract-only",
     scenarioIds: ["teams-missed-call-observation"],
     routeOwnerKey: "teams-missed-call-rehearsal-verify",
+  },
+  {
+    schemaVersion: 1,
+    surface: "authenticated-rehearsal-verification-client",
+    scenarioScope: "explicit-scenarios",
+    manifestSchemaVersion: 2,
+    repositoryBoundary: "contract-only",
+    scenarioIds: ["oauth-application-reconnaissance"],
+    routeOwnerKey: "oauth-application-recon-rehearsal-verify",
   },
 ] as const satisfies readonly ScenarioSurfaceCapabilityDeclaration[];
 
@@ -370,6 +387,10 @@ export interface AfterPartyApi {
     accessToken: string,
     output: TeamsMissedCallRehearsalVerificationRequest,
   ): Promise<VerifiedTeamsMissedCallRehearsalSummary>;
+  verifyOauthApplicationReconRehearsalOutput(
+    accessToken: string,
+    output: OauthApplicationReconRehearsalVerificationRequest,
+  ): Promise<VerifiedOauthApplicationReconRehearsalSummary>;
   calculateMultiScenarioFeasibility(
     accessToken: string,
     request: BatchFeasibilityRequest,
@@ -548,6 +569,23 @@ export class TeamsMissedCallRehearsalVerificationClientError extends Error {
   }
 }
 
+export class OauthApplicationReconRehearsalVerificationClientError
+  extends Error {
+  readonly category: RehearsalOutputVerificationClientErrorCategory;
+  readonly refusalCategory?:
+    OauthApplicationReconRehearsalVerificationFailure;
+
+  constructor(
+    category: RehearsalOutputVerificationClientErrorCategory,
+    refusalCategory?: OauthApplicationReconRehearsalVerificationFailure,
+  ) {
+    super(`OAuth application-recon rehearsal verification failed: ${category}`);
+    this.name = "OauthApplicationReconRehearsalVerificationClientError";
+    this.category = category;
+    this.refusalCategory = refusalCategory;
+  }
+}
+
 export type BatchFeasibilityClientErrorCategory =
   | "unauthorized"
   | "forbidden"
@@ -596,6 +634,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly privateDocumentRehearsalVerificationUrl: string;
   private readonly helpDeskEmailRehearsalVerificationUrl: string;
   private readonly teamsMissedCallRehearsalVerificationUrl: string;
+  private readonly oauthApplicationReconRehearsalVerificationUrl: string;
   private readonly multiScenarioFeasibilityUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
@@ -639,6 +678,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     this.teamsMissedCallRehearsalVerificationUrl = routeUrl(
       baseUrl,
       "teams-missed-call-rehearsal-verify",
+    );
+    this.oauthApplicationReconRehearsalVerificationUrl = routeUrl(
+      baseUrl,
+      "oauth-application-recon-rehearsal-verify",
     );
     this.request = request.bind(globalThis);
   }
@@ -1391,6 +1434,145 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       !isVerifiedTeamsMissedCallRehearsalSummary(value, output)
     ) {
       throw new TeamsMissedCallRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    return value;
+  }
+
+  async verifyOauthApplicationReconRehearsalOutput(
+    accessToken: string,
+    output: OauthApplicationReconRehearsalVerificationRequest,
+  ): Promise<VerifiedOauthApplicationReconRehearsalSummary> {
+    const contract = apiRouteContract(
+      "oauth-application-recon-rehearsal-verify",
+    );
+    if (!isBoundedOauthApplicationReconRehearsalRequest(output)) {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "validation-refused",
+        "INPUT_SHAPE",
+      );
+    }
+    let body: string;
+    try {
+      body = JSON.stringify(output);
+    } catch {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "validation-refused",
+      );
+    }
+    if (
+      new TextEncoder().encode(body).byteLength > contract.requestMaxBytes
+    ) {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await this.request(
+        this.oauthApplicationReconRehearsalVerificationUrl,
+        {
+          method: contract.method,
+          credentials: "omit",
+          redirect: "error",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body,
+        },
+      );
+    } catch {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (response.status === 401) {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "unauthorized",
+      );
+    }
+    if (response.status === 403) {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "forbidden",
+      );
+    }
+    if (response.status === 413) {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(
+        response.headers.get("content-type") ?? "",
+      )
+    ) {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+
+    let responseText: string;
+    try {
+      responseText = await readBoundedJsonResponse(
+        response,
+        contract.responseMaxBytes,
+      );
+    } catch (error) {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        error instanceof BoundedResponseTooLargeError
+          ? "response-too-large"
+          : "safe-failure",
+      );
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (!response.ok) {
+      if (
+        response.status === 400 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error", "category"]) &&
+        value.error === "oauth_application_recon_rehearsal_refused" &&
+        typeof value.category === "string" &&
+        OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_FAILURES.includes(
+          value.category as
+            OauthApplicationReconRehearsalVerificationFailure,
+        )
+      ) {
+        throw new OauthApplicationReconRehearsalVerificationClientError(
+          "validation-refused",
+          value.category as
+            OauthApplicationReconRehearsalVerificationFailure,
+        );
+      }
+      if (
+        response.status === 500 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error"]) &&
+        value.error ===
+          "oauth_application_recon_rehearsal_response_too_large"
+      ) {
+        throw new OauthApplicationReconRehearsalVerificationClientError(
+          "response-too-large",
+        );
+      }
+      throw new OauthApplicationReconRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (
+      response.status !== 200 ||
+      !isVerifiedOauthApplicationReconRehearsalSummary(value, output)
+    ) {
+      throw new OauthApplicationReconRehearsalVerificationClientError(
         "safe-failure",
       );
     }

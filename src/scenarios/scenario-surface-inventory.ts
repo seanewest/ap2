@@ -5,6 +5,7 @@ import { TEAMS_MISSED_CALL_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../a
 import { BATCH_FEASIBILITY_API_CAPABILITY } from "../../api/multi-scenario-feasibility.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/private-document-rehearsal-verification.ts";
 import { HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/help-desk-email-rehearsal-verification.ts";
+import { OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/oauth-application-recon-rehearsal-verification.ts";
 import { AVD_MANIFEST_ADAPTER_CAPABILITY } from "../../scripts/avd-three-vm-manifest-adapter.ts";
 import { AVD_THREE_VM_REHEARSAL_CAPABILITY } from "../../scripts/avd-three-vm-rehearsal.ts";
 import { HELP_DESK_EMAIL_REHEARSAL_CAPABILITY } from "../../scripts/help-desk-email-rehearsal.ts";
@@ -175,6 +176,7 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
   BATCH_FEASIBILITY_API_CAPABILITY,
   PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY,
   HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_API_CAPABILITY,
+  OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_API_CAPABILITY,
   SCENARIO_PLAN_API_CAPABILITY,
   SCENARIO_RECEIPT_API_CAPABILITY,
   REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
