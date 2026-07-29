@@ -47,11 +47,20 @@ they are not hosted-deployment readiness evidence or an orchestration SLA.
 ## Production image boundary
 
 The API image uses the exact Playwright release and Ubuntu-family tag that
-matches the runtime `playwright` package. The local audit records the resolved
-base digest, but the Dockerfile does not freeze it: this repository has no
-multi-architecture digest-renewal process, and pinning one platform digest
-without that maintenance contract would become stale. A future digest policy
-needs an explicit automated update and review path.
+matches the runtime `playwright` package. Both Docker stages also pin the
+approved linux/amd64 child-manifest digest. `container-base-lock.json` records
+the tag's manifest-list digest, its single linux/amd64 child digest, and the
+intended platform. The image remains intentionally linux/amd64-only.
+
+`npm run update:api-container-base` is the sole base-renewal command. It reads
+the exact Playwright version from `package.json`, queries only Microsoft's
+Container Registry over TLS, hashes the returned manifest list and child
+manifest, and hashes the child's config before accepting its declared
+linux/amd64 platform. It then rewrites only the deterministic base lock and
+the two bounded `FROM` lines. The resulting digest change is ordinary reviewable
+source; the command does not pull, build, publish, or approve an image. Routine
+Playwright updates therefore update the package lock first, run this command,
+and review both dependency and base-digest changes together.
 
 The final stage contains `dist-api/index.js`, production `node_modules`, and
 `container-provenance.json`; build source maps are removed before the stage
@@ -62,19 +71,21 @@ filter, and no host/device mounts. Chromium receives only a bounded `/tmp`
 tmpfs when its local proof runs.
 
 `npm run check:api-container-provenance` deterministically binds every file in
-the Docker build input allowlist, the complete lockfile, the exact Playwright
-base release tag, and each installed production Node dependency. During the
-image build, it additionally binds the exact sole API bundle by path, byte
-count, and digest. The embedded manifest lists only that fixed image-relative
-artifact path, public package name/version/integrity metadata, and bounded
-classification fields; source contents or paths, resolution URLs, environment
-values, and registry credentials are never emitted. The production-container
-test compares the embedded input and dependency bindings to the current
-repository, then independently hashes the final bundle and manifest.
+the Docker build input allowlist, the complete lockfile, the base lock's tag,
+index digest, linux/amd64 manifest digest, and each installed production Node
+dependency. It rejects a tag-only `FROM`, a stale Playwright/base-lock pair, a
+wrong platform, malformed digest, or a Dockerfile/lock mismatch without a
+registry read. During the image build, it additionally binds the exact sole API
+bundle by path, byte count, and digest. The embedded manifest lists only that
+fixed image-relative artifact path, public package name/version/integrity
+metadata, and bounded classification fields; source contents or paths,
+resolution URLs, environment values, and registry credentials are never
+emitted. The production-container test compares the embedded base, input, and
+dependency bindings to the current repository, then independently hashes the
+final bundle and manifest.
 
 This is deliberately a provenance manifest, not a published SBOM or
-attestation. The base tag binds the Ubuntu/Playwright runtime but does not
-enumerate its OS and browser components; the final image digest is available
-only after build. Publishing a full multi-architecture SBOM or attestation,
-and pinning a base digest, still requires an explicit automated image
-publication and update path.
+attestation. The pinned child manifest binds the selected base bytes but does
+not enumerate or independently attest its OS and browser components; the final
+image digest is available only after build. Publishing an SBOM, image, or
+attestation remains a separate operational decision.

@@ -30,9 +30,14 @@ describe("API container provenance", () => {
 
     expect(second).toEqual(first);
     expect(first.baseImage).toEqual({
-      classification: "mutable-version-tag",
-      reference: "mcr.microsoft.com/playwright:v1.2.3-noble",
+      classification: "pinned-platform-manifest",
+      indexDigest: `sha256:${"a".repeat(64)}`,
+      manifestDigest: `sha256:${"b".repeat(64)}`,
+      platform: "linux/amd64",
+      reference:
+        `mcr.microsoft.com/playwright:v1.2.3-noble@sha256:${"b".repeat(64)}`,
       runtimeComponents: "reference-bound-not-enumerated",
+      tagReference: "mcr.microsoft.com/playwright:v1.2.3-noble",
     });
     expect(first.productionComponents.count).toBe(1);
     expect(first.productionComponents.components).toEqual([
@@ -51,10 +56,15 @@ describe("API container provenance", () => {
       schemaVersion: 1,
       label: "API_CONTAINER_PROVENANCE",
       status: "pass",
-      baseImage: "mcr.microsoft.com/playwright:v1.2.3-noble",
-      baseClassification: "mutable-version-tag",
+      baseImage:
+        `mcr.microsoft.com/playwright:v1.2.3-noble@sha256:${"b".repeat(64)}`,
+      baseClassification: "pinned-platform-manifest",
+      baseIndexDigest: `sha256:${"a".repeat(64)}`,
+      baseManifestDigest: `sha256:${"b".repeat(64)}`,
+      basePlatform: "linux/amd64",
       baseRuntimeComponents: "reference-bound-not-enumerated",
-      buildInputCount: 9,
+      baseTag: "mcr.microsoft.com/playwright:v1.2.3-noble",
+      buildInputCount: 10,
       buildInputsDigest: first.buildInputs.digest,
       buildArtifactClassification: "resolved-during-image-build",
       buildArtifactCount: 0,
@@ -113,6 +123,52 @@ describe("API container provenance", () => {
     );
     expect(() => createApiContainerProvenance(root)).toThrow(
       "API_CONTAINER_PROVENANCE_BASE_DRIFT",
+    );
+
+    const tagOnly = fixtureRepository();
+    replace(
+      join(tagOnly, "Dockerfile"),
+      `@sha256:${"b".repeat(64)}`,
+      "",
+    );
+    expect(() => createApiContainerProvenance(tagOnly)).toThrow(
+      "API_CONTAINER_PROVENANCE_BASE_DRIFT",
+    );
+
+    const unreviewedDigest = fixtureRepository();
+    replace(
+      join(unreviewedDigest, "Dockerfile"),
+      `sha256:${"b".repeat(64)}`,
+      `sha256:${"c".repeat(64)}`,
+    );
+    expect(() => createApiContainerProvenance(unreviewedDigest)).toThrow(
+      "API_CONTAINER_PROVENANCE_BASE_DRIFT",
+    );
+  });
+
+  it("fails closed on a stale or malformed base lock", () => {
+    const stale = fixtureRepository();
+    mutateBaseLock(stale, (lock) => {
+      lock.tag = "v1.2.2-noble";
+    });
+    expect(() => createApiContainerProvenance(stale)).toThrow(
+      "API_CONTAINER_PROVENANCE_BASE_LOCK_STALE",
+    );
+
+    const wrongPlatform = fixtureRepository();
+    mutateBaseLock(wrongPlatform, (lock) => {
+      lock.platform.architecture = "arm64";
+    });
+    expect(() => createApiContainerProvenance(wrongPlatform)).toThrow(
+      "API_CONTAINER_BASE_LOCK_SCHEMA",
+    );
+
+    const wrongDigest = fixtureRepository();
+    mutateBaseLock(wrongDigest, (lock) => {
+      lock.manifestDigest = "sha256:not-a-digest";
+    });
+    expect(() => createApiContainerProvenance(wrongDigest)).toThrow(
+      "API_CONTAINER_BASE_LOCK_SCHEMA",
     );
   });
 
@@ -232,9 +288,9 @@ function fixtureRepository(): string {
   writeFileSync(
     join(root, "Dockerfile"),
     [
-      "FROM mcr.microsoft.com/playwright:v1.2.3-noble AS build",
+      `FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.2.3-noble@sha256:${"b".repeat(64)} AS build`,
       "WORKDIR /app",
-      "COPY .dockerignore Dockerfile package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./",
+      "COPY .dockerignore Dockerfile container-base-lock.json package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./",
       "RUN npm ci",
       "COPY api ./api",
       "COPY scripts ./scripts",
@@ -244,7 +300,7 @@ function fixtureRepository(): string {
       "RUN npm run build:api && rm -f dist-api/*.map",
       "RUN npm prune --omit=dev",
       "RUN node scripts/api-container-provenance.ts --output container-provenance.json",
-      "FROM mcr.microsoft.com/playwright:v1.2.3-noble",
+      `FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.2.3-noble@sha256:${"b".repeat(64)}`,
       "COPY --from=build /app/dist-api ./dist-api",
       "COPY --from=build /app/node_modules ./node_modules",
       "COPY --from=build /app/container-provenance.json ./container-provenance.json",
@@ -253,6 +309,19 @@ function fixtureRepository(): string {
   );
   writeFileSync(join(root, "package.json"), JSON.stringify({
     dependencies: { playwright: "1.2.3" },
+  }));
+  writeFileSync(join(root, "container-base-lock.json"), JSON.stringify({
+    schemaVersion: 1,
+    kind: "ap2-api-container-base-lock",
+    registry: "mcr.microsoft.com",
+    repository: "playwright",
+    tag: "v1.2.3-noble",
+    indexDigest: `sha256:${"a".repeat(64)}`,
+    manifestDigest: `sha256:${"b".repeat(64)}`,
+    platform: {
+      os: "linux",
+      architecture: "amd64",
+    },
   }));
   writeFileSync(join(root, "package-lock.json"), JSON.stringify({
     lockfileVersion: 3,
@@ -295,6 +364,26 @@ function mutateLock(
   const path = join(root, "package-lock.json");
   const lock = JSON.parse(readFileSync(path, "utf8")) as {
     packages: Record<string, Record<string, unknown>>;
+  };
+  mutation(lock);
+  writeFileSync(path, JSON.stringify(lock));
+}
+
+function mutateBaseLock(
+  root: string,
+  mutation: (lock: {
+    tag: string;
+    indexDigest: string;
+    manifestDigest: string;
+    platform: { architecture: string; os: string };
+  }) => void,
+): void {
+  const path = join(root, "container-base-lock.json");
+  const lock = JSON.parse(readFileSync(path, "utf8")) as {
+    tag: string;
+    indexDigest: string;
+    manifestDigest: string;
+    platform: { architecture: string; os: string };
   };
   mutation(lock);
   writeFileSync(path, JSON.stringify(lock));

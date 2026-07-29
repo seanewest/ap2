@@ -10,6 +10,7 @@
     "build:calling-bot": "tsc -p tsconfig.calling-bot.json",
     "check:artifact-hygiene": "node scripts/check-repository-artifact-hygiene.ts",
     "check:api-container-provenance": "node scripts/api-container-provenance.ts",
+    "update:api-container-base": "node scripts/update-api-container-base.ts",
     "check:workflow-security": "node scripts/check-github-actions-security.ts",
     "check:windows-host-boundary": "node scripts/check-windows-host-boundary.ts",
     "check:spa-bundle": "node scripts/check-spa-bundle-budget.ts",

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "ap2-api-container-base-lock",
+  "registry": "mcr.microsoft.com",
+  "repository": "playwright",
+  "tag": "v1.61.1-noble",
+  "indexDigest": "sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48",
+  "manifestDigest": "sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6",
+  "platform": {
+    "os": "linux",
+    "architecture": "amd64"
+  }
+}

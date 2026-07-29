@@ -229,6 +229,10 @@ function verifyProductionImageContract(): Record<string, unknown> {
   const expectedProvenance = createApiContainerProvenance(process.cwd());
   const expectedProvenanceSummary = {
     baseImage: expectedProvenance.baseImage.reference,
+    baseIndexDigest: expectedProvenance.baseImage.indexDigest,
+    baseManifestDigest: expectedProvenance.baseImage.manifestDigest,
+    basePlatform: expectedProvenance.baseImage.platform,
+    baseTag: expectedProvenance.baseImage.tagReference,
     buildInputsDigest: expectedProvenance.buildInputs.digest,
     lockfileDigest: expectedProvenance.lockfile.digest,
     productionComponentCount: expectedProvenance.productionComponents.count,
@@ -252,14 +256,20 @@ function verifyProductionImageContract(): Record<string, unknown> {
     ? Reflect.get(inspected.Config, String.fromCharCode(67, 109, 100))
     : undefined;
   const exposedPorts = Object.keys(inspected?.Config?.ExposedPorts ?? {}).sort();
+  const expectedHealthcheck = [
+    String.fromCharCode(67, 77, 68),
+    "node",
+    "-e",
+    "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+  ];
   if (
     inspected?.Config?.User !== "pwuser" ||
     inspected.Config.WorkingDir !== "/app" ||
     inspected.Config.Entrypoint != null ||
     JSON.stringify(startup) !== JSON.stringify(["node", "dist-api/index.js"]) ||
     JSON.stringify(exposedPorts) !== JSON.stringify(["3000/tcp"]) ||
-    inspected.Healthcheck?.Test?.length !== 2 ||
-    !inspected.Healthcheck.Test[1]?.includes("http://127.0.0.1:3000/health")
+    JSON.stringify(inspected.Healthcheck?.Test) !==
+      JSON.stringify(expectedHealthcheck)
   ) {
     throw new Error("Production image metadata does not match the bounded runtime contract");
   }
@@ -288,7 +298,7 @@ function verifyProductionImageContract(): Record<string, unknown> {
     "const bundleDigest = createHash('sha256').update(bundle).digest('hex');",
     "const artifactDigest = createHash('sha256').update(`dist-api/index.js\\0${bundle.byteLength}\\0${bundleDigest}\\n`).digest('hex');",
     "if (provenance.buildArtifacts.classification !== 'bound-build-output' || provenance.buildArtifacts.count !== 1 || provenance.buildArtifacts.digest !== artifactDigest || JSON.stringify(provenance.buildArtifacts.files) !== JSON.stringify([{bytes:bundle.byteLength,digest:bundleDigest,path:'dist-api/index.js'}])) fail('build artifact provenance');",
-    "console.log(JSON.stringify({uid:process.getuid(),gid:process.getgid(),appEntries:app,distEntries:dist,devDependencies:'absent',caches:'absent',rootFilesystem:'read-only',effectiveCapabilities:'none',noNewPrivileges:true,seccomp:'filter',provenance:{baseImage:provenance.baseImage.reference,buildArtifactCount:provenance.buildArtifacts.count,buildArtifactsDigest:provenance.buildArtifacts.digest,buildInputsDigest:provenance.buildInputs.digest,documentDigest:createHash('sha256').update(provenanceText).digest('hex'),lockfileDigest:provenance.lockfile.digest,productionComponentCount:provenance.productionComponents.count,productionComponentsDigest:provenance.productionComponents.digest}}));",
+    "console.log(JSON.stringify({uid:process.getuid(),gid:process.getgid(),appEntries:app,distEntries:dist,devDependencies:'absent',caches:'absent',rootFilesystem:'read-only',effectiveCapabilities:'none',noNewPrivileges:true,seccomp:'filter',provenance:{baseImage:provenance.baseImage.reference,baseIndexDigest:provenance.baseImage.indexDigest,baseManifestDigest:provenance.baseImage.manifestDigest,basePlatform:provenance.baseImage.platform,baseTag:provenance.baseImage.tagReference,buildArtifactCount:provenance.buildArtifacts.count,buildArtifactsDigest:provenance.buildArtifacts.digest,buildInputsDigest:provenance.buildInputs.digest,documentDigest:createHash('sha256').update(provenanceText).digest('hex'),lockfileDigest:provenance.lockfile.digest,productionComponentCount:provenance.productionComponents.count,productionComponentsDigest:provenance.productionComponents.digest}}));",
   ].join(" ");
   const runtime = JSON.parse(runPodman([
     "run",
