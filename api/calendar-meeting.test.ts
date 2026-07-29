@@ -21,6 +21,11 @@ import {
   type CalendarMeetingResult,
 } from "./calendar-meeting.js";
 import {
+  OperationTelemetry,
+  type OperationTelemetryEvent,
+  type OperationTelemetrySink,
+} from "./operation-telemetry.js";
+import {
   CORY_USER_PRINCIPAL_NAME,
   coryIdentity,
   type DelegatedGraphToken,
@@ -51,6 +56,30 @@ const cancellationResult = {
   organizer: CORY_USER_PRINCIPAL_NAME,
   subject: CALENDAR_MEETING_SUBJECT,
 } as const satisfies CalendarMeetingResult;
+
+function telemetryFixture(...ticks: number[]): {
+  events: OperationTelemetryEvent[];
+  telemetry: OperationTelemetry;
+} {
+  const events: OperationTelemetryEvent[] = [];
+  const sink: OperationTelemetrySink = {
+    record: (event) => events.push(event),
+  };
+  return {
+    events,
+    telemetry: new OperationTelemetry(
+      CALENDAR_MEETING_RUN_ID,
+      sink,
+      () => {
+        const tick = ticks.shift();
+        if (tick === undefined) {
+          throw new Error("Unexpected telemetry clock read.");
+        }
+        return tick;
+      },
+    ),
+  };
+}
 
 function createdMeeting(
   overrides: Record<string, unknown> = {},
@@ -635,6 +664,357 @@ describe("delegated Graph calendar meeting operation", () => {
     await operation.create();
     await expect(operation.cancel()).rejects.toThrow("returned HTTP 503");
     expect(request).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("calendar operation telemetry", () => {
+  it("records normal mutation completion without identity or scenario content", async () => {
+    const telemetry = telemetryFixture(10, 35);
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json(createdMeeting(), { status: 201 }),
+      );
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+      telemetry.telemetry,
+    );
+
+    await expect(operation.create()).resolves.toEqual(configuredResult);
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(telemetry.events).toEqual([
+      {
+        schemaVersion: 1,
+        markerHash: expect.stringMatching(/^m1_[0-9a-f]{24}$/),
+        operationKind: "calendar.create",
+        phase: "execution",
+        outcome: "started",
+        durationMs: 0,
+        reason: "none",
+        ambiguityState: "none",
+        recoveryState: "not-applicable",
+      },
+      {
+        schemaVersion: 1,
+        markerHash: telemetry.events[0]?.markerHash,
+        operationKind: "calendar.create",
+        phase: "execution",
+        outcome: "succeeded",
+        durationMs: 25,
+        reason: "none",
+        ambiguityState: "none",
+        recoveryState: "not-needed",
+      },
+    ]);
+    const serialized = JSON.stringify(telemetry.events);
+    for (const forbidden of [
+      coryToken.token,
+      CORY_OBJECT_ID,
+      CORY_USER_PRINCIPAL_NAME,
+      CALENDAR_MEETING_SUBJECT,
+      CALENDAR_MEETING_BODY,
+      "event/id",
+    ]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
+
+  it("records a definite refusal with safe status and no raw Microsoft response", async () => {
+    const telemetry = telemetryFixture(0, 4);
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json(
+          {
+            error: {
+              message: "Bearer secret-token and learner message body",
+            },
+          },
+          { status: 429 },
+        ),
+      );
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+      telemetry.telemetry,
+    );
+
+    await expect(operation.create()).rejects.toThrow("unconfirmed HTTP 429");
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(telemetry.events).toHaveLength(2);
+    expect(telemetry.events[1]).toMatchObject({
+      outcome: "refused",
+      reason: "upstream-refusal",
+      ambiguityState: "none",
+      recoveryState: "not-needed",
+      upstreamStatus: 429,
+    });
+    expect(JSON.stringify(telemetry.events)).not.toContain("secret-token");
+    expect(JSON.stringify(telemetry.events)).not.toContain(
+      "learner message body",
+    );
+  });
+
+  it("records an ambiguous accepted mutation shape without retrying", async () => {
+    const telemetry = telemetryFixture(20, 29);
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json(
+          {
+            id: "tenant-event-id",
+            body: "private tenant object contents",
+          },
+          { status: 201 },
+        ),
+      );
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+      telemetry.telemetry,
+    );
+
+    await expect(operation.create()).rejects.toThrow("unconfirmed HTTP 201");
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(telemetry.events[1]).toMatchObject({
+      outcome: "ambiguous",
+      reason: "invalid-upstream-shape",
+      ambiguityState: "possible-mutation",
+      upstreamStatus: 201,
+    });
+    const serialized = JSON.stringify(telemetry.events);
+    expect(serialized).not.toContain("tenant-event-id");
+    expect(serialized).not.toContain("private tenant object contents");
+  });
+
+  it("records read-only recovery and cleanup completion in four bounded events", async () => {
+    const telemetry = telemetryFixture(0, 2, 7, 15);
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        Response.json({ value: [recoverableMeeting()] }),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 202 }));
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+      telemetry.telemetry,
+    );
+
+    await expect(operation.cancel()).resolves.toEqual(cancellationResult);
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(telemetry.events.map((event) => [
+      event.phase,
+      event.outcome,
+      event.recoveryState,
+    ])).toEqual([
+      ["cleanup", "started", "not-applicable"],
+      ["recovery", "started", "in-progress"],
+      ["recovery", "succeeded", "reconciled"],
+      ["cleanup", "succeeded", "reconciled"],
+    ]);
+    expect(telemetry.events).toHaveLength(4);
+    expect(telemetry.events[2]?.durationMs).toBe(5);
+    expect(telemetry.events[3]?.durationMs).toBe(15);
+  });
+
+  it("records unresolved recovery and refuses cleanup without mutation", async () => {
+    const telemetry = telemetryFixture(0, 1, 3, 4);
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json({ value: [] }));
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+      telemetry.telemetry,
+    );
+
+    await expect(operation.cancel()).rejects.toBeInstanceOf(
+      CalendarMeetingConflictError,
+    );
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]?.[1]?.method).toBe("GET");
+    expect(telemetry.events.map((event) => [
+      event.phase,
+      event.outcome,
+      event.ambiguityState,
+      event.recoveryState,
+    ])).toEqual([
+      ["cleanup", "started", "none", "not-applicable"],
+      ["recovery", "started", "none", "in-progress"],
+      ["recovery", "refused", "unresolved", "unresolved"],
+      ["cleanup", "refused", "unresolved", "unresolved"],
+    ]);
+    expect(telemetry.events).toHaveLength(4);
+  });
+
+  it("records unavailable recovery as ambiguous while safely refusing cleanup", async () => {
+    const telemetry = telemetryFixture(0, 1, 3, 4);
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json(
+          {
+            error: {
+              message: "Bearer secret and raw Microsoft recovery body",
+            },
+          },
+          { status: 503 },
+        ),
+      );
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+      telemetry.telemetry,
+    );
+
+    await expect(operation.cancel()).rejects.toBeInstanceOf(
+      CalendarMeetingConflictError,
+    );
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]?.[1]?.method).toBe("GET");
+    expect(telemetry.events[2]).toMatchObject({
+      phase: "recovery",
+      outcome: "ambiguous",
+      reason: "upstream-unavailable",
+      ambiguityState: "unresolved",
+      recoveryState: "unresolved",
+      upstreamStatus: 503,
+    });
+    expect(telemetry.events[3]).toMatchObject({
+      phase: "cleanup",
+      outcome: "refused",
+      reason: "upstream-unavailable",
+      ambiguityState: "unresolved",
+      recoveryState: "unresolved",
+      upstreamStatus: 503,
+    });
+    expect(telemetry.events).toHaveLength(4);
+    const serialized = JSON.stringify(telemetry.events);
+    expect(serialized).not.toContain("Bearer secret");
+    expect(serialized).not.toContain("raw Microsoft recovery body");
+  });
+
+  it("keeps a recovery transport failure raw-error-free and does not cancel", async () => {
+    const telemetry = telemetryFixture(0, 1, 3, 4);
+    const request = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(
+        new Error("Bearer transport-token and private response body"),
+      );
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+      telemetry.telemetry,
+    );
+
+    await expect(operation.cancel()).rejects.toThrow("transport-token");
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]?.[1]?.method).toBe("GET");
+    expect(telemetry.events[2]).toMatchObject({
+      phase: "recovery",
+      outcome: "ambiguous",
+      reason: "upstream-unavailable",
+      ambiguityState: "unresolved",
+      recoveryState: "unresolved",
+    });
+    expect(telemetry.events[2]).not.toHaveProperty("upstreamStatus");
+    expect(telemetry.events[3]).toMatchObject({
+      phase: "cleanup",
+      outcome: "refused",
+      reason: "upstream-unavailable",
+      ambiguityState: "unresolved",
+      recoveryState: "unresolved",
+    });
+    expect(telemetry.events).toHaveLength(4);
+    const serialized = JSON.stringify(telemetry.events);
+    expect(serialized).not.toContain("transport-token");
+    expect(serialized).not.toContain("private response body");
+  });
+
+  it("records a paginated recovery envelope as ambiguous without cancellation", async () => {
+    const telemetry = telemetryFixture(0, 1, 3, 4);
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        Response.json({
+          value: [recoverableMeeting()],
+          "@odata.nextLink":
+            "https://graph.microsoft.com/private-tenant-page?token=secret",
+        }),
+      );
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+      telemetry.telemetry,
+    );
+
+    await expect(operation.cancel()).rejects.toBeInstanceOf(
+      CalendarMeetingConflictError,
+    );
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]?.[1]?.method).toBe("GET");
+    expect(telemetry.events[2]).toMatchObject({
+      phase: "recovery",
+      outcome: "ambiguous",
+      reason: "invalid-upstream-shape",
+      ambiguityState: "unresolved",
+      recoveryState: "unresolved",
+      upstreamStatus: 200,
+    });
+    expect(telemetry.events[3]).toMatchObject({
+      phase: "cleanup",
+      outcome: "refused",
+      reason: "invalid-upstream-shape",
+      ambiguityState: "unresolved",
+      recoveryState: "unresolved",
+      upstreamStatus: 200,
+    });
+    expect(telemetry.events).toHaveLength(4);
+    const serialized = JSON.stringify(telemetry.events);
+    expect(serialized).not.toContain("private-tenant-page");
+    expect(serialized).not.toContain("token=secret");
+  });
+
+  it("does not retry or alter failure behavior when the telemetry sink fails", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 503 }));
+    const telemetry = new OperationTelemetry(
+      CALENDAR_MEETING_RUN_ID,
+      {
+        record: () => {
+          throw new Error("telemetry sink failure");
+        },
+      },
+      () => 0,
+    );
+    const operation = new DelegatedGraphCalendarMeetingOperation(
+      { getToken: vi.fn().mockResolvedValue(coryToken) },
+      cory,
+      request,
+      telemetry,
+    );
+
+    await expect(operation.create()).rejects.toThrow("unconfirmed HTTP 503");
+    expect(request).toHaveBeenCalledOnce();
   });
 });
 

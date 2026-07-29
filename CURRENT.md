@@ -36,6 +36,13 @@ At each material checkpoint, the Captain checks and updates this docket against 
   persistence architecture decision. Do not substitute memory or filesystem
   state. See the
   [durable operation journal decision](docs/durable-operation-journal-decision.md).
+- **Bounded operation telemetry — locally productized:** Calendar create,
+  cancel, and explicit read-only recovery use a sink-agnostic in-process
+  structured event contract. Correlation is a bounded marker hash; dimensions
+  are enums; raw identity, scenario content, credentials, browser state, and
+  Microsoft responses cannot enter the event shape. The console sink is
+  observational and introduces no persistence or retry. See
+  [operation telemetry](docs/operation-telemetry.md).
 
 ## Cleanup later
 

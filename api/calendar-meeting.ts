@@ -6,6 +6,12 @@ import {
   type DelegatedGraphTokenProvider,
   type SimulatedUserIdentity,
 } from "./simulated-user.js";
+import {
+  OperationTelemetry,
+  type OperationReasonCategory,
+  type OperationRecoveryState,
+  type OperationTelemetryRun,
+} from "./operation-telemetry.js";
 
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
 const GRAPH_EVENTS_URL = `${GRAPH_ROOT}/me/events`;
@@ -57,6 +63,22 @@ export class CalendarMeetingConflictError extends Error {
   constructor() {
     super("The fixed calendar meeting is not in the expected state.");
     this.name = "CalendarMeetingConflictError";
+  }
+}
+
+class CalendarMeetingRecoveryReadError extends CalendarMeetingConflictError {
+  readonly telemetryReason: OperationReasonCategory;
+  readonly upstreamStatus: number;
+
+  constructor(upstreamStatus: number) {
+    super();
+    this.name = "CalendarMeetingRecoveryReadError";
+    this.upstreamStatus = upstreamStatus;
+    this.telemetryReason = upstreamStatus >= 500
+      ? "upstream-unavailable"
+      : upstreamStatus >= 400
+        ? "upstream-refusal"
+        : "invalid-upstream-shape";
   }
 }
 
@@ -139,12 +161,16 @@ export class DelegatedGraphCalendarMeetingOperation
   readonly #tokenProvider: DelegatedGraphTokenProvider;
   readonly #coryIdentity: SimulatedUserIdentity;
   readonly #request: typeof fetch;
+  readonly #telemetry: OperationTelemetry;
   #eventId: string | undefined;
 
   constructor(
     tokenProvider: DelegatedGraphTokenProvider,
     coryIdentity: SimulatedUserIdentity,
     request: typeof fetch = fetch,
+    telemetry: OperationTelemetry = new OperationTelemetry(
+      CALENDAR_MEETING_RUN_ID,
+    ),
   ) {
     if (coryIdentity.userPrincipalName !== CORY_USER_PRINCIPAL_NAME) {
       throw new TypeError("The calendar organizer must be Cory West.");
@@ -152,62 +178,117 @@ export class DelegatedGraphCalendarMeetingOperation
     this.#tokenProvider = tokenProvider;
     this.#coryIdentity = coryIdentity;
     this.#request = request.bind(globalThis);
+    this.#telemetry = telemetry;
   }
 
   async create(): Promise<
     Extract<CalendarMeetingResult, { state: "configured" }>
   > {
-    if (this.#eventId) {
-      throw new CalendarMeetingConflictError();
-    }
-    const cory = await this.#coryToken();
-    const response = await this.#request(GRAPH_EVENTS_URL, {
-      method: "POST",
-      redirect: "error",
-      headers: {
-        Authorization: `Bearer ${cory.token}`,
-        "Content-Type": "application/json",
-        Prefer: 'outlook.timezone="UTC"',
-      },
-      body: JSON.stringify(fixedMeetingRequest()),
-    });
-    const value = await readJson(response);
-    if (response.status !== 201 || !isExactCreatedMeeting(value)) {
-      throw new Error(
-        `Microsoft Graph calendar creation returned an unconfirmed HTTP ${response.status} result.`,
-      );
-    }
-    this.#eventId = value.id;
-    return configuredResult();
-  }
-
-  async cancel(): Promise<
-    Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
-  > {
-    const cory = await this.#coryToken();
-    const eventId = this.#eventId ?? await this.#recoverEventId(cory);
-    const response = await this.#request(
-      `${GRAPH_EVENTS_URL}/${encodeURIComponent(eventId)}/cancel`,
-      {
+    const run = this.#telemetry.begin("calendar.create", "execution");
+    let mutationAttempted = false;
+    try {
+      if (this.#eventId) {
+        throw new CalendarMeetingConflictError();
+      }
+      const cory = await this.#coryToken();
+      mutationAttempted = true;
+      const response = await this.#request(GRAPH_EVENTS_URL, {
         method: "POST",
         redirect: "error",
         headers: {
           Authorization: `Bearer ${cory.token}`,
           "Content-Type": "application/json",
+          Prefer: 'outlook.timezone="UTC"',
         },
-        body: JSON.stringify({ comment: CALENDAR_MEETING_CANCEL_COMMENT }),
-      },
-    );
-    if (response.status !== 202) {
-      throw new Error(
-        `Microsoft Graph calendar cancellation returned HTTP ${response.status}.`,
-      );
+        body: JSON.stringify(fixedMeetingRequest()),
+      });
+      const value = await readJson(response);
+      if (response.status !== 201 || !isExactCreatedMeeting(value)) {
+        finishMutationResponse(
+          run,
+          response.status,
+          response.status === 201,
+          "not-needed",
+        );
+        throw new Error(
+          `Microsoft Graph calendar creation returned an unconfirmed HTTP ${response.status} result.`,
+        );
+      }
+      this.#eventId = value.id;
+      run.finish("succeeded");
+      return configuredResult();
+    } catch (error) {
+      finishUnexpected(run, mutationAttempted, "not-needed", error);
+      throw error;
     }
-    return {
-      state: "cancellation-accepted",
-      organizer: CORY_USER_PRINCIPAL_NAME,
-      subject: CALENDAR_MEETING_SUBJECT,
-    };
+  }
+
+  async cancel(): Promise<
+    Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
+  > {
+    const run = this.#telemetry.begin("calendar.cancel", "cleanup");
+    let mutationAttempted = false;
+    let recoveryState: OperationRecoveryState = "not-needed";
+    try {
+      const cory = await this.#coryToken();
+      let eventId = this.#eventId;
+      if (!eventId) {
+        const recovery = run.beginRecovery();
+        recoveryState = "unresolved";
+        try {
+          eventId = await this.#recoverEventId(cory);
+          recoveryState = "reconciled";
+          recovery.finish("succeeded", { recoveryState });
+        } catch (error) {
+          const failure = classifyRecoveryFailure(error);
+          recovery.finish(failure.outcome, {
+            reason: failure.reason,
+            ambiguityState: "unresolved",
+            recoveryState,
+            ...(failure.upstreamStatus === undefined
+              ? {}
+              : { upstreamStatus: failure.upstreamStatus }),
+          });
+          run.finish("refused", {
+            reason: failure.reason,
+            ambiguityState: "unresolved",
+            recoveryState,
+            ...(failure.upstreamStatus === undefined
+              ? {}
+              : { upstreamStatus: failure.upstreamStatus }),
+          });
+          throw error;
+        }
+      }
+      mutationAttempted = true;
+      const response = await this.#request(
+        `${GRAPH_EVENTS_URL}/${encodeURIComponent(eventId)}/cancel`,
+        {
+          method: "POST",
+          redirect: "error",
+          headers: {
+            Authorization: `Bearer ${cory.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ comment: CALENDAR_MEETING_CANCEL_COMMENT }),
+        },
+      );
+      if (response.status !== 202) {
+        finishMutationResponse(run, response.status, false, recoveryState);
+        throw new Error(
+          `Microsoft Graph calendar cancellation returned HTTP ${response.status}.`,
+        );
+      }
+      run.finish("succeeded", { recoveryState });
+      return {
+        state: "cancellation-accepted",
+        organizer: CORY_USER_PRINCIPAL_NAME,
+        subject: CALENDAR_MEETING_SUBJECT,
+      };
+    } catch (error) {
+      finishUnexpected(run, mutationAttempted, recoveryState, error);
+      throw error;
+    }
   }
 
   async #recoverEventId(cory: DelegatedGraphToken): Promise<string> {
@@ -257,12 +338,18 @@ export class DelegatedGraphCalendarMeetingOperation
       },
     });
     const value = await readJson(response);
+    if (response.status !== 200) {
+      throw new CalendarMeetingRecoveryReadError(response.status);
+    }
     if (
-      response.status !== 200 ||
       !isRecord(value) ||
       !Array.isArray(value.value) ||
+      value["@odata.nextLink"] !== undefined
+    ) {
+      throw new CalendarMeetingRecoveryReadError(response.status);
+    }
+    if (
       value.value.length !== 1 ||
-      value["@odata.nextLink"] !== undefined ||
       !isExactRecoverableMeeting(value.value[0])
     ) {
       throw new CalendarMeetingConflictError();
@@ -454,6 +541,78 @@ function noLocation(value: unknown): boolean {
       (value.displayName === undefined || value.displayName === "") &&
       (value.locationUri === undefined || value.locationUri === ""))
   );
+}
+
+function finishMutationResponse(
+  run: OperationTelemetryRun,
+  status: number,
+  invalidSuccessShape: boolean,
+  recoveryState: OperationRecoveryState,
+): void {
+  if (invalidSuccessShape || status < 400) {
+    run.finish("ambiguous", {
+      reason: "invalid-upstream-shape",
+      ambiguityState: "possible-mutation",
+      recoveryState,
+      upstreamStatus: status,
+    });
+    return;
+  }
+  if (status < 500) {
+    run.finish("refused", {
+      reason: "upstream-refusal",
+      recoveryState,
+      upstreamStatus: status,
+    });
+    return;
+  }
+  run.finish("ambiguous", {
+    reason: "upstream-unavailable",
+    ambiguityState: "possible-mutation",
+    recoveryState,
+    upstreamStatus: status,
+  });
+}
+
+function classifyRecoveryFailure(error: unknown): {
+  outcome: "refused" | "ambiguous";
+  reason: OperationReasonCategory;
+  upstreamStatus?: number;
+} {
+  if (error instanceof CalendarMeetingRecoveryReadError) {
+    return {
+      outcome: error.telemetryReason === "upstream-refusal"
+        ? "refused"
+        : "ambiguous",
+      reason: error.telemetryReason,
+      upstreamStatus: error.upstreamStatus,
+    };
+  }
+  if (error instanceof CalendarMeetingConflictError) {
+    return {
+      outcome: "refused",
+      reason: "precondition-refusal",
+    };
+  }
+  return {
+    outcome: "ambiguous",
+    reason: "upstream-unavailable",
+  };
+}
+
+function finishUnexpected(
+  run: OperationTelemetryRun,
+  mutationAttempted: boolean,
+  recoveryState: OperationRecoveryState,
+  error: unknown,
+): void {
+  run.finish(mutationAttempted ? "ambiguous" : "refused", {
+    reason: error instanceof CalendarMeetingConflictError
+      ? "precondition-refusal"
+      : "unexpected",
+    ambiguityState: mutationAttempted ? "possible-mutation" : "none",
+    recoveryState,
+  });
 }
 
 async function readJson(response: Response): Promise<unknown> {

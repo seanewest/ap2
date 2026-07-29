@@ -201,6 +201,12 @@ loss. The live proof therefore requires `maxReplicas=1`. The same
 [durable operation journal decision](durable-operation-journal-decision.md)
 applies to this production-wired consumer.
 
+Calendar create, cancel, and explicit read-only recovery now pass through the
+in-process [operation telemetry contract](operation-telemetry.md). The API
+emits only bounded structured events with a hashed marker, enum dimensions,
+duration, sanitized status, and ambiguity/recovery state. Telemetry does not
+persist, claim, or retry work, and sink failure does not alter Graph behavior.
+
 Production enables the calendar operation only when the existing Homer/shared
 client configuration and all three Cory settings are present:
 
