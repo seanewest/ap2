@@ -38,6 +38,8 @@ import {
   type SimulatedEmailResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "./api/server-shutdown";
+import { withApiSupportReference } from "./api/support-reference";
 import {
   isBoundedRehearsalOutputRequest,
 } from "./api/rehearsal-output-verification-contract";
@@ -384,7 +386,7 @@ export function createAfterPartyApp(
 
     const message =
       error instanceof AuthenticationError
-        ? error.message
+        ? withApiSupportReference(error.message, error)
         : "Microsoft sign-in could not be completed. Try again.";
     setState({ kind: "error", message });
   };
@@ -435,7 +437,7 @@ export function createAfterPartyApp(
       }
       const message =
         error instanceof AccessTokenError || error instanceof ApiAccessError
-          ? error.message
+          ? withApiSupportReference(error.message, error)
           : "API access could not be checked. Try again.";
       setSignedInPatch(account, {
         apiAccess: { kind: "error", message },
@@ -470,7 +472,7 @@ export function createAfterPartyApp(
       }
       const message =
         error instanceof AccessTokenError || error instanceof ApiAccessError
-          ? error.message
+          ? withApiSupportReference(error.message, error)
           : "Rehearsal status could not be checked. Try again.";
       setSignedInPatch(account, {
         rehearsalStatus: { kind: "error", message },
@@ -526,6 +528,14 @@ export function createAfterPartyApp(
             : serverShuttingDown
             ? "server-shutting-down"
             : "error",
+          message: withApiSupportReference(
+            unauthorized
+              ? "Your API session expired or this account is not authorized. Sign in again, then refresh."
+              : serverShuttingDown
+              ? SERVER_SHUTTING_DOWN_MESSAGE
+              : "Recent operations could not be loaded. No event details were returned.",
+            error,
+          ),
         },
       });
     }
@@ -560,7 +570,7 @@ export function createAfterPartyApp(
       }
       const message =
         error instanceof AccessTokenError || error instanceof ApiAccessError
-          ? error.message
+          ? withApiSupportReference(error.message, error)
           : "The internal email could not be submitted. Try again.";
       setSignedInPatch(account, {
         simulatedEmail: { kind: "error", message },
@@ -599,7 +609,7 @@ export function createAfterPartyApp(
       }
       const message =
         error instanceof AccessTokenError || error instanceof ApiAccessError
-          ? error.message
+          ? withApiSupportReference(error.message, error)
           : "The help desk email was not confirmed. Do not repeat it.";
       setSignedInPatch(account, {
         helpDeskScenario: {
@@ -678,7 +688,7 @@ export function createAfterPartyApp(
           oneDriveProof: {
             stage: "uncertain",
             activity: "idle",
-            message: error.message,
+            message: withApiSupportReference(error.message, error),
             inviteFailure: error.diagnostic,
           },
         });
@@ -690,7 +700,7 @@ export function createAfterPartyApp(
           oneDriveProof: {
             stage: previousStage,
             activity: "idle",
-            message: error.message,
+            message: withApiSupportReference(error.message, error),
           },
         });
         return;
@@ -699,7 +709,7 @@ export function createAfterPartyApp(
         "The OneDrive change was not confirmed. Do not repeat sharing; clean up explicitly.";
       const message =
         error instanceof AccessTokenError || error instanceof ApiAccessError
-          ? error.message
+          ? withApiSupportReference(error.message, error)
           : fallback;
       setSignedInPatch(account, {
         oneDriveProof: { stage: "uncertain", activity: "idle", message },
@@ -775,14 +785,14 @@ export function createAfterPartyApp(
           calendarMeeting: {
             stage: previousStage,
             activity: "idle",
-            message: error.message,
+            message: withApiSupportReference(error.message, error),
           },
         });
         return;
       }
       const message =
         error instanceof AccessTokenError || error instanceof ApiAccessError
-          ? error.message
+          ? withApiSupportReference(error.message, error)
           : "The calendar change was not confirmed. Do not repeat it.";
       persistCalendarMeetingStage(storage, account, attemptedStage);
       setSignedInPatch(account, {
@@ -842,7 +852,7 @@ export function createAfterPartyApp(
         message: cancelled
           ? "The contact action was cancelled before it started."
           : error instanceof AccessTokenError || error instanceof ApiAccessError
-            ? error.message
+            ? withApiSupportReference(error.message, error)
             : "The contact change was not confirmed. Remove it explicitly; do not create again.",
       }, cancelled ? undefined : account);
     }
@@ -929,7 +939,7 @@ export function createAfterPartyApp(
               ? `The ${definition.label} action was cancelled before it started.`
               : error instanceof AccessTokenError ||
                   error instanceof ApiAccessError
-                ? error.message
+                ? withApiSupportReference(error.message, error)
                 : `The ${definition.label} change was not confirmed. Do not repeat it.`,
           },
         },

@@ -3,6 +3,10 @@
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { REQUIRED_DELEGATED_SCOPE } from "./identity.js";
+import {
+  StructuredConsoleApiRequestTelemetry,
+  type ApiRequestTelemetryEvent,
+} from "./api-telemetry.js";
 import { API_PROCESS_ADMISSION_LIMITS } from "./process-admission.js";
 import {
   API_HEADERS_TIMEOUT_MS,
@@ -12,6 +16,7 @@ import {
   createApiServer,
   type ApiDependencies,
 } from "./server.js";
+import { API_SUPPORT_REFERENCE_HEADER } from "../src/api/support-reference.js";
 
 const policy = {
   tenantId: "fixture-tenant",
@@ -35,6 +40,8 @@ afterEach(async () => {
 describe("API process-local admission", () => {
   it("refuses excess pure work before authentication or body parsing", async () => {
     const gate = deferred();
+    const telemetryMessages: string[] = [];
+    let correlationSequence = 0;
     const compile = vi.fn(async () => {
       await gate.promise;
       return { status: "compiled" };
@@ -47,6 +54,12 @@ describe("API process-local admission", () => {
           ApiDependencies["scenarioPlanService"]
         >["compile"],
       },
+      allowedOrigin: "https://allowed.example.test",
+      requestTelemetry: new StructuredConsoleApiRequestTelemetry({
+        write: (message) => telemetryMessages.push(message),
+        correlation: () =>
+          `r1_${(++correlationSequence).toString(16).padStart(24, "0")}`,
+      }),
     });
     const accepted = Array.from(
       { length: API_PROCESS_ADMISSION_LIMITS.purePerRoute },
@@ -55,6 +68,7 @@ describe("API process-local admission", () => {
         headers: {
           Authorization: "Bearer fixture",
           "Content-Type": "application/json",
+          Origin: "https://allowed.example.test",
         },
         body: "{}",
       }),
@@ -69,6 +83,7 @@ describe("API process-local admission", () => {
       headers: {
         Authorization: "Bearer fixture",
         "Content-Type": "application/json",
+        Origin: "https://allowed.example.test",
       },
       body: "not-json",
     });
@@ -77,6 +92,12 @@ describe("API process-local admission", () => {
       error: "process_capacity_exceeded",
     });
     expect(refused.headers.get("retry-after")).toBeNull();
+    expect(refused.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://allowed.example.test",
+    );
+    expect(refused.headers.get("Access-Control-Expose-Headers")).toBe(
+      API_SUPPORT_REFERENCE_HEADER,
+    );
     expect(verify).toHaveBeenCalledTimes(
       API_PROCESS_ADMISSION_LIMITS.purePerRoute,
     );
@@ -84,6 +105,13 @@ describe("API process-local admission", () => {
     gate.resolve();
     expect((await Promise.all(accepted)).every(({ status }) => status === 200))
       .toBe(true);
+    const capacityEvent = telemetryMessages
+      .map((message) => JSON.parse(message) as ApiRequestTelemetryEvent)
+      .find(({ status }) => status === 503);
+    expect(capacityEvent).toBeDefined();
+    expect(refused.headers.get(API_SUPPORT_REFERENCE_HEADER)).toBe(
+      capacityEvent!.correlationId,
+    );
   });
 
   it("never queues a second mutation on the same route", async () => {

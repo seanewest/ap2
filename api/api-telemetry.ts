@@ -5,9 +5,10 @@ import type {
   ApiRouteContract,
   ApiSideEffectClass,
 } from "../src/api/api-route-contract.js";
+import { API_SUPPORT_REFERENCE_PATTERN } from "../src/api/support-reference.js";
 
 export const API_REQUEST_TELEMETRY_SCHEMA_VERSION = 1;
-export const API_REQUEST_CORRELATION_PATTERN = /^r1_[0-9a-f]{24}$/;
+export const API_REQUEST_CORRELATION_PATTERN = API_SUPPORT_REFERENCE_PATTERN;
 export const MAX_API_REQUEST_DURATION_MS = 60_000;
 export const API_CONNECTION_CLOSED_STATUS = 499;
 
@@ -35,7 +36,7 @@ export interface ApiRequestTelemetry {
     response: ServerResponse,
     contract: ApiRouteContract | undefined,
     shuttingDown: boolean,
-  ): void;
+  ): string | undefined | void;
 }
 
 type Clock = () => number;
@@ -61,9 +62,9 @@ export class StructuredConsoleApiRequestTelemetry
     response: ServerResponse,
     contract: ApiRouteContract | undefined,
     shuttingDown: boolean,
-  ): void {
+  ): string | undefined {
     const correlationId = safeCorrelation(this.#correlation);
-    if (!correlationId) return;
+    if (!correlationId) return undefined;
     const startedAt = safeNow(this.#clock);
     let emitted = false;
     const emit = (status: number, outcome?: ApiRequestOutcome): void => {
@@ -93,6 +94,7 @@ export class StructuredConsoleApiRequestTelemetry
     response.once("close", () => {
       emit(API_CONNECTION_CLOSED_STATUS, "connection-closed");
     });
+    return correlationId;
   }
 }
 

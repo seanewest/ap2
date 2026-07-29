@@ -576,6 +576,7 @@ describe("After Party authentication UI", () => {
   });
 
   it("shows a safe failure and allows retry", async () => {
+    const supportReference = "r1_0123456789abcdef01234567";
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",
       account,
@@ -583,7 +584,12 @@ describe("After Party authentication UI", () => {
     });
     authentication.acquireAccessToken.mockResolvedValue("temporary-token");
     api.checkAccess
-      .mockRejectedValueOnce(new ApiAccessError("The API is unavailable. Try again."))
+      .mockRejectedValueOnce(
+        new ApiAccessError("The API is unavailable. Try again.")
+          .bindSupportReference(new Response(null, {
+            headers: { "X-AP2-Support-Reference": supportReference },
+          })),
+      )
       .mockResolvedValueOnce({
         callerType: "delegated",
         tenantId: "student-tenant",
@@ -594,12 +600,16 @@ describe("After Party authentication UI", () => {
     apiButton()?.click();
     await nextTask();
     expect(root.textContent).toContain("The API is unavailable. Try again.");
+    expect(root.textContent).toContain(
+      `Support reference: ${supportReference}.`,
+    );
     expect(apiButton()?.textContent).toBe("Check API access");
 
     apiButton()?.click();
     await nextTask();
     expect(api.checkAccess).toHaveBeenCalledTimes(2);
     expect(root.textContent).toContain("API access confirmed");
+    expect(root.textContent).not.toContain(supportReference);
   });
 
   it("shows API token acquisition cancellation without calling the API", async () => {

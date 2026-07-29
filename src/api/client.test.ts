@@ -68,6 +68,26 @@ describe("HTTP After Party API client", () => {
     },
   );
 
+  it("binds a valid response support reference without exposing response detail", async () => {
+    const supportReference = "r1_0123456789abcdef01234567";
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({ error: "unsafe upstream detail" }, {
+        status: 401,
+        headers: { "X-AP2-Support-Reference": supportReference },
+      }),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example",
+      request,
+    );
+
+    await expect(client.checkAccess("temporary-token")).rejects.toMatchObject({
+      category: "unauthorized",
+      supportReference,
+      message: "API access needs Microsoft authorization. Try again.",
+    });
+  });
+
   it("does not promote an expanded 503 body to the shutdown category", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(
       Response.json({

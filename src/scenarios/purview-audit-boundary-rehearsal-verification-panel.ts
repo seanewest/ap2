@@ -5,6 +5,7 @@ import {
 } from "../api/purview-audit-boundary-rehearsal-verification-contract";
 import { appendIdentity, createStatus } from "../ui/elements.ts";
 import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown.ts";
+import { withApiSupportReference } from "../api/support-reference.ts";
 import type {
   ScenarioSurfaceCapabilityDeclaration,
 } from "./scenario-surface-capability.ts";
@@ -137,7 +138,10 @@ export function createPurviewAuditBoundaryRehearsalVerificationPanel(
       } catch {
         // Preserve the fixed general failure.
       }
-      show(createStatus(failureMessage(failure), "error"), true);
+      show(createStatus(
+        withApiSupportReference(failureMessage(failure), error),
+        "error",
+      ), true);
     }).finally(() => {
       loading = false;
       submit.disabled = false;

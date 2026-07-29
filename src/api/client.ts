@@ -85,6 +85,10 @@ import {
   SERVER_SHUTTING_DOWN_MESSAGE,
   isExactServerShuttingDown,
 } from "./server-shutdown.ts";
+import {
+  readApiSupportReference,
+  type ApiSupportReferencedError,
+} from "./support-reference.ts";
 
 export const SCENARIO_API_CLIENT_CAPABILITIES = [
   {
@@ -471,7 +475,26 @@ export type ApiAccessErrorCategory =
   | "server-shutting-down"
   | "safe-failure";
 
-export class ApiAccessError extends Error {
+abstract class SupportReferencedApiClientError
+  extends Error
+  implements ApiSupportReferencedError {
+  readonly supportReference?: string;
+
+  bindSupportReference(response: Response): this {
+    const supportReference = readApiSupportReference(response.headers);
+    if (supportReference !== undefined) {
+      Object.defineProperty(this, "supportReference", {
+        configurable: false,
+        enumerable: true,
+        value: supportReference,
+        writable: false,
+      });
+    }
+    return this;
+  }
+}
+
+export class ApiAccessError extends SupportReferencedApiClientError {
   readonly category: ApiAccessErrorCategory;
 
   constructor(
@@ -494,7 +517,7 @@ export type ScenarioPlanClientErrorCategory =
   | "safe-failure"
   | ServerShutdownClientErrorCategory;
 
-export class ScenarioPlanClientError extends Error {
+export class ScenarioPlanClientError extends SupportReferencedApiClientError {
   readonly category: ScenarioPlanClientErrorCategory;
   readonly refusalCategory?: ScenarioPlanErrorCategory;
 
@@ -518,7 +541,8 @@ export type ScenarioEvidenceVerificationClientErrorCategory =
   | "safe-failure"
   | ServerShutdownClientErrorCategory;
 
-export class ScenarioEvidenceVerificationClientError extends Error {
+export class ScenarioEvidenceVerificationClientError
+  extends SupportReferencedApiClientError {
   readonly category: ScenarioEvidenceVerificationClientErrorCategory;
   readonly refusalCategory?: EvidenceReceiptErrorCode;
 
@@ -542,7 +566,8 @@ export type RehearsalOutputVerificationClientErrorCategory =
   | "safe-failure"
   | ServerShutdownClientErrorCategory;
 
-export class RehearsalOutputVerificationClientError extends Error {
+export class RehearsalOutputVerificationClientError
+  extends SupportReferencedApiClientError {
   readonly category: RehearsalOutputVerificationClientErrorCategory;
   readonly refusalCategory?: RehearsalOutputVerificationFailure;
 
@@ -557,7 +582,8 @@ export class RehearsalOutputVerificationClientError extends Error {
   }
 }
 
-export class PrivateDocumentRehearsalVerificationClientError extends Error {
+export class PrivateDocumentRehearsalVerificationClientError
+  extends SupportReferencedApiClientError {
   readonly category: RehearsalOutputVerificationClientErrorCategory;
   readonly refusalCategory?: PrivateDocumentRehearsalVerificationFailure;
 
@@ -572,7 +598,8 @@ export class PrivateDocumentRehearsalVerificationClientError extends Error {
   }
 }
 
-export class HelpDeskEmailRehearsalVerificationClientError extends Error {
+export class HelpDeskEmailRehearsalVerificationClientError
+  extends SupportReferencedApiClientError {
   readonly category: RehearsalOutputVerificationClientErrorCategory;
   readonly refusalCategory?: HelpDeskEmailRehearsalVerificationFailure;
 
@@ -587,7 +614,8 @@ export class HelpDeskEmailRehearsalVerificationClientError extends Error {
   }
 }
 
-export class TeamsMissedCallRehearsalVerificationClientError extends Error {
+export class TeamsMissedCallRehearsalVerificationClientError
+  extends SupportReferencedApiClientError {
   readonly category: RehearsalOutputVerificationClientErrorCategory;
   readonly refusalCategory?: TeamsMissedCallRehearsalVerificationFailure;
 
@@ -603,7 +631,7 @@ export class TeamsMissedCallRehearsalVerificationClientError extends Error {
 }
 
 export class OauthApplicationReconRehearsalVerificationClientError
-  extends Error {
+  extends SupportReferencedApiClientError {
   readonly category: RehearsalOutputVerificationClientErrorCategory;
   readonly refusalCategory?:
     OauthApplicationReconRehearsalVerificationFailure;
@@ -620,7 +648,7 @@ export class OauthApplicationReconRehearsalVerificationClientError
 }
 
 export class PurviewAuditBoundaryRehearsalVerificationClientError
-  extends Error {
+  extends SupportReferencedApiClientError {
   readonly category: RehearsalOutputVerificationClientErrorCategory;
   readonly refusalCategory?:
     PurviewAuditBoundaryRehearsalVerificationFailure;
@@ -645,7 +673,8 @@ export type BatchFeasibilityClientErrorCategory =
   | "safe-failure"
   | ServerShutdownClientErrorCategory;
 
-export class BatchFeasibilityClientError extends Error {
+export class BatchFeasibilityClientError
+  extends SupportReferencedApiClientError {
   readonly category: BatchFeasibilityClientErrorCategory;
   readonly refusalCategory?:
     | ScenarioPlanErrorCategory
@@ -743,13 +772,13 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   }
 
   async checkAccess(accessToken: string): Promise<ApiCallerIdentity> {
-    const value = await this.getAuthorizedJson(
+    const { value, response } = await this.getAuthorizedJson(
       this.whoAmIUrl,
       accessToken,
       "whoami",
     );
     if (!isSafeCallerIdentity(value)) {
-      throw new ApiAccessError();
+      throw new ApiAccessError().bindSupportReference(response);
     }
 
     return {
@@ -759,13 +788,13 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   }
 
   async getRehearsalStatus(accessToken: string): Promise<RehearsalStatus> {
-    const value = await this.getAuthorizedJson(
+    const { value, response } = await this.getAuthorizedJson(
       this.rehearsalStatusUrl,
       accessToken,
       "rehearsal-status",
     );
     if (!isSafeRehearsalStatus(value)) {
-      throw new ApiAccessError();
+      throw new ApiAccessError().bindSupportReference(response);
     }
 
     return {
@@ -785,13 +814,13 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     }
     const url = new URL(this.operationEventsUrl);
     url.searchParams.set("order", order);
-    const value = await this.getAuthorizedJson(
+    const { value, response } = await this.getAuthorizedJson(
       url.toString(),
       accessToken,
       "operation-events",
     );
     if (!isSafeRecentOperationEvents(value) || value.order !== order) {
-      throw new ApiAccessError();
+      throw new ApiAccessError().bindSupportReference(response);
     }
     return {
       schemaVersion: 1,
@@ -831,6 +860,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ScenarioPlanClientError("safe-failure");
     }
 
+    try {
     if (response.status === 401) {
       throw new ScenarioPlanClientError("unauthorized");
     }
@@ -892,6 +922,9 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ScenarioPlanClientError("safe-failure");
     }
     return value;
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 
   async verifyScenarioEvidenceReceipt(
@@ -933,6 +966,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new ScenarioEvidenceVerificationClientError("safe-failure");
     }
+    try {
     if (response.status === 401) {
       throw new ScenarioEvidenceVerificationClientError("unauthorized");
     }
@@ -1010,6 +1044,9 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ScenarioEvidenceVerificationClientError("safe-failure");
     }
     return value;
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 
   async verifyRehearsalOutput(
@@ -1051,6 +1088,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new RehearsalOutputVerificationClientError("safe-failure");
     }
+    try {
     if (response.status === 401) {
       throw new RehearsalOutputVerificationClientError("unauthorized");
     }
@@ -1128,6 +1166,9 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new RehearsalOutputVerificationClientError("safe-failure");
     }
     return value;
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 
   async verifyPrivateDocumentRehearsalOutput(
@@ -1178,6 +1219,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "safe-failure",
       );
     }
+    try {
     if (response.status === 401) {
       throw new PrivateDocumentRehearsalVerificationClientError(
         "unauthorized",
@@ -1270,6 +1312,9 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       );
     }
     return value;
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 
   async verifyHelpDeskEmailRehearsalOutput(
@@ -1317,6 +1362,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new HelpDeskEmailRehearsalVerificationClientError("safe-failure");
     }
+    try {
     if (response.status === 401) {
       throw new HelpDeskEmailRehearsalVerificationClientError("unauthorized");
     }
@@ -1398,6 +1444,9 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new HelpDeskEmailRehearsalVerificationClientError("safe-failure");
     }
     return value;
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 
   async verifyTeamsMissedCallRehearsalOutput(
@@ -1447,6 +1496,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "safe-failure",
       );
     }
+    try {
     if (response.status === 401) {
       throw new TeamsMissedCallRehearsalVerificationClientError(
         "unauthorized",
@@ -1539,6 +1589,9 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       );
     }
     return value;
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 
   async verifyOauthApplicationReconRehearsalOutput(
@@ -1590,6 +1643,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "safe-failure",
       );
     }
+    try {
     if (response.status === 401) {
       throw new OauthApplicationReconRehearsalVerificationClientError(
         "unauthorized",
@@ -1686,6 +1740,9 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       );
     }
     return value;
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 
   async verifyPurviewAuditBoundaryRehearsalOutput(
@@ -1737,6 +1794,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "safe-failure",
       );
     }
+    try {
     if (response.status === 401) {
       throw new PurviewAuditBoundaryRehearsalVerificationClientError(
         "unauthorized",
@@ -1833,6 +1891,9 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       );
     }
     return value;
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 
   async calculateMultiScenarioFeasibility(
@@ -1876,6 +1937,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new BatchFeasibilityClientError("safe-failure");
     }
+    try {
     if (response.status === 401) {
       throw new BatchFeasibilityClientError("unauthorized");
     }
@@ -1957,19 +2019,22 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new BatchFeasibilityClientError("safe-failure");
     }
     return value;
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 
   async sendSimulatedEmail(
     accessToken: string,
   ): Promise<SimulatedEmailResult> {
-    const value = await this.getAuthorizedJson(
+    const { value, response } = await this.getAuthorizedJson(
       this.simulatedEmailUrl,
       accessToken,
       "simulated-email-send",
       202,
     );
     if (!isSafeSimulatedEmailResult(value)) {
-      throw new ApiAccessError();
+      throw new ApiAccessError().bindSupportReference(response);
     }
 
     return {
@@ -1983,14 +2048,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   async sendHelpDeskScenario(
     accessToken: string,
   ): Promise<HelpDeskScenarioResult> {
-    const value = await this.getAuthorizedJson(
+    const { value, response } = await this.getAuthorizedJson(
       this.helpDeskScenarioUrl,
       accessToken,
       "help-desk-scenario-send",
       202,
     );
     if (!isSafeHelpDeskScenarioResult(value)) {
-      throw new ApiAccessError();
+      throw new ApiAccessError().bindSupportReference(response);
     }
     return {
       accepted: true,
@@ -2035,7 +2100,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   async createCalendarMeeting(
     accessToken: string,
   ): Promise<Extract<CalendarMeetingResult, { state: "configured" }>> {
-    const value = await this.getAuthorizedJson(
+    const { value, response } = await this.getAuthorizedJson(
       this.calendarMeetingUrl,
       accessToken,
       "calendar-meeting-create",
@@ -2043,7 +2108,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       "calendar",
     );
     if (!isSafeCalendarMeetingResult(value) || value.state !== "configured") {
-      throw new ApiAccessError();
+      throw new ApiAccessError().bindSupportReference(response);
     }
     return {
       state: "configured",
@@ -2060,7 +2125,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   ): Promise<
     Extract<CalendarMeetingResult, { state: "cancellation-accepted" }>
   > {
-    const value = await this.getAuthorizedJson(
+    const { value, response } = await this.getAuthorizedJson(
       this.calendarMeetingCancelUrl,
       accessToken,
       "calendar-meeting-cancel",
@@ -2071,7 +2136,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       !isSafeCalendarMeetingResult(value) ||
       value.state !== "cancellation-accepted"
     ) {
-      throw new ApiAccessError();
+      throw new ApiAccessError().bindSupportReference(response);
     }
     return {
       state: "cancellation-accepted",
@@ -2114,14 +2179,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     state: S,
     validate: (value: unknown) => value is R,
   ): Promise<Extract<R, { state: S }>> {
-    const value = await this.getAuthorizedJson(
+    const { value, response } = await this.getAuthorizedJson(
       routeUrl(this.baseUrl, ownerKey),
       accessToken,
       ownerKey,
       status,
     );
     if (!validate(value) || value.state !== state) {
-      throw new ApiAccessError();
+      throw new ApiAccessError().bindSupportReference(response);
     }
     return value as Extract<R, { state: S }>;
   }
@@ -2238,7 +2303,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     expectedStatus: number,
     expectedState: T,
   ): Promise<Extract<OneDriveProofResult, { state: T }>> {
-    const value = await this.getAuthorizedJson(
+    const { value, response } = await this.getAuthorizedJson(
       routeUrl(this.baseUrl, ownerKey),
       accessToken,
       ownerKey,
@@ -2248,7 +2313,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         : undefined,
     );
     if (!isSafeOneDriveProofResult(value) || value.state !== expectedState) {
-      throw new ApiAccessError();
+      throw new ApiAccessError().bindSupportReference(response);
     }
     return value as Extract<OneDriveProofResult, { state: T }>;
   }
@@ -2259,7 +2324,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ownerKey: ApiRouteOwnerKey,
     expectedStatus?: number,
     failureContext?: "onedrive-invite" | "calendar",
-  ): Promise<unknown> {
+  ): Promise<{ value: unknown; response: Response }> {
     const contract = apiRouteContract(ownerKey);
     let response: Response;
     try {
@@ -2275,6 +2340,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ApiAccessError();
     }
 
+    try {
     if (response.status === 401) {
       throw new ApiAccessError(
         "API access needs Microsoft authorization. Try again.",
@@ -2370,7 +2436,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new ApiAccessError();
     }
-    return value;
+    return { value, response };
+    } catch (error) {
+      throw bindApiSupportReference(error, response);
+    }
   }
 }
 
@@ -2379,6 +2448,15 @@ function routeUrl(baseUrl: string, ownerKey: ApiRouteOwnerKey): string {
     apiRouteContract(ownerKey).path.slice(1),
     `${baseUrl}/`,
   ).toString();
+}
+
+function bindApiSupportReference(
+  error: unknown,
+  response: Response,
+): unknown {
+  return error instanceof SupportReferencedApiClientError
+    ? error.bindSupportReference(response)
+    : error;
 }
 
 async function readOneDriveInviteFailure(

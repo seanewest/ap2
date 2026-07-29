@@ -19,6 +19,7 @@ import {
 import {
   createApiContainerProvenance,
 } from "./api-container-provenance.ts";
+import { API_SUPPORT_REFERENCE_HEADER } from "../src/api/support-reference.ts";
 
 const ISSUER = "https://container-fixture.example/student/v2.0";
 const AUDIENCE = "api://ap2-container-fixture";
@@ -26,6 +27,7 @@ const KEY_ID = "container-fixture-key";
 const UNSAFE_SENTINEL = "unsafe-private-marker@example.test";
 const image = `ap2-api-container-test:${process.pid}`;
 const container = `ap2-api-container-test-${process.pid}`;
+const observedSupportReferences = new Set<string>();
 
 async function main(): Promise<void> {
   const availability = spawnSync("podman", ["info", "--format", "{{.Version.Version}}"], {
@@ -195,7 +197,7 @@ async function main(): Promise<void> {
       applicationToken,
       wrongTenantToken,
       unknownUserToken,
-    ]);
+    ], observedSupportReferences);
     runPodman(["rm", container]);
     containerCreated = false;
     console.log(
@@ -397,6 +399,7 @@ async function expectStatus(
   expectedCallerType?: string,
 ): Promise<void> {
   const response = await fetch(url, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+  captureSupportReference(url, response);
   if (response.status !== expectedStatus) {
     throw new Error(`Expected ${expectedStatus} from ${url}, received ${response.status}`);
   }
@@ -414,12 +417,17 @@ async function expectRequestStatus(
   expectedStatus: number,
 ): Promise<void> {
   const response = await fetch(url, init);
+  captureSupportReference(url, response);
   if (response.status !== expectedStatus) {
     throw new Error(`Expected ${expectedStatus} from ${url}, received ${response.status}`);
   }
 }
 
-function verifyStructuredLogs(logs: string, tokens: readonly string[]): void {
+function verifyStructuredLogs(
+  logs: string,
+  tokens: readonly string[],
+  supportReferences: ReadonlySet<string>,
+): void {
   const records = logs
     .split("\n")
     .filter(Boolean)
@@ -467,6 +475,18 @@ function verifyStructuredLogs(logs: string, tokens: readonly string[]): void {
     }
     correlationIds.add(record.correlationId);
   }
+  if (supportReferences.size < 10) {
+    throw new Error(
+      `Expected at least 10 authenticated response support references, received ${supportReferences.size}`,
+    );
+  }
+  for (const supportReference of supportReferences) {
+    if (!correlationIds.has(supportReference)) {
+      throw new Error(
+        "An authenticated response support reference did not match terminal request telemetry",
+      );
+    }
+  }
   expectSignature(requests, "whoami", "pure", 200, 3);
   expectSignature(requests, "whoami", "pure", 401, 1);
   expectSignature(requests, "whoami", "pure", 403, 2);
@@ -500,6 +520,20 @@ function verifyStructuredLogs(logs: string, tokens: readonly string[]): void {
       throw new Error("Production telemetry exposed an unsafe request value");
     }
   }
+}
+
+function captureSupportReference(url: string, response: Response): void {
+  if (!new URL(url).pathname.startsWith("/api/")) return;
+  const supportReference = response.headers.get(API_SUPPORT_REFERENCE_HEADER);
+  if (
+    supportReference === null ||
+    !/^r1_[0-9a-f]{24}$/.test(supportReference)
+  ) {
+    throw new Error(
+      "Authenticated API response omitted its bounded support reference",
+    );
+  }
+  observedSupportReferences.add(supportReference);
 }
 
 async function incompleteJsonRequest(

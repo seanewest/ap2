@@ -1,5 +1,6 @@
 import { appendIdentity, createStatus } from "../ui/elements";
 import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
+import { withApiSupportReference } from "../api/support-reference";
 import {
   REHEARSAL_OUTPUT_MAX_REQUEST_BYTES,
   type RehearsalOutputVerificationRequest,
@@ -145,7 +146,10 @@ export function createAvdRehearsalVerificationPanel<TInput extends object>(
       } catch {
         // Keep the fixed general failure.
       }
-      show(createStatus(failureMessage(failure), "error"), true);
+      show(createStatus(
+        withApiSupportReference(failureMessage(failure), error),
+        "error",
+      ), true);
     }).finally(() => {
       loading = false;
       submit.disabled = false;
