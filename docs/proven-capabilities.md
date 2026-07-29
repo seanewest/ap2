@@ -128,6 +128,17 @@ assigning the learner to either proof role.
 - **Cleanup means no active AP2 artifact or effect.** It does not erase
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
   deleted-policy history.
+- **Ordinary-VM WCD bulk enrollment is not proven.** The protected design had
+  no retained package or bulk token. Microsoft's supported token acquisition
+  is an interactive password/CBA step in the Windows Configuration Designer
+  desktop wizard, while its CLI only builds from existing customization input.
+  The 2026-07-29 unattended experiment stopped before tenant mutation, VM
+  creation, or spend after the wizard appeared in a shared physical Windows
+  session. WCD, its exact project directory, package/project files, marker
+  resources/devices, package identity, and tenant mutation were reconciled
+  absent. A future pass must author the package in a separately authorized
+  isolated interactive Windows client, then use the
+  [fail-closed headless execution contract](shared-device-provisioning-package.md).
 - The dedicated Teams Call Canary's first authorized audio-only create attempt
   retained only a `4xx` class. A separately authorized unanswered
   follow-up then made exactly one create attempt with the corrected diagnostic

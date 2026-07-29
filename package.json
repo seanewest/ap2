@@ -11,6 +11,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/build-docs.ts && npm run build:api && npm run build:calling-bot",
     "check:rehearsal-status": "node scripts/check-rehearsal-status.ts",
+    "check:shared-device-readiness": "node scripts/shared-device-provisioning-readiness.ts",
     "preview:calendar-reset": "node scripts/preview-calendar-reset.ts",
     "preview:oauth-app-recon": "node scripts/preview-oauth-app-recon.ts",
     "observe:oauth-recon-signin": "node scripts/observe-oauth-recon-signin.ts",

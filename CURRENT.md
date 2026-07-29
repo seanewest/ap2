@@ -9,7 +9,20 @@ At each material checkpoint, the Captain checks and updates this docket against 
 ## Future endpoint automation
 
 - **AVD personal prototype — Intune permission gate:** One reviewed direct registration request converged to `Microsoft.DesktopVirtualization: Registered`; provider and possible Microsoft provider-identity residue are accepted and must not be removed. Fresh East US image, `Standard_D2s_v3` zone/quota, private NAT network, stable AVD API, Azure RBAC, and conservative eight-hour USD 4.6693 price contracts passed. Deployment stopped before creating resources because the established Dev actor lacks both `DeviceManagementConfiguration.ReadWrite.All` for the run-scoped EDR policy and `DeviceManagementManagedDevices.ReadWrite.All` for exact Intune-device cleanup. Granting/admin-consenting those tenant-wide application permissions was outside the authorized boundary. No billable or run-owned state exists; after narrow permission authorization, begin a fresh enrollment/cleanup readiness pass.
-- **Later shared-device alternative:** An ordinary disposable Windows VM can use a protected Windows provisioning package for deployment-time join and Intune enrollment. This remains a recorded later experiment, not an executed capability; package/token custody, user-affinity differences, renewal, and any authentication-policy exception remain material boundaries.
+- **Later shared-device alternative — unattended WCD boundary:** The ordinary
+  private-VM experiment stopped before tenant mutation, VM creation, or spend.
+  No protected package existed, and Microsoft's supported bulk-token step
+  requires interactive password or CBA authentication in the Windows
+  Configuration Designer desktop wizard; `ICD.exe` can build from existing
+  customization input but is not a documented unattended token-acquisition
+  API. A brief WCD readiness attempt touched a shared physical Windows session
+  and was stopped as out of boundary; the process, Store app, project directory,
+  package/project files, marker resources/devices, package identity, and tenant
+  mutation are all absent. Do not drive a host desktop, pointer, keyboard, or
+  hidden session. The executable alternative is a separately authorized
+  attended package-authoring pass in an isolated Windows client, followed by
+  the repository's fail-closed readiness gate and a headless private-VM
+  executor. See [the shared-device package contract](docs/shared-device-provisioning-package.md).
 
 ## Cleanup later
 
