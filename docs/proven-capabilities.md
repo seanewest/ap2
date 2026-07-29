@@ -118,7 +118,12 @@ they are not additional tenant capabilities.
   identity. No incoming or missed-call UI event, callback, voicemail route, or
   hang-up occurred, so Teams calling remains unproven. The visible token,
   application, service principal, Azure Bot, and Cory target tenant bindings
-  were exact; the underlying platform or registration cause is not yet proven.
+  were exact. Fresh authoritative reads additionally proved the token issuer
+  and service-principal claims, subscription tenant, Azure Bot single-tenant
+  fields, Cory's tenant-local Member identity, and the catalog definition's
+  bot relationship. Microsoft exposes no readable Cloud Communications
+  calling-registration record or official `7505` repair contract, so the
+  remaining cause is Microsoft-internal and no tenant mutation is justified.
   The request matches Microsoft's current one-target service-hosted example;
   the proposed `direction`, `subject`, `source`, and audio-group additions
   belong to the group-call example. The service is on one healthy,
@@ -126,7 +131,9 @@ they are not additional tenant capabilities.
   `TEAMS_CALLING_BOT_RUN_CANARY=false`; its application, sole
   `Calls.Initiate.All` grant, fixed Cory installation, protected certificate,
   disabled revisions, exclusive reduced journal, and platform history remain
-  for separately authorized diagnosis or cleanup.
+  for Microsoft support or separately authorized cleanup. A controlled
+  licensed-user Teams call is the smallest authentic artifact pivot; it
+  requires a separate originator session and fresh explicit call authority.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted
