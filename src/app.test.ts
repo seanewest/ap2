@@ -20,6 +20,7 @@ import {
   RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
+  TeamsMissedCallRehearsalVerificationClientError,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
@@ -42,6 +43,9 @@ import {
 import {
   parseHelpDeskEmailRehearsalVerificationRequest,
 } from "./api/help-desk-email-rehearsal-verification-contract";
+import {
+  parseTeamsMissedCallRehearsalVerificationRequest,
+} from "./api/teams-missed-call-rehearsal-verification-contract";
 import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
 import { CANONICAL_RECEIPT_FIXTURES } from "./scenarios/scenario-evidence-receipt.fixtures";
 import { verifyCanonicalScenarioEvidenceReceipt } from "./scenarios/scenario-evidence-verification";
@@ -56,6 +60,9 @@ import {
 import {
   verifyHelpDeskEmailRehearsalOutput,
 } from "../scripts/verify-help-desk-email-rehearsal-output";
+import {
+  verifyTeamsMissedCallRehearsalOutput,
+} from "../scripts/verify-teams-missed-call-rehearsal-output";
 
 const privateDocumentRehearsalOutput =
   parsePrivateDocumentRehearsalVerificationRequest(JSON.parse(readFileSync(
@@ -71,6 +78,15 @@ const helpDeskRehearsalOutput =
   )) as unknown);
 const helpDeskRehearsalSummary =
   verifyHelpDeskEmailRehearsalOutput(helpDeskRehearsalOutput);
+const teamsRehearsalOutput =
+  parseTeamsMissedCallRehearsalVerificationRequest(JSON.parse(readFileSync(
+    resolve(
+      "scripts/fixtures/teams-missed-call-rehearsal-output-native-cleaned.json",
+    ),
+    "utf8",
+  )) as unknown);
+const teamsRehearsalSummary =
+  verifyTeamsMissedCallRehearsalOutput(teamsRehearsalOutput);
 
 const account: AccountIdentity = {
   accountId: "student-object-id",
@@ -112,6 +128,8 @@ class FakeApi implements AfterPartyApi {
     vi.fn<AfterPartyApi["verifyPrivateDocumentRehearsalOutput"]>();
   verifyHelpDeskEmailRehearsalOutput =
     vi.fn<AfterPartyApi["verifyHelpDeskEmailRehearsalOutput"]>();
+  verifyTeamsMissedCallRehearsalOutput =
+    vi.fn<NonNullable<AfterPartyApi["verifyTeamsMissedCallRehearsalOutput"]>>();
   calculateMultiScenarioFeasibility =
     vi.fn<AfterPartyApi["calculateMultiScenarioFeasibility"]>();
   getRecentOperationEvents =
@@ -2110,6 +2128,130 @@ describe("After Party authentication UI", () => {
       expect(panel.textContent).toContain(message);
       expect(panel.textContent).not.toContain(failure.message);
       expect(api.verifyHelpDeskEmailRehearsalOutput).toHaveBeenCalledTimes(
+        reachesApi ? 1 : 0,
+      );
+    },
+  );
+
+  it("verifies Teams output only after explicit signed submission", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.verifyTeamsMissedCallRehearsalOutput.mockResolvedValue(
+      teamsRehearsalSummary,
+    );
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".teams-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify(teamsRehearsalOutput);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyTeamsMissedCallRehearsalOutput).not.toHaveBeenCalled();
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.verifyTeamsMissedCallRehearsalOutput).toHaveBeenCalledWith(
+      "temporary-token",
+      teamsRehearsalOutput,
+    );
+    expect(panel.textContent).toContain("Network-free contract verified");
+    expect(panel.textContent).not.toContain("temporary-token");
+    expect(panel.textContent).not.toContain(
+      teamsRehearsalSummary.planDigestSha256,
+    );
+  });
+
+  it("refuses unsafe Teams output before acquiring authorization", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".teams-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify({
+      ...teamsRehearsalOutput,
+      unsafe: ["operator", "example.invalid"].join("@"),
+    });
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+
+    expect(panel.textContent).toContain("Local validation failed");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyTeamsMissedCallRehearsalOutput).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new AccessTokenError("raw expired session detail"),
+      "operator session expired",
+      false,
+    ],
+    [
+      new TeamsMissedCallRehearsalVerificationClientError("forbidden"),
+      "not authorized",
+      true,
+    ],
+    [
+      new TeamsMissedCallRehearsalVerificationClientError(
+        "validation-refused",
+        "FAKE_CONTRACT_BINDING",
+      ),
+      "inconsistent or tampered",
+      true,
+    ],
+    [
+      new TeamsMissedCallRehearsalVerificationClientError(
+        "response-too-large",
+      ),
+      "response-size limit",
+      true,
+    ],
+    [
+      new TeamsMissedCallRehearsalVerificationClientError("safe-failure"),
+      "verification is unavailable",
+      true,
+    ],
+  ] as const)(
+    "maps typed Teams failure without rendering detail",
+    async (failure, message, reachesApi) => {
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      authentication.acquireAccessToken.mockImplementation(async () => {
+        if (!reachesApi) throw failure;
+        return "temporary-token";
+      });
+      if (reachesApi) {
+        api.verifyTeamsMissedCallRehearsalOutput.mockRejectedValue(failure);
+      }
+      await createAfterPartyApp(root, authentication, api).start();
+      const panel = root.querySelector<HTMLElement>(
+        ".teams-rehearsal-verification",
+      )!;
+      const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+      input.value = JSON.stringify(teamsRehearsalOutput);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+      await nextTask();
+
+      expect(panel.textContent).toContain(message);
+      expect(panel.textContent).not.toContain(failure.message);
+      expect(api.verifyTeamsMissedCallRehearsalOutput).toHaveBeenCalledTimes(
         reachesApi ? 1 : 0,
       );
     },

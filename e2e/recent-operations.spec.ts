@@ -27,6 +27,9 @@ import {
 import {
   InMemoryHelpDeskEmailRehearsalVerificationService,
 } from "../api/help-desk-email-rehearsal-verification";
+import {
+  InMemoryTeamsMissedCallRehearsalVerificationService,
+} from "../api/teams-missed-call-rehearsal-verification";
 import { InMemoryScenarioPlanService } from "../api/scenario-plan";
 import { createApiServer } from "../api/server";
 import { JoseTokenVerifier } from "../api/token-verifier";
@@ -44,6 +47,9 @@ import {
 import {
   parseHelpDeskEmailRehearsalVerificationRequest,
 } from "../src/api/help-desk-email-rehearsal-verification-contract";
+import {
+  parseTeamsMissedCallRehearsalVerificationRequest,
+} from "../src/api/teams-missed-call-rehearsal-verification-contract";
 
 const ISSUER = "https://fixture.invalid/operator/v2.0";
 const AUDIENCE = "api://ap2-local-fixture";
@@ -58,6 +64,13 @@ const PRIVATE_DOCUMENT_REHEARSAL_OUTPUT =
 const HELP_DESK_REHEARSAL_OUTPUT =
   parseHelpDeskEmailRehearsalVerificationRequest(JSON.parse(readFileSync(
     resolve("scripts/fixtures/help-desk-email-rehearsal-output-cleaned.json"),
+    "utf8",
+  )) as unknown);
+const TEAMS_REHEARSAL_OUTPUT =
+  parseTeamsMissedCallRehearsalVerificationRequest(JSON.parse(readFileSync(
+    resolve(
+      "scripts/fixtures/teams-missed-call-rehearsal-output-native-cleaned.json",
+    ),
     "utf8",
   )) as unknown);
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
@@ -125,6 +138,8 @@ test.beforeAll(async () => {
       new InMemoryPrivateDocumentRehearsalVerificationService(),
     helpDeskEmailRehearsalVerificationService:
       new InMemoryHelpDeskEmailRehearsalVerificationService(),
+    teamsMissedCallRehearsalVerificationService:
+      new InMemoryTeamsMissedCallRehearsalVerificationService(),
     allowedOrigin: APP_ORIGIN,
   });
   await new Promise<void>((resolve) =>
@@ -215,6 +230,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     "/api/rehearsal-output-verification",
     "/api/private-document-rehearsal-verification",
     "/api/help-desk-email-rehearsal-verification",
+    "/api/teams-missed-call-rehearsal-verification",
   ]);
   let manualRequests = 0;
   page.on("request", (request) => {
@@ -233,6 +249,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     "AVD rehearsal verification",
     "Private-document rehearsal verification",
     "Help-desk email rehearsal verification",
+    "Teams missed-call rehearsal verification",
   ];
   for (const name of panels) {
     await expect(page.getByRole("region", { name })).toBeVisible();
@@ -255,6 +272,10 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     [
       "Help-desk email rehearsal verification",
       "Verify help-desk rehearsal",
+    ],
+    [
+      "Teams missed-call rehearsal verification",
+      "Verify Teams rehearsal",
     ],
   ] as const;
   for (const [panelName, actionName] of formPanels) {
@@ -1717,6 +1738,224 @@ test("distinguishes help-desk expired and forbidden sessions", async ({
     );
     await panel.getByRole("button", {
       name: "Verify help-desk rehearsal",
+    }).click();
+    expect((await response).status()).toBe(status);
+    await expect(panel.getByText(new RegExp(message))).toBeVisible();
+    await context.close();
+  }
+});
+
+test("manually verifies one Teams rehearsal through the signed local product path", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await configureOperator(page, accessToken);
+  let requests = 0;
+  let releaseRequest!: () => void;
+  const requestGate = new Promise<void>((resolve) => {
+    releaseRequest = resolve;
+  });
+  await page.route(
+    "**/api/teams-missed-call-rehearsal-verification",
+    async (route) => {
+      await requestGate;
+      await route.continue();
+    },
+  );
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/teams-missed-call-rehearsal-verification"
+    ) requests += 1;
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Teams missed-call rehearsal verification",
+  });
+  const input = panel.getByLabel(
+    "Sanitized Teams REHEARSAL_ONLY output JSON",
+  );
+  const verify = panel.getByRole("button", {
+    name: "Verify Teams rehearsal",
+  });
+  await input.fill(JSON.stringify(TEAMS_REHEARSAL_OUTPUT));
+  expect(requests).toBe(0);
+
+  const response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/teams-missed-call-rehearsal-verification"
+  );
+  await verify.focus();
+  await page.keyboard.press("Enter");
+  await expect(verify).toBeDisabled();
+  await expect(panel.locator("form")).toHaveAttribute("aria-busy", "true");
+  await verify.click({ force: true });
+  expect(requests).toBe(1);
+  releaseRequest();
+  expect((await response).status()).toBe(200);
+  expect(requests).toBe(1);
+
+  const result = panel.getByRole("region", {
+    name: "Teams missed-call rehearsal verification result",
+  });
+  await expect(result).toContainText("Network-free contract verified");
+  await expect(result).toContainText("Native Cleaned");
+  await expect(result).toContainText("Two Surface Absent");
+  await expect(result).toContainText("All Uninspected");
+  await expect(result).toContainText("proves no call or native Teams evidence");
+  await expect(result).not.toContainText("planDigestSha256");
+  await expect(result).not.toContainText("fakeRunDigestSha256");
+  await expect(result).not.toContainText("nativeHistory");
+  await expect(
+    panel.locator(".teams-rehearsal-verification-output"),
+  ).toBeFocused();
+  expect(
+    await verify.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.animationDuration, style.transitionDuration];
+    }),
+  ).toEqual(["0s", "0s"]);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+
+  await input.pressSequentially(" ");
+  await expect(result).toHaveCount(0);
+  expect(requests).toBe(1);
+});
+
+test("refuses unsafe Teams rehearsal input locally without authorization", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  let requests = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/teams-missed-call-rehearsal-verification"
+    ) requests += 1;
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Teams missed-call rehearsal verification",
+  });
+  const input = panel.getByLabel(
+    "Sanitized Teams REHEARSAL_ONLY output JSON",
+  );
+  const verify = panel.getByRole("button", {
+    name: "Verify Teams rehearsal",
+  });
+  await input.fill("{");
+  await verify.click();
+  await expect(panel.getByText(/exact bounded PR #106 envelope/)).toBeVisible();
+  await input.fill(JSON.stringify({
+    ...TEAMS_REHEARSAL_OUTPUT,
+    label: "LIVE_RESULT",
+  }));
+  await verify.click();
+  await expect(panel.getByText(/exact REHEARSAL_ONLY label/)).toBeVisible();
+  await input.fill(JSON.stringify({
+    ...TEAMS_REHEARSAL_OUTPUT,
+    unsafe: ["operator", "example.invalid"].join("@"),
+  }));
+  await verify.click();
+  await expect(panel.getByText(/Local validation failed/)).toBeVisible();
+  expect(requests).toBe(0);
+});
+
+test("distinguishes Teams tampering and safe transport failures", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Teams missed-call rehearsal verification",
+  });
+  const input = panel.getByLabel(
+    "Sanitized Teams REHEARSAL_ONLY output JSON",
+  );
+  const verify = panel.getByRole("button", {
+    name: "Verify Teams rehearsal",
+  });
+  const tampered = JSON.parse(JSON.stringify(TEAMS_REHEARSAL_OUTPUT)) as {
+    receipt: { candidateClaimCount: number };
+  };
+  tampered.receipt.candidateClaimCount += 1;
+  let response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/teams-missed-call-rehearsal-verification"
+  );
+  await input.fill(JSON.stringify(tampered));
+  await verify.click();
+  expect((await response).status()).toBe(400);
+  await expect(panel.getByText(/inconsistent or tampered/)).toBeVisible();
+
+  let kind: "request-size" | "response-size" | "general" = "request-size";
+  await page.route(
+    "**/api/teams-missed-call-rehearsal-verification",
+    async (route) => {
+      if (kind === "response-size") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: `"${"x".repeat(10_000)}"`,
+        });
+        return;
+      }
+      await route.fulfill({
+        status: kind === "request-size" ? 413 : 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "raw private backend payload" }),
+      });
+    },
+  );
+  await input.fill(JSON.stringify(TEAMS_REHEARSAL_OUTPUT));
+  await verify.click();
+  await expect(panel.getByText(/request-size limit/)).toBeVisible();
+  kind = "response-size";
+  await verify.click();
+  await expect(panel.getByText(/response-size limit/)).toBeVisible();
+  kind = "general";
+  await verify.click();
+  await expect(panel.getByText(/verification is unavailable/)).toBeVisible();
+  await expect(panel).not.toContainText("raw private backend payload");
+});
+
+test("distinguishes Teams expired and forbidden sessions", async ({
+  browser,
+}) => {
+  const cases = [
+    ["invalid-fixture-token", 401, "operator session expired"],
+    [
+      fixtureToken({
+        tid: STUDENT_TENANT_ID,
+        oid: "fixture-unapproved-operator",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      }),
+      403,
+      "not authorized",
+    ],
+  ] as const;
+  for (const [token, status, message] of cases) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await configureOperator(page, token);
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    const panel = page.getByRole("region", {
+      name: "Teams missed-call rehearsal verification",
+    });
+    await panel.getByLabel(
+      "Sanitized Teams REHEARSAL_ONLY output JSON",
+    ).fill(JSON.stringify(TEAMS_REHEARSAL_OUTPUT));
+    const response = page.waitForResponse((candidate) =>
+      new URL(candidate.url()).pathname ===
+        "/api/teams-missed-call-rehearsal-verification"
+    );
+    await panel.getByRole("button", {
+      name: "Verify Teams rehearsal",
     }).click();
     expect((await response).status()).toBe(status);
     await expect(panel.getByText(new RegExp(message))).toBeVisible();

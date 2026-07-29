@@ -24,6 +24,7 @@ import {
   RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
+  TeamsMissedCallRehearsalVerificationClientError,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
@@ -44,6 +45,9 @@ import {
 import {
   isBoundedHelpDeskEmailRehearsalRequest,
 } from "./api/help-desk-email-rehearsal-verification-contract";
+import {
+  isBoundedTeamsMissedCallRehearsalRequest,
+} from "./api/teams-missed-call-rehearsal-verification-contract";
 import {
   FIXED_PROOF_BY_ID,
   bindFixedProofActions,
@@ -86,6 +90,11 @@ import {
   type HelpDeskRehearsalPanelClient,
   type HelpDeskRehearsalPanelFailure,
 } from "./scenarios/help-desk-rehearsal-verification-panel";
+import {
+  createTeamsRehearsalVerificationPanel,
+  type TeamsRehearsalPanelClient,
+  type TeamsRehearsalPanelFailure,
+} from "./scenarios/teams-rehearsal-verification-panel";
 import {
   createScenarioEvidenceVerificationPanel,
   type ScenarioEvidenceVerificationFailure,
@@ -247,6 +256,24 @@ export function createAfterPartyApp(
       },
       classifyError: classifyHelpDeskRehearsalFailure,
     };
+  const teamsRehearsalVerificationClient: TeamsRehearsalPanelClient = {
+    parse: (value) =>
+      isBoundedTeamsMissedCallRehearsalRequest(value) ? value : undefined,
+    verify: async (output) => {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      if (!api.verifyTeamsMissedCallRehearsalOutput) {
+        throw new TeamsMissedCallRehearsalVerificationClientError(
+          "safe-failure",
+        );
+      }
+      return await api.verifyTeamsMissedCallRehearsalOutput(
+        accessToken,
+        output,
+      );
+    },
+    classifyError: classifyTeamsRehearsalFailure,
+  };
   const batchFeasibilityClient: BatchFeasibilityPanelClient = {
     evaluate: async (request) => {
       const accessToken =
@@ -821,6 +848,7 @@ export function createAfterPartyApp(
         avdRehearsalVerificationClient,
         privateDocumentRehearsalVerificationClient,
         helpDeskRehearsalVerificationClient,
+        teamsRehearsalVerificationClient,
         batchFeasibilityClient,
       ),
     );
@@ -923,6 +951,7 @@ function createShell(
   privateDocumentRehearsalVerificationClient:
     PrivateDocumentRehearsalPanelClient,
   helpDeskRehearsalVerificationClient: HelpDeskRehearsalPanelClient,
+  teamsRehearsalVerificationClient: TeamsRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const shell = document.createElement("main");
@@ -951,6 +980,7 @@ function createShell(
       avdRehearsalVerificationClient,
       privateDocumentRehearsalVerificationClient,
       helpDeskRehearsalVerificationClient,
+      teamsRehearsalVerificationClient,
       batchFeasibilityClient,
     ),
   );
@@ -967,6 +997,7 @@ function createStatePanel(
   privateDocumentRehearsalVerificationClient:
     PrivateDocumentRehearsalPanelClient,
   helpDeskRehearsalVerificationClient: HelpDeskRehearsalPanelClient,
+  teamsRehearsalVerificationClient: TeamsRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const panel = document.createElement("section");
@@ -1035,6 +1066,9 @@ function createStatePanel(
         }),
         createHelpDeskRehearsalVerificationPanel({
           client: helpDeskRehearsalVerificationClient,
+        }),
+        createTeamsRehearsalVerificationPanel({
+          client: teamsRehearsalVerificationClient,
         }),
         createButton("Sign out", "sign-out", "secondary"),
       );
@@ -1203,6 +1237,31 @@ function classifyHelpDeskRehearsalFailure(
     return "session-expired";
   }
   if (!(error instanceof HelpDeskEmailRehearsalVerificationClientError)) {
+    return "unavailable";
+  }
+  switch (error.category) {
+    case "unauthorized":
+      return "session-expired";
+    case "forbidden":
+      return "unauthorized";
+    case "validation-refused":
+      return "verification-refused";
+    case "request-too-large":
+      return "request-too-large";
+    case "response-too-large":
+      return "response-too-large";
+    case "safe-failure":
+      return "unavailable";
+  }
+}
+
+function classifyTeamsRehearsalFailure(
+  error: unknown,
+): TeamsRehearsalPanelFailure {
+  if (error instanceof AccessTokenError) {
+    return "session-expired";
+  }
+  if (!(error instanceof TeamsMissedCallRehearsalVerificationClientError)) {
     return "unavailable";
   }
   switch (error.category) {
