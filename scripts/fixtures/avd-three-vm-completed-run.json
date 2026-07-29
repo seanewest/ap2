@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "learnerSessionObserved": false,
+  "observedUpperBoundUsd": 3.07872603,
+  "evidence": {
+    "arm-completion": "proven",
+    "avd-availability": "proven",
+    "intune-compliance": "proven",
+    "defender-onboarding": "proven",
+    "private-probes": "proven",
+    "learner-session": "not-observed"
+  },
+  "cleanup": {
+    "defenderOffboardedWhileHostAlive": true,
+    "endpointStateAbsent": true,
+    "azureStateAbsent": true,
+    "entraStateAbsent": true,
+    "temporaryRolesAbsentWithFreshToken": true,
+    "expiryAbsent": true,
+    "sensitiveArtifactsAbsent": true
+  }
+}
