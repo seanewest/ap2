@@ -459,6 +459,35 @@ describe("After Party authentication UI", () => {
     expect(simulatedEmailButton()).toBeNull();
   });
 
+  it("does not let a pre-sign-out completion restore signed-in content", async () => {
+    const deferred = createDeferred<ApiCallerIdentity>();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    authentication.signOut.mockResolvedValue();
+    api.checkAccess.mockReturnValue(deferred.promise);
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    apiButton()?.click();
+    await nextTask();
+    root.querySelector<HTMLButtonElement>("[data-action='sign-out']")!.click();
+    await nextTask();
+    expect(root.textContent).toContain("You are signed out");
+
+    deferred.resolve({
+      callerType: "delegated",
+      tenantId: "stale-tenant",
+    });
+    await nextTask();
+    expect(root.textContent).toContain("You are signed out");
+    expect(root.textContent).not.toContain("API access confirmed");
+    expect(root.textContent).not.toContain("stale-tenant");
+  });
+
   it("requests the exact scope and renders only safe API identity fields", async () => {
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",

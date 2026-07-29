@@ -26,7 +26,7 @@ import {
   SIGN_IN_SCOPES,
 } from "./config";
 
-const configuration: Configuration = {
+export const MSAL_BROWSER_CONFIGURATION: Configuration = {
   auth: {
     clientId: AFTER_PARTY_CLIENT_ID,
     authority: ORGANIZATIONS_AUTHORITY,
@@ -34,7 +34,7 @@ const configuration: Configuration = {
     postLogoutRedirectUri: getApplicationUrl(),
   },
   cache: {
-    cacheLocation: "sessionStorage",
+    cacheLocation: "memoryStorage",
   },
 };
 
@@ -55,8 +55,17 @@ export interface MsalClient {
 export class MsalAuthentication implements Authentication {
   private readonly client: MsalClient;
   private activeAccount: AccountInfo | null = null;
+  private sessionRevision = 0;
+  private tokenAcquisition: {
+    key: string;
+    promise: Promise<string>;
+  } | null = null;
 
-  constructor(client: MsalClient = new PublicClientApplication(configuration)) {
+  constructor(
+    client: MsalClient = new PublicClientApplication(
+      MSAL_BROWSER_CONFIGURATION,
+    ),
+  ) {
     this.client = client;
   }
 
@@ -69,11 +78,11 @@ export class MsalAuthentication implements Authentication {
       const account = this.findAccount(result);
 
       if (!account) {
+        this.clearSession();
         return { kind: "signed-out" };
       }
 
-      this.activeAccount = account;
-      this.client.setActiveAccount(account);
+      this.activateAccount(account);
 
       return {
         kind: "signed-in",
@@ -97,9 +106,11 @@ export class MsalAuthentication implements Authentication {
   }
 
   async signOut(): Promise<void> {
+    const account = this.activeAccount;
+    this.clearSession();
     try {
       await this.client.logoutRedirect({
-        account: this.activeAccount ?? undefined,
+        account: account ?? undefined,
         postLogoutRedirectUri: getApplicationUrl(),
       });
     } catch (error) {
@@ -108,34 +119,44 @@ export class MsalAuthentication implements Authentication {
   }
 
   async acquireAccessToken(scopes: readonly string[]): Promise<string> {
-    if (!this.activeAccount) {
+    const account = this.activeAccount;
+    if (!account) {
       throw new AccessTokenError("Sign in before checking API access.");
     }
 
-    try {
-      let result: AuthenticationResult;
-      try {
-        result = await this.client.acquireTokenSilent({
-          account: this.activeAccount,
-          scopes: [...scopes],
-        });
-      } catch (error) {
-        if (!(error instanceof InteractionRequiredAuthError)) {
-          throw error;
-        }
-        result = await this.client.acquireTokenPopup({
-          account: this.activeAccount,
-          scopes: [...scopes],
-        });
+    const key = tokenRequestKey(account, scopes);
+    if (this.tokenAcquisition) {
+      if (this.tokenAcquisition.key === key) {
+        return this.tokenAcquisition.promise;
       }
-
-      if (!result.accessToken) {
-        throw new AccessTokenError();
-      }
-      return result.accessToken;
-    } catch (error) {
-      throw normalizeAccessTokenError(error);
+      throw new AccessTokenError(
+        "Another API access request is already in progress.",
+      );
     }
+
+    const revision = this.sessionRevision;
+    const promise = this.acquireToken(
+      account,
+      scopes,
+      revision,
+    ).then((accessToken) => {
+      if (
+        revision !== this.sessionRevision ||
+        !sameAccount(this.activeAccount, account)
+      ) {
+        throw new AccessTokenError("The operator session changed.");
+      }
+      return accessToken;
+    }).catch((error: unknown) => {
+      throw normalizeAccessTokenError(error);
+    });
+    const guarded = promise.finally(() => {
+      if (this.tokenAcquisition?.promise === guarded) {
+        this.tokenAcquisition = null;
+      }
+    });
+    this.tokenAcquisition = { key, promise: guarded };
+    return guarded;
   }
 
   private findAccount(result: AuthenticationResult | null): AccountInfo | null {
@@ -150,6 +171,55 @@ export class MsalAuthentication implements Authentication {
 
     const cachedAccounts = this.client.getAllAccounts();
     return cachedAccounts.length === 1 ? (cachedAccounts[0] ?? null) : null;
+  }
+
+  private activateAccount(account: AccountInfo): void {
+    if (!sameAccount(this.activeAccount, account)) {
+      this.sessionRevision += 1;
+      this.tokenAcquisition = null;
+    }
+    this.activeAccount = account;
+    this.client.setActiveAccount(account);
+  }
+
+  private clearSession(): void {
+    this.sessionRevision += 1;
+    this.tokenAcquisition = null;
+    this.activeAccount = null;
+    this.client.setActiveAccount(null);
+  }
+
+  private async acquireToken(
+    account: AccountInfo,
+    scopes: readonly string[],
+    revision: number,
+  ): Promise<string> {
+    let result: AuthenticationResult;
+    try {
+      result = await this.client.acquireTokenSilent({
+        account,
+        scopes: [...scopes],
+      });
+    } catch (error) {
+      if (!(error instanceof InteractionRequiredAuthError)) {
+        throw error;
+      }
+      if (
+        revision !== this.sessionRevision ||
+        !sameAccount(this.activeAccount, account)
+      ) {
+        throw new AccessTokenError("The operator session changed.");
+      }
+      result = await this.client.acquireTokenPopup({
+        account,
+        scopes: [...scopes],
+      });
+    }
+
+    if (!result.accessToken) {
+      throw new AccessTokenError();
+    }
+    return result.accessToken;
   }
 }
 
@@ -211,4 +281,26 @@ function readStringProperty(value: unknown, property: string): string | undefine
 
   const candidate = (value as Record<string, unknown>)[property];
   return typeof candidate === "string" ? candidate : undefined;
+}
+
+function tokenRequestKey(
+  account: AccountInfo,
+  scopes: readonly string[],
+): string {
+  return [
+    account.homeAccountId,
+    account.localAccountId,
+    account.tenantId,
+    ...scopes,
+  ].join("\u0000");
+}
+
+function sameAccount(
+  current: AccountInfo | null,
+  expected: AccountInfo,
+): boolean {
+  return current !== null &&
+    current.homeAccountId === expected.homeAccountId &&
+    current.localAccountId === expected.localAccountId &&
+    current.tenantId === expected.tenantId;
 }

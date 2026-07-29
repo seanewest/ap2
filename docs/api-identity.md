@@ -262,6 +262,23 @@ configured with the Student Microsoft issuer and JWKS, the Product app
 audience, and `CORS_ALLOWED_ORIGIN=http://localhost:5173`. It clicks the SPA
 sign-in, API-access, and sign-out buttons and exposes no token.
 
+## Operator browser-session lifecycle
+
+The SPA keeps MSAL access tokens in `memoryStorage`; it does not persist tokens
+or claims in local or session storage. Redirect bookkeeping remains MSAL-owned,
+but a page reload without a redirect result starts a new signed-out adapter.
+For one active account, concurrent requests for the exact same scopes share one
+in-flight silent acquisition. A different concurrent scope is refused instead
+of starting another interaction.
+
+Sign-out clears the adapter's active account and invalidates pending token
+results before logout navigation. An account change also invalidates an older
+pending acquisition. The SPA removes signed-in panels as soon as sign-out
+starts, and account-bound completion guards prevent stale API results from
+restoring them. HTTP `401`, `403`, exact `server_shutting_down`, and other
+failures remain distinct fixed messages; none causes automatic token or API
+retry.
+
 Agents can call the deployed rehearsal-status operation with the existing Dev
 app certificate. The command obtains a token in memory and prints only the safe
 status response:

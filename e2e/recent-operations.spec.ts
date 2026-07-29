@@ -242,6 +242,138 @@ test("manually loads sanitized recent operations through the local product path"
   expect(readRequests).toBe(1);
 });
 
+test("keeps the signed operator session bounded through concurrent requests and sign-out", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  const consoleMessages: string[] = [];
+  page.on("console", (message) => consoleMessages.push(message.text()));
+  await page.goto("/e2e/recent-operations.html");
+
+  await expect(page.getByText("Signed in as Fixture Operator")).toBeVisible();
+  const whoAmI = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === "/api/whoami"
+  );
+  await page.getByRole("button", { name: "Check API access" }).click();
+  expect((await whoAmI).status()).toBe(200);
+  await expect(page.getByText("API access confirmed")).toBeVisible();
+  await expect(page.getByText("delegated", { exact: true })).toBeVisible();
+  await expect(page.getByText(STUDENT_TENANT_ID)).toBeVisible();
+
+  const avdPanel = page.getByRole("region", {
+    name: "AVD rehearsal verification",
+  });
+  const privateDocumentPanel = page.getByRole("region", {
+    name: "Private-document rehearsal verification",
+  });
+  await avdPanel.locator("textarea").fill(
+    JSON.stringify(canonicalAvdThreeVmRehearsalOutput()),
+  );
+  await privateDocumentPanel.locator("textarea").fill(
+    JSON.stringify(PRIVATE_DOCUMENT_REHEARSAL_OUTPUT),
+  );
+  const avdResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === "/api/rehearsal-output-verification"
+  );
+  const privateDocumentResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname ===
+      "/api/private-document-rehearsal-verification"
+  );
+  await page.evaluate(() => {
+    const forms = [
+      ".avd-rehearsal-verification form",
+      ".private-document-rehearsal-verification form",
+    ];
+    forms.forEach((selector) =>
+      document.querySelector<HTMLFormElement>(selector)?.requestSubmit()
+    );
+  });
+  expect((await avdResponse).status()).toBe(200);
+  expect((await privateDocumentResponse).status()).toBe(200);
+  await expect(
+    avdPanel.getByText("Network-free contract verified"),
+  ).toBeVisible();
+  await expect(
+    privateDocumentPanel.getByText("Network-free contract verified"),
+  ).toBeVisible();
+
+  expect(await page.evaluate(() => {
+    const metrics = (
+      window as Window & {
+        __AP2_LOCAL_OPERATOR_METRICS__?: {
+          silentAcquisitions: number;
+          popupAcquisitions: number;
+        };
+      }
+    ).__AP2_LOCAL_OPERATOR_METRICS__;
+    return metrics;
+  })).toEqual({
+    silentAcquisitions: 2,
+    popupAcquisitions: 0,
+  });
+
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByText("You are signed out")).toBeVisible();
+  await expect(page.getByText("Fixture Operator")).toHaveCount(0);
+  expect(await page.evaluate(() => ({
+    local: Object.values(localStorage),
+    session: Object.values(sessionStorage),
+  }))).toEqual({ local: [], session: [] });
+  expect(consoleMessages.join("\n")).not.toContain(accessToken);
+});
+
+test("renders distinct authorization, shutdown, and general API failures without retry", async ({
+  browser,
+}) => {
+  const cases = [
+    {
+      name: "expired authorization",
+      status: 401,
+      body: { error: "invalid_token" },
+      message: "API access needs Microsoft authorization",
+    },
+    {
+      name: "forbidden operator",
+      status: 403,
+      body: { error: "caller_not_allowed" },
+      message: "This account is not allowed to use the API",
+    },
+    {
+      name: "shutdown",
+      status: 503,
+      body: { error: "server_shutting_down" },
+      message: "The API is shutting down",
+    },
+    {
+      name: "general failure",
+      status: 500,
+      body: { error: "raw_private_failure" },
+      message: "The API could not complete the access check",
+    },
+  ] as const;
+  for (const fixture of cases) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await configureOperator(page, accessToken);
+    let requests = 0;
+    await page.route("**/api/whoami", async (route) => {
+      requests += 1;
+      await route.fulfill({
+        status: fixture.status,
+        contentType: "application/json",
+        body: JSON.stringify(fixture.body),
+      });
+    });
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    await page.getByRole("button", { name: "Check API access" }).click();
+    await expect(page.getByText(fixture.message)).toBeVisible();
+    await expect(page.getByText("raw_private_failure")).toHaveCount(0);
+    await page.waitForTimeout(100);
+    expect(requests, fixture.name).toBe(1);
+    await context.close();
+  }
+});
+
 test("audits every manual-only operator panel at the shared accessibility boundary", async ({
   page,
 }) => {
@@ -1001,6 +1133,10 @@ test("refuses unsafe preview input locally without an API request", async ({
   await button.click();
   await expect(preview.getByText(/Expiry must be greater than zero/)).toBeVisible();
 
+  await preview.getByLabel("Canonical scenario").selectOption({
+    label: "Kobe help-desk email for Cory",
+  });
+  await preview.getByLabel("Maximum budget (USD)").fill("0");
   await preview.getByLabel(/Expiry window/).fill("1");
   await preview.getByLabel("Optional response").evaluate((select) => {
     const option = document.createElement("option");
