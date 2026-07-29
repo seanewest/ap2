@@ -242,6 +242,20 @@ Sanitized source and fixtures use ordinary source extensions; `.env.example`,
 the package lockfile, Dockerfiles, token-verifier source, and journal
 implementations remain valid tracked inputs.
 
+## Keep workflow authority separate from build steps
+
+`npm test` statically checks every tracked GitHub Actions workflow. Workflows
+must declare bounded triggers, explicit permissions, Linux-hosted runners,
+concurrency cancellation, safe checkout and artifact paths, and classified
+action references. Third-party actions require an immutable commit SHA;
+GitHub-owned actions may use a major version tag and remain visibly classified
+as mutable.
+
+Jobs that install dependencies or run repository scripts cannot hold write or
+OIDC authority. The Pages workflow therefore builds with read-only contents
+access, uploads only `dist`, and grants Pages/OIDC writes only to a separate
+shell-free deployment job. Manual deployments remain restricted to `main`.
+
 ## Focused mutation-safety review
 
 Use a focused review when the operation is broadly destructive, difficult to
