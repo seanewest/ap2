@@ -16,6 +16,9 @@ import {
   STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
   STUDENT_TENANT_ID,
 } from "../api/identity.ts";
+import {
+  createApiContainerProvenance,
+} from "./api-container-provenance.ts";
 
 const ISSUER = "https://container-fixture.example/student/v2.0";
 const AUDIENCE = "api://ap2-container-fixture";
@@ -221,6 +224,15 @@ async function main(): Promise<void> {
 }
 
 function verifyProductionImageContract(): Record<string, unknown> {
+  const expectedProvenance = createApiContainerProvenance(process.cwd());
+  const expectedProvenanceSummary = {
+    baseImage: expectedProvenance.baseImage.reference,
+    buildInputsDigest: expectedProvenance.buildInputs.digest,
+    lockfileDigest: expectedProvenance.lockfile.digest,
+    productionComponentCount: expectedProvenance.productionComponents.count,
+    productionComponentsDigest:
+      expectedProvenance.productionComponents.digest,
+  };
   const metadata = JSON.parse(
     runPodman(["image", "inspect", image]),
   ) as Array<{
@@ -251,11 +263,12 @@ function verifyProductionImageContract(): Record<string, unknown> {
   }
 
   const proof = [
+    "import { createHash } from 'node:crypto';",
     "import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';",
     "const fail = (reason) => { throw new Error(reason); };",
     "if (process.getuid() !== 1001 || process.getgid() !== 1001) fail('runtime identity');",
     "const app = readdirSync('/app').sort();",
-    "if (JSON.stringify(app) !== JSON.stringify(['dist-api','node_modules'])) fail('app contents');",
+    "if (JSON.stringify(app) !== JSON.stringify(['container-provenance.json','dist-api','node_modules'])) fail('app contents');",
     "const dist = readdirSync('/app/dist-api').sort();",
     "if (JSON.stringify(dist) !== JSON.stringify(['index.js'])) fail('bundle contents');",
     "const dev = ['@playwright/test','@types/node','jsdom','marked','typescript','vite','vitest'];",
@@ -266,7 +279,14 @@ function verifyProductionImageContract(): Record<string, unknown> {
     "if (!readOnly) fail('writable root');",
     "const status = Object.fromEntries(readFileSync('/proc/self/status','utf8').split('\\n').filter((line) => /^(?:CapEff|NoNewPrivs|Seccomp):/.test(line)).map((line) => line.split(/:\\s*/,2)));",
     "if (status.CapEff !== '0000000000000000' || status.NoNewPrivs !== '1' || status.Seccomp !== '2') fail('process security');",
-    "console.log(JSON.stringify({uid:process.getuid(),gid:process.getgid(),appEntries:app,distEntries:dist,devDependencies:'absent',caches:'absent',rootFilesystem:'read-only',effectiveCapabilities:'none',noNewPrivileges:true,seccomp:'filter'}));",
+    "const provenanceText = readFileSync('/app/container-provenance.json','utf8');",
+    "const provenance = JSON.parse(provenanceText);",
+    "if (provenance.schemaVersion !== 1 || provenance.kind !== 'ap2-api-container-provenance') fail('provenance schema');",
+    "const bundle = readFileSync('/app/dist-api/index.js');",
+    "const bundleDigest = createHash('sha256').update(bundle).digest('hex');",
+    "const artifactDigest = createHash('sha256').update(`dist-api/index.js\\0${bundle.byteLength}\\0${bundleDigest}\\n`).digest('hex');",
+    "if (provenance.buildArtifacts.classification !== 'bound-build-output' || provenance.buildArtifacts.count !== 1 || provenance.buildArtifacts.digest !== artifactDigest || JSON.stringify(provenance.buildArtifacts.files) !== JSON.stringify([{bytes:bundle.byteLength,digest:bundleDigest,path:'dist-api/index.js'}])) fail('build artifact provenance');",
+    "console.log(JSON.stringify({uid:process.getuid(),gid:process.getgid(),appEntries:app,distEntries:dist,devDependencies:'absent',caches:'absent',rootFilesystem:'read-only',effectiveCapabilities:'none',noNewPrivileges:true,seccomp:'filter',provenance:{baseImage:provenance.baseImage.reference,buildArtifactCount:provenance.buildArtifacts.count,buildArtifactsDigest:provenance.buildArtifacts.digest,buildInputsDigest:provenance.buildInputs.digest,documentDigest:createHash('sha256').update(provenanceText).digest('hex'),lockfileDigest:provenance.lockfile.digest,productionComponentCount:provenance.productionComponents.count,productionComponentsDigest:provenance.productionComponents.digest}}));",
   ].join(" ");
   const runtime = JSON.parse(runPodman([
     "run",
@@ -285,6 +305,14 @@ function verifyProductionImageContract(): Record<string, unknown> {
     "--eval",
     proof,
   ])) as Record<string, unknown>;
+  const runtimeProvenance = runtime.provenance as Record<string, unknown>;
+  if (
+    Object.entries(expectedProvenanceSummary).some(
+      ([key, value]) => runtimeProvenance[key] !== value,
+    )
+  ) {
+    throw new Error("Production image provenance does not match repository inputs");
+  }
   return {
     imageUser: inspected.Config.User,
     workingDirectory: inspected.Config.WorkingDir,

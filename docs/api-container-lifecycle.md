@@ -53,14 +53,28 @@ multi-architecture digest-renewal process, and pinning one platform digest
 without that maintenance contract would become stale. A future digest policy
 needs an explicit automated update and review path.
 
-The final stage contains only `dist-api/index.js` and production
-`node_modules`; build source maps are removed before the stage copy. The image
-runs as `pwuser` and exposes only port 3000. The rootless production-container
-test proves compatibility with a read-only root filesystem, all capabilities
-dropped, `no-new-privileges`, the default seccomp filter, and no host/device
-mounts. Chromium receives only a bounded `/tmp` tmpfs when its local proof runs.
+The final stage contains `dist-api/index.js`, production `node_modules`, and
+`container-provenance.json`; build source maps are removed before the stage
+copy. The image runs as `pwuser` and exposes only port 3000. The rootless
+production-container test proves compatibility with a read-only root
+filesystem, all capabilities dropped, `no-new-privileges`, the default seccomp
+filter, and no host/device mounts. Chromium receives only a bounded `/tmp`
+tmpfs when its local proof runs.
 
-The current rootless Podman toolchain exposes inherited OCI version/build
-labels but no embedded SBOM command or attestation. Adding SBOM generation is
-an image publication/update-pipeline decision, not a reason to invent a local
-artifact or add a scanner framework here.
+`npm run check:api-container-provenance` deterministically binds every file in
+the Docker build input allowlist, the complete lockfile, the exact Playwright
+base release tag, and each installed production Node dependency. During the
+image build, it additionally binds the exact sole API bundle by path, byte
+count, and digest. The embedded manifest lists only that fixed image-relative
+artifact path, public package name/version/integrity metadata, and bounded
+classification fields; source contents or paths, resolution URLs, environment
+values, and registry credentials are never emitted. The production-container
+test compares the embedded input and dependency bindings to the current
+repository, then independently hashes the final bundle and manifest.
+
+This is deliberately a provenance manifest, not a published SBOM or
+attestation. The base tag binds the Ubuntu/Playwright runtime but does not
+enumerate its OS and browser components; the final image digest is available
+only after build. Publishing a full multi-architecture SBOM or attestation,
+and pinning a base digest, still requires an explicit automated image
+publication and update path.
