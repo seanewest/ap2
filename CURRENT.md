@@ -26,8 +26,12 @@ At each material checkpoint, the Captain checks and updates this docket against 
   Cory, and runtime binding while Microsoft exposes no internal calling-
   registration read or official `7505` repair. The healthy single replica is
   literal call-disabled. Do not retry Graph without a specific Microsoft
-  backend repair; use a separately authorized controlled licensed-user call
-  as the smallest authentic Teams-artifact pivot.
+  backend repair. A separately authorized controlled client call from licensed
+  fictional lab user Kobe to Cory subsequently produced one authentic native
+  `Missed incoming` Calls-history row and one matching missed-call Activity
+  notification. That proves the human-assisted Teams-user path only, not
+  unattended automation; exact duration and voicemail behavior remain
+  unproven.
 - The retained Teams chat learner remediation is complete. Sean removed only
   Marge once; one exact post-action membership read proved Cory, Homer, and
   Kobe retained and Marge absent, while protected learner evidence showed the
