@@ -57,8 +57,11 @@ The capability catalog therefore shows only:
 - the evidence type and learner-facing observation; and
 - the current proof limitation.
 
-Operator-only planning, execution, retention, cleanup, and verification remain
-in the existing technical contracts and operator panels.
+Planning, receipt verification, rehearsal verification, retention, and cleanup
+contracts remain available through reusable APIs, clients, CLIs, and automated
+tests. They are not controls in the primary SPA. The signed-in page keeps only
+the honest catalogs and plainly described real capability actions; see the
+[primary SPA surface inventory](spa-surface-inventory.md).
 
 ## Future lab boundary
 

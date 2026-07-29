@@ -1,5 +1,8 @@
 # Multi-scenario feasibility planner
 
+> The planner remains available through its CLI, API, client, and tests. Its
+> manual feasibility form was removed from the primary SPA.
+
 The local feasibility planner evaluates a bounded batch of already compiled
 canonical scenario plans. It recomputes each plan through the scenario-plan
 compiler, sums every declared maximum without discounts, and checks the whole
@@ -40,21 +43,10 @@ A returned `feasible` result is conservative planning arithmetic only. The
 endpoint does not execute, schedule, reserve, query quota or availability,
 persist state, collect telemetry, retry, or authorize scenario work.
 
-## Authenticated operator panel
+## Primary SPA boundary
 
-The authenticated operator shell also exposes the same calculation as a
-manual-only **Scenario batch feasibility** panel. The panel accepts only
-canonical registry scenarios, short opaque local aliases, and fixed bounded
-budget, concurrency, duration, expiry-margin, and human-gate fields. It
-validates and derives canonical planning inputs before acquiring operator
-authorization. Changing any field clears the prior result; only an explicit
-**Evaluate feasibility** action sends one request.
-
-The panel renders the typed aggregate summary and fixed categorical blockers.
-It does not display request echoes or arbitrary server text. A feasible result
-is not a schedule, reservation, quota or availability check, live price,
-authorization, execution, or proof that external work occurred. The panel does
-not poll, retry automatically, persist a batch, or offer scenario execution.
+The primary SPA does not expose feasibility controls. The bounded API, typed
+client, network-free CLI, fixtures, and tests remain supported.
 
 Run it with one explicit sanitized JSON file:
 

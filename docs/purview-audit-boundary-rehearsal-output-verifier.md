@@ -1,5 +1,8 @@
 # Purview audit-boundary rehearsal output verifier
 
+> The verifier remains available through its CLI, API, client, fixtures, and
+> tests. Its manual JSON panel was removed from the primary SPA.
+
 The offline verifier checks one canonical sanitized output envelope from the
 Purview audit-boundary `REHEARSAL_ONLY` pipeline. It does not invoke that
 pipeline or its synthetic detector, submit or read an audit search, call
@@ -17,20 +20,10 @@ fixed safe summary to stdout. Refusal writes one categorical failure to stderr
 and exits nonzero. Neither path echoes the input path or arbitrary input
 values.
 
-## Manual operator panel
+## Primary SPA boundary
 
-The signed-in SPA includes a manual-only Purview audit-boundary rehearsal
-verification panel. It validates the exact bounded envelope locally before
-requesting an operator access token, then calls only the typed authenticated
-verification client when the operator deliberately selects **Verify Purview
-rehearsal**. The panel renders only the fixed safe summary or categorical
-authorization, refusal, size, and unavailable states.
-
-Editing input suppresses a stale pending result, and a pending request blocks
-duplicate submission. The panel does not invoke a rehearsal, submit or read an
-audit search, call Graph or Purview directly, persist input, retry, poll, or
-schedule work. A service shutdown is therefore a fixed unavailable result and
-never an automatic retry.
+The primary SPA does not expose this verifier or accept pasted envelopes. The
+bounded API, typed client, offline CLI, fixtures, and tests remain supported.
 
 ## Independent verification
 

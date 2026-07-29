@@ -27,10 +27,10 @@ contain unsafe, stale, duplicate, unknown, or unsupported claims.
 
 | Scenario | Manifest / plan / receipt | Adapter | `REHEARSAL_ONLY` pipeline | Offline verifier | Authenticated rehearsal verification API/client | Manual-only rehearsal panel | Learner briefing |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `avd-three-vm-substrate` | implemented | implemented | implemented | implemented | implemented | implemented | missing |
-| `help-desk-email-observation` | implemented | implemented | implemented | implemented | implemented | implemented | implemented |
-| `oauth-application-reconnaissance` | implemented | implemented | implemented | implemented | implemented | implemented | missing |
-| `private-document-evidence` | implemented | implemented | implemented | implemented | implemented | implemented | missing |
+| `avd-three-vm-substrate` | implemented | implemented | implemented | implemented | implemented | missing | missing |
+| `help-desk-email-observation` | implemented | implemented | implemented | implemented | implemented | missing | missing |
+| `oauth-application-reconnaissance` | implemented | implemented | implemented | implemented | implemented | missing | missing |
+| `private-document-evidence` | implemented | implemented | implemented | implemented | implemented | missing | missing |
 | `teams-missed-call-observation` | implemented | implemented | implemented | implemented | implemented | missing | missing |
 
 The table describes source availability only. In particular, `implemented`
@@ -40,21 +40,13 @@ is exported; it is not a validation failure and does not invent whether the
 surface is deliberately absent or future work. No pending capability
 declarations currently exist.
 
-## Authenticated operator matrix
+## Primary SPA boundary
 
-The authenticated SPA renders a compact read-only capability-surface matrix by
-calling the same `inventoryCanonicalScenarioSurfaces()` function in process. It does not copy
-the inventory declarations, fetch an API, or infer tenant, cloud, workload, or
-external readiness. The matrix shows the exact manifest/plan, adapter,
-rehearsal, offline-verifier, authenticated rehearsal-verification API/client,
-manual-panel and learner-briefing cells for all five canonical building-block
-families. The same inventory verifies the capability-catalog declaration.
-
-The UI labels `missing` as “Missing — not a failure” and `not-applicable` as
-“Deliberately absent.” Pending remains a separate concept, but the
-authoritative inventory currently declares no pending state. The semantic
-table is horizontally scrollable at narrow widths and contains no action,
-execution navigation, persistence, polling, or retry control.
+The primary SPA does not render the repository surface matrix. The same
+authoritative inventory remains available through the network-free
+`check:scenario-surfaces` command and deterministic tests. UI-only surfaces
+removed from the primary product are reported honestly as `missing`; that is a
+repository-support classification, not a live-readiness failure.
 
 ## Authority and failure boundary
 

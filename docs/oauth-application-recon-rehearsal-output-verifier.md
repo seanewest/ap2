@@ -1,5 +1,8 @@
 # OAuth application reconnaissance rehearsal output verifier
 
+> The verifier remains available through its CLI, API, client, fixtures, and
+> tests. Its manual JSON panel was removed from the primary SPA.
+
 The offline verifier checks one canonical output envelope from the
 [OAuth application reconnaissance rehearsal](oauth-application-recon-rehearsal.md).
 It does not invoke that pipeline or its fake four-read operation, acquire an
@@ -44,16 +47,10 @@ This endpoint verifies supplied data only. It does not run the rehearsal,
 obtain evidence, acquire a token, call OAuth or Microsoft Graph, schedule
 work, persist input, or prove that external work occurred.
 
-## Manual operator panel
+## Primary SPA boundary
 
-The signed SPA exposes the same pure verifier through the manual-only
-**Application-reconnaissance rehearsal verification** panel. The panel accepts
-one sanitized PR #111 envelope, applies the authoritative 32 KiB request
-parser locally before acquiring operator authorization, and calls only the
-typed PR #121 client after deliberate **Verify** submission. It renders only
-the fixed safe summary or categorical refusal states, suppresses duplicate
-submissions and stale completions, and adds no execution, OAuth, Graph,
-persistence, retry, polling, or scheduling path.
+The primary SPA does not expose this verifier or accept pasted envelopes. The
+bounded API, typed client, offline CLI, fixtures, and tests remain supported.
 
 ## Claim boundary
 

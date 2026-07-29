@@ -1,5 +1,8 @@
 # Private-document rehearsal output verifier
 
+> The verifier remains available through its CLI, API, client, fixtures, and
+> tests. Its manual JSON panel was removed from the primary SPA.
+
 The offline verifier accepts only an exact successful output envelope from the
 canonical private-document `REHEARSAL_ONLY` pipeline. It does not call that
 pipeline or invoke its fake lifecycle.
@@ -76,22 +79,7 @@ all-uninspected checks use the
 Private-document branch, visibility, cleanup, fake-digest, adapter, and receipt
 semantics remain local to this verifier.
 
-## Authenticated operator panel
+## Primary SPA boundary
 
-The authenticated operator shell provides a manual-only
-**Private-document rehearsal verification** panel for one sanitized PR #90
-output. It accepts no file upload or arbitrary fields. The exact label,
-synthetic branch, size, shape, safe-content, and all-uninspected claim
-boundaries are checked before operator authorization is acquired. Only an
-explicit **Verify private-document rehearsal** action submits one request.
-
-The panel renders only fixed contract, branch, terminal fake-state,
-adapter/receipt, claim-count, and all-uninspected summary fields. It never
-renders the submitted JSON, digests, journal details, proof references, or
-backend text, and it clears stale results whenever the input changes.
-
-The panel repeats the learning boundary explicitly: synthetic learner
-observation does not prove live learner visibility, and post-cleanup absence
-cannot substitute for the required pre-cleanup access observation. It does not
-invoke the fake lifecycle, execute a scenario, poll, retry automatically,
-persist input, ingest evidence, or claim external proof.
+The primary SPA does not expose this verifier or accept pasted envelopes. The
+bounded API, typed client, offline CLI, fixtures, and tests remain supported.

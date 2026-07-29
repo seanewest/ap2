@@ -202,20 +202,10 @@ receipt data supplied by an operator. It does not collect telemetry, obtain or
 inspect evidence, authorize or execute a scenario, persist a receipt, schedule
 work, or prove that any external operation occurred.
 
-## Authenticated operator verification
+## Primary SPA boundary
 
-The signed-in operator shell exposes the same typed client through a
-manual-only `Receipt verification` panel. The operator may paste one sanitized
-JSON receipt of at most 128 KiB and select `Verify receipt`. Before acquiring
-authorization, the panel uses the authoritative receipt-request parser and
-refuses malformed or unknown fields plus obvious raw identities, UPNs, GUIDs,
-paths, marker-shaped values, credentials, and session data. It has no file
-upload, persistence, automatic submission, retry, polling, or execution path.
-
-Successful output shows only the normalized scenario and manifest version,
-fixed role aliases, deterministic claim category/assertion/state rows, and
-missing-coverage categories. It never re-renders receipt JSON, claim IDs,
-subjects, proof references, or backend payloads. Editing the input clears a
-prior result and causes any pending completion to be ignored. Fixed loading,
-session, authorization, validation, verification-refusal, size, and general
-failure messages do not echo submitted or upstream text.
+The primary signed-in SPA does not expose a receipt-verification panel or
+accept pasted JSON. The authoritative verifier, typed client, API route, CLI,
+fixtures, and automated tests remain available for technical workflows. This
+removes an implementation contract from the human experience without changing
+receipt validation or evidence-strength semantics.

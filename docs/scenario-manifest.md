@@ -123,8 +123,8 @@ loop, persistence, polling, planning handoff, or execution control. Canonical
 IDs, operation keys, markers, proof references, and raw payloads are not
 rendered.
 
-The separate plan-preview panel remains an operator orchestration tool. Only
-its explicit `Preview plan` action may make one planning request.
+The primary SPA does not expose plan-preview or other orchestration controls.
+The planner remains available through its API, typed client, CLI, and tests.
 
 Role separation compares actor IDs, never display labels, actor kinds, or
 authentication transport names. Those fields describe the contract but cannot

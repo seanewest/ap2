@@ -1,5 +1,8 @@
 # Operation telemetry
 
+> Telemetry collection and validation remain reusable technical capabilities.
+> The Recent operations diagnostic panel was removed from the primary SPA.
+
 The API has a small in-process structured telemetry seam for consequential
 scenario operations. It is observational only: it does not persist state,
 claim work, retry mutations, select a monitoring vendor, or change the durable
@@ -29,16 +32,9 @@ token verification and caller allowlist as the other protected API routes.
 The typed `HttpAfterPartyApi.getRecentOperationEvents` client performs its own
 strict schema check and rejects additional response or event fields.
 
-The signed-in operator view includes a **Recent operations** panel backed by
-that typed client. It loads only when the operator selects **Refresh recent
-operations**; there is no polling, automatic retry, or background refresh.
-The panel presents fixed labels for operation, phase, outcome, reason,
-ambiguity, recovery, bounded duration, and optional HTTP status. It never
-renders the marker hash or invents an event timestamp that the API does not
-provide. Loading, empty, session/authorization, capacity, and general failure
-states use fixed text rather than upstream error bodies.
-The panel also states that a snapshot contains at most 64 events and that the
-16 KiB response bound can omit older events before that count is reached.
+The primary SPA does not expose this telemetry as a diagnostic panel. The
+bounded route, typed client, collector, and contract tests remain available to
+technical tooling.
 
 ## Fixed event contract
 

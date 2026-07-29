@@ -64,12 +64,9 @@ close may leave only the server-side `499` terminal record. In every case the
 reference is diagnostic only: it does not prove absence or success and never
 authorizes an automatic retry.
 
-The authenticated browser can collect valid references from the six
-failed rehearsal-verification panels into an explicit, bounded local
-[operator support bundle](operator-support-bundle.md). This is a client-side
-handoff convenience, not another telemetry channel: no bundle is created
-until the operator selects the download action, and no bundle is uploaded or
-sent by the application.
+The primary SPA does not collect or export support-reference bundles. Safe
+fixed references remain available in individual API error messages for
+technical correlation.
 
 ## Production-container proof
 
