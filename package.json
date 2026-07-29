@@ -21,6 +21,7 @@
     "package:calling-bot-app": "node scripts/package-teams-calling-bot-app.ts",
     "plan:scenario": "node scripts/compile-scenario-plan.ts",
     "rehearse:avd-three-vm": "node scripts/run-avd-three-vm-rehearsal.ts",
+    "rehearse:private-document": "node scripts/run-private-document-rehearsal.ts",
     "report:codex": "node scripts/codex-session-report.ts",
     "test:e2e:cba": "playwright test --config playwright.cba.config.ts",
     "test:e2e:local": "playwright test --config playwright.local.config.ts",

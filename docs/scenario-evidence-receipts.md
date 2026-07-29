@@ -28,6 +28,13 @@ The network-free
 uses all-`uninspected` probes and canonical fixtures to detect manifest/receipt
 vocabulary or coverage drift without upgrading any claim.
 
+The
+[private-document contract rehearsal](private-document-rehearsal.md) exercises
+that adapter and this verifier with a deterministic injected fake. Its
+candidate acceptance is not external proof: the emitted rehearsal summary
+keeps staging, visibility, interpretation, audit/detection, response, cleanup,
+and retention `uninspected`.
+
 ## Receipt shape
 
 `verifyScenarioEvidenceReceipt` accepts only schema version 1. A receipt
