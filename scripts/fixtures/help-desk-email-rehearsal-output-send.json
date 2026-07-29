@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "label": "REHEARSAL_ONLY",
+  "status": "completed",
+  "failure": null,
+  "binding": {
+    "scenarioId": "help-desk-email-observation",
+    "manifestSchemaVersion": 2,
+    "planDigestSha256": "87846ba59f61fc67d6faa98fe130f4ae8db464b07b2c4f72454316db42821c68",
+    "fakeRunDigestSha256": "34d0aa39655ffd01a0b3fa0856f3d8ee69d45b1d891b97961af54cb1eaa38f5f",
+    "syntheticBranch": "send-accepted"
+  },
+  "stages": {
+    "plan": "compiled",
+    "fakeOperation": "completed",
+    "adapter": "accepted",
+    "fakeBinding": "accepted",
+    "receiptVerifier": "accepted",
+    "envelope": "accepted"
+  },
+  "envelope": {
+    "terminalState": "terminal-complete",
+    "observationSource": "synthetic-only",
+    "externalEvidence": "all-uninspected"
+  },
+  "fakeRun": {
+    "operationAttempts": 1,
+    "journalEntries": 2,
+    "send": "synthetic-accepted",
+    "learnerVisibility": "synthetic-uninspected",
+    "learnerInterpretation": "synthetic-uninspected",
+    "retention": "synthetic-uninspected",
+    "cleanup": "synthetic-uninspected",
+    "auditOrDetection": "synthetic-uninspected",
+    "teamsCall": "synthetic-uninspected",
+    "voicemail": "synthetic-uninspected",
+    "terminalState": "synthetic-send-accepted"
+  },
+  "receipt": {
+    "adapterCandidateAccepted": true,
+    "verifierAccepted": true,
+    "candidateClaimCount": 15,
+    "externalEvidence": {
+      "emailSend": "uninspected",
+      "inboxVisibility": "uninspected",
+      "learnerInterpretation": "uninspected",
+      "response": "uninspected",
+      "cleanup": "uninspected",
+      "retention": "uninspected",
+      "auditOrDetection": "uninspected",
+      "teamsCall": "uninspected",
+      "voicemail": "uninspected"
+    }
+  }
+}

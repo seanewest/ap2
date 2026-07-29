@@ -4,6 +4,7 @@ import { REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY } from "../../api/rehearsa
 import { BATCH_FEASIBILITY_API_CAPABILITY } from "../../api/multi-scenario-feasibility.ts";
 import { AVD_MANIFEST_ADAPTER_CAPABILITY } from "../../scripts/avd-three-vm-manifest-adapter.ts";
 import { AVD_THREE_VM_REHEARSAL_CAPABILITY } from "../../scripts/avd-three-vm-rehearsal.ts";
+import { HELP_DESK_EMAIL_REHEARSAL_CAPABILITY } from "../../scripts/help-desk-email-rehearsal.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY } from "../../scripts/private-document-rehearsal.ts";
 import { SCENARIO_API_CLIENT_CAPABILITIES } from "../api/client.ts";
 import { SCENARIO_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
@@ -153,6 +154,7 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
   SCENARIO_PLAN_PREVIEW_UI_CAPABILITY,
   SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY,
   AVD_THREE_VM_REHEARSAL_CAPABILITY,
+  HELP_DESK_EMAIL_REHEARSAL_CAPABILITY,
   PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY,
 ] as const satisfies readonly ScenarioSurfaceCapabilityDeclaration[];
 
