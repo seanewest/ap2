@@ -74,8 +74,12 @@ import {
 } from "./simulated-user.js";
 import { SimulatedUserDelegatedTokenProvider } from "./simulated-user-cba.js";
 import { createRemoteTokenVerifier } from "./token-verifier.js";
+import {
+  StructuredConsoleApiRequestTelemetry,
+  writeApiLifecycleEvent,
+} from "./api-telemetry.js";
 
-const config = loadApiConfig();
+const config = loadConfig();
 const tokenVerifier = createRemoteTokenVerifier({
   issuer: config.issuer,
   audience: config.audience,
@@ -207,23 +211,46 @@ const server = createApiServer({
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
   allowedOrigin: config.allowedOrigin,
   isShuttingDown: () => shuttingDown,
+  requestTelemetry: new StructuredConsoleApiRequestTelemetry(),
+});
+
+server.once("error", () => {
+  writeApiLifecycleEvent({
+    schemaVersion: 1,
+    event: "api_lifecycle",
+    state: "startup-failed",
+    reason: "listener",
+  }, console.error);
+  process.exit(1);
 });
 
 server.listen(config.port, config.host, () => {
-  const address = server.address();
-  const port = typeof address === "object" && address ? address.port : config.port;
-  console.log(`AP2 API listening on ${config.host}:${port}`);
+  writeApiLifecycleEvent({
+    schemaVersion: 1,
+    event: "api_lifecycle",
+    state: "ready",
+  });
 });
 
-function shutdown(signal: string): void {
+function shutdown(signal: "SIGINT" | "SIGTERM"): void {
   if (shuttingDown) {
     return;
   }
   shuttingDown = true;
-  console.log(`Received ${signal}; shutting down`);
+  writeApiLifecycleEvent({
+    schemaVersion: 1,
+    event: "api_lifecycle",
+    state: "draining",
+    signal,
+  });
 
   const forcedExit = setTimeout(() => {
-    console.error("API shutdown timed out");
+    writeApiLifecycleEvent({
+      schemaVersion: 1,
+      event: "api_lifecycle",
+      state: "forced-exit",
+      reason: "drain-timeout",
+    }, console.error);
     process.exit(1);
   }, 10_000);
   forcedExit.unref();
@@ -231,12 +258,38 @@ function shutdown(signal: string): void {
   server.close((error) => {
     clearTimeout(forcedExit);
     if (error) {
-      console.error(error);
+      writeApiLifecycleEvent({
+        schemaVersion: 1,
+        event: "api_lifecycle",
+        state: "forced-exit",
+        reason: "listener-close",
+      }, console.error);
       process.exitCode = 1;
+      return;
     }
+    writeApiLifecycleEvent({
+      schemaVersion: 1,
+      event: "api_lifecycle",
+      state: "stopped",
+      reason: "drained",
+    });
   });
   server.closeIdleConnections();
 }
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+function loadConfig(): ReturnType<typeof loadApiConfig> {
+  try {
+    return loadApiConfig();
+  } catch {
+    writeApiLifecycleEvent({
+      schemaVersion: 1,
+      event: "api_lifecycle",
+      state: "startup-failed",
+      reason: "configuration",
+    }, console.error);
+    process.exit(1);
+  }
+}

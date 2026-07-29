@@ -5,6 +5,11 @@ scenario operations. It is observational only: it does not persist state,
 claim work, retry mutations, select a monitoring vendor, or change the durable
 operation-journal decision.
 
+This is distinct from the production API's bounded
+[request and lifecycle telemetry](api-request-telemetry.md). Request
+correlation identifies one local HTTP response only; it is not an operation
+marker or external evidence reference.
+
 The first product-wired consumer is the calendar scenario:
 
 - `calendar.create` reports the execution mutation;

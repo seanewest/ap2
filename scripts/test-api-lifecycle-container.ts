@@ -20,6 +20,8 @@ const image = `ap2-api-lifecycle-test:${process.pid}`;
 const primaryContainer = `ap2-api-lifecycle-term-${process.pid}`;
 const interruptContainer = `ap2-api-lifecycle-int-${process.pid}`;
 const failedContainer = `ap2-api-lifecycle-failed-${process.pid}`;
+const listenerFailedContainer =
+  `ap2-api-lifecycle-listener-failed-${process.pid}`;
 
 async function main(): Promise<void> {
   const availability = spawnSync(
@@ -52,10 +54,53 @@ async function main(): Promise<void> {
     const failedExit = waitForContainer(failedContainer);
     timings.startupFailureMs = elapsed(failedStartedAt);
     const failedLogs = containerLogs(failedContainer);
-    if (failedExit === 0 || !failedLogs.includes("AUTH_ISSUER is required")) {
+    if (
+      failedExit === 0 ||
+      !hasLifecycleEvent(failedLogs, {
+        state: "startup-failed",
+        reason: "configuration",
+      }) ||
+      failedLogs.includes("AUTH_ISSUER") ||
+      failedLogs.includes("/app/")
+    ) {
       throw new Error("Invalid configuration did not fail startup categorically");
     }
     runPodman(["rm", failedContainer]);
+
+    const listenerFailedStartedAt = performance.now();
+    runPodman([
+      "run",
+      "--detach",
+      "--name",
+      listenerFailedContainer,
+      "--env",
+      "HOST=invalid host fixture",
+      "--env",
+      `AUTH_ISSUER=${ISSUER}`,
+      "--env",
+      `AUTH_AUDIENCE=${AUDIENCE}`,
+      "--env",
+      `AUTH_JWKS_URL=http://host.containers.internal:${jwksPort}/jwks`,
+      "--env",
+      "AUTH_ALLOW_INSECURE_JWKS=true",
+      image,
+    ]);
+    const listenerFailedExit = waitForContainer(listenerFailedContainer);
+    timings.listenerFailureMs = elapsed(listenerFailedStartedAt);
+    const listenerFailedLogs = containerLogs(listenerFailedContainer);
+    if (
+      listenerFailedExit === 0 ||
+      !hasLifecycleEvent(listenerFailedLogs, {
+        state: "startup-failed",
+        reason: "listener",
+      }) ||
+      listenerFailedLogs.includes("ENOTFOUND") ||
+      listenerFailedLogs.includes("getaddrinfo") ||
+      listenerFailedLogs.includes("/app/")
+    ) {
+      throw new Error("Invalid listener did not fail startup categorically");
+    }
+    runPodman(["rm", listenerFailedContainer]);
 
     const primaryPort = await reservePort();
     const primaryStartedAt = performance.now();
@@ -92,7 +137,10 @@ async function main(): Promise<void> {
 
     const termStartedAt = performance.now();
     runPodman(["kill", "--signal", "TERM", primaryContainer]);
-    await waitForLog(primaryContainer, "Received SIGTERM; shutting down");
+    await waitForLog(
+      primaryContainer,
+      '"state":"draining","signal":"SIGTERM"',
+    );
     await expectNotReady(primaryPort);
     socket.write(
       [
@@ -120,7 +168,21 @@ async function main(): Promise<void> {
     const primaryLogs = containerLogs(primaryContainer);
     if (
       primaryExit !== 0 ||
-      !primaryLogs.includes("Received SIGTERM; shutting down")
+      !hasLifecycleEvent(primaryLogs, {
+        state: "draining",
+        signal: "SIGTERM",
+      }) ||
+      !hasLifecycleEvent(primaryLogs, {
+        state: "stopped",
+        reason: "drained",
+      }) ||
+      !hasJsonEvent(primaryLogs, {
+        event: "api_request",
+        routeOwner: "simulated-email-send",
+        sideEffect: "bounded-mutation",
+        status: 503,
+        outcome: "shutdown-refused",
+      })
     ) {
       throw new Error(`SIGTERM shutdown was not clean (exit ${primaryExit})`);
     }
@@ -137,7 +199,14 @@ async function main(): Promise<void> {
     const interruptLogs = containerLogs(interruptContainer);
     if (
       interruptExit !== 0 ||
-      !interruptLogs.includes("Received SIGINT; shutting down")
+      !hasLifecycleEvent(interruptLogs, {
+        state: "draining",
+        signal: "SIGINT",
+      }) ||
+      !hasLifecycleEvent(interruptLogs, {
+        state: "stopped",
+        reason: "drained",
+      })
     ) {
       throw new Error(`SIGINT shutdown was not clean (exit ${interruptExit})`);
     }
@@ -147,6 +216,7 @@ async function main(): Promise<void> {
       primaryContainer,
       interruptContainer,
       failedContainer,
+      listenerFailedContainer,
     ]) {
       spawnSync("podman", ["rm", "--force", name], { encoding: "utf8" });
     }
@@ -156,7 +226,12 @@ async function main(): Promise<void> {
     await close(controlledJwks.server);
   }
 
-  for (const name of [primaryContainer, interruptContainer, failedContainer]) {
+  for (const name of [
+    primaryContainer,
+    interruptContainer,
+    failedContainer,
+    listenerFailedContainer,
+  ]) {
     if (spawnSync("podman", ["container", "exists", name]).status === 0) {
       throw new Error(`Lifecycle test left container residue: ${name}`);
     }
@@ -402,6 +477,33 @@ function containerLogs(container: string): string {
     );
   }
   return `${result.stdout}${result.stderr}`;
+}
+
+function hasLifecycleEvent(
+  logs: string,
+  expected: Readonly<Record<string, string>>,
+): boolean {
+  return hasJsonEvent(logs, {
+    event: "api_lifecycle",
+    ...expected,
+  });
+}
+
+function hasJsonEvent(
+  logs: string,
+  expected: Readonly<Record<string, string | number>>,
+): boolean {
+  return logs.split("\n").some((line) => {
+    try {
+      const value = JSON.parse(line) as Record<string, unknown>;
+      return (
+        value.schemaVersion === 1 &&
+        Object.entries(expected).every(([key, item]) => value[key] === item)
+      );
+    } catch {
+      return false;
+    }
+  });
 }
 
 async function withTimeout<T>(

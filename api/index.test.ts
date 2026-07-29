@@ -51,6 +51,7 @@ vi.mock("./server.js", () => ({
         _host: string,
         callback: () => void,
       ): void => callback(),
+      once: (): void => undefined,
       address: (): { port: number } => ({ port: 3000 }),
       close: (): void => undefined,
       closeIdleConnections: (): void => undefined,
