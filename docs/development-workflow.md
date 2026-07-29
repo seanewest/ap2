@@ -75,6 +75,12 @@ The [lifecycle cost envelope](lifecycle-cost-envelope.md) can bind a future
 billable plan to one supplied, time-bounded rate card. Its conservative result
 is a forecast-only ceiling check, never a live price quote or observed bill.
 The
+[executable generalized lifecycle contract](executable-scenario-manifest.md)
+then composes a dependency-complete manifest and canonical plan with the
+authoritative receipt verifier and that supplied-rate envelope. Its output is
+still contract-only and `not-executed`; it cannot promote readiness into a
+learner session or external proof.
+The
 [canonical scenario surface inventory](scenario-surface-inventory.md) shows
 which validated scenarios also have repository adapters, rehearsal
 composition, authenticated API/client support, and operator surfaces. It is a
