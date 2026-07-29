@@ -21,15 +21,12 @@ import {
 import { API_ACCESS_SCOPES } from "../api/config";
 
 describe("MSAL authentication adapter", () => {
-  it("keeps the operator token cache in memory only", () => {
+  it("uses tab-scoped storage required for redirect sign-in", () => {
     expect(MSAL_BROWSER_CONFIGURATION.cache).toEqual({
-      cacheLocation: "memoryStorage",
+      cacheLocation: "sessionStorage",
     });
     expect(JSON.stringify(MSAL_BROWSER_CONFIGURATION.cache)).not.toContain(
       "localStorage",
-    );
-    expect(JSON.stringify(MSAL_BROWSER_CONFIGURATION.cache)).not.toContain(
-      "sessionStorage",
     );
   });
 
@@ -66,6 +63,19 @@ describe("MSAL authentication adapter", () => {
     expect(error.message).toBe(
       "Microsoft sign-in could not be completed. Try again.",
     );
+  });
+
+  it("starts redirect sign-in with the exact identity-only scopes", async () => {
+    const client = fakeClient(null);
+    const authentication = new MsalAuthentication(client);
+
+    await authentication.initialize();
+    await expect(authentication.signIn()).resolves.toBeUndefined();
+
+    expect(client.loginRedirect).toHaveBeenCalledWith({
+      scopes: ["openid", "profile"],
+      prompt: "select_account",
+    });
   });
 
   it("requests the exact API scope silently for the active account", async () => {
