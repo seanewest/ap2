@@ -509,8 +509,15 @@ export class GraphSharePointTrustedVersionLifecycle
     token: string,
     journal: TrustedVersionJournalWriter,
   ): Promise<void> {
+    const current = await this.exactOwnedFolder(pathUrl, token);
+    if (!current || current.id !== item.id) {
+      throw failure(
+        "state-conflict",
+        "the exact run folder identity changed before cleanup.",
+      );
+    }
     const children = await this.request(
-      `${driveUrl}/items/${encodeURIComponent(item.id)}/children?$top=1&$select=id`,
+      `${driveUrl}/items/${encodeURIComponent(current.id)}/children?$top=1&$select=id`,
       { method: "GET", redirect: "error", headers: graphHeaders(token) },
     );
     const body = asRecord(await readJson(children));
@@ -523,7 +530,12 @@ export class GraphSharePointTrustedVersionLifecycle
       throw failure("state-conflict", "the exact run folder was not proven empty.");
     }
     journal.record("folder-delete", "intent");
-    await this.deleteOnce(`${driveUrl}/items/${encodeURIComponent(item.id)}`, item.eTag, pathUrl, token);
+    await this.deleteOnce(
+      `${driveUrl}/items/${encodeURIComponent(current.id)}`,
+      current.eTag,
+      pathUrl,
+      token,
+    );
     journal.record("folder-delete", "succeeded");
   }
 

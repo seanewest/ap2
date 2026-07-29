@@ -25,6 +25,7 @@ const input = {
   expiresAt: "2026-07-29T12:10:00.000Z",
 };
 const folder = item("folder-id", "AP2 Trusted Version [ap2-spv-abc123def456]", 0, "folder-etag", "folder");
+const folderFresh = item("folder-id", "AP2 Trusted Version [ap2-spv-abc123def456]", 0, "folder-etag-fresh", "folder");
 const fileV1 = item("file-id", "trusted-version.txt", 49, "file-etag-1", "file");
 const fileV2 = item("file-id", "trusted-version.txt", 70, "file-etag-2", "file");
 
@@ -51,6 +52,7 @@ describe("SharePoint trusted-version lifecycle", () => {
       redirect("https://download.example/v1-history"),
       text(TRUSTED_VERSION_ONE_CONTENT),
       response(204),
+      json(200, folderFresh),
       json(200, { value: [] }),
       response(204),
       response(404),
@@ -90,7 +92,7 @@ describe("SharePoint trusted-version lifecycle", () => {
     expect(otherReceipt.scenario.evidenceBindingDigestSha256).not.toBe(
       receipt.scenario.evidenceBindingDigestSha256,
     );
-    expect(request).toHaveBeenCalledTimes(19);
+    expect(request).toHaveBeenCalledTimes(20);
     expect(
       request.mock.calls.filter(([, init]) => init?.method === "PUT"),
     ).toHaveLength(2);
@@ -98,6 +100,10 @@ describe("SharePoint trusted-version lifecycle", () => {
       request.mock.calls.filter(([, init]) => init?.method === "PUT")[1]![1]
         ?.headers,
     ).toMatchObject({ "If-Match": "file-etag-1" });
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "DELETE")[1]![1]
+        ?.headers,
+    ).toMatchObject({ "If-Match": "folder-etag-fresh" });
     expect(JSON.stringify(result)).not.toMatch(
       /driveId|folder-id|file-id|ap2-spv-abc123def456|@|\/home\/|token/i,
     );
@@ -144,6 +150,7 @@ describe("SharePoint trusted-version lifecycle", () => {
       redirect("https://download.example/v1-history"),
       text(TRUSTED_VERSION_ONE_CONTENT),
       response(204),
+      json(200, folderFresh),
       json(200, { value: [] }),
       response(204),
       response(404),
@@ -187,6 +194,7 @@ describe("SharePoint trusted-version lifecycle", () => {
       redirect("https://download.example/v1-history"),
       text(TRUSTED_VERSION_ONE_CONTENT),
       response(204),
+      json(200, folderFresh),
       json(200, { value: [] }),
       response(204),
       response(404),
@@ -282,6 +290,7 @@ describe("SharePoint trusted-version lifecycle", () => {
     const request = vi.fn(sequence([
       response(404),
       json(201, folder),
+      json(200, folderFresh),
       json(200, { value: [] }),
       response(204),
       response(404),
@@ -350,6 +359,7 @@ describe("SharePoint trusted-version lifecycle", () => {
       redirect("https://download.example/v1-history"),
       text(TRUSTED_VERSION_ONE_CONTENT),
       response(204),
+      json(200, folderFresh),
       json(200, { value: [] }),
       response(204),
       response(404),
@@ -369,7 +379,7 @@ describe("SharePoint trusted-version lifecycle", () => {
     await expect(operation.run(input)).rejects.toMatchObject({
       code: "marker-reused",
     });
-    expect(request).toHaveBeenCalledTimes(19);
+    expect(request).toHaveBeenCalledTimes(20);
   });
 });
 
