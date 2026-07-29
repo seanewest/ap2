@@ -2,12 +2,19 @@ import {
   API_DEPLOYMENT_REPLICA_CONTRACT,
   requireSingleReplicaScale,
 } from "./api-replica-contract.js";
+import {
+  API_DEPLOYMENT_RESOURCE_GROUP,
+  API_DEPLOYMENT_SUBSCRIPTION_ID,
+  apiContainerAppResourceId,
+} from "./api-deployment-target.js";
 
 export const REHEARSAL_SUBSCRIPTION_ID =
-  "6d8ebd0e-017f-401e-950d-e5a35de93dc6";
-export const REHEARSAL_RESOURCE_GROUP = "rg-ap2-rehearsal";
+  API_DEPLOYMENT_SUBSCRIPTION_ID;
+export const REHEARSAL_RESOURCE_GROUP = API_DEPLOYMENT_RESOURCE_GROUP;
 export const REHEARSAL_CONTAINER_APP =
   API_DEPLOYMENT_REPLICA_CONTRACT.target;
+export const REHEARSAL_CONTAINER_APP_RESOURCE_ID =
+  apiContainerAppResourceId(REHEARSAL_CONTAINER_APP);
 
 const AZURE_MANAGEMENT_SCOPE = "https://management.azure.com/.default";
 const CONTAINER_APP_API_VERSION = "2025-07-01";
@@ -68,11 +75,10 @@ export class AzureRehearsalStatusProvider
 }
 
 function containerAppUrl(): string {
-  const resourcePath =
-    `/subscriptions/${REHEARSAL_SUBSCRIPTION_ID}` +
-    `/resourceGroups/${REHEARSAL_RESOURCE_GROUP}` +
-    `/providers/Microsoft.App/containerApps/${REHEARSAL_CONTAINER_APP}`;
-  const url = new URL(resourcePath, "https://management.azure.com");
+  const url = new URL(
+    REHEARSAL_CONTAINER_APP_RESOURCE_ID,
+    "https://management.azure.com",
+  );
   url.searchParams.set("api-version", CONTAINER_APP_API_VERSION);
   return url.toString();
 }

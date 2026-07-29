@@ -15,12 +15,13 @@ accepts only `ca-ap2-api`, `minReplicas: 1`, and `maxReplicas: 1`; missing,
 extra, malformed, or drifted fields fail categorically. It is the explicit
 input contract for any future repository deployment command.
 
-The repository has no main-API IaC, deployment command, or hosted deployment
-workflow today. The check does not infer coverage by scanning filenames or
-deployment syntax, and the separate calling-bot template is not evidence for
-the main API. When a real deployment path is added, it must consume the exact
-validated plan rather than restating replica values or relying on heuristic
-discovery.
+The repository has no main-API deployment command or hosted deployment
+workflow. Its one declarative main-API artifact path is the
+[offline Container Apps artifact compiler](api-container-app-deployment-artifact.md).
+That compiler consumes this exact validated plan instead of restating replica
+values. It emits data only; it cannot deploy or call Azure. The check does not
+infer coverage by scanning filenames or deployment syntax, and the separate
+calling-bot template is not evidence for the main API.
 
 The API's existing read-only rehearsal-status operation independently reads
 the fixed Container App ARM resource and refuses readiness unless

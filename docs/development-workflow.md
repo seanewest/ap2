@@ -211,6 +211,11 @@ explicit distributed admission architecture exist. The explicit topology-plan
 contract and authoritative readiness read enforce the
 [single-replica fallback](api-single-replica-fallback.md). See
 [API process-local backpressure](api-abuse-backpressure.md).
+The
+[offline Container Apps artifact compiler](api-container-app-deployment-artifact.md)
+is the sole declarative main-API artifact path. It consumes that exact
+topology plan and emits validated data only; it is not a deployment command or
+external readiness proof.
 
 ## Eventual consistency
 
