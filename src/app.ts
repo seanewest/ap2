@@ -18,6 +18,7 @@ import {
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
   OneDriveInviteFailureError,
+  ScenarioPlanClientError,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
@@ -51,6 +52,11 @@ import {
   createStatus,
 } from "./ui/elements";
 import { createScenarioCatalog } from "./scenarios/scenario-catalog";
+import {
+  createScenarioPlanPreview,
+  type ScenarioPlanPreviewClient,
+  type ScenarioPlanPreviewFailure,
+} from "./scenarios/scenario-plan-preview";
 import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
 
 type ApiAccessState =
@@ -146,6 +152,14 @@ export function createAfterPartyApp(
   storage: Pick<Storage, "getItem" | "setItem"> = window.localStorage,
 ): AfterPartyApp {
   let state: ViewState = { kind: "initial" };
+  const scenarioPlanPreviewClient: ScenarioPlanPreviewClient = {
+    preview: async (request) => {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      return await api.compileScenarioPlan(accessToken, request);
+    },
+    classifyError: classifyScenarioPlanPreviewFailure,
+  };
   let contactProof: ContactProofState = {
     stage: "not-started",
     activity: "idle",
@@ -700,7 +714,9 @@ export function createAfterPartyApp(
   };
 
   const render = (): void => {
-    root.replaceChildren(createShell(state, contactProof));
+    root.replaceChildren(
+      createShell(state, contactProof, scenarioPlanPreviewClient),
+    );
     root
       .querySelector<HTMLButtonElement>("[data-action='sign-in']")
       ?.addEventListener("click", () => void signIn());
@@ -794,6 +810,7 @@ export function createAfterPartyApp(
 function createShell(
   state: ViewState,
   contactProof: ContactProofState,
+  scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
 ): HTMLElement {
   const shell = document.createElement("main");
   shell.className = "shell";
@@ -811,7 +828,10 @@ function createShell(
   introduction.className = "introduction";
   introduction.textContent =
     "Sign in with your Microsoft work or school account to continue.";
-  shell.append(introduction, createStatePanel(state, contactProof));
+  shell.append(
+    introduction,
+    createStatePanel(state, contactProof, scenarioPlanPreviewClient),
+  );
 
   return shell;
 }
@@ -819,6 +839,7 @@ function createShell(
 function createStatePanel(
   state: ViewState,
   contactProof: ContactProofState,
+  scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
 ): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "auth-panel";
@@ -871,6 +892,10 @@ function createStatePanel(
         createContactProofPanel(contactProof, apiOperationLoading),
         ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
         createScenarioCatalog(SCENARIO_MANIFESTS),
+        createScenarioPlanPreview({
+          registry: SCENARIO_MANIFESTS,
+          client: scenarioPlanPreviewClient,
+        }),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -889,6 +914,29 @@ function createStatePanel(
   }
 
   return panel;
+}
+
+function classifyScenarioPlanPreviewFailure(
+  error: unknown,
+): ScenarioPlanPreviewFailure {
+  if (error instanceof AccessTokenError) {
+    return "session-expired";
+  }
+  if (!(error instanceof ScenarioPlanClientError)) {
+    return "unavailable";
+  }
+  switch (error.category) {
+    case "unauthorized":
+      return "session-expired";
+    case "forbidden":
+      return "unauthorized";
+    case "validation-refused":
+      return "compiler-refused";
+    case "request-too-large":
+      return "response-too-large";
+    case "safe-failure":
+      return "unavailable";
+  }
 }
 
 function createSimulatedEmailPanel(

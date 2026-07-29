@@ -1,4 +1,5 @@
 import { appendIdentity, createStatus } from "../ui/elements";
+import { isSafeScenarioPlanningRequest } from "../api/client";
 import {
   parseScenarioManifest,
   type ScenarioManifest,
@@ -330,7 +331,7 @@ function buildRequest(
     }
     selectedResponseId = action.id;
   }
-  return {
+  const request = {
     scenarioId: manifest.id,
     actorAliases,
     now: generatedAt.toISOString(),
@@ -338,6 +339,9 @@ function buildRequest(
     maximumBudgetUsd,
     ...(selectedResponseId ? { selectedResponseId } : {}),
   };
+  return isSafeScenarioPlanningRequest(request)
+    ? request
+    : "Aliases must be opaque and sanitized; identity, tenant, credential, token, session, and other raw-identifier terms are not accepted.";
 }
 
 function createPlanResult(
@@ -500,93 +504,11 @@ function validatePlanForDisplay(
       !manifest.responseActions.some(({ id }) => id === plan.selectedResponseId)
     ) ||
     plan.terminalProof.requiredResult !== "reconciled" ||
-    plan.steps.some((step, index) =>
-      step.sequence !== index + 1 ||
-      !safeStep(step)
-    )
+    plan.steps.some((step, index) => step.sequence !== index + 1)
   ) {
     return "unavailable";
   }
   return undefined;
-}
-
-function safeStep(step: ScenarioPlanStep): boolean {
-  const phases: readonly ScenarioPlanStep["phase"][] = [
-    "preflight",
-    "producer-operation",
-    "authentic-evidence",
-    "learner-interpretation",
-    "optional-response",
-    "expiry",
-    "cleanup",
-    "retention",
-    "terminal-verification",
-  ];
-  const roles: readonly ScenarioPlanRole[] = [
-    ...INPUT_ROLES.map(([role]) => role),
-    "system",
-  ];
-  const execution: readonly ScenarioPlanStep["execution"][] = [
-    "automated",
-    "declarative",
-    "human-only",
-    "pre-seeded-reference",
-  ];
-  const ambiguities: readonly ScenarioPlanStep["ambiguityBehavior"][] = [
-    "bounded-read-retry",
-    "fail-closed",
-    "not-applicable",
-    "stop-and-reconcile",
-  ];
-  const recoveries: readonly ScenarioPlanStep["recoveryBehavior"][] = [
-    "none",
-    "read-only-reconcile-no-replay",
-    "retry-within-read-budget",
-    "stop-on-mismatch",
-  ];
-  const artifactKinds = [
-    "application-recon-summary",
-    "avd-topology",
-    "cleanup-state",
-    "endpoint-posture",
-    "outlook-email",
-    "private-network-topology",
-    "purview-audit-summary",
-    "teams-missed-call",
-  ];
-  const authenticities = [
-    "application-narrative",
-    "platform-control-plane",
-    "platform-native",
-  ];
-  const evidenceModes = ["planned", "pre-seeded"];
-  const learnerVisibility = ["not-proven", "observed"];
-  const retention = [
-    "cleanup-later",
-    "expire-automatically",
-    "retain-audit-history",
-  ];
-  return phases.includes(step.phase) &&
-    roles.includes(step.owningRole) &&
-    execution.includes(step.execution) &&
-    ambiguities.includes(step.ambiguityBehavior) &&
-    recoveries.includes(step.recoveryBehavior) &&
-    (step.actorAlias === undefined || SAFE_ALIAS.test(step.actorAlias)) &&
-    (
-      step.evidenceExpectation === undefined ||
-      (
-        artifactKinds.includes(step.evidenceExpectation.artifactKind) &&
-        authenticities.includes(step.evidenceExpectation.authenticity) &&
-        evidenceModes.includes(step.evidenceExpectation.evidenceMode) &&
-        learnerVisibility.includes(
-          step.evidenceExpectation.learnerVisibility,
-        )
-      )
-    ) &&
-    (
-      step.retention === undefined ||
-      retention.includes(step.retention.disposition)
-    );
 }
 
 function failureMessage(failure: ScenarioPlanPreviewFailure): string {

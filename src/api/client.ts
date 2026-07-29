@@ -1345,7 +1345,7 @@ const SAFE_SCENARIO_ALIAS = /^[a-z][a-z0-9-]{1,63}$/;
 const RAW_SCENARIO_IDENTIFIER =
   /(?:@|[\\/]|onmicrosoft|tenant|subscription|object-?id|message-?id|userprincipal|credential|certificate|access-?token|refresh-?token|session|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})/i;
 
-function isSafeScenarioPlanningRequest(
+export function isSafeScenarioPlanningRequest(
   value: unknown,
 ): value is ScenarioPlanningRequest {
   if (

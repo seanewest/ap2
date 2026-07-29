@@ -12,6 +12,7 @@ import {
 import {
   ApiAccessError,
   OneDriveInviteFailureError,
+  ScenarioPlanClientError,
   type AfterPartyApi,
   type ApiCallerIdentity,
   type CalendarMeetingResult,
@@ -28,6 +29,7 @@ import {
   type TodoTaskProofResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
+import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
 
 const account: AccountIdentity = {
   accountId: "student-object-id",
@@ -1612,7 +1614,98 @@ describe("After Party authentication UI", () => {
 
     expect(root.textContent).toContain("You are signed out");
     expect(root.querySelector(".scenario-catalog")).toBeNull();
+    expect(root.querySelector(".scenario-plan-preview")).toBeNull();
   });
+
+  it("requests a scenario preview only after the signed-in operator submits it", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.compileScenarioPlan.mockImplementation(async (_token, request) =>
+      compileScenarioExecutionPlan(request)
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+    const preview = root.querySelector<HTMLElement>(
+      ".scenario-plan-preview",
+    )!;
+    expect(preview.textContent).toContain("No preview requested");
+    expect(api.compileScenarioPlan).not.toHaveBeenCalled();
+
+    preview.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.compileScenarioPlan).toHaveBeenCalledOnce();
+    expect(api.compileScenarioPlan).toHaveBeenCalledWith(
+      "temporary-token",
+      expect.objectContaining({
+        scenarioId: "teams-missed-call-observation",
+      }),
+    );
+    expect(preview.textContent).toContain("Deterministic preview");
+    expect(preview.textContent).not.toContain("temporary-token");
+  });
+
+  it.each([
+    [
+      new AccessTokenError("raw expired session detail"),
+      "session expired",
+      false,
+    ],
+    [
+      new ScenarioPlanClientError("forbidden"),
+      "not authorized",
+      true,
+    ],
+    [
+      new ScenarioPlanClientError("validation-refused", "EXPIRY_INVALID"),
+      "planner refused",
+      true,
+    ],
+    [
+      new ScenarioPlanClientError("safe-failure"),
+      "preview is unavailable",
+      true,
+    ],
+  ] as const)(
+    "maps typed preview failure without rendering its detail",
+    async (failure, message, reachesApi) => {
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      authentication.acquireAccessToken.mockImplementation(async () => {
+        if (!reachesApi) {
+          throw failure;
+        }
+        return "temporary-token";
+      });
+      if (reachesApi) {
+        api.compileScenarioPlan.mockRejectedValue(failure);
+      }
+      const app = createAfterPartyApp(root, authentication, api);
+      await app.start();
+
+      root.querySelector<HTMLFormElement>(
+        ".scenario-plan-preview form",
+      )!.requestSubmit();
+      await nextTask();
+
+      const preview = root.querySelector(".scenario-plan-preview")!;
+      expect(preview.textContent).toContain(message);
+      expect(preview.textContent).not.toContain(failure.message);
+      expect(api.compileScenarioPlan).toHaveBeenCalledTimes(
+        reachesApi ? 1 : 0,
+      );
+    },
+  );
 
   it("disables refresh and other API actions while loading", async () => {
     const deferred = createDeferred<RecentOperationEvents>();

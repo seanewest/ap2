@@ -99,6 +99,22 @@ describe("Scenario plan preview", () => {
     }
   });
 
+  it.each(SCENARIO_MANIFESTS.map((manifest, index) => [
+    manifest.title,
+    index,
+  ] as const))("previews the canonical %s contract", async (_title, index) => {
+    const preview = render();
+    const scenario = preview.querySelector<HTMLSelectElement>(
+      "select[name='scenario']",
+    )!;
+    scenario.value = String(index);
+    scenario.dispatchEvent(new Event("change", { bubbles: true }));
+    submit(preview);
+    await settle();
+    expect(preview.textContent).toContain("Deterministic preview");
+    expect(preview.textContent).not.toContain("preview is unavailable");
+  });
+
   it("renders only response choices declared by the selected manifest", () => {
     const preview = render();
     const responses = preview.querySelector<HTMLSelectElement>(
@@ -117,11 +133,25 @@ describe("Scenario plan preview", () => {
     const previewClient = client();
     const preview = render(previewClient);
     const alias = preview.querySelector<HTMLInputElement>(
-      "input[name='alias-evidenceProducer']",
+      "input[name='alias-learner']",
     )!;
     alias.value = "operator@example.invalid";
     submit(preview);
     expect(preview.textContent).toContain("raw identifiers are not accepted");
+    expect(previewClient.preview).not.toHaveBeenCalled();
+  });
+
+  it("uses the canonical request parser to reject token-like aliases before the client", () => {
+    const previewClient = client();
+    const preview = render(previewClient);
+    const alias = preview.querySelector<HTMLInputElement>(
+      "input[name='alias-learner']",
+    )!;
+    alias.value = "access-token";
+    submit(preview);
+    expect(preview.textContent).toContain(
+      "credential, token, session, and other raw-identifier terms",
+    );
     expect(previewClient.preview).not.toHaveBeenCalled();
   });
 
