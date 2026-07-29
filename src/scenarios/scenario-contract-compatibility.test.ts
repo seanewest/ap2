@@ -501,6 +501,23 @@ describe("scenario contract compatibility checker", () => {
     expect(result.scenarios[0]?.adapters).toEqual([]);
   });
 
+  it("validates the canonical Teams adapter input and pinpoints drift", () => {
+    const manifest = supportedManifests.find(
+      ({ id }) => id === "teams-missed-call-observation",
+    )!;
+    const result = checkOne(manifest, {
+      teamsMissedCallInput: {} as never,
+    });
+
+    expect(categories(result)).toEqual([
+      "TEAMS_MISSED_CALL_ADAPTER_DRIFT",
+    ]);
+    expect(result.scenarios[0]?.adapters).toEqual([]);
+    expect(checkOne(manifest).scenarios[0]?.adapters).toEqual([
+      "teams-missed-call",
+    ]);
+  });
+
   it("uses the private-document adapter only for its canonical fixture", () => {
     const manifest = supportedManifests.find(
       ({ id }) => id === "private-document-evidence",

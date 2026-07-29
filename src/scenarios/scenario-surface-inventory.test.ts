@@ -114,12 +114,19 @@ describe("canonical scenario surface inventory", () => {
     expect(helpDesk.surfaces.adapter.status).toBe("implemented");
     expect(helpDesk.surfaces.rehearsal.status).toBe("missing");
 
+    const teams = first.scenarios.find(
+      ({ scenarioId }) => scenarioId === "teams-missed-call-observation",
+    )!;
+    expect(teams.surfaces.adapter.status).toBe("implemented");
+    expect(teams.surfaces.rehearsal.status).toBe("missing");
+
     for (
       const row of first.scenarios.filter(
         ({ scenarioId }) =>
           scenarioId !== "avd-three-vm-substrate" &&
           scenarioId !== "private-document-evidence" &&
-          scenarioId !== "help-desk-email-observation",
+          scenarioId !== "help-desk-email-observation" &&
+          scenarioId !== "teams-missed-call-observation",
       )
     ) {
       expect(row.surfaces.adapter.status).toBe("not-applicable");

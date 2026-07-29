@@ -50,6 +50,13 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- The canonical Teams missed-call scenario now has a pure
+  observation-to-receipt adapter. One licensed-user stage result proves only
+  its one-attempt operation; Cory-side native history plus Activity, the
+  learner report, and retained or cleaned state require separate categorical
+  observations. Bot, voicemail, callback, raw evidence, and cleanup inference
+  fail closed. See
+  [the Teams missed-call receipt adapter](docs/teams-missed-call-receipt-adapter.md).
 - The canonical help-desk email scenario now has a pure operation-to-receipt
   adapter. One reduced accepted journal proves only the send operation;
   authentic learner-visible email and retained or cleaned state require

@@ -1,11 +1,11 @@
 # Scenario contract compatibility
 
 The local compatibility check detects drift between the canonical scenario
-registry and the existing plan, receipt, AVD, help-desk email,
-operation-telemetry, and private-document adapter contracts. It imports and
-calls their runtime validators, adapters, and compilers; it does not copy their
-schemas, rewrite an input, execute a plan, run a lifecycle, call an API, persist
-state, or establish external proof.
+registry and the existing plan, receipt, AVD, help-desk email, Teams
+missed-call, operation-telemetry, and private-document adapter contracts. It
+imports and calls their runtime validators, adapters, and compilers; it does
+not copy their schemas, rewrite an input, execute a plan, run a lifecycle, call
+an API, persist state, or establish external proof.
 
 Run:
 
@@ -41,6 +41,8 @@ For every registry manifest, the checker:
 - calls the help-desk email receipt adapter only for that canonical scenario,
   using its accepted-only sanitized input and preserving every unsupported
   evidence category as `uninspected`;
+- calls the Teams missed-call receipt adapter only for that canonical scenario,
+  using its stage-only sanitized input without inventing target-side evidence;
 - calls the private-document receipt adapter only for that canonical scenario,
   using a bounded sanitized lifecycle fixture;
 - calls the PR #79 AVD manifest adapter only for the canonical AVD scenario,

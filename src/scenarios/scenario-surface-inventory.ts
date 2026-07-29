@@ -27,6 +27,9 @@ import {
   type ScenarioSurfaceDeclarationName,
 } from "./scenario-surface-capability.ts";
 import { SCENARIO_MANIFESTS } from "./scenarios.ts";
+import {
+  TEAMS_MISSED_CALL_RECEIPT_ADAPTER_CAPABILITY,
+} from "./teams-missed-call-receipt-adapter.ts";
 
 const MAX_SCENARIOS = 32;
 const MAX_DECLARATIONS = 32;
@@ -157,6 +160,7 @@ const AUTHORITATIVE_ADAPTER_DECLARATIONS = [
   AVD_MANIFEST_ADAPTER_CAPABILITY,
   HELP_DESK_EMAIL_RECEIPT_ADAPTER_CAPABILITY,
   PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY,
+  TEAMS_MISSED_CALL_RECEIPT_ADAPTER_CAPABILITY,
 ] as const satisfies readonly ScenarioAdapterCapabilityDeclaration[];
 
 export function inventoryCanonicalScenarioSurfaces(
