@@ -171,6 +171,16 @@ assigning the learner to either proof role.
   This proves bounded human-assisted user-to-user artifact creation, not
   unattended automation. Exact elapsed time and all voicemail behavior remain
   unproven and were not inspected. The Graph-bot `7505` blocker is unchanged.
+- An operator-free Teams Web readiness harness established an exact,
+  non-persistent Kobe caller session, but three bounded attempts could not
+  establish the independent Cory observer session needed to reconcile a native
+  missed-call artifact. No call was placed. No ACS resource exists, the shared
+  client lacks ACS `Teams.ManageCalls` and `Teams.ManageChats` delegated
+  grants, and no Teams Phone resource account or Enterprise Voice prerequisite
+  exists. The repository now includes a deterministic Kobe-to-Cory help-desk
+  email generator as the honest non-call fallback. It is explicitly labeled as
+  Outlook email—not a Teams call, missed call, or voicemail—and has not yet
+  been exercised through the hosted product path.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted

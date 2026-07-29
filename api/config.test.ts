@@ -112,6 +112,25 @@ describe("loadApiConfig", () => {
     });
   });
 
+  it("accepts complete Kobe-only CBA configuration under the shared client", () => {
+    const config = loadApiConfig({
+      AUTH_ISSUER: "https://issuer.example/",
+      AUTH_AUDIENCE: "api://audience",
+      AUTH_JWKS_URL: "https://issuer.example/keys",
+      SIMULATED_USER_CLIENT_ID: "11111111-1111-4111-8111-111111111111",
+      KOBE_CBA_PFX_PATH: "/run/secrets/kobe.pfx",
+      KOBE_CBA_PFX_PASSPHRASE: "kobe-passphrase",
+    });
+
+    expect(config.simulatedUsersCba).toEqual({
+      clientId: "11111111-1111-4111-8111-111111111111",
+      kobe: {
+        pfxPath: "/run/secrets/kobe.pfx",
+        pfxPassphrase: "kobe-passphrase",
+      },
+    });
+  });
+
   it.each([
     ["CORY_CBA_OBJECT_ID", "22222222-2222-4222-8222-222222222222"],
     ["CORY_CBA_PFX_PATH", "/run/secrets/cory.pfx"],
@@ -159,6 +178,8 @@ describe("loadApiConfig", () => {
     ["SIMULATED_USER_CLIENT_ID", "11111111-1111-4111-8111-111111111111"],
     ["HOMER_CBA_PFX_PATH", "/run/secrets/homer.pfx"],
     ["HOMER_CBA_PFX_PASSPHRASE", "secret-passphrase"],
+    ["KOBE_CBA_PFX_PATH", "/run/secrets/kobe.pfx"],
+    ["KOBE_CBA_PFX_PASSPHRASE", "secret-passphrase"],
   ])("rejects partial Homer CBA configuration with only %s", (name, value) => {
     expect(() =>
       loadApiConfig({
@@ -179,6 +200,10 @@ describe("loadApiConfig", () => {
       CORY_CBA_OBJECT_ID: "22222222-2222-4222-8222-222222222222",
       CORY_CBA_PFX_PATH: "/run/secrets/cory.pfx",
       CORY_CBA_PFX_PASSPHRASE: "cory-passphrase",
+    },
+    {
+      KOBE_CBA_PFX_PATH: "/run/secrets/kobe.pfx",
+      KOBE_CBA_PFX_PASSPHRASE: "kobe-passphrase",
     },
   ])("rejects complete user CBA configuration without the shared client", (user) => {
     expect(() =>

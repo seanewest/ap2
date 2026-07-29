@@ -207,3 +207,39 @@ end it. This path is suitable for bounded human-assisted scenario construction
 or pre-seeding a lab artifact, but it is not an automated per-learner runtime
 capability. The application-originated Graph bot remains blocked by HTTP `403`
 / code `7505` pending a specific Microsoft backend repair.
+
+## Operator-free evidence-producer decision
+
+On 2026-07-29, a bounded browser harness opened fresh non-persistent Teams Web
+contexts with service workers blocked and no storage-state export. Kobe's
+certificate established an exact `kobe@corywest.onmicrosoft.com` Teams
+session. Three bounded Cory readiness attempts did not progress past
+Microsoft's authentication surface, including one headed attempt. Every
+context closed, no browser state or token was retained, and no call control was
+used. This is controlled browser UI automation, not a supported calling API.
+Without a deterministic, isolated Cory observation session, placing the one
+permitted call would not have produced trustworthy terminal or native-artifact
+evidence, so the call allowance was not consumed.
+
+The supported alternatives were also not ready inside the lane:
+
+| Path | Classification | Decisive result |
+| --- | --- | --- |
+| Existing Graph bot | Supported Cloud Communications API | Exact app remains blocked pre-identity by `7505`; no retry without a Microsoft-specific repair |
+| Teams Web harness | Lab browser UI automation | Exact ephemeral Kobe caller session passed; isolated Cory observer readiness failed after three bounded attempts |
+| ACS as Teams user | Supported client SDK | No ACS resource or `Teams.ManageCalls` / `Teams.ManageChats` delegated grants exist; it still needs a delegated user session and custom client |
+| Teams Phone Extensibility | Preview server/client surface | No ACS resource, Teams Phone resource account, Enterprise Voice, or linkage exists |
+| Human Teams client | Supported client operation | One authentic missed-call artifact is proven, but the originator is human-operated |
+
+No ACS resource, credential, permission, enabled revision, call, or incremental
+spend was created. The smallest honest non-call fallback is therefore the
+already-proven delegated `sendMail` primitive: a new fixed backend operation
+can submit one clearly labeled Kobe-to-Cory Outlook help-desk email. Its
+subject and body explicitly identify it as an AP2 lab email, not a Teams call
+or voicemail; the API and UI expose only the `email` platform claim, verify the
+exact Kobe token identity before Graph, accept only Graph `202`, and never
+retry inside the one API process after any attempted submission. Like the other
+Pass 3 mutations, it has no durable cross-replica exactly-once journal. This
+fallback is implemented and deterministically tested but was not
+staged in Microsoft during this lane, so delivery remains unproven until a
+separately authorized hosted rehearsal.

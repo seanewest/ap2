@@ -66,24 +66,31 @@ that delivery is confirmed. Tokens are cached only in process memory, no
 refresh token is requested, and every browser acquisition uses a fresh
 non-persistent context.
 
-Production enables Homer's operation only when the shared client and both
-Homer certificate settings are present:
+Production enables each simulated-user operation only when the shared client
+and that actor's certificate settings are present:
 
 - `SIMULATED_USER_CLIENT_ID`: UUID of the existing shared multitenant public
   client
 - `HOMER_CBA_PFX_PATH`: absolute path to the externally mounted Homer PFX
 - `HOMER_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
+- `KOBE_CBA_PFX_PATH`: absolute path to the externally mounted Kobe PFX
+- `KOBE_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
 
-The public client must already allow the exact
+Kobe's settings enable only the fixed, clearly labeled Kobe-to-Cory help-desk
+email fallback. The public client must already allow the exact
 `http://localhost/ap2-simulated-user-callback` redirect and have consent for
 delegated `User.Read` and `Mail.Send`. Homer must already have working Student
-CBA. The container needs outbound access to Microsoft login, certificate
-authentication, and Graph endpoints. This application work does not create
-consent, identity, certificate, or tenant configuration.
+CBA for the original simulated email; Kobe must have working Student CBA for
+the help-desk fallback. The container needs outbound access to Microsoft
+login, certificate authentication, and Graph endpoints. This application work
+does not create consent, identity, certificate, or tenant configuration.
 
 The disposable rehearsal assumes one controlled click against one API replica.
-It does not claim exactly-once delivery across callers, replicas, or restarts,
-and intentionally adds no job or durable idempotency system.
+The `/api/help-desk-scenario` operation consumes a singleton process-local
+attempt before authentication or Graph, so success, refusal, and ambiguous
+failure cannot be retried on that replica. It does not claim exactly-once
+delivery across replicas or restarts, and intentionally adds no job or durable
+idempotency system.
 
 ## OneDrive share proof
 

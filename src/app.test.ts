@@ -17,6 +17,7 @@ import {
   type CategoryProofResult,
   type ContactProofResult,
   type DraftProofResult,
+  type HelpDeskScenarioResult,
   type InboxRuleProofResult,
   type OneDriveProofResult,
   type RehearsalStatus,
@@ -61,6 +62,8 @@ class FakeApi implements AfterPartyApi {
     vi.fn<(accessToken: string) => Promise<RehearsalStatus>>();
   sendSimulatedEmail =
     vi.fn<(accessToken: string) => Promise<SimulatedEmailResult>>();
+  sendHelpDeskScenario =
+    vi.fn<(accessToken: string) => Promise<HelpDeskScenarioResult>>();
   shareOneDriveProof =
     vi.fn<
       (
@@ -595,6 +598,45 @@ describe("After Party authentication UI", () => {
     simulatedEmailButton()?.click();
     await nextTask();
     expect(api.sendSimulatedEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("labels the Kobe-to-Cory help desk artifact as email-only and submits once", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("sensitive-access-token");
+    api.sendHelpDeskScenario.mockResolvedValue({
+      accepted: true,
+      artifact: "outlook-email",
+      sender: "kobe@corywest.onmicrosoft.com",
+      recipient: "cory@corywest.onmicrosoft.com",
+      subject: "AP2 help desk follow-up [ap2-help-desk-email-20260729-001]",
+      platformClaims: ["email"],
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    expect(root.textContent).toContain(
+      "This is not a Teams call, missed call, or voicemail.",
+    );
+    helpDeskScenarioButton()?.click();
+    await nextTask();
+
+    expect(api.sendHelpDeskScenario).toHaveBeenCalledOnce();
+    expect(api.sendHelpDeskScenario).toHaveBeenCalledWith(
+      "sensitive-access-token",
+    );
+    expect(root.textContent).toContain("Outlook email");
+    expect(root.textContent).toContain("kobe@corywest.onmicrosoft.com");
+    expect(root.textContent).toContain("cory@corywest.onmicrosoft.com");
+    expect(root.textContent).toContain("Platform claimEmail only");
+    expect(helpDeskScenarioButton()?.disabled).toBe(true);
+
+    helpDeskScenarioButton()?.click();
+    await nextTask();
+    expect(api.sendHelpDeskScenario).toHaveBeenCalledOnce();
   });
 
   it("serializes the internal email with the other API operations", async () => {
@@ -1509,6 +1551,12 @@ describe("After Party authentication UI", () => {
   function simulatedEmailButton(): HTMLButtonElement | null {
     return root.querySelector<HTMLButtonElement>(
       "[data-action='send-simulated-email']",
+    );
+  }
+
+  function helpDeskScenarioButton(): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>(
+      "[data-action='send-help-desk-scenario']",
     );
   }
 

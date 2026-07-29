@@ -34,9 +34,11 @@ import {
   DelegatedGraphSimulatedEmailOperation,
   GRAPH_MAIL_SEND_SCOPE,
 } from "./simulated-email.js";
+import { DelegatedGraphHelpDeskScenarioOperation } from "./help-desk-scenario.js";
 import {
   coryIdentity,
   HOMER_IDENTITY,
+  KOBE_IDENTITY,
 } from "./simulated-user.js";
 import { SimulatedUserDelegatedTokenProvider } from "./simulated-user-cba.js";
 import { createRemoteTokenVerifier } from "./token-verifier.js";
@@ -59,6 +61,18 @@ const homerTokenProvider = config.simulatedUsersCba && homerConfig
   : undefined;
 const simulatedEmailOperation = homerTokenProvider
   ? new DelegatedGraphSimulatedEmailOperation(homerTokenProvider)
+  : undefined;
+const kobeConfig = config.simulatedUsersCba?.kobe;
+const kobeTokenProvider = config.simulatedUsersCba && kobeConfig
+  ? new SimulatedUserDelegatedTokenProvider({
+      clientId: config.simulatedUsersCba.clientId,
+      ...kobeConfig,
+      identity: KOBE_IDENTITY,
+      allowedScopes: [GRAPH_MAIL_SEND_SCOPE],
+    })
+  : undefined;
+const helpDeskScenarioOperation = kobeTokenProvider
+  ? new DelegatedGraphHelpDeskScenarioOperation(kobeTokenProvider)
   : undefined;
 const oneDriveShareProofOperation =
   homerTokenProvider
@@ -118,6 +132,7 @@ const server = createApiServer({
   callerPolicy: config.callerPolicy,
   rehearsalStatusProvider: new AzureRehearsalStatusProvider(managedIdentity),
   simulatedEmailOperation,
+  helpDeskScenarioOperation,
   oneDriveShareProofOperation,
   calendarMeetingOperation,
   contactProofOperation,

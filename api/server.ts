@@ -31,6 +31,7 @@ import {
   type SharePointFileProofOperation,
 } from "./sharepoint-file-proof.js";
 import type { SimulatedEmailOperation } from "./simulated-email.js";
+import type { HelpDeskScenarioOperation } from "./help-desk-scenario.js";
 import {
   OneDriveInviteFailureError,
   OneDriveProofBusyError,
@@ -44,6 +45,7 @@ export interface ApiDependencies {
   callerPolicy: CallerPolicy;
   rehearsalStatusProvider: RehearsalStatusProvider;
   simulatedEmailOperation?: SimulatedEmailOperation;
+  helpDeskScenarioOperation?: HelpDeskScenarioOperation;
   oneDriveShareProofOperation?: OneDriveShareProofOperation;
   calendarMeetingOperation?: CalendarMeetingOperation;
   contactProofOperation?: ContactProofOperation;
@@ -102,7 +104,8 @@ async function route(
 
   if (
     request.method === "OPTIONS" &&
-    pathname === "/api/simulated-email"
+    (pathname === "/api/simulated-email" ||
+      pathname === "/api/help-desk-scenario")
   ) {
     handleProtectedPreflight(request, response, origin, ["POST"]);
     return;
@@ -145,6 +148,10 @@ async function route(
 
   if (request.method === "POST" && pathname === "/api/simulated-email") {
     await simulatedEmail(request, response, dependencies);
+    return;
+  }
+  if (request.method === "POST" && pathname === "/api/help-desk-scenario") {
+    await helpDeskScenario(request, response, dependencies);
     return;
   }
 
@@ -285,6 +292,25 @@ async function simulatedEmail(
         throw new Error("Simulated email operation is not configured");
       }
       return dependencies.simulatedEmailOperation.send();
+    },
+    202,
+  );
+}
+
+async function helpDeskScenario(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(
+    request,
+    response,
+    dependencies,
+    () => {
+      if (!dependencies.helpDeskScenarioOperation) {
+        throw new Error("Help desk scenario operation is not configured");
+      }
+      return dependencies.helpDeskScenarioOperation.send();
     },
     202,
   );

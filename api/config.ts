@@ -15,6 +15,7 @@ export interface SimulatedUsersCbaConfig {
   clientId: string;
   homer?: SimulatedUserCertificateConfig;
   cory?: SimulatedUserCertificateConfig & { objectId: string };
+  kobe?: SimulatedUserCertificateConfig;
 }
 
 export interface ApiConfig {
@@ -65,16 +66,22 @@ function parseSimulatedUsersCbaConfig(
     "CORY_CBA_PFX_PASSPHRASE",
   );
   const coryObjectId = environment.CORY_CBA_OBJECT_ID;
+  const kobe = parseCertificate(
+    environment,
+    "KOBE_CBA_PFX_PATH",
+    "KOBE_CBA_PFX_PASSPHRASE",
+  );
 
   if (
     clientId === undefined &&
     !homer &&
     !cory &&
+    !kobe &&
     coryObjectId === undefined
   ) {
     return undefined;
   }
-  if (!clientId || (!homer && !cory)) {
+  if (!clientId || (!homer && !cory && !kobe)) {
     throw new Error(
       "SIMULATED_USER_CLIENT_ID and at least one complete simulated-user certificate must be configured together",
     );
@@ -93,6 +100,7 @@ function parseSimulatedUsersCbaConfig(
   return {
     clientId,
     ...(homer ? { homer } : {}),
+    ...(kobe ? { kobe } : {}),
     ...(cory && coryObjectId
       ? { cory: { ...cory, objectId: coryObjectId } }
       : {}),

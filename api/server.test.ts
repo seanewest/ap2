@@ -62,6 +62,14 @@ import {
   type SimulatedEmailResult,
 } from "./simulated-email.js";
 import {
+  HELP_DESK_SCENARIO_SUBJECT,
+  type HelpDeskScenarioResult,
+} from "./help-desk-scenario.js";
+import {
+  CORY_USER_PRINCIPAL_NAME,
+  KOBE_USER_PRINCIPAL_NAME,
+} from "./simulated-user.js";
+import {
   ONEDRIVE_PROOF_PATH,
   OneDriveInviteFailureError,
   ProcessLocalOneDriveShareProofBoundary,
@@ -98,6 +106,17 @@ const simulatedEmailResult: SimulatedEmailResult = {
 };
 const simulatedEmailOperation = {
   send: vi.fn().mockResolvedValue(simulatedEmailResult),
+};
+const helpDeskScenarioResult: HelpDeskScenarioResult = {
+  accepted: true,
+  artifact: "outlook-email",
+  sender: KOBE_USER_PRINCIPAL_NAME,
+  recipient: CORY_USER_PRINCIPAL_NAME,
+  subject: HELP_DESK_SCENARIO_SUBJECT,
+  platformClaims: ["email"],
+};
+const helpDeskScenarioOperation = {
+  send: vi.fn().mockResolvedValue(helpDeskScenarioResult),
 };
 const calendarMeetingResults = {
   configured: {
@@ -199,6 +218,7 @@ const server = createApiServer({
   callerPolicy: defaultCallerPolicy,
   rehearsalStatusProvider,
   simulatedEmailOperation,
+  helpDeskScenarioOperation,
   oneDriveShareProofOperation: oneDriveOperationBoundary,
   calendarMeetingOperation,
   contactProofOperation,
@@ -278,8 +298,10 @@ describe("local API", () => {
     },
   );
 
-  it("allows only POST with Authorization to preflight the simulated email", async () => {
-    const response = await fetch(`${baseUrl}/api/simulated-email`, {
+  it.each(["/api/simulated-email", "/api/help-desk-scenario"])(
+    "allows only POST with Authorization to preflight %s",
+    async (path) => {
+    const response = await fetch(`${baseUrl}${path}`, {
       method: "OPTIONS",
       headers: {
         Origin: "http://localhost:5173",
@@ -296,7 +318,8 @@ describe("local API", () => {
     expect(response.headers.get("access-control-allow-headers")).toBe(
       "Authorization",
     );
-  });
+    },
+  );
 
   it.each([
     ["GET", "Authorization"],
@@ -579,6 +602,25 @@ describe("local API", () => {
 
     expect(response.status).toBe(403);
     expect(simulatedEmailOperation.send).not.toHaveBeenCalled();
+  });
+
+  it("submits the fixed help desk scenario once for an authorized caller", async () => {
+    helpDeskScenarioOperation.send.mockClear();
+
+    const response = await protectedRequest(
+      {
+        tid: STUDENT_TENANT_ID,
+        oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+        scp: REQUIRED_DELEGATED_SCOPE,
+      },
+      undefined,
+      "/api/help-desk-scenario",
+      "POST",
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toEqual(helpDeskScenarioResult);
+    expect(helpDeskScenarioOperation.send).toHaveBeenCalledOnce();
   });
 
   it.each([
