@@ -62,6 +62,10 @@ backward-compatible capability rehearsals. They validate environment and
 operation contracts and are not implicitly learner scenarios. A rehearsal
 becomes a learner scenario only when it is deliberately migrated into the
 validated scenario registry and its learner-facing evidence plan is explicit.
+The [scenario manifest contract](scenario-manifest.md) is the executable
+authoring boundary for those migrated scenarios. It binds setup, evidence,
+learner interpretation, response, cleanup, retention, permissions, expiry, and
+cost; runtime validation must pass before the UI consumes a manifest.
 
 ## Work inside the lab boundary
 
