@@ -46,6 +46,7 @@
     "test:api-lifecycle-container": "node scripts/test-api-lifecycle-container.ts",
     "test:api-security-headers-container": "node scripts/api-security-header-container-audit.ts",
     "test:api-backpressure-container": "node scripts/test-api-abuse-backpressure-container.ts",
+    "test:shared-operation-journal-emulator": "node scripts/test-shared-operation-journal-emulator.ts",
     "test:rehearsal-verification-container": "node scripts/test-rehearsal-output-verification-container.ts",
     "test:private-document-rehearsal-container": "node scripts/test-private-document-rehearsal-verification-container.ts",
     "test:help-desk-email-rehearsal-container": "node scripts/test-help-desk-email-rehearsal-verification-container.ts",
@@ -63,6 +64,7 @@
     "verify:teams-missed-call-rehearsal": "node scripts/verify-teams-missed-call-rehearsal-output-cli.ts"
   },
   "dependencies": {
+    "@azure/data-tables": "13.3.2",
     "@azure/identity": "4.13.1",
     "@azure/msal-browser": "5.17.1",
     "@azure/msal-node": "5.4.2",
