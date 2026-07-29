@@ -8,6 +8,7 @@ import {
 import { AVD_THREE_VM_SCENARIO } from "./avd-three-vm";
 import { HELP_DESK_EMAIL_SCENARIO } from "./help-desk-email";
 import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon";
+import { PRIVATE_DOCUMENT_EVIDENCE_SCENARIO } from "./private-document-evidence";
 import { TEAMS_MISSED_CALL_SCENARIO } from "./teams-missed-call";
 
 const marker = "test-scenario-001";
@@ -598,6 +599,31 @@ describe("generalized scenario manifest contract", () => {
         (artifact) => artifact.learnerVisibility === "not-proven",
       ),
     ).toBe(true);
+  });
+
+  it("keeps private-document platform acceptance separate from learner visibility", () => {
+    const manifest = parseScenarioManifest(
+      PRIVATE_DOCUMENT_EVIDENCE_SCENARIO,
+    );
+    expect(manifest.roles).toMatchObject({
+      evidenceProducer: "ap2-orchestrator",
+      workloadActor: "document-producer",
+      learner: "document-learner",
+    });
+    expect(manifest.evidence.artifacts).toMatchObject([
+      {
+        state: "platform-accepted",
+        learnerVisibility: "not-proven",
+        semanticClaims: ["private-document-staged"],
+        retention: "ephemeral",
+      },
+    ]);
+    expect(manifest.learner.completionState).toBe("not-run");
+    expect(manifest.lifecycle.cleanupOperationKeys).toEqual([
+      "delete-direct-learner-read",
+      "delete-private-text-file",
+      "delete-private-run-folder",
+    ]);
   });
 
   it("renders roles, learner interpretation, expiry, and cost", () => {
