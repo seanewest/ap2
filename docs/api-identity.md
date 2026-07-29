@@ -103,11 +103,13 @@ actions:
 - `POST` refuses an existing `/AP2-OneDrive-share-proof.txt`, creates that
   fixed file with the exact rehearsal sentence, and grants only
   `marge.simpson@corywest.onmicrosoft.com` read access. Sign-in is required and
-  no invitation is sent. Configured success requires exactly one no-link
-  permission with role `read` and `grantedToV2.user.id` equal to Marge's
-  immutable object ID. If Graph's `200` response does not contain that shape,
-  AP2 performs one owner-side permissions read and accepts only one matching
-  effective permission. It never repeats the invite.
+  Microsoft is asked to send its native sharing invitation with a fixed
+  harmless message. Configured success requires exactly one no-link permission
+  with role `read` and `grantedToV2.user.id` equal to Marge's immutable object
+  ID. If Graph's `200` response does not contain that shape, AP2 performs one
+  owner-side permissions read and accepts only one matching effective
+  permission. It never repeats the invite. The accepted response proves the
+  permission and invitation request, not email delivery or learner opening.
 - `DELETE` resolves the fixed item and its permissions, revokes only the exact
   Marge read permission, then re-resolves and validates the 58-byte file before
   deleting once with its current eTag. OneDrive moves the item to the recycle
@@ -122,9 +124,15 @@ OneDrive has exposed every inheritance detail.
 After an uncertain mutation response, the UI disables sharing and offers only
 cleanup. Its stage is stored per signed-in account in browser storage so a
 reload does not blindly repeat a mutation. After configured success, a human
-can sign in to OneDrive as Marge in a separate browser or profile, open
-**Shared > Shared with you**, find `AP2-OneDrive-share-proof.txt`, then return
-to the SPA and click Cleanup.
+can sign in to Outlook as Marge in a separate browser or profile, open
+Microsoft's sharing invitation for `AP2-OneDrive-share-proof.txt`, use its
+**Open** link, then return to the SPA and click Cleanup. An empty OneDrive
+**Shared** view is not permission-absence proof: Microsoft has deprecated
+Graph's
+[`sharedWithMe` discovery API](https://learn.microsoft.com/graph/api/drive-sharedwithme?view=graph-rest-1.0)
+and says it operates in a degraded state before retirement. The native
+invitation is therefore the fixed discovery path; direct access still requires
+its own learner observation.
 
 Homer uses delegated `Files.ReadWrite` through the same shared public client
 and exact callback used by the email operation. The OneDrive runtime requires

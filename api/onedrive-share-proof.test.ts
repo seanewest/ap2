@@ -6,6 +6,7 @@ import {
   GRAPH_FILES_READ_WRITE_SCOPE,
   ONEDRIVE_PROOF_CONTENT,
   ONEDRIVE_PROOF_FILE_NAME,
+  ONEDRIVE_PROOF_INVITATION_MESSAGE,
   ONEDRIVE_PROOF_PATH,
   OneDriveInviteFailureError,
   OneDriveProofBusyError,
@@ -143,7 +144,8 @@ describe("DelegatedGraphOneDriveShareProof", () => {
     expect(JSON.parse(invite[1].body as string)).toEqual({
       recipients: [{ objectId: MARGE_IDENTITY.objectId }],
       requireSignIn: true,
-      sendInvitation: false,
+      sendInvitation: true,
+      message: ONEDRIVE_PROOF_INVITATION_MESSAGE,
       roles: ["read"],
     });
     expect(invite[1].headers).toEqual({
