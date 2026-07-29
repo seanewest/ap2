@@ -40,6 +40,7 @@
     "test": "npm run check:artifact-hygiene && npm run check:workflow-security && npm run check:windows-host-boundary && vitest run",
     "test:container": "node scripts/test-api-container.ts",
     "test:api-lifecycle-container": "node scripts/test-api-lifecycle-container.ts",
+    "test:api-security-headers-container": "node scripts/api-security-header-container-audit.ts",
     "test:rehearsal-verification-container": "node scripts/test-rehearsal-output-verification-container.ts",
     "test:private-document-rehearsal-container": "node scripts/test-private-document-rehearsal-verification-container.ts",
     "test:help-desk-email-rehearsal-container": "node scripts/test-help-desk-email-rehearsal-verification-container.ts",

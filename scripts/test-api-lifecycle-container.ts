@@ -260,6 +260,14 @@ function fixtureToken(privateKey: KeyObject): string {
 }
 
 function assertDrainedResponses(received: string): void {
+  const normalized = received.toLowerCase();
+  const fixedHeaders = [
+    "cache-control: no-store",
+    "content-security-policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+    "referrer-policy: no-referrer",
+    "x-content-type-options: nosniff",
+    "x-frame-options: deny",
+  ];
   const statuses = [...received.matchAll(/HTTP\/1\.1 (\d{3})/g)]
     .map((match) => Number(match[1]));
   if (
@@ -267,12 +275,17 @@ function assertDrainedResponses(received: string): void {
     statuses[0] !== 200 ||
     statuses[1] !== 503 ||
     !received.includes('"error":"server_shutting_down"') ||
-    received.includes("simulated_email_not_configured")
+    received.includes("simulated_email_not_configured") ||
+    fixedHeaders.some((header) => count(normalized, header) !== 2)
   ) {
     throw new Error(
       `Shutdown admitted a pipelined mutation or lost the pure request: ${statuses.join(",")}`,
     );
   }
+}
+
+function count(value: string, expected: string): number {
+  return value.split(expected).length - 1;
 }
 
 async function expectNotReady(port: number): Promise<void> {
