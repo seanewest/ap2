@@ -121,6 +121,15 @@ h2 {
   border-top: 1px solid #d4d8df;
 }
 
+.operator-support-bundle {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid #b9c9dc;
+  border-radius: 0.85rem;
+  background: #f7fafd;
+}
+
 .recent-operations {
   display: grid;
   gap: 0.8rem;

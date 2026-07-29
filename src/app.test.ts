@@ -2308,6 +2308,56 @@ describe("After Party authentication UI", () => {
     },
   );
 
+  it("exports one correlated rehearsal failure only after an explicit action", async () => {
+    const supportReference = "r1_0123456789abcdef01234567";
+    const failure = new HelpDeskEmailRehearsalVerificationClientError(
+      "validation-refused",
+      "FAKE_CONTRACT_BINDING",
+    ).bindSupportReference(new Response(null, {
+      headers: { "X-AP2-Support-Reference": supportReference },
+    }));
+    const exportBundle = vi.fn();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.verifyHelpDeskEmailRehearsalOutput.mockRejectedValue(failure);
+    await createAfterPartyApp(
+      root,
+      authentication,
+      api,
+      window.localStorage,
+      exportBundle,
+    ).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".help-desk-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify(helpDeskRehearsalOutput);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(exportBundle).not.toHaveBeenCalled();
+    root.querySelector<HTMLButtonElement>(
+      ".operator-support-bundle button",
+    )!.click();
+    expect(exportBundle).toHaveBeenCalledOnce();
+    expect(exportBundle.mock.calls[0]?.[0].failures).toEqual([
+      expect.objectContaining({
+        routeCategory: "help-desk-email-rehearsal-verify",
+        categoricalStatus: "verification-refused",
+        supportReference,
+      }),
+    ]);
+    expect(JSON.stringify(exportBundle.mock.calls[0]?.[0])).not.toContain(
+      JSON.stringify(helpDeskRehearsalOutput),
+    );
+    expect(api.verifyHelpDeskEmailRehearsalOutput).toHaveBeenCalledOnce();
+  });
+
   it("verifies Teams output only after explicit signed submission", async () => {
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",
