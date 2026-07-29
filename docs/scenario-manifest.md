@@ -92,3 +92,15 @@ invented as a fifth registry scenario or treated as an execution receipt.
 Application reconnaissance retains its narrower registry claim: the workload
 and observer are distinct, while one sign-in or audit record does not prove
 every workload read.
+
+`purview-audit-boundary.ts` is a receipt-facing canonical manifest for the
+already-completed PR #73 audit boundary. It is not registered as a runnable UI
+scenario: the surface and distinct detector are proven, while operation
+attribution remains licensing or latency blocked.
+
+The manifest remains a pre-run plan, not post-run proof. Post-run truth belongs
+in a separate
+[scenario evidence receipt](scenario-evidence-receipts.md). The receipt binds
+back to the exact manifest roles, operations, artifacts, learner contract,
+response, cleanup, and retention without changing the plan or embedding raw
+evidence.

@@ -50,6 +50,17 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- Post-run scenario truth now has a runtime-validated sanitized receipt
+  contract over the generalized manifest. It requires exact role bindings and
+  terminal categorical rows for operations, artifacts, independent
+  observation, learner visibility and interpretation, response, cleanup,
+  retention, and proof. Empty or blocked audit queries, human-assisted
+  artifacts, cleanup mutations, and weaker terminal states cannot be promoted
+  into stronger claims. Five canonical positive/negative fixtures cover the
+  help-desk email, three-VM AVD, Teams missed call, application
+  reconnaissance, and Purview boundary. The offline CLI reads one bounded JSON
+  receipt and performs no network work. See
+  [post-run scenario evidence receipts](docs/scenario-evidence-receipts.md).
 - Microsoft Graph v1 Purview Audit Search is officially supported for
   application-only SharePoint observation, with
   `AuditLogsQuery-SharePoint.Read.All` as the product-minimum application

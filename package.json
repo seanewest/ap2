@@ -24,7 +24,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:container": "node scripts/test-api-container.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "validate:scenario-receipt": "node scripts/validate-scenario-evidence-receipt.ts"
   },
   "dependencies": {
     "@azure/identity": "4.13.1",

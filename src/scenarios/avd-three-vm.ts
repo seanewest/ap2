@@ -1,7 +1,7 @@
 import {
   parseScenarioManifest,
   type ScenarioManifest,
-} from "./scenario-manifest";
+} from "./scenario-manifest.ts";
 
 const marker = "ap2-avd-three-vm-fixture";
 const expiry = "2026-07-29T13:45:37Z";
