@@ -41,3 +41,8 @@ fixed `synthetic-*` categories, and the shared envelope declares every external
 claim `uninspected`. Green output demonstrates deterministic local contract
 compatibility only; it is not evidence that any Azure or Microsoft 365 event
 occurred.
+
+Saved rehearsal output can be checked independently with the
+[offline output verifier](oauth-application-recon-rehearsal-output-verifier.md).
+The verifier reconstructs the plan, four-read adapter input, receipt, and
+shared envelope without invoking this fake or pipeline runner.
