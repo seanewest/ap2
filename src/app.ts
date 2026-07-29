@@ -1822,7 +1822,7 @@ function createOneDriveProofPanel(
       state.stage === "not-started"
         ? "OneDrive proof: not started in this browser."
         : state.stage === "configured"
-          ? "OneDrive proof: read-only access is configured for Marge."
+          ? "OneDrive proof: Microsoft accepted Marge's read permission and the request to send a sharing invitation. Email delivery and opening are not yet confirmed."
             : state.stage === "removed"
               ? "OneDrive proof: removed to Homer's recycle bin."
               : "OneDrive proof: the last change outcome is uncertain. Do not share again; clean up explicitly.";
@@ -1998,9 +1998,9 @@ function inviteResponseShape(
 function createOneDriveHumanVerificationInstructions(): HTMLOListElement {
   const list = document.createElement("ol");
   for (const instruction of [
-    "In a separate browser or profile, sign in to OneDrive as marge.simpson@corywest.onmicrosoft.com.",
-    "Open Shared, then Shared with you.",
-    "Find AP2-OneDrive-share-proof.txt.",
+    "In a separate browser or profile, sign in to Outlook as marge.simpson@corywest.onmicrosoft.com.",
+    "Open the Microsoft sharing invitation for AP2-OneDrive-share-proof.txt, then use its Open link.",
+    "Do not treat an empty OneDrive Shared view as proof that access is absent.",
     "Return here and click Clean up OneDrive proof when finished.",
   ]) {
     const item = document.createElement("li");

@@ -15,6 +15,8 @@ export const ONEDRIVE_PROOF_FILE_NAME = "AP2-OneDrive-share-proof.txt";
 export const ONEDRIVE_PROOF_PATH = `/${ONEDRIVE_PROOF_FILE_NAME}`;
 export const ONEDRIVE_PROOF_CONTENT =
   "Homer shared this harmless AP2 rehearsal file with Marge.\n";
+export const ONEDRIVE_PROOF_INVITATION_MESSAGE =
+  "Homer shared this harmless AP2 rehearsal file with Marge.";
 export const GRAPH_FILES_READ_WRITE_SCOPE =
   `${GRAPH_ORIGIN}/Files.ReadWrite`;
 
@@ -391,7 +393,8 @@ export class DelegatedGraphOneDriveShareProof
         body: JSON.stringify({
           recipients: [{ objectId: MARGE_IDENTITY.objectId }],
           requireSignIn: true,
-          sendInvitation: false,
+          sendInvitation: true,
+          message: ONEDRIVE_PROOF_INVITATION_MESSAGE,
           roles: ["read"],
         }),
       },

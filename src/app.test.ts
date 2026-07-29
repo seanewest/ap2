@@ -890,13 +890,18 @@ describe("After Party authentication UI", () => {
     expect(api.shareOneDriveProof).toHaveBeenCalledWith("temporary-token");
     expect(api.removeOneDriveProof).not.toHaveBeenCalled();
     expect(root.textContent).toContain(
-      "read-only access is configured for Marge",
+      "Microsoft accepted Marge's read permission and the request to send a sharing invitation",
     );
     expect(root.textContent).toContain(
-      "sign in to OneDrive as marge.simpson@corywest.onmicrosoft.com",
+      "sign in to Outlook as marge.simpson@corywest.onmicrosoft.com",
     );
-    expect(root.textContent).toContain("Open Shared, then Shared with you");
+    expect(root.textContent).toContain(
+      "Open the Microsoft sharing invitation for AP2-OneDrive-share-proof.txt",
+    );
     expect(root.textContent).toContain("AP2-OneDrive-share-proof.txt");
+    expect(root.textContent).toContain(
+      "Do not treat an empty OneDrive Shared view as proof that access is absent",
+    );
     expect(root.textContent).toContain(
       "Return here and click Clean up OneDrive proof when finished",
     );
@@ -1042,7 +1047,7 @@ describe("After Party authentication UI", () => {
     await app.start();
 
     expect(root.textContent).toContain(
-      "read-only access is configured for Marge",
+      "Microsoft accepted Marge's read permission and the request to send a sharing invitation",
     );
     expect(
       oneDriveRemoveButton()?.closest(".api-access")?.textContent,
