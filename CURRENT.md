@@ -50,6 +50,12 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- Teams missed-call `REHEARSAL_ONLY` outputs now have a pure offline verifier.
+  It independently recompiles the plan, reconstructs the exact categorical
+  adapter input, invokes the receipt contracts, recomputes both digests, and
+  enforces the shared all-uninspected envelope without running the fake or a
+  call path. See
+  [the Teams rehearsal output verifier](docs/teams-missed-call-rehearsal-verifier.md).
 - The canonical Teams missed-call scenario now has a network-free
   `REHEARSAL_ONLY` pipeline. It compiles the real plan, executes one
   deterministic fake lifecycle, adapts and verifies a candidate receipt, and

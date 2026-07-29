@@ -45,6 +45,9 @@ semantics, optional reporting, independent retained or two-surface cleanup
 state, PR #101 adapter, and PR #78 receipt semantics remain exclusively in the
 Teams rehearsal family. Synthetic adapter acceptance never upgrades the
 canonical learner-interpretation or any external claim beyond `uninspected`.
+Its offline verifier reconstructs that family contract without importing the
+fake factory or invoking the pipeline runner, then supplies only the outer
+terminal, synthetic, and claim-cardinality values to this shared module.
 
 The module performs no pipeline, verifier, adapter, runner, network, retry,
 mutation, persistence, browser, or Windows-host action. Both pipeline output

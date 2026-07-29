@@ -43,3 +43,9 @@ voicemail or callback inference, branch mismatch, or nonterminal outcomes fail
 closed. Output contains only fixed categorical values and digests; raw
 identifiers, markers, timestamps, durations, payloads, paths, client state, and
 arbitrary text are never propagated.
+
+Use the
+[offline rehearsal output verifier](teams-missed-call-rehearsal-verifier.md)
+to validate a saved bounded output independently. Verification recompiles the
+plan and reconstructs adapter/receipt state without invoking this rehearsal's
+fake lifecycle or pipeline runner.
