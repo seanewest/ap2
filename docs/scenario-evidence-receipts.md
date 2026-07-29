@@ -9,6 +9,12 @@ The receipt does not perform tenant work, inspect protected evidence, or prove
 that an external operation happened. The external observation remains the
 proof; the receipt preserves its bounded meaning for product code and learners.
 
+The optional pure local
+[operation telemetry adapter](operation-telemetry-receipt-adapter.md) can
+produce only candidate operation rows from bounded lifecycle events. It cannot
+auto-complete a receipt or supply artifact, learner, cleanup, retention, or
+terminal proof.
+
 ## Receipt shape
 
 `verifyScenarioEvidenceReceipt` accepts only schema version 1. A receipt

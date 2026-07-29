@@ -95,3 +95,9 @@ The local operator product-path test runs the real SPA and API in isolated
 headless Chromium. It uses a runtime-generated signed fixture token, verifies
 the same operator authorization boundary, and leaves screenshots, traces, and
 video disabled.
+
+The pure local
+[telemetry-to-receipt adapter](operation-telemetry-receipt-adapter.md) can
+reduce a coherent bounded lifecycle to a candidate operation claim. It drops
+correlation and HTTP details and cannot prove artifacts, learner observation,
+cleanup absence, retention, or terminal external state.
