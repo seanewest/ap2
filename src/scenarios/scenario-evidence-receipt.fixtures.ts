@@ -678,7 +678,7 @@ const purview = applyTruth(
         PURVIEW_AUDIT_BOUNDARY_SCENARIO,
         "read-bounded-audit-status",
         "independent-detector",
-        "query-empty",
+        "record-match",
       ),
     },
     "artifact-purview-query-boundary": {
@@ -687,7 +687,7 @@ const purview = applyTruth(
         PURVIEW_AUDIT_BOUNDARY_SCENARIO,
         "read-bounded-audit-status",
         "independent-detector",
-        "operation-result",
+        "record-match",
       ),
     },
     "detector-independent": {
@@ -723,7 +723,7 @@ const purview = applyTruth(
         PURVIEW_AUDIT_BOUNDARY_SCENARIO,
         "read-bounded-audit-status",
         "independent-detector",
-        "query-empty",
+        "record-match",
       ),
     },
     {
@@ -734,12 +734,12 @@ const purview = applyTruth(
         id: PURVIEW_AUDIT_BOUNDARY_SCENARIO.id,
       },
       assertion: "producer-attribution",
-      state: "ambiguous",
+      state: "proven",
       observation: observed(
         PURVIEW_AUDIT_BOUNDARY_SCENARIO,
         "read-bounded-audit-status",
         "independent-detector",
-        "query-empty",
+        "record-match",
       ),
     },
     terminal(

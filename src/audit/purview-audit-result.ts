@@ -188,9 +188,12 @@ function parseOperationRecord(
   validation: PurviewAuditValidationContext,
 ): PurviewOperationRecord {
   const item = record(value, "record");
-  if (item.recordType !== "sharePointFileOperation") {
+  if (
+    item.recordType !== "sharePointFileOperation" &&
+    item.recordType !== "SharePointFileOperation"
+  ) {
     throw new PurviewAuditResultError(
-      "record.recordType must be sharePointFileOperation.",
+      "record.recordType must be the supported SharePoint file-operation type.",
     );
   }
   if (item.workload !== "SharePoint") {

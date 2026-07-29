@@ -10,7 +10,7 @@ export const PURVIEW_AUDIT_BOUNDARY_SCENARIO = parseScenarioManifest({
   id: "purview-sharepoint-audit-boundary",
   title: "Purview SharePoint operation-audit boundary",
   summary:
-    "A distinct detector reaches Microsoft Graph Purview Audit Search while operation-level producer attribution remains explicitly ambiguous.",
+    "A distinct detector reaches Microsoft Graph Purview Audit Search and observes exact operation-level producer attribution.",
   actors: [
     {
       id: "purview-lab-harness",
@@ -118,7 +118,7 @@ export const PURVIEW_AUDIT_BOUNDARY_SCENARIO = parseScenarioManifest({
     staging:
       "The detector queries only the already-retained historical evidence window.",
     learnerReceives:
-      "A sanitized result that proves surface reachability and preserves ambiguous operation attribution.",
+      "A sanitized result that separates surface reachability from exact operation-level producer attribution.",
     artifacts: [
       {
         id: "purview-query-boundary",
@@ -128,13 +128,13 @@ export const PURVIEW_AUDIT_BOUNDARY_SCENARIO = parseScenarioManifest({
         learnerVisibility: "not-proven",
         sourceOperationKey: "submit-bounded-audit-query",
         claim:
-          "Microsoft Graph accepted bounded Purview audit searches from the distinct detector.",
+          "Microsoft Graph returned exact producer-attributed operation records to the distinct detector.",
         semanticClaims: ["purview-surface-reachability"],
         retention: "retained",
         observation: {
           operationKey: "read-bounded-audit-status",
           proofReference:
-            "canonical:purview-audit-contract/observed-but-incomplete",
+            "canonical:purview-audit-contract/live-proven",
         },
       },
     ],
@@ -143,7 +143,7 @@ export const PURVIEW_AUDIT_BOUNDARY_SCENARIO = parseScenarioManifest({
     task:
       "Explain why accepted or empty audit searches do not prove producer attribution.",
     expectedInterpretation:
-      "The app-only surface and distinct detector are proven; successful unmatched result pages leave operation-level producer attribution ambiguous.",
+      "Surface reachability alone is insufficient; exact operation, producer application, target, time, and correlation fields prove this bounded attribution.",
     completionState: "not-run",
     evidenceArtifactIds: ["purview-query-boundary"],
   },

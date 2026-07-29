@@ -151,7 +151,7 @@ describe("scenario evidence receipts", () => {
     );
   });
 
-  it("keeps successful unmatched Purview attribution ambiguous", () => {
+  it("keeps exact Purview producer attribution separate from reachability", () => {
     const fixture = CANONICAL_RECEIPT_FIXTURES[4]!;
     const verified = verifyScenarioEvidenceReceipt(
       fixture.receipt,
@@ -161,9 +161,9 @@ describe("scenario evidence receipts", () => {
     expect(
       verified.claims.find((row) => row.claimId === "producer-attribution"),
     ).toMatchObject({
-      state: "ambiguous",
+      state: "proven",
       observationSource: "independent-detector",
-      observationOutcome: "query-empty",
+      observationOutcome: "record-match",
     });
   });
 
