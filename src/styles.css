@@ -370,6 +370,7 @@ h2 {
 
 .scenario-evidence-verification,
 .avd-rehearsal-verification,
+.private-document-rehearsal-verification,
 .batch-feasibility {
   display: grid;
   gap: 1rem;
@@ -455,13 +456,16 @@ h2 {
 .scenario-evidence-verification-form,
 .scenario-evidence-verification-form label,
 .avd-rehearsal-verification-form,
-.avd-rehearsal-verification-form label {
+.avd-rehearsal-verification-form label,
+.private-document-rehearsal-verification-form,
+.private-document-rehearsal-verification-form label {
   display: grid;
   gap: 0.65rem;
 }
 
 .scenario-evidence-verification-form textarea,
-.avd-rehearsal-verification-form textarea {
+.avd-rehearsal-verification-form textarea,
+.private-document-rehearsal-verification-form textarea {
   box-sizing: border-box;
   width: 100%;
   min-height: 12rem;
@@ -470,7 +474,8 @@ h2 {
 }
 
 .scenario-evidence-verification .field-guidance,
-.avd-rehearsal-verification .field-guidance {
+.avd-rehearsal-verification .field-guidance,
+.private-document-rehearsal-verification .field-guidance {
   color: #667085;
   font-size: 0.9rem;
   font-weight: 400;
@@ -478,26 +483,30 @@ h2 {
 }
 
 .scenario-evidence-verification-output:focus-visible,
-.avd-rehearsal-verification-output:focus-visible {
+.avd-rehearsal-verification-output:focus-visible,
+.private-document-rehearsal-verification-output:focus-visible {
   border-radius: 0.2rem;
   outline: 0.2rem solid #86aee0;
   outline-offset: 0.2rem;
 }
 
 .scenario-evidence-verification-result,
-.avd-rehearsal-verification-result {
+.avd-rehearsal-verification-result,
+.private-document-rehearsal-verification-result {
   display: grid;
   gap: 0.8rem;
 }
 
 .scenario-evidence-verification-result h3,
 .scenario-evidence-verification-result h4,
-.avd-rehearsal-verification-result h3 {
+.avd-rehearsal-verification-result h3,
+.private-document-rehearsal-verification-result h3 {
   margin: 0;
 }
 
 .scenario-evidence-verification-summary,
-.avd-rehearsal-verification-summary {
+.avd-rehearsal-verification-summary,
+.private-document-rehearsal-verification-summary {
   display: grid;
   grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr);
   gap: 0.45rem 1rem;
@@ -505,7 +514,8 @@ h2 {
 }
 
 .scenario-evidence-verification-summary dd,
-.avd-rehearsal-verification-summary dd {
+.avd-rehearsal-verification-summary dd,
+.private-document-rehearsal-verification-summary dd {
   margin: 0;
   overflow-wrap: anywhere;
 }
@@ -573,6 +583,7 @@ h2 {
 
   .scenario-evidence-verification-summary,
   .avd-rehearsal-verification-summary,
+  .private-document-rehearsal-verification-summary,
   .batch-feasibility-summary,
   .batch-feasibility-row {
     grid-template-columns: 1fr;
