@@ -50,6 +50,13 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- The canonical Teams missed-call scenario now has a network-free
+  `REHEARSAL_ONLY` pipeline. It compiles the real plan, executes one
+  deterministic fake lifecycle, adapts and verifies a candidate receipt, and
+  emits the shared all-uninspected envelope. Synthetic history, Activity,
+  optional reporting, retention, and two-surface cleanup exercise contracts
+  without proving a call or any external state. See
+  [the Teams missed-call contract rehearsal](docs/teams-missed-call-rehearsal.md).
 - The canonical Teams missed-call scenario now has a pure
   observation-to-receipt adapter. One licensed-user stage result proves only
   its one-attempt operation; Cory-side native history plus Activity, the

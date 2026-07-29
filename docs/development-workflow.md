@@ -83,6 +83,11 @@ The
 applies the same boundary to the human-assisted call path: originator
 completion is distinct from Cory-side native evidence, interpretation, and
 terminal cleanup.
+The
+[Teams missed-call contract rehearsal](teams-missed-call-rehearsal.md)
+composes that contract with deterministic synthetic staging and observations.
+Its output keeps every external claim uninspected; it is not a call or evidence
+that Teams, a learner, or cleanup reached any external state.
 
 ## Work inside the lab boundary
 
