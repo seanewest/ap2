@@ -51,3 +51,9 @@ digest-tampered, nonterminal, cleanup-gap, branch-mismatched, or overclaiming
 input fails closed. The verifier has no API route, runner or fake execution,
 network access, retry, mutation, persistence, external proof, browser path, or
 Windows-host dependency.
+
+The outer label, canonical JSON, safe-string, plan-binding, terminal, and
+all-uninspected checks use the
+[shared rehearsal envelope invariants](rehearsal-envelope-invariants.md).
+Private-document branch, visibility, cleanup, fake-digest, adapter, and receipt
+semantics remain local to this verifier.

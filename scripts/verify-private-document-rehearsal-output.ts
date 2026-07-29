@@ -16,19 +16,18 @@ import {
   type PrivateDocumentRehearsalResult,
   type PrivateDocumentSyntheticBranch,
 } from "./private-document-rehearsal.ts";
+import {
+  bindRehearsalPlan,
+  declareRehearsalEnvelope,
+  exactRehearsalRecord,
+  inspectBoundedRehearsalValue,
+  parseCanonicalRehearsalJson,
+  REHEARSAL_VERIFIED_LABEL,
+  type SharedRehearsalInvariantFailure,
+} from "../src/scenarios/rehearsal-envelope-invariants.ts";
 
 const MAX_OUTPUT_BYTES = 32 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/;
-const GUID =
-  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
-const UPN = /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/i;
-const TOKEN_LIKE =
-  /\b(?:Bearer\s+\S+|eyJ[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]+|access[_-]?token|refresh[_-]?token|client[_-]?secret|password)\b/i;
-const PRIVATE_PATH =
-  /(?:[A-Za-z]:\\|\/(?:home|mnt|Users|tmp|var)\/|AppData|\\\\Users\\\\)/i;
-const MARKER_LIKE =
-  /\b(?:ap2doc-\d{8}T\d{6}Z-[a-f0-9]{6}|run-[a-z0-9]{2,})\b/i;
-const PEM = /-----BEGIN [A-Z ]*(?:PRIVATE KEY|CERTIFICATE)-----/;
 const EXTERNAL_CLAIMS = [
   "producerStaging",
   "learnerVisibility",
@@ -66,7 +65,7 @@ export class PrivateDocumentRehearsalVerificationError extends Error {
 
 export interface VerifiedPrivateDocumentRehearsalSummary {
   schemaVersion: 1;
-  label: "REHEARSAL_ONLY_VERIFIED";
+  label: typeof REHEARSAL_VERIFIED_LABEL;
   status: "verified";
   scenarioId: "private-document-evidence";
   manifestSchemaVersion: 2;
@@ -83,11 +82,11 @@ export interface VerifiedPrivateDocumentRehearsalSummary {
 export function verifyPrivateDocumentRehearsalOutput(
   value: unknown,
 ): VerifiedPrivateDocumentRehearsalSummary {
-  const serialized = boundedSerialization(value);
-  if (Buffer.byteLength(serialized, "utf8") > MAX_OUTPUT_BYTES) {
-    throw failure("INPUT_OVERSIZED");
-  }
-  rejectUnsafeContent(value);
+  const inputFailure = inspectBoundedRehearsalValue(
+    value,
+    MAX_OUTPUT_BYTES,
+  );
+  if (inputFailure) throw sharedFailure(inputFailure);
 
   const output = exactRecord(value, [
     "schemaVersion",
@@ -99,10 +98,7 @@ export function verifyPrivateDocumentRehearsalOutput(
     "fakeRun",
     "receipt",
   ]);
-  if (
-    output.schemaVersion !== 1 ||
-    output.label !== "REHEARSAL_ONLY"
-  ) {
+  if (output.schemaVersion !== 1) {
     throw failure("INPUT_SHAPE");
   }
   const binding = exactRecord(output.binding, [
@@ -128,23 +124,44 @@ export function verifyPrivateDocumentRehearsalOutput(
     Object.keys(expected.receipt!.externalEvidence),
   );
 
+  const planBinding = bindRehearsalPlan({
+    scenarioId: binding.scenarioId,
+    expectedScenarioId: PRIVATE_DOCUMENT_EVIDENCE_SCENARIO.id,
+    manifestSchemaVersion: binding.manifestSchemaVersion,
+    expectedManifestSchemaVersion:
+      PRIVATE_DOCUMENT_EVIDENCE_SCENARIO.schemaVersion,
+    planDigestSha256: binding.planDigestSha256,
+    expectedPlanDigestSha256: expectedBinding.planDigestSha256,
+  });
+  if (!planBinding.ok) throw sharedFailure(planBinding.failure);
+  const externalStates = EXTERNAL_CLAIMS.map((key) =>
+    externalEvidence[key]
+  );
+  const declaration = declareRehearsalEnvelope({
+    label: output.label,
+    status: output.status,
+    failure: output.failure,
+    syntheticValues: [
+      fakeRun.learnerObservation,
+      fakeRun.initialTerminalProducerAbsence,
+      fakeRun.initialTerminalLearnerAbsence,
+      freshTerminal.producerFolder,
+      freshTerminal.producerItem,
+      freshTerminal.producerPermission,
+      freshTerminal.learnerAccess,
+    ],
+    externalClaims: {
+      total: externalStates.length,
+      uninspected: externalStates.filter((state) =>
+        state === "uninspected"
+      ).length,
+      nonUninspected: externalStates.filter((state) =>
+        state !== "uninspected"
+      ).length,
+    },
+  });
+  if (!declaration.ok) throw sharedFailure(declaration.failure);
   if (
-    binding.scenarioId !== PRIVATE_DOCUMENT_EVIDENCE_SCENARIO.id ||
-    binding.manifestSchemaVersion !==
-      PRIVATE_DOCUMENT_EVIDENCE_SCENARIO.schemaVersion
-  ) {
-    throw failure("PLAN_BINDING");
-  }
-  if (
-    typeof binding.planDigestSha256 !== "string" ||
-    !SHA256.test(binding.planDigestSha256) ||
-    binding.planDigestSha256 !== expectedBinding.planDigestSha256
-  ) {
-    throw failure("PLAN_BINDING");
-  }
-  if (
-    output.status !== "completed" ||
-    output.failure !== null ||
     JSON.stringify(stages) !== JSON.stringify(expected.stages)
   ) {
     throw failure("RUN_NONTERMINAL");
@@ -180,31 +197,23 @@ export function verifyPrivateDocumentRehearsalOutput(
   ) {
     throw failure("RECEIPT_REFUSED");
   }
-  if (
-    Object.keys(externalEvidence).length !== EXTERNAL_CLAIMS.length ||
-    EXTERNAL_CLAIMS.some((key) =>
-      externalEvidence[key] !== "uninspected"
-    )
-  ) {
-    throw failure("EVIDENCE_OVERCLAIM");
-  }
   if (JSON.stringify(output) !== JSON.stringify(expected)) {
     throw failure("INPUT_SHAPE");
   }
 
   return deepFreeze({
     schemaVersion: 1,
-    label: "REHEARSAL_ONLY_VERIFIED",
+    label: REHEARSAL_VERIFIED_LABEL,
     status: "verified",
     scenarioId: "private-document-evidence",
     manifestSchemaVersion: 2,
-    planDigestSha256: expectedBinding.planDigestSha256,
+    planDigestSha256: planBinding.value.planDigestSha256,
     fakeRunDigestSha256: expectedBinding.fakeRunDigestSha256,
     syntheticBranch: branch,
     fakeContract: "ordered-terminal-verified",
     adapter: "accepted",
     receiptVerifier: "accepted",
-    externalEvidence: "all-uninspected",
+    externalEvidence: declaration.value.externalEvidence,
     claimCount: expected.receipt!.candidateClaimCount,
   });
 }
@@ -212,19 +221,9 @@ export function verifyPrivateDocumentRehearsalOutput(
 export function verifyPrivateDocumentRehearsalOutputText(
   text: string,
 ): VerifiedPrivateDocumentRehearsalSummary {
-  if (Buffer.byteLength(text, "utf8") > MAX_OUTPUT_BYTES) {
-    throw failure("INPUT_OVERSIZED");
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    throw failure("NON_CANONICAL_JSON");
-  }
-  if (`${JSON.stringify(value, null, 2)}\n` !== text) {
-    throw failure("NON_CANONICAL_JSON");
-  }
-  return verifyPrivateDocumentRehearsalOutput(value);
+  const parsed = parseCanonicalRehearsalJson(text, MAX_OUTPUT_BYTES);
+  if (!parsed.ok) throw sharedFailure(parsed.failure);
+  return verifyPrivateDocumentRehearsalOutput(parsed.value);
 }
 
 function independentlyExpectedOutput(
@@ -428,56 +427,15 @@ function parseBranch(value: unknown): PrivateDocumentSyntheticBranch {
   return value;
 }
 
-function boundedSerialization(value: unknown): string {
-  let serialized: string | undefined;
-  try {
-    serialized = JSON.stringify(value);
-  } catch {
-    throw failure("INPUT_SHAPE");
-  }
-  if (serialized === undefined) throw failure("INPUT_SHAPE");
-  return serialized;
-}
-
-function rejectUnsafeContent(value: unknown): void {
-  if (typeof value === "string") {
-    if (
-      GUID.test(value) ||
-      UPN.test(value) ||
-      TOKEN_LIKE.test(value) ||
-      PRIVATE_PATH.test(value) ||
-      MARKER_LIKE.test(value) ||
-      PEM.test(value)
-    ) {
-      throw failure("UNSAFE_CONTENT");
-    }
-    return;
-  }
-  if (Array.isArray(value)) {
-    value.forEach(rejectUnsafeContent);
-    return;
-  }
-  if (value !== null && typeof value === "object") {
-    for (const [key, child] of Object.entries(value)) {
-      rejectUnsafeContent(key);
-      rejectUnsafeContent(child);
-    }
-  }
-}
-
 function exactRecord(
   value: unknown,
   expectedKeys: readonly string[],
 ): Record<string, unknown> {
-  if (
-    value === null ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    JSON.stringify(Object.keys(value)) !== JSON.stringify(expectedKeys)
-  ) {
+  const record = exactRehearsalRecord(value, expectedKeys);
+  if (record === null) {
     throw failure("INPUT_SHAPE");
   }
-  return value as Record<string, unknown>;
+  return record;
 }
 
 function sha256(value: unknown): string {
@@ -503,6 +461,17 @@ function failure(
   category: PrivateDocumentRehearsalVerificationFailure,
 ): PrivateDocumentRehearsalVerificationError {
   return new PrivateDocumentRehearsalVerificationError(category);
+}
+
+function sharedFailure(
+  category: SharedRehearsalInvariantFailure,
+): PrivateDocumentRehearsalVerificationError {
+  const mapped: PrivateDocumentRehearsalVerificationFailure =
+    category === "SYNTHETIC_MISMATCH" ||
+      category === "EXTERNAL_CLAIM_MISMATCH"
+      ? "EVIDENCE_OVERCLAIM"
+      : category;
+  return failure(mapped);
 }
 
 function deepFreeze<T>(value: T): T {

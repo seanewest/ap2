@@ -17,15 +17,31 @@ const CLEANED_FIXTURE = resolve(
 const LEARNER_FIXTURE = resolve(
   "scripts/fixtures/private-document-rehearsal-learner.json",
 );
+const CLEANED_OUTPUT_FIXTURE = resolve(
+  "scripts/fixtures/private-document-rehearsal-output-cleaned.json",
+);
+const LEARNER_OUTPUT_FIXTURE = resolve(
+  "scripts/fixtures/private-document-rehearsal-output-learner.json",
+);
 const CLI = resolve("scripts/run-private-document-rehearsal.ts");
 
 describe("private-document REHEARSAL_ONLY pipeline", () => {
   it.each([
-    ["cleaned-canary", CLEANED_FIXTURE, "blocked-cleanup"],
-    ["learner-observation", LEARNER_FIXTURE, "completed-cleaned"],
+    [
+      "cleaned-canary",
+      CLEANED_FIXTURE,
+      CLEANED_OUTPUT_FIXTURE,
+      "blocked-cleanup",
+    ],
+    [
+      "learner-observation",
+      LEARNER_FIXTURE,
+      LEARNER_OUTPUT_FIXTURE,
+      "completed-cleaned",
+    ],
   ] as const)(
     "composes and binds the %s branch deterministically",
-    async (branch, fixture, lifecycleStatus) => {
+    async (branch, fixture, outputFixture, lifecycleStatus) => {
       const request: unknown = JSON.parse(readFileSync(fixture, "utf8"));
       const first = await runPrivateDocumentRehearsal(
         request,
@@ -75,6 +91,9 @@ describe("private-document REHEARSAL_ONLY pipeline", () => {
       });
       expect(first.binding?.planDigestSha256).toMatch(/^[a-f0-9]{64}$/);
       expect(first.binding?.fakeRunDigestSha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(`${JSON.stringify(first, null, 2)}\n`).toBe(
+        readFileSync(outputFixture, "utf8"),
+      );
     },
   );
 

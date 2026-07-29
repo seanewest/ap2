@@ -18,6 +18,8 @@ import {
 import type {
   ScenarioSurfaceCapabilityDeclaration,
 } from "../src/scenarios/scenario-surface-capability.ts";
+import { REHEARSAL_ONLY_LABEL } from
+  "../src/scenarios/rehearsal-envelope-invariants.ts";
 import {
   compileAvdManifestRunnerPlan,
   type AvdManifestRunnerAdapterInput,
@@ -38,7 +40,7 @@ import {
   type TemporaryRoleProofRequest,
 } from "./avd-three-vm-runner.ts";
 
-const LABEL = "REHEARSAL_ONLY";
+const LABEL = REHEARSAL_ONLY_LABEL;
 export const AVD_THREE_VM_REHEARSAL_CAPABILITY = {
   schemaVersion: 1,
   surface: "rehearsal-only",

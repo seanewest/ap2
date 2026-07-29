@@ -35,8 +35,10 @@ import {
 import type {
   ScenarioSurfaceCapabilityDeclaration,
 } from "../src/scenarios/scenario-surface-capability.ts";
+import { REHEARSAL_ONLY_LABEL } from
+  "../src/scenarios/rehearsal-envelope-invariants.ts";
 
-const LABEL = "REHEARSAL_ONLY";
+const LABEL = REHEARSAL_ONLY_LABEL;
 const SCENARIO_ID = "private-document-evidence";
 export const PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY = {
   schemaVersion: 1,
