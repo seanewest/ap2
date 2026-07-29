@@ -1786,6 +1786,15 @@ test("distinguishes rehearsal tampering, size, and general safe failures", async
   page,
 }) => {
   await configureOperator(page, accessToken);
+  let verificationRequests = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/rehearsal-output-verification"
+    ) {
+      verificationRequests += 1;
+    }
+  });
   await page.goto("/e2e/recent-operations.html");
   const panel = page.getByRole("region", {
     name: "AVD rehearsal verification",
@@ -1805,6 +1814,34 @@ test("distinguishes rehearsal tampering, size, and general safe failures", async
   await verify.click();
   expect((await response).status()).toBe(400);
   await expect(panel.getByText(/inconsistent or tampered/)).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", {
+    name: "Download support bundle",
+  }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("ap2-support-bundle.json");
+  const downloadPath = await download.path();
+  if (downloadPath === null) {
+    throw new Error("Support bundle download had no temporary path.");
+  }
+  const bundleText = readFileSync(downloadPath, "utf8");
+  expect(JSON.parse(bundleText)).toEqual(expect.objectContaining({
+    schemaVersion: 1,
+    label: "AP2_OPERATOR_SUPPORT_BUNDLE",
+    applicationVersion: "0.1.0",
+    buildCategory: "browser-spa",
+    failures: [
+      expect.objectContaining({
+        routeCategory: "avd-rehearsal-verify",
+        categoricalStatus: "verification-refused",
+        supportReference: expect.stringMatching(/^r1_[0-9a-f]{24}$/),
+      }),
+    ],
+  }));
+  expect(bundleText).not.toMatch(
+    /runnerJournal|planDigest|raw private|credential|example\.invalid/i,
+  );
+  expect(verificationRequests).toBe(1);
 
   let kind: "request-size" | "response-size" | "general" = "request-size";
   await page.route("**/api/rehearsal-output-verification", async (route) => {

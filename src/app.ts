@@ -130,6 +130,14 @@ import {
   type ScenarioPlanPreviewFailure,
 } from "./scenarios/scenario-plan-preview";
 import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
+import {
+  createOperatorSupportBundleSession,
+  type OperatorSupportBundleSession,
+} from "./support/operator-support-bundle";
+import {
+  createOperatorSupportBundlePanel,
+  type OperatorSupportBundleExporter,
+} from "./support/operator-support-bundle-panel";
 
 type ApiAccessState =
   | { kind: "idle" }
@@ -223,8 +231,10 @@ export function createAfterPartyApp(
   authentication: Authentication,
   api: AfterPartyApi,
   storage: Pick<Storage, "getItem" | "setItem"> = window.localStorage,
+  supportBundleExporter?: OperatorSupportBundleExporter,
 ): AfterPartyApp {
   let state: ViewState = { kind: "initial" };
+  const operatorSupportBundle = createOperatorSupportBundleSession();
   const scenarioPlanPreviewClient: ScenarioPlanPreviewClient = {
     preview: async (request) => {
       const accessToken =
@@ -251,7 +261,15 @@ export function createAfterPartyApp(
           await authentication.acquireAccessToken(API_ACCESS_SCOPES);
         return await api.verifyRehearsalOutput(accessToken, output);
       },
-      classifyError: classifyAvdRehearsalVerificationFailure,
+      classifyError: (error) => {
+        const status = classifyAvdRehearsalVerificationFailure(error);
+        operatorSupportBundle.recordFailure({
+          routeCategory: "avd-rehearsal-verify",
+          categoricalStatus: status,
+          error,
+        });
+        return status;
+      },
     };
   const privateDocumentRehearsalVerificationClient:
     PrivateDocumentRehearsalPanelClient = {
@@ -265,7 +283,15 @@ export function createAfterPartyApp(
           output,
         );
       },
-      classifyError: classifyPrivateDocumentRehearsalFailure,
+      classifyError: (error) => {
+        const status = classifyPrivateDocumentRehearsalFailure(error);
+        operatorSupportBundle.recordFailure({
+          routeCategory: "private-document-rehearsal-verify",
+          categoricalStatus: status,
+          error,
+        });
+        return status;
+      },
     };
   const helpDeskRehearsalVerificationClient:
     HelpDeskRehearsalPanelClient = {
@@ -279,7 +305,15 @@ export function createAfterPartyApp(
           output,
         );
       },
-      classifyError: classifyHelpDeskRehearsalFailure,
+      classifyError: (error) => {
+        const status = classifyHelpDeskRehearsalFailure(error);
+        operatorSupportBundle.recordFailure({
+          routeCategory: "help-desk-email-rehearsal-verify",
+          categoricalStatus: status,
+          error,
+        });
+        return status;
+      },
     };
   const teamsRehearsalVerificationClient: TeamsRehearsalPanelClient = {
     parse: (value) =>
@@ -297,7 +331,15 @@ export function createAfterPartyApp(
         output,
       );
     },
-    classifyError: classifyTeamsRehearsalFailure,
+    classifyError: (error) => {
+      const status = classifyTeamsRehearsalFailure(error);
+      operatorSupportBundle.recordFailure({
+        routeCategory: "teams-missed-call-rehearsal-verify",
+        categoricalStatus: status,
+        error,
+      });
+      return status;
+    },
   };
   const oauthApplicationReconRehearsalVerificationClient:
     OauthApplicationReconRehearsalPanelClient = {
@@ -313,7 +355,16 @@ export function createAfterPartyApp(
           output,
         );
       },
-      classifyError: classifyOauthApplicationReconRehearsalFailure,
+      classifyError: (error) => {
+        const status =
+          classifyOauthApplicationReconRehearsalFailure(error);
+        operatorSupportBundle.recordFailure({
+          routeCategory: "oauth-application-recon-rehearsal-verify",
+          categoricalStatus: status,
+          error,
+        });
+        return status;
+      },
     };
   const purviewAuditBoundaryRehearsalVerificationClient:
     PurviewAuditBoundaryRehearsalPanelClient = {
@@ -334,7 +385,15 @@ export function createAfterPartyApp(
           output,
         );
       },
-      classifyError: classifyPurviewAuditBoundaryRehearsalFailure,
+      classifyError: (error) => {
+        const status = classifyPurviewAuditBoundaryRehearsalFailure(error);
+        operatorSupportBundle.recordFailure({
+          routeCategory: "purview-audit-boundary-rehearsal-verify",
+          categoricalStatus: status,
+          error,
+        });
+        return status;
+      },
     };
   const batchFeasibilityClient: BatchFeasibilityPanelClient = {
     evaluate: async (request) => {
@@ -404,6 +463,7 @@ export function createAfterPartyApp(
     setState({ kind: "processing", message: "Signing out…" });
     try {
       await authentication.signOut();
+      operatorSupportBundle.clear();
       setState({ kind: "signed-out" });
     } catch (error) {
       handleAuthenticationFailure(error);
@@ -961,6 +1021,8 @@ export function createAfterPartyApp(
         oauthApplicationReconRehearsalVerificationClient,
         purviewAuditBoundaryRehearsalVerificationClient,
         batchFeasibilityClient,
+        operatorSupportBundle,
+        supportBundleExporter,
       ),
     );
     root
@@ -1068,6 +1130,8 @@ function createShell(
   purviewAuditBoundaryRehearsalVerificationClient:
     PurviewAuditBoundaryRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
+  operatorSupportBundle: OperatorSupportBundleSession,
+  supportBundleExporter?: OperatorSupportBundleExporter,
 ): HTMLElement {
   const shell = document.createElement("main");
   shell.className = "shell";
@@ -1099,6 +1163,8 @@ function createShell(
       oauthApplicationReconRehearsalVerificationClient,
       purviewAuditBoundaryRehearsalVerificationClient,
       batchFeasibilityClient,
+      operatorSupportBundle,
+      supportBundleExporter,
     ),
   );
 
@@ -1120,6 +1186,8 @@ function createStatePanel(
   purviewAuditBoundaryRehearsalVerificationClient:
     PurviewAuditBoundaryRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
+  operatorSupportBundle: OperatorSupportBundleSession,
+  supportBundleExporter?: OperatorSupportBundleExporter,
 ): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "auth-panel";
@@ -1236,6 +1304,14 @@ function createStatePanel(
             createPurviewAuditBoundaryRehearsalVerificationPanel({
               client: purviewAuditBoundaryRehearsalVerificationClient,
             }),
+        ),
+        createPanelBoundary(
+          "Failed-rehearsal support bundle",
+          () =>
+            createOperatorSupportBundlePanel(
+              operatorSupportBundle,
+              supportBundleExporter,
+            ),
         ),
         createButton("Sign out", "sign-out", "secondary"),
       );
