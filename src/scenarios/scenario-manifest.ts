@@ -218,6 +218,7 @@ export interface ScenarioOperation {
   ownerActorId: string;
   summary: string;
   marker?: string;
+  dependsOnOperationKeys?: readonly string[];
 }
 
 export interface ScenarioResource {
@@ -466,6 +467,26 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
     const marker = operation.marker === undefined
       ? undefined
       : text(operation.marker, `${path}.marker`);
+    const dependsOnOperationKeys = operation.dependsOnOperationKeys ===
+        undefined
+      ? undefined
+      : boundedArray(
+        operation.dependsOnOperationKeys,
+        `${path}.dependsOnOperationKeys`,
+        1,
+        MAX_ITEMS,
+      ).map((value, dependencyIndex) =>
+        id(
+          value,
+          `${path}.dependsOnOperationKeys[${dependencyIndex}]`,
+        )
+      );
+    if (dependsOnOperationKeys !== undefined) {
+      uniqueStrings(
+        dependsOnOperationKeys,
+        `${path}.dependsOnOperationKeys`,
+      );
+    }
     if (effect === "mutation" && marker === undefined) {
       throw new ScenarioManifestError(
         `${path}.marker is required for a mutating operation.`,
@@ -487,6 +508,9 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
       ownerActorId,
       summary: text(operation.summary, `${path}.summary`),
       ...(marker === undefined ? {} : { marker }),
+      ...(dependsOnOperationKeys === undefined
+        ? {}
+        : { dependsOnOperationKeys }),
     };
   });
   uniqueIds(
@@ -496,6 +520,7 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
   const operationByKey = new Map(
     operations.map((operation) => [operation.key, operation]),
   );
+  validateOperationDependencies(operations, operationByKey);
 
   const resources = boundedArray(
     manifest.resources,
@@ -839,6 +864,41 @@ function validateLifecycleMarker(
       "all mutating operations must share one lifecycle marker.",
     );
   }
+}
+
+function validateOperationDependencies(
+  operations: readonly ScenarioOperation[],
+  operationByKey: ReadonlyMap<string, ScenarioOperation>,
+): void {
+  for (const operation of operations) {
+    for (const dependency of operation.dependsOnOperationKeys ?? []) {
+      if (dependency === operation.key || !operationByKey.has(dependency)) {
+        throw new ScenarioManifestError(
+          `operation '${operation.key}' has an invalid dependency '${dependency}'.`,
+        );
+      }
+    }
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (operationKey: string): void => {
+    if (visiting.has(operationKey)) {
+      throw new ScenarioManifestError(
+        "operation dependencies must be acyclic.",
+      );
+    }
+    if (visited.has(operationKey)) return;
+    visiting.add(operationKey);
+    for (
+      const dependency of operationByKey.get(operationKey)
+        ?.dependsOnOperationKeys ?? []
+    ) {
+      visit(dependency);
+    }
+    visiting.delete(operationKey);
+    visited.add(operationKey);
+  };
+  operations.forEach(({ key }) => visit(key));
 }
 
 function validateBillableExpiryContract(

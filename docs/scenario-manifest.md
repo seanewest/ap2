@@ -12,7 +12,8 @@ bounded sections:
   and explicitly absent or independent-detector classification;
 - authentication transports and explicit prerequisites;
 - setup, evidence, response, and cleanup operations with a stable operation
-  key, owner, supported capability, and read/mutation effect;
+  key, owner, supported capability, read/mutation effect, and optional exact
+  operation dependencies;
 - setup resources, including expiry and cleanup for every billable resource;
 - retained and temporary permissions, with exact grant/revocation operations
   and revocation ownership for temporary access;
@@ -32,6 +33,11 @@ shared ownership. References must resolve to declared actors, operations,
 resources, or artifacts. Every cleanup operation is declared by lifecycle and
 owned by the lifecycle cleanup actor. Every retained evidence artifact has one
 inventory entry; `cleanup-later` also names its exact cleanup operation.
+Declared operation dependencies are unique, resolve inside the same manifest,
+cannot target the operation itself, and form an acyclic graph. Existing
+scenario-specific manifests may omit this optional planning field; a contract
+that presents itself as executable must supply and validate the complete
+dependency graph.
 When any resource is billable, the manifest also declares exactly one
 marker-bound expiry-schedule resource. Its setup and cleanup operations are
 the supported `expiry.schedule` and `expiry.remove` capabilities, and its
@@ -70,6 +76,13 @@ resource group, marker policies/groups, Intune and Entra device records,
 temporary roles, expiry job, and sensitive run artifacts absent. No learner
 session occurred, so its learner completion is `not-run` and learner visibility
 is `not-proven`. Reduced evidence remains with the AP2 orchestrator.
+
+`planned-avd-three-node-lab.ts` is a separate plan-only derivative of those
+repository-backed operations. It adds explicit setup, evidence, learner,
+response, cleanup, and terminal-readback dependencies and removes every
+historical observation. It is deliberately absent from the runnable scenario
+registry: the fixture exercises the generalized lifecycle compiler without
+claiming a new product execution path or rewriting the completed proof.
 
 This active manifest is also the canonical personal-AVD infrastructure
 contract because that host is one explicit resource in the three-VM topology.
@@ -135,6 +148,13 @@ in a separate
 back to the exact manifest roles, operations, artifacts, learner contract,
 response, cleanup, and retention without changing the plan or embedding raw
 evidence.
+
+The
+[executable generalized lifecycle contract](executable-scenario-manifest.md)
+combines a dependency-complete manifest, its canonical plan, an authoritative
+receipt verification, and the supplied-rate cost envelope. Its output remains
+`not-executed`; executable means the ordered contract is complete, not that
+AP2 performed any operation.
 
 `private-document-evidence.ts` describes the cleanup-first delegated document
 contract. A distinct producer stages one private harmless text artifact and

@@ -177,6 +177,57 @@ describe("generalized scenario manifest contract", () => {
     });
   });
 
+  it("accepts bounded operation dependencies and rejects unknown, self, duplicate, or cyclic edges", () => {
+    const withDependencies = {
+      ...separatedScenario,
+      operations: separatedScenario.operations.map((operation, index) => ({
+        ...operation,
+        ...(index === 0
+          ? {}
+          : {
+            dependsOnOperationKeys: [
+              separatedScenario.operations[index - 1]!.key,
+            ],
+          }),
+      })),
+    };
+    expect(
+      parseScenarioManifest(withDependencies).operations[1]
+        ?.dependsOnOperationKeys,
+    ).toEqual(["stage-evidence"]);
+
+    for (const dependencies of [
+      ["missing-operation"],
+      ["learner-inspect"],
+      ["stage-evidence", "stage-evidence"],
+    ]) {
+      expect(() =>
+        parseScenarioManifest({
+          ...separatedScenario,
+          operations: separatedScenario.operations.map((operation) =>
+            operation.key === "learner-inspect"
+              ? { ...operation, dependsOnOperationKeys: dependencies }
+              : operation
+          ),
+        })
+      ).toThrow(ScenarioManifestError);
+    }
+
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: separatedScenario.operations.map((operation) => ({
+          ...operation,
+          dependsOnOperationKeys: [
+            operation.key === "stage-evidence"
+              ? "learner-inspect"
+              : "stage-evidence",
+          ],
+        })),
+      })
+    ).toThrowError("operation dependencies must be acyclic");
+  });
+
   it("accepts an explicit, explained self-triggered exercise", () => {
     const manifest = parseScenarioManifest({
       ...separatedScenario,
