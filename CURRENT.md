@@ -50,6 +50,18 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- Microsoft Graph v1 Purview Audit Search is officially supported for
+  application-only SharePoint observation, with
+  `AuditLogsQuery-SharePoint.Read.All` as the product-minimum application
+  permission. A fixed detector distinct from the API managed-identity producer
+  reached the live endpoint using already-retained diagnostic authority. One
+  historical keyword query succeeded with zero records, while one reviewed
+  exact-path correction remained `notStarted` through all three bounded status
+  reads; no records page was read for that correction. Authorization stayed
+  unchanged and no content or workload mutation occurred. Operation-level
+  producer attribution is therefore `licensing-or-latency-blocked`, not
+  proven. Do not repeat either search or the workload event under this lane.
+  See [the fail-closed audit contract](docs/purview-audit-contract.md).
 - The one authorized Teams Call Canary create was submitted exactly once for
   Cory with audio-only service-hosted media. Microsoft Graph returned a
   definitive HTTP `403` / code `7505` tenant-mismatch refusal before assigning
