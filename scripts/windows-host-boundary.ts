@@ -289,7 +289,7 @@ export function parseGitIndex(index: Buffer): GitIndexEntry[] {
   );
 }
 
-function readTrackedPathsFromIndex(root: string): GitIndexEntry[] {
+export function readTrackedPathsFromIndex(root: string): GitIndexEntry[] {
   const gitDirectory = repositoryGitDirectory(root);
   const indexPath = resolve(gitDirectory, "index");
   const indexStat = lstatSync(indexPath);

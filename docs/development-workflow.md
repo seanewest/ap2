@@ -223,6 +223,20 @@ display recorded status, manual instructions, or an explicit refresh; it does
 not need a tight polling loop. This repository does not yet provide that
 durable product orchestration.
 
+## Keep generated and private artifacts out of Git
+
+`npm test` checks the tracked Git index for generated output, caches, reports,
+local environment files, browser/session state, credentials and certificates,
+package/container residue, temporary files, and protected worker artifacts.
+The check classifies paths only; it never opens those artifacts or emits their
+contents. A forced-added artifact still fails even when an ignore rule normally
+hides it.
+
+Ignore rules remain a local convenience rather than a security boundary.
+Sanitized source and fixtures use ordinary source extensions; `.env.example`,
+the package lockfile, Dockerfiles, token-verifier source, and journal
+implementations remain valid tracked inputs.
+
 ## Focused mutation-safety review
 
 Use a focused review when the operation is broadly destructive, difficult to
