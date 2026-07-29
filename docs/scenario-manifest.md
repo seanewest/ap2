@@ -71,3 +71,24 @@ The [local scenario planner](scenario-planner.md) consumes this validated
 contract to produce a deterministic sanitized readiness plan. The planner is
 not an executor and its output is not evidence that any external operation
 occurred.
+
+## Authenticated read-only catalog
+
+The signed-in operator shell renders `SCENARIO_MANIFESTS` through a compact
+Scenario catalog. Each entry is revalidated with `parseScenarioManifest` at
+render time; validation failure produces one fixed safe error and no scenario
+details. The catalog has no network fetch, loading loop, persistence, polling,
+or execution control.
+
+Cards use only validated labels and summaries for purpose, actor-role
+separation, producer operation, artifact authenticity and visibility, learner
+task and interpretation, optional response, prerequisites and human
+gates, setup/cleanup/retention, expiry, cost ceiling, and current
+limitations. Canonical IDs, operation keys, markers, proof references, and raw
+payloads are not rendered.
+
+The separate Purview audit capability is labeled as a read-only boundary, not
+invented as a fifth registry scenario or treated as an execution receipt.
+Application reconnaissance retains its narrower registry claim: the workload
+and observer are distinct, while one sign-in or audit record does not prove
+every workload read.

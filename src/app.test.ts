@@ -247,10 +247,10 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain("Evidence producerAP2 instructor");
     expect(root.textContent).toContain("Workload actorKobe lab user");
     expect(root.textContent).toContain(
-      "Learner / observerLearner using Cory's lab Teams view",
+      "LearnerLearner using Cory's lab Teams view",
     );
     expect(root.textContent).toContain(
-      "What the learner receivesOne Missed incoming call entry",
+      "Learner observesOne Missed incoming call entry",
     );
     expect(root.textContent).toContain(
       "Application reconnaissance and audit observation",
@@ -259,11 +259,11 @@ describe("After Party authentication UI", () => {
       "Workload actorReconnaissance workload application",
     );
     expect(root.textContent).toContain(
-      "Detector / observerIndependent audit observer application",
+      "DetectorIndependent audit observer application",
     );
     expect(root.textContent).toContain(
       "Authentication — Independent audit observer application" +
-        "A separate application-only session with bounded audit-read authority",
+        "Application Only. A separate application-only session with bounded audit-read authority",
     );
   });
 
@@ -886,7 +886,9 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain(
       "read-only access is configured for Marge",
     );
-    expect(root.textContent).not.toContain("verified");
+    expect(
+      oneDriveRemoveButton()?.closest(".api-access")?.textContent,
+    ).not.toContain("verified");
     expect(oneDriveVerifyButton()).toBeNull();
     expect(oneDriveRemoveButton()?.disabled).toBe(false);
     expect(localStorage.getItem(
@@ -1600,6 +1602,15 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain("Succeeded");
     expect(root.textContent).not.toContain("m1_0123456789abcdef01234567");
     expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it("does not expose the scenario catalog outside the signed-in shell", async () => {
+    authentication.initialize.mockResolvedValue({ kind: "signed-out" });
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    expect(root.textContent).toContain("You are signed out");
+    expect(root.querySelector(".scenario-catalog")).toBeNull();
   });
 
   it("disables refresh and other API actions while loading", async () => {
