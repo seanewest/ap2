@@ -62,12 +62,15 @@ export interface ApiContainerProvenance {
   kind: "ap2-api-container-provenance";
   baseImage: {
     classification: "pinned-platform-manifest";
+    configDigest: string;
     indexDigest: string;
+    layerDescriptorsDigest: string;
     manifestDigest: string;
     platform: "linux/amd64";
     reference: string;
     tagReference: string;
     runtimeComponents: "reference-bound-not-enumerated";
+    rootfsDiffIdsDigest: string;
   };
   buildInputs: {
     digest: string;
@@ -164,13 +167,16 @@ export function createApiContainerProvenance(
     kind: "ap2-api-container-provenance",
     baseImage: {
       classification: "pinned-platform-manifest",
+      configDigest: baseLock.configDigest,
       indexDigest: baseLock.indexDigest,
+      layerDescriptorsDigest: baseLock.layerDescriptorsDigest,
       manifestDigest: baseLock.manifestDigest,
       platform: "linux/amd64",
       reference: pinnedApiContainerBaseReference(baseLock),
       tagReference:
         `${baseLock.registry}/${baseLock.repository}:${baseLock.tag}`,
       runtimeComponents: "reference-bound-not-enumerated",
+      rootfsDiffIdsDigest: digestLines(baseLock.rootfsDiffIds),
     },
     buildInputs: {
       digest: digestLines(
@@ -211,11 +217,14 @@ export function summarizeApiContainerProvenance(
     status: "pass",
     baseImage: provenance.baseImage.reference,
     baseClassification: provenance.baseImage.classification,
+    baseConfigDigest: provenance.baseImage.configDigest,
     baseIndexDigest: provenance.baseImage.indexDigest,
+    baseLayerDescriptorsDigest: provenance.baseImage.layerDescriptorsDigest,
     baseManifestDigest: provenance.baseImage.manifestDigest,
     basePlatform: provenance.baseImage.platform,
     baseTag: provenance.baseImage.tagReference,
     baseRuntimeComponents: provenance.baseImage.runtimeComponents,
+    baseRootfsDiffIdsDigest: provenance.baseImage.rootfsDiffIdsDigest,
     buildInputCount: provenance.buildInputs.fileCount,
     buildInputsDigest: provenance.buildInputs.digest,
     buildArtifactClassification: provenance.buildArtifacts.classification,

@@ -11,17 +11,27 @@ const MANIFEST_MEDIA_TYPE =
 const MAX_REGISTRY_BYTES = 1024 * 1024;
 
 export interface ApiContainerBaseLock {
-  schemaVersion: 1;
+  schemaVersion: 2;
   kind: "ap2-api-container-base-lock";
   registry: "mcr.microsoft.com";
   repository: "playwright";
   tag: string;
   indexDigest: string;
   manifestDigest: string;
+  configDigest: string;
+  layerDescriptorsDigest: string;
+  layerDescriptors: ApiContainerLayerDescriptor[];
+  rootfsDiffIds: string[];
   platform: {
     os: "linux";
     architecture: "amd64";
   };
+}
+
+export interface ApiContainerLayerDescriptor {
+  digest: string;
+  mediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip";
+  size: number;
 }
 
 export interface RegistryResponse {
@@ -62,11 +72,20 @@ interface ImageManifest {
     mediaType?: string;
     size?: number;
   };
+  layers?: Array<{
+    digest?: string;
+    mediaType?: string;
+    size?: number;
+  }>;
 }
 
 interface ImageConfig {
   architecture?: string;
   os?: string;
+  rootfs?: {
+    type?: string;
+    diff_ids?: unknown[];
+  };
 }
 
 export function readApiContainerBaseLock(
@@ -89,18 +108,22 @@ export function validateApiContainerBaseLock(
     throw new Error("API_CONTAINER_BASE_LOCK_SCHEMA");
   }
   const expectedKeys = [
+    "configDigest",
     "indexDigest",
     "kind",
+    "layerDescriptors",
+    "layerDescriptorsDigest",
     "manifestDigest",
     "platform",
     "registry",
     "repository",
+    "rootfsDiffIds",
     "schemaVersion",
     "tag",
   ];
   if (
     JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(expectedKeys) ||
-    value.schemaVersion !== 1 ||
+    value.schemaVersion !== 2 ||
     value.kind !== "ap2-api-container-base-lock" ||
     value.registry !== "mcr.microsoft.com" ||
     value.repository !== "playwright" ||
@@ -110,6 +133,25 @@ export function validateApiContainerBaseLock(
     !DIGEST_PATTERN.test(value.indexDigest) ||
     typeof value.manifestDigest !== "string" ||
     !DIGEST_PATTERN.test(value.manifestDigest) ||
+    typeof value.configDigest !== "string" ||
+    !DIGEST_PATTERN.test(value.configDigest) ||
+    typeof value.layerDescriptorsDigest !== "string" ||
+    !/^[0-9a-f]{64}$/u.test(value.layerDescriptorsDigest) ||
+    !Array.isArray(value.layerDescriptors) ||
+    value.layerDescriptors.length === 0 ||
+    value.layerDescriptors.length > 64 ||
+    value.layerDescriptors.some((entry) => !isLayerDescriptor(entry)) ||
+    digestLayerDescriptors(
+      value.layerDescriptors as ApiContainerLayerDescriptor[],
+    ) !== value.layerDescriptorsDigest ||
+    !Array.isArray(value.rootfsDiffIds) ||
+    value.rootfsDiffIds.length === 0 ||
+    value.rootfsDiffIds.length > 64 ||
+    value.layerDescriptors.length !== value.rootfsDiffIds.length ||
+    new Set(value.rootfsDiffIds).size !== value.rootfsDiffIds.length ||
+    value.rootfsDiffIds.some((entry) =>
+      typeof entry !== "string" || !DIGEST_PATTERN.test(entry)
+    ) ||
     !isRecord(value.platform) ||
     JSON.stringify(Object.keys(value.platform).sort()) !==
       JSON.stringify(["architecture", "os"]) ||
@@ -200,7 +242,18 @@ export async function resolveApiContainerBase(
     typeof manifestDocument.config.digest !== "string" ||
     !DIGEST_PATTERN.test(manifestDocument.config.digest) ||
     !Number.isSafeInteger(manifestDocument.config.size) ||
-    (manifestDocument.config.size ?? 0) <= 0
+    (manifestDocument.config.size ?? 0) <= 0 ||
+    !Array.isArray(manifestDocument.layers) ||
+    manifestDocument.layers.length === 0 ||
+    manifestDocument.layers.length > 64 ||
+    manifestDocument.layers.some((layer) =>
+      layer.mediaType !==
+        "application/vnd.docker.image.rootfs.diff.tar.gzip" ||
+      typeof layer.digest !== "string" ||
+      !DIGEST_PATTERN.test(layer.digest) ||
+      !Number.isSafeInteger(layer.size) ||
+      (layer.size ?? 0) <= 0
+    )
   ) {
     throw new Error("API_CONTAINER_BASE_UPDATE_MANIFEST_SCHEMA");
   }
@@ -225,23 +278,62 @@ export async function resolveApiContainerBase(
   );
   if (
     configDocument.os !== "linux" ||
-    configDocument.architecture !== "amd64"
+    configDocument.architecture !== "amd64" ||
+    configDocument.rootfs?.type !== "layers" ||
+    !Array.isArray(configDocument.rootfs.diff_ids) ||
+    configDocument.rootfs.diff_ids.length === 0 ||
+    configDocument.rootfs.diff_ids.length > 64 ||
+    configDocument.rootfs.diff_ids.length !== manifestDocument.layers.length ||
+    new Set(configDocument.rootfs.diff_ids).size !==
+      configDocument.rootfs.diff_ids.length ||
+    configDocument.rootfs.diff_ids.some((entry) =>
+      typeof entry !== "string" || !DIGEST_PATTERN.test(entry)
+    )
   ) {
     throw new Error("API_CONTAINER_BASE_UPDATE_CONFIG_PLATFORM");
   }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: "ap2-api-container-base-lock",
     registry: "mcr.microsoft.com",
     repository: "playwright",
     tag,
     indexDigest,
     manifestDigest,
+    configDigest,
+    layerDescriptors:
+      manifestDocument.layers as ApiContainerLayerDescriptor[],
+    layerDescriptorsDigest: digestLayerDescriptors(
+      manifestDocument.layers as ApiContainerLayerDescriptor[],
+    ),
+    rootfsDiffIds: configDocument.rootfs.diff_ids as string[],
     platform: {
       os: "linux",
       architecture: "amd64",
     },
   };
+}
+
+export function digestLayerDescriptors(
+  descriptors: readonly ApiContainerLayerDescriptor[],
+): string {
+  return createHash("sha256").update(
+    descriptors.map(({ digest, mediaType, size }) =>
+      `${mediaType}\0${size}\0${digest}`
+    ).join("\n") + "\n",
+  ).digest("hex");
+}
+
+function isLayerDescriptor(value: unknown): boolean {
+  return isRecord(value) &&
+    JSON.stringify(Object.keys(value).sort()) ===
+      JSON.stringify(["digest", "mediaType", "size"]) &&
+    value.mediaType ===
+      "application/vnd.docker.image.rootfs.diff.tar.gzip" &&
+    typeof value.digest === "string" &&
+    DIGEST_PATTERN.test(value.digest) &&
+    Number.isSafeInteger(value.size) &&
+    (value.size as number) > 0;
 }
 
 async function readMicrosoftContainerRegistry(

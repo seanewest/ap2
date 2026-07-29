@@ -40,18 +40,20 @@ describe("API container base provenance", () => {
 
     expect(second).toEqual(first);
     expect(first).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: "ap2-api-container-base-lock",
       registry: "mcr.microsoft.com",
       repository: "playwright",
       tag: "v1.2.3-noble",
       indexDigest: fixture.indexDigest,
       manifestDigest: fixture.manifestDigest,
+      configDigest: fixture.configDigest,
+      layerDescriptors: fixture.layerDescriptors,
+      layerDescriptorsDigest: fixture.layerDescriptorsDigest,
+      rootfsDiffIds: fixture.rootfsDiffIds,
       platform: { os: "linux", architecture: "amd64" },
     });
-    expect(serializeApiContainerBaseLock(first).endsWith(
-      "\"architecture\": \"amd64\"\n  }\n}\n",
-    )).toBe(true);
+    expect(serializeApiContainerBaseLock(first).endsWith("}\n")).toBe(true);
     expect(fixture.calls.map(({ policy }) => policy)).toEqual([
       "direct",
       "direct",
@@ -194,13 +196,31 @@ function registryFixture(
   calls: Array<{ path: string; policy: RegistryRedirectPolicy }>;
   indexDigest: string;
   manifestDigest: string;
+  configDigest: string;
+  layerDescriptorsDigest: string;
+  layerDescriptors: Array<{
+    digest: string;
+    mediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip";
+    size: number;
+  }>;
+  rootfsDiffIds: string[];
   read: RegistryRead;
 } {
+  const rootfsDiffIds = [
+    `sha256:${"1".repeat(64)}`,
+    `sha256:${"2".repeat(64)}`,
+  ];
   const config = Buffer.from(JSON.stringify({
     architecture: options.configArchitecture ?? "amd64",
     os: "linux",
+    rootfs: { type: "layers", diff_ids: rootfsDiffIds },
   }));
   const configDigest = digest(config);
+  const layers = rootfsDiffIds.map((_entry, index) => ({
+    mediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip" as const,
+    size: index + 1,
+    digest: `sha256:${String(index + 1).padStart(64, "0")}`,
+  }));
   const manifest = Buffer.from(JSON.stringify({
     schemaVersion: 2,
     mediaType: "application/vnd.docker.distribution.manifest.v2+json",
@@ -209,7 +229,7 @@ function registryFixture(
       size: config.length,
       digest: configDigest,
     },
-    layers: [],
+    layers,
   }));
   const manifestDigest = digest(manifest);
   const descriptor = {
@@ -268,8 +288,18 @@ function registryFixture(
   const calls: Array<{ path: string; policy: RegistryRedirectPolicy }> = [];
   return {
     calls,
+    configDigest,
     indexDigest,
+    layerDescriptorsDigest: createHash("sha256")
+      .update(
+        layers.map(({ digest, mediaType, size }) =>
+          `${mediaType}\0${size}\0${digest}`
+        ).join("\n") + "\n",
+      )
+      .digest("hex"),
+    layerDescriptors: layers,
     manifestDigest,
+    rootfsDiffIds,
     read: async (path, _accept, policy) => {
       calls.push({ path, policy });
       const response = responses.get(path);

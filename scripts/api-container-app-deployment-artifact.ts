@@ -1,5 +1,6 @@
 import { readFileSync, realpathSync, statSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { dirname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   API_DEPLOYMENT_REPLICA_CONTRACT,
   parseApiDeploymentReplicaPlan,
@@ -7,8 +8,24 @@ import {
 import {
   apiContainerAppResourceId,
 } from "../api/api-deployment-target.ts";
+import {
+  createApiContainerProvenance,
+} from "./api-container-provenance.ts";
+import {
+  readApiContainerBaseLock,
+} from "./api-container-base.ts";
+import {
+  applicationLayerDigests,
+  createApiContainerDeploymentProvenanceBinding,
+  imageConfigDigest,
+  validateApiContainerDeploymentProvenanceBinding,
+  type ApiContainerDeploymentProvenanceBinding,
+  type ApiContainerOciEvidence,
+} from "./api-container-deployment-provenance.ts";
 
 const MAX_INPUT_BYTES = 16_384;
+const MAX_OCI_DOCUMENT_BYTES = 64 * 1024;
+const MAX_OCI_LAYER_BYTES = 64 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 32_768;
 const CONTAINER_APP_API_VERSION = "2025-07-01";
 const TARGET_PORT = 3_000;
@@ -51,8 +68,9 @@ export interface ApiContainerAppDeploymentInput {
 }
 
 export interface ApiContainerAppDeploymentArtifact {
-  schemaVersion: 1;
+  schemaVersion: 2;
   kind: "ap2-api-container-app-deployment-artifact";
+  provenance: ApiContainerDeploymentProvenanceBinding;
   target: typeof API_DEPLOYMENT_REPLICA_CONTRACT.target;
   apiVersion: typeof CONTAINER_APP_API_VERSION;
   resourceId: string;
@@ -116,6 +134,7 @@ export class ApiDeploymentArtifactError extends Error {
 export function compileApiContainerAppDeploymentArtifact(
   replicaPlanValue: unknown,
   inputValue: unknown,
+  provenanceEvidence: ApiContainerOciEvidence,
 ): ApiContainerAppDeploymentArtifact {
   const replicaPlan = parseApiDeploymentReplicaPlan(replicaPlanValue);
   const input = parseDeploymentInput(inputValue);
@@ -125,8 +144,12 @@ export function compileApiContainerAppDeploymentArtifact(
     identity: "system" as const,
   })).sort((left, right) => left.name.localeCompare(right.name));
   const artifact: ApiContainerAppDeploymentArtifact = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: "ap2-api-container-app-deployment-artifact",
+    provenance: createApiContainerDeploymentProvenanceBinding(
+      input.imageReference,
+      provenanceEvidence,
+    ),
     target: replicaPlan.target,
     apiVersion: CONTAINER_APP_API_VERSION,
     resourceId: input.targetResourceId,
@@ -191,11 +214,15 @@ export function compileApiContainerAppDeploymentArtifact(
       },
     },
   };
-  return validateApiContainerAppDeploymentArtifact(artifact);
+  return validateApiContainerAppDeploymentArtifact(
+    artifact,
+    provenanceEvidence,
+  );
 }
 
 export function validateApiContainerAppDeploymentArtifact(
   value: unknown,
+  provenanceEvidence: ApiContainerOciEvidence,
 ): ApiContainerAppDeploymentArtifact {
   try {
     const artifact = requireRecord(value);
@@ -203,12 +230,13 @@ export function validateApiContainerAppDeploymentArtifact(
       "apiVersion",
       "body",
       "kind",
+      "provenance",
       "resourceId",
       "schemaVersion",
       "target",
     ]);
     if (
-      artifact.schemaVersion !== 1 ||
+      artifact.schemaVersion !== 2 ||
       artifact.kind !== "ap2-api-container-app-deployment-artifact" ||
       artifact.target !== API_DEPLOYMENT_REPLICA_CONTRACT.target ||
       artifact.apiVersion !== CONTAINER_APP_API_VERSION
@@ -218,6 +246,20 @@ export function validateApiContainerAppDeploymentArtifact(
     const body = requireRecord(artifact.body);
     exactKeys(body, ["identity", "location", "properties", "tags"]);
     requireLocation(body.location);
+    const artifactImage = requireRecord(
+      requireArray(
+        requireRecord(requireRecord(body.properties).template).containers,
+        1,
+      )[0],
+    ).image;
+    if (typeof artifactImage !== "string") {
+      refuse();
+    }
+    validateApiContainerDeploymentProvenanceBinding(
+      artifact.provenance,
+      artifactImage,
+      provenanceEvidence,
+    );
     const targetScope = parseResourceId(
       artifact.resourceId,
       "Microsoft.App",
@@ -705,20 +747,87 @@ function readBoundedJson(pathValue: string): unknown {
   }
 }
 
-function main(): void {
-  if (process.argv.length !== 4) {
+function readBoundedFile(pathValue: string, maximumBytes: number): Buffer {
+  const path = realpathSync(pathValue);
+  const stat = statSync(path);
+  if (!stat.isFile() || stat.size === 0 || stat.size > maximumBytes) {
     refuse();
   }
+  return readFileSync(path);
+}
+
+function readOciBlob(
+  layoutValue: string,
+  digest: string,
+  maximumBytes: number,
+): Buffer {
+  if (!/^sha256:[0-9a-f]{64}$/u.test(digest)) {
+    refuse();
+  }
+  const layout = realpathSync(layoutValue);
+  const path = realpathSync(join(layout, "blobs", "sha256", digest.slice(7)));
+  if (!path.startsWith(`${layout}${sep}`)) {
+    refuse();
+  }
+  return readBoundedFile(path, maximumBytes);
+}
+
+function main(): void {
+  if (process.argv.length !== 5) {
+    refuse();
+  }
+  const repositoryRoot = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+  );
+  const input = readBoundedJson(process.argv[3]!);
+  const inputRecord = requireRecord(input);
+  if (typeof inputRecord.imageReference !== "string") {
+    refuse();
+  }
+  const imageDigest = inputRecord.imageReference.match(
+    /@(sha256:[0-9a-f]{64})$/u,
+  )?.[1];
+  if (!imageDigest) {
+    refuse();
+  }
+  const baseLock = readApiContainerBaseLock(repositoryRoot);
+  const imageManifest = readOciBlob(
+    process.argv[4]!,
+    imageDigest,
+    MAX_OCI_DOCUMENT_BYTES,
+  );
+  const imageConfig = readOciBlob(
+    process.argv[4]!,
+    imageConfigDigest(imageManifest),
+    MAX_OCI_DOCUMENT_BYTES,
+  );
+  const layers = applicationLayerDigests(
+    imageManifest,
+    baseLock.rootfsDiffIds.length,
+  ).map((digest) =>
+    readOciBlob(process.argv[4]!, digest, MAX_OCI_LAYER_BYTES)
+  );
+  const provenanceEvidence: ApiContainerOciEvidence = {
+    applicationLayers: layers,
+    baseLock,
+    imageConfig,
+    imageManifest,
+    repositoryProvenance: createApiContainerProvenance(repositoryRoot, {
+      bindBuildArtifacts: true,
+    }),
+  };
   const artifact = compileApiContainerAppDeploymentArtifact(
     readBoundedJson(process.argv[2]!),
-    readBoundedJson(process.argv[3]!),
+    input,
+    provenanceEvidence,
   );
   process.stdout.write(`${JSON.stringify(artifact, null, 2)}\n`);
 }
 
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
   try {
     main();
