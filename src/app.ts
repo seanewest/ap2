@@ -8,7 +8,6 @@ import {
 } from "./auth/authentication";
 import {
   ApiAccessError,
-  BatchFeasibilityClientError,
   CALENDAR_MEETING_ATTENDEES,
   CALENDAR_MEETING_END,
   CALENDAR_MEETING_ORGANIZER,
@@ -18,53 +17,16 @@ import {
   CONTACT_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
-  HelpDeskEmailRehearsalVerificationClientError,
   OneDriveInviteFailureError,
-  OauthApplicationReconRehearsalVerificationClientError,
-  PrivateDocumentRehearsalVerificationClientError,
-  PurviewAuditBoundaryRehearsalVerificationClientError,
-  RehearsalOutputVerificationClientError,
-  ScenarioEvidenceVerificationClientError,
-  ScenarioPlanClientError,
-  TeamsMissedCallRehearsalVerificationClientError,
   type AfterPartyApi,
-  type ApiCallerIdentity,
   type CalendarMeetingResult,
   type HelpDeskScenarioResult,
   type OneDriveInviteFailure,
   type OneDriveProofResult,
-  type RecentOperationEvents,
-  type RehearsalStatus,
   type SimulatedEmailResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
-import { SERVER_SHUTTING_DOWN_MESSAGE } from "./api/server-shutdown";
 import { withApiSupportReference } from "./api/support-reference";
-import {
-  isBoundedRehearsalOutputRequest,
-} from "./api/rehearsal-output-verification-contract";
-import type {
-  ScenarioEvidenceReceipt,
-} from "./scenarios/scenario-evidence-receipt";
-import type {
-  ScenarioExecutionPlan,
-  ScenarioPlanningRequest,
-} from "./scenarios/scenario-plan";
-import {
-  isBoundedPrivateDocumentRehearsalRequest,
-} from "./api/private-document-rehearsal-verification-contract";
-import {
-  isBoundedHelpDeskEmailRehearsalRequest,
-} from "./api/help-desk-email-rehearsal-verification-contract";
-import {
-  isBoundedTeamsMissedCallRehearsalRequest,
-} from "./api/teams-missed-call-rehearsal-verification-contract";
-import {
-  isBoundedOauthApplicationReconRehearsalRequest,
-} from "./api/oauth-application-recon-rehearsal-verification-contract";
-import {
-  isBoundedPurviewAuditBoundaryRehearsalRequest,
-} from "./api/purview-audit-boundary-rehearsal-verification-contract";
 import {
   FIXED_PROOF_BY_ID,
   bindFixedProofActions,
@@ -78,10 +40,6 @@ import {
   type FixedProofStates,
 } from "./operations/fixed-proofs";
 import {
-  createRecentOperationsPanel,
-  type RecentOperationsState,
-} from "./operations/recent-operations";
-import {
   appendIdentity,
   createButton,
   createStatus,
@@ -92,85 +50,7 @@ import {
   createLabCatalog,
   LEARNER_LAB_CATALOG,
 } from "./labs/lab-catalog";
-import {
-  createScenarioSurfaceMatrix,
-} from "./scenarios/scenario-surface-matrix";
-import {
-  createBatchFeasibilityPanel,
-  type BatchFeasibilityPanelClient,
-  type BatchFeasibilityPanelFailure,
-} from "./scenarios/batch-feasibility-panel";
-import {
-  createAvdRehearsalVerificationPanel,
-  type AvdRehearsalVerificationFailure,
-  type AvdRehearsalVerificationPanelClient,
-} from "./scenarios/avd-rehearsal-verification-panel";
-import {
-  createPrivateDocumentRehearsalVerificationPanel,
-  type PrivateDocumentRehearsalPanelClient,
-  type PrivateDocumentRehearsalPanelFailure,
-} from "./scenarios/private-document-rehearsal-verification-panel";
-import {
-  createHelpDeskRehearsalVerificationPanel,
-  type HelpDeskRehearsalPanelClient,
-  type HelpDeskRehearsalPanelFailure,
-} from "./scenarios/help-desk-rehearsal-verification-panel";
-import {
-  createTeamsRehearsalVerificationPanel,
-  type TeamsRehearsalPanelClient,
-  type TeamsRehearsalPanelFailure,
-} from "./scenarios/teams-rehearsal-verification-panel";
-import {
-  createOauthApplicationReconRehearsalVerificationPanel,
-  type OauthApplicationReconRehearsalPanelClient,
-  type OauthApplicationReconRehearsalPanelFailure,
-} from "./scenarios/oauth-application-recon-rehearsal-verification-panel";
-import {
-  createPurviewAuditBoundaryRehearsalVerificationPanel,
-  type PurviewAuditBoundaryRehearsalPanelClient,
-  type PurviewAuditBoundaryRehearsalPanelFailure,
-} from "./scenarios/purview-audit-boundary-rehearsal-verification-panel";
-import {
-  createScenarioEvidenceVerificationPanel,
-  type ScenarioEvidenceVerificationFailure,
-  type ScenarioEvidenceVerificationPanelClient,
-} from "./scenarios/scenario-evidence-verification-panel";
-import {
-  createScenarioPlanPreviewController,
-  type ScenarioPlanPreviewClient,
-  type ScenarioPlanPreviewFailure,
-} from "./scenarios/scenario-plan-preview";
 import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
-import {
-  LEARNER_BRIEFING_EXPECTED_ALIAS,
-  buildLearnerEvidenceBriefing,
-  type LearnerEvidenceBriefing,
-} from "./scenarios/learner-evidence-briefing";
-import {
-  createLearnerEvidenceBriefingRoute,
-} from "./scenarios/learner-evidence-briefing-route";
-import {
-  createOperatorSupportBundleSession,
-  type OperatorSupportBundleSession,
-} from "./support/operator-support-bundle";
-import {
-  createOperatorSupportBundlePanel,
-  type OperatorSupportBundleExporter,
-} from "./support/operator-support-bundle-panel";
-
-type ApiAccessState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "success"; caller: ApiCallerIdentity }
-  | { kind: "cancelled" }
-  | { kind: "error"; message: string };
-
-type RehearsalStatusState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "success"; status: RehearsalStatus }
-  | { kind: "cancelled" }
-  | { kind: "error"; message: string };
 
 type SimulatedEmailState =
   | { kind: "idle" }
@@ -226,16 +106,12 @@ type ViewState =
   | {
       kind: "signed-in";
       account: AccountIdentity;
-      apiAccess: ApiAccessState;
-      recentOperations: RecentOperationsState;
-      rehearsalStatus: RehearsalStatusState;
       simulatedEmail: SimulatedEmailState;
       helpDeskScenario: HelpDeskScenarioState;
       oneDriveProof: OneDriveProofState;
       calendarMeeting: CalendarMeetingState;
       fixedProofs: FixedProofStates;
     }
-  | { kind: "learner-briefing"; briefing: LearnerEvidenceBriefing }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
 
@@ -251,182 +127,8 @@ export function createAfterPartyApp(
   authentication: Authentication,
   api: AfterPartyApi,
   storage: Pick<Storage, "getItem" | "setItem"> = window.localStorage,
-  supportBundleExporter?: OperatorSupportBundleExporter,
 ): AfterPartyApp {
   let state: ViewState = { kind: "initial" };
-  let latestScenarioPlan: ScenarioExecutionPlan | undefined;
-  const operatorSupportBundle = createOperatorSupportBundleSession();
-  const scenarioPlanPreviewClient: ScenarioPlanPreviewClient = {
-    preview: async (request) => {
-      const accessToken =
-        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-      return await api.compileScenarioPlan(accessToken, request);
-    },
-    classifyError: classifyScenarioPlanPreviewFailure,
-  };
-  const scenarioEvidenceVerificationClient:
-    ScenarioEvidenceVerificationPanelClient = {
-      verify: async (receipt) => {
-        const accessToken =
-          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-        return await api.verifyScenarioEvidenceReceipt(accessToken, receipt);
-      },
-      classifyError: classifyScenarioEvidenceVerificationFailure,
-    };
-  const avdRehearsalVerificationClient:
-    AvdRehearsalVerificationPanelClient = {
-      parse: (value) =>
-        isBoundedRehearsalOutputRequest(value) ? value : undefined,
-      verify: async (output) => {
-        const accessToken =
-          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-        return await api.verifyRehearsalOutput(accessToken, output);
-      },
-      classifyError: (error) => {
-        const status = classifyAvdRehearsalVerificationFailure(error);
-        operatorSupportBundle.recordFailure({
-          routeCategory: "avd-rehearsal-verify",
-          categoricalStatus: status,
-          error,
-        });
-        return status;
-      },
-    };
-  const privateDocumentRehearsalVerificationClient:
-    PrivateDocumentRehearsalPanelClient = {
-      parse: (value) =>
-        isBoundedPrivateDocumentRehearsalRequest(value) ? value : undefined,
-      verify: async (output) => {
-        const accessToken =
-          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-        return await api.verifyPrivateDocumentRehearsalOutput(
-          accessToken,
-          output,
-        );
-      },
-      classifyError: (error) => {
-        const status = classifyPrivateDocumentRehearsalFailure(error);
-        operatorSupportBundle.recordFailure({
-          routeCategory: "private-document-rehearsal-verify",
-          categoricalStatus: status,
-          error,
-        });
-        return status;
-      },
-    };
-  const helpDeskRehearsalVerificationClient:
-    HelpDeskRehearsalPanelClient = {
-      parse: (value) =>
-        isBoundedHelpDeskEmailRehearsalRequest(value) ? value : undefined,
-      verify: async (output) => {
-        const accessToken =
-          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-        return await api.verifyHelpDeskEmailRehearsalOutput(
-          accessToken,
-          output,
-        );
-      },
-      classifyError: (error) => {
-        const status = classifyHelpDeskRehearsalFailure(error);
-        operatorSupportBundle.recordFailure({
-          routeCategory: "help-desk-email-rehearsal-verify",
-          categoricalStatus: status,
-          error,
-        });
-        return status;
-      },
-    };
-  const teamsRehearsalVerificationClient: TeamsRehearsalPanelClient = {
-    parse: (value) =>
-      isBoundedTeamsMissedCallRehearsalRequest(value) ? value : undefined,
-    verify: async (output) => {
-      const accessToken =
-        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-      if (!api.verifyTeamsMissedCallRehearsalOutput) {
-        throw new TeamsMissedCallRehearsalVerificationClientError(
-          "safe-failure",
-        );
-      }
-      return await api.verifyTeamsMissedCallRehearsalOutput(
-        accessToken,
-        output,
-      );
-    },
-    classifyError: (error) => {
-      const status = classifyTeamsRehearsalFailure(error);
-      operatorSupportBundle.recordFailure({
-        routeCategory: "teams-missed-call-rehearsal-verify",
-        categoricalStatus: status,
-        error,
-      });
-      return status;
-    },
-  };
-  const oauthApplicationReconRehearsalVerificationClient:
-    OauthApplicationReconRehearsalPanelClient = {
-      parse: (value) =>
-        isBoundedOauthApplicationReconRehearsalRequest(value)
-          ? value
-          : undefined,
-      verify: async (output) => {
-        const accessToken =
-          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-        return await api.verifyOauthApplicationReconRehearsalOutput(
-          accessToken,
-          output,
-        );
-      },
-      classifyError: (error) => {
-        const status =
-          classifyOauthApplicationReconRehearsalFailure(error);
-        operatorSupportBundle.recordFailure({
-          routeCategory: "oauth-application-recon-rehearsal-verify",
-          categoricalStatus: status,
-          error,
-        });
-        return status;
-      },
-    };
-  const purviewAuditBoundaryRehearsalVerificationClient:
-    PurviewAuditBoundaryRehearsalPanelClient = {
-      parse: (value) =>
-        isBoundedPurviewAuditBoundaryRehearsalRequest(value)
-          ? value
-          : undefined,
-      verify: async (output) => {
-        const accessToken =
-          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-        if (!api.verifyPurviewAuditBoundaryRehearsalOutput) {
-          throw new PurviewAuditBoundaryRehearsalVerificationClientError(
-            "safe-failure",
-          );
-        }
-        return await api.verifyPurviewAuditBoundaryRehearsalOutput(
-          accessToken,
-          output,
-        );
-      },
-      classifyError: (error) => {
-        const status = classifyPurviewAuditBoundaryRehearsalFailure(error);
-        operatorSupportBundle.recordFailure({
-          routeCategory: "purview-audit-boundary-rehearsal-verify",
-          categoricalStatus: status,
-          error,
-        });
-        return status;
-      },
-    };
-  const batchFeasibilityClient: BatchFeasibilityPanelClient = {
-    evaluate: async (request) => {
-      const accessToken =
-        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-      return await api.calculateMultiScenarioFeasibility(
-        accessToken,
-        request,
-      );
-    },
-    classifyError: classifyBatchFeasibilityFailure,
-  };
   let contactProof: ContactProofState = {
     stage: "not-started",
     activity: "idle",
@@ -443,9 +145,6 @@ export function createAfterPartyApp(
   };
 
   const setState = (nextState: ViewState): void => {
-    if (nextState.kind !== "learner-briefing") {
-      latestScenarioPlan = undefined;
-    }
     state = nextState;
     render();
   };
@@ -487,142 +186,9 @@ export function createAfterPartyApp(
     setState({ kind: "processing", message: "Signing out…" });
     try {
       await authentication.signOut();
-      latestScenarioPlan = undefined;
-      operatorSupportBundle.clear();
       setState({ kind: "signed-out" });
     } catch (error) {
       handleAuthenticationFailure(error);
-    }
-  };
-
-  const checkApiAccess = async (): Promise<void> => {
-    if (
-      state.kind !== "signed-in" ||
-      isApiOperationBusy(state, contactProof)
-    ) {
-      return;
-    }
-    const account = state.account;
-    setSignedInPatch(account, {
-      apiAccess: { kind: "loading" },
-    });
-
-    try {
-      const accessToken = await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-      const caller = await api.checkAccess(accessToken);
-      setSignedInPatch(account, {
-        apiAccess: { kind: "success", caller },
-      });
-    } catch (error) {
-      if (error instanceof AccessTokenCancelledError) {
-        setSignedInPatch(account, {
-          apiAccess: { kind: "cancelled" },
-        });
-        return;
-      }
-      const message =
-        error instanceof AccessTokenError || error instanceof ApiAccessError
-          ? withApiSupportReference(error.message, error)
-          : "API access could not be checked. Try again.";
-      setSignedInPatch(account, {
-        apiAccess: { kind: "error", message },
-      });
-    }
-  };
-
-  const checkRehearsalStatus = async (): Promise<void> => {
-    if (
-      state.kind !== "signed-in" ||
-      isApiOperationBusy(state, contactProof)
-    ) {
-      return;
-    }
-    const account = state.account;
-    setSignedInPatch(account, {
-      rehearsalStatus: { kind: "loading" },
-    });
-
-    try {
-      const accessToken = await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-      const status = await api.getRehearsalStatus(accessToken);
-      setSignedInPatch(account, {
-        rehearsalStatus: { kind: "success", status },
-      });
-    } catch (error) {
-      if (error instanceof AccessTokenCancelledError) {
-        setSignedInPatch(account, {
-          rehearsalStatus: { kind: "cancelled" },
-        });
-        return;
-      }
-      const message =
-        error instanceof AccessTokenError || error instanceof ApiAccessError
-          ? withApiSupportReference(error.message, error)
-          : "Rehearsal status could not be checked. Try again.";
-      setSignedInPatch(account, {
-        rehearsalStatus: { kind: "error", message },
-      });
-    }
-  };
-
-  const refreshRecentOperations = async (): Promise<void> => {
-    if (
-      state.kind !== "signed-in" ||
-      isApiOperationBusy(state, contactProof)
-    ) {
-      return;
-    }
-    const account = state.account;
-    setSignedInPatch(account, {
-      recentOperations: { kind: "loading" },
-    });
-
-    try {
-      const accessToken =
-        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-      const getRecentOperationEvents = api.getRecentOperationEvents;
-      if (!getRecentOperationEvents) {
-        throw new Error("Recent operations client is not configured.");
-      }
-      const snapshot: RecentOperationEvents =
-        await getRecentOperationEvents.call(api, accessToken, "newest");
-      setSignedInPatch(account, {
-        recentOperations: { kind: "success", snapshot },
-      });
-    } catch (error) {
-      if (error instanceof AccessTokenCancelledError) {
-        setSignedInPatch(account, {
-          recentOperations: { kind: "cancelled" },
-        });
-        return;
-      }
-      const unauthorized =
-        error instanceof AccessTokenError ||
-        (
-          error instanceof ApiAccessError &&
-          (error.category === "unauthorized" ||
-            error.category === "forbidden")
-        );
-      const serverShuttingDown =
-        error instanceof ApiAccessError &&
-        error.category === "server-shutting-down";
-      setSignedInPatch(account, {
-        recentOperations: {
-          kind: unauthorized
-            ? "unauthorized"
-            : serverShuttingDown
-            ? "server-shutting-down"
-            : "error",
-          message: withApiSupportReference(
-            unauthorized
-              ? "Your API session expired or this account is not authorized. Sign in again, then refresh."
-              : serverShuttingDown
-              ? SERVER_SHUTTING_DOWN_MESSAGE
-              : "Recent operations could not be loaded. No event details were returned.",
-            error,
-          ),
-        },
-      });
     }
   };
 
@@ -1033,69 +599,13 @@ export function createAfterPartyApp(
   };
 
   const render = (): void => {
-    root.replaceChildren(
-      createShell(
-        state,
-        contactProof,
-        scenarioPlanPreviewClient,
-        scenarioEvidenceVerificationClient,
-        avdRehearsalVerificationClient,
-        privateDocumentRehearsalVerificationClient,
-        helpDeskRehearsalVerificationClient,
-        teamsRehearsalVerificationClient,
-        oauthApplicationReconRehearsalVerificationClient,
-        purviewAuditBoundaryRehearsalVerificationClient,
-        batchFeasibilityClient,
-        operatorSupportBundle,
-        supportBundleExporter,
-        (_request, plan) => {
-          latestScenarioPlan = plan;
-        },
-        () => {
-          latestScenarioPlan = undefined;
-        },
-        (receipt) => {
-          if (
-            state.kind !== "signed-in" ||
-            latestScenarioPlan === undefined
-          ) {
-            return false;
-          }
-          try {
-            const briefing = buildLearnerEvidenceBriefing({
-              schemaVersion: 1,
-              plan: latestScenarioPlan,
-              receipt,
-              expectedLearnerAlias: LEARNER_BRIEFING_EXPECTED_ALIAS,
-              now: new Date().toISOString(),
-            });
-            latestScenarioPlan = undefined;
-            setState({ kind: "learner-briefing", briefing });
-            return true;
-          } catch {
-            latestScenarioPlan = undefined;
-            return false;
-          }
-        },
-      ),
-    );
+    root.replaceChildren(createShell(state, contactProof));
     root
       .querySelector<HTMLButtonElement>("[data-action='sign-in']")
       ?.addEventListener("click", () => void signIn());
     root
       .querySelector<HTMLButtonElement>("[data-action='sign-out']")
       ?.addEventListener("click", () => void signOut());
-    root
-      .querySelector<HTMLButtonElement>("[data-action='check-api']")
-      ?.addEventListener("click", () => void checkApiAccess());
-    root
-      .querySelector<HTMLButtonElement>("[data-action='check-rehearsal']")
-      ?.addEventListener("click", () => void checkRehearsalStatus());
-    root
-      .querySelector<HTMLButtonElement>(
-        "[data-action='refresh-recent-operations']",
-      )
-      ?.addEventListener("click", () => void refreshRecentOperations());
     root
       .querySelector<HTMLButtonElement>("[data-action='send-simulated-email']")
       ?.addEventListener("click", () => void sendSimulatedEmail());
@@ -1126,7 +636,6 @@ export function createAfterPartyApp(
   };
 
   const start = async (): Promise<void> => {
-    latestScenarioPlan = undefined;
     setState({
       kind: "processing",
       message: "Completing Microsoft sign-in…",
@@ -1144,9 +653,6 @@ export function createAfterPartyApp(
           ? {
               kind: "signed-in",
               account: startup.account,
-              apiAccess: { kind: "idle" },
-              recentOperations: { kind: "idle" },
-              rehearsalStatus: { kind: "idle" },
               simulatedEmail: { kind: "idle" },
               helpDeskScenario: { kind: "idle" },
               oneDriveProof: {
@@ -1173,30 +679,7 @@ export function createAfterPartyApp(
 function createShell(
   state: ViewState,
   contactProof: ContactProofState,
-  scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
-  scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
-  avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
-  privateDocumentRehearsalVerificationClient:
-    PrivateDocumentRehearsalPanelClient,
-  helpDeskRehearsalVerificationClient: HelpDeskRehearsalPanelClient,
-  teamsRehearsalVerificationClient: TeamsRehearsalPanelClient,
-  oauthApplicationReconRehearsalVerificationClient:
-    OauthApplicationReconRehearsalPanelClient,
-  purviewAuditBoundaryRehearsalVerificationClient:
-    PurviewAuditBoundaryRehearsalPanelClient,
-  batchFeasibilityClient: BatchFeasibilityPanelClient,
-  operatorSupportBundle: OperatorSupportBundleSession,
-  supportBundleExporter?: OperatorSupportBundleExporter,
-  onPlanAccepted?: (
-    request: ScenarioPlanningRequest,
-    plan: ScenarioExecutionPlan,
-  ) => void,
-  onPlanInvalidated?: () => void,
-  onLearnerBriefing?: (receipt: ScenarioEvidenceReceipt) => boolean,
 ): HTMLElement {
-  if (state.kind === "learner-briefing") {
-    return createLearnerEvidenceBriefingRoute(state.briefing);
-  }
   const shell = document.createElement("main");
   shell.className = "shell";
 
@@ -1215,24 +698,7 @@ function createShell(
     "Sign in with your Microsoft work or school account to continue.";
   shell.append(
     introduction,
-    createStatePanel(
-      state,
-      contactProof,
-      scenarioPlanPreviewClient,
-      scenarioEvidenceVerificationClient,
-      avdRehearsalVerificationClient,
-      privateDocumentRehearsalVerificationClient,
-      helpDeskRehearsalVerificationClient,
-      teamsRehearsalVerificationClient,
-      oauthApplicationReconRehearsalVerificationClient,
-      purviewAuditBoundaryRehearsalVerificationClient,
-      batchFeasibilityClient,
-      operatorSupportBundle,
-      supportBundleExporter,
-      onPlanAccepted,
-      onPlanInvalidated,
-      onLearnerBriefing,
-    ),
+    createStatePanel(state, contactProof),
   );
 
   return shell;
@@ -1241,26 +707,6 @@ function createShell(
 function createStatePanel(
   state: ViewState,
   contactProof: ContactProofState,
-  scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
-  scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
-  avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
-  privateDocumentRehearsalVerificationClient:
-    PrivateDocumentRehearsalPanelClient,
-  helpDeskRehearsalVerificationClient: HelpDeskRehearsalPanelClient,
-  teamsRehearsalVerificationClient: TeamsRehearsalPanelClient,
-  oauthApplicationReconRehearsalVerificationClient:
-    OauthApplicationReconRehearsalPanelClient,
-  purviewAuditBoundaryRehearsalVerificationClient:
-    PurviewAuditBoundaryRehearsalPanelClient,
-  batchFeasibilityClient: BatchFeasibilityPanelClient,
-  operatorSupportBundle: OperatorSupportBundleSession,
-  supportBundleExporter?: OperatorSupportBundleExporter,
-  onPlanAccepted?: (
-    request: ScenarioPlanningRequest,
-    plan: ScenarioExecutionPlan,
-  ) => void,
-  onPlanInvalidated?: () => void,
-  onLearnerBriefing?: (receipt: ScenarioEvidenceReceipt) => boolean,
 ): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "auth-panel";
@@ -1299,21 +745,8 @@ function createStatePanel(
           () => createScenarioCatalog(SCENARIO_MANIFESTS),
         ),
         createStatus(
-          "The remaining panels are operator and orchestration tools. They validate, plan, rehearse, or inspect capabilities; they are not learner labs.",
+          "Capability actions below make the specific Microsoft 365 change described beside each button. Review the stated effect before continuing.",
           "notice",
-        ),
-        createApiAccessPanel(state.apiAccess, apiOperationLoading),
-        createPanelBoundary(
-          "Recent operations",
-          () =>
-            createRecentOperationsPanel(
-              state.recentOperations,
-              apiOperationLoading,
-            ),
-        ),
-        createRehearsalStatusPanel(
-          state.rehearsalStatus,
-          apiOperationLoading,
         ),
         createSimulatedEmailPanel(
           state.simulatedEmail,
@@ -1333,81 +766,6 @@ function createStatePanel(
         ),
         createContactProofPanel(contactProof, apiOperationLoading),
         ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
-        ...createScenarioPlanningFlow(
-          scenarioPlanPreviewClient,
-          onPlanAccepted,
-          onPlanInvalidated,
-        ),
-        createPanelBoundary(
-          "Scenario surface availability",
-          createScenarioSurfaceMatrix,
-        ),
-        createPanelBoundary(
-          "Scenario batch feasibility",
-          () =>
-            createBatchFeasibilityPanel({
-              registry: SCENARIO_MANIFESTS,
-              client: batchFeasibilityClient,
-            }),
-        ),
-        createPanelBoundary(
-          "Receipt verification",
-          () =>
-            createScenarioEvidenceVerificationPanel({
-              client: scenarioEvidenceVerificationClient,
-              onLearnerBriefing,
-            }),
-        ),
-        createPanelBoundary(
-          "AVD rehearsal verification",
-          () =>
-            createAvdRehearsalVerificationPanel({
-              client: avdRehearsalVerificationClient,
-            }),
-        ),
-        createPanelBoundary(
-          "Private-document rehearsal verification",
-          () =>
-            createPrivateDocumentRehearsalVerificationPanel({
-              client: privateDocumentRehearsalVerificationClient,
-            }),
-        ),
-        createPanelBoundary(
-          "Help-desk email rehearsal verification",
-          () =>
-            createHelpDeskRehearsalVerificationPanel({
-              client: helpDeskRehearsalVerificationClient,
-            }),
-        ),
-        createPanelBoundary(
-          "Teams missed-call rehearsal verification",
-          () =>
-            createTeamsRehearsalVerificationPanel({
-              client: teamsRehearsalVerificationClient,
-            }),
-        ),
-        createPanelBoundary(
-          "Application-reconnaissance rehearsal verification",
-          () =>
-            createOauthApplicationReconRehearsalVerificationPanel({
-              client: oauthApplicationReconRehearsalVerificationClient,
-            }),
-        ),
-        createPanelBoundary(
-          "Purview audit-boundary rehearsal verification",
-          () =>
-            createPurviewAuditBoundaryRehearsalVerificationPanel({
-              client: purviewAuditBoundaryRehearsalVerificationClient,
-            }),
-        ),
-        createPanelBoundary(
-          "Failed-rehearsal support bundle",
-          () =>
-            createOperatorSupportBundlePanel(
-              operatorSupportBundle,
-              supportBundleExporter,
-            ),
-        ),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -1423,57 +781,9 @@ function createStatePanel(
         createButton("Try sign-in again", "sign-in", "primary"),
       );
       break;
-    case "learner-briefing":
-      break;
   }
 
   return panel;
-}
-
-function createScenarioPlanningFlow(
-  client: ScenarioPlanPreviewClient,
-  onPlanAccepted?: (
-    request: ScenarioPlanningRequest,
-    plan: ScenarioExecutionPlan,
-  ) => void,
-  onPlanInvalidated?: () => void,
-): HTMLElement[] {
-  const previewElement = createPanelBoundary(
-    "Scenario plan preview",
-    () =>
-      createScenarioPlanPreviewController({
-        registry: SCENARIO_MANIFESTS,
-        client,
-        onPlanAccepted,
-        onPlanInvalidated,
-      }).element,
-  );
-  return [previewElement];
-}
-
-function classifyScenarioPlanPreviewFailure(
-  error: unknown,
-): ScenarioPlanPreviewFailure {
-  if (error instanceof AccessTokenError) {
-    return "session-expired";
-  }
-  if (!(error instanceof ScenarioPlanClientError)) {
-    return "unavailable";
-  }
-  switch (error.category) {
-    case "unauthorized":
-      return "session-expired";
-    case "forbidden":
-      return "unauthorized";
-    case "validation-refused":
-      return "compiler-refused";
-    case "request-too-large":
-      return "response-too-large";
-    case "server-shutting-down":
-      return "server-shutting-down";
-    case "safe-failure":
-      return "unavailable";
-  }
 }
 
 function isServerShuttingDownError(
@@ -1481,228 +791,6 @@ function isServerShuttingDownError(
 ): error is ApiAccessError {
   return error instanceof ApiAccessError &&
     error.category === "server-shutting-down";
-}
-
-function classifyScenarioEvidenceVerificationFailure(
-  error: unknown,
-): ScenarioEvidenceVerificationFailure {
-  if (error instanceof AccessTokenError) {
-    return "session-expired";
-  }
-  if (!(error instanceof ScenarioEvidenceVerificationClientError)) {
-    return "unavailable";
-  }
-  switch (error.category) {
-    case "unauthorized":
-      return "session-expired";
-    case "forbidden":
-      return "unauthorized";
-    case "validation-refused":
-      return "verification-refused";
-    case "request-too-large":
-      return "request-too-large";
-    case "response-too-large":
-      return "response-too-large";
-    case "server-shutting-down":
-      return "server-shutting-down";
-    case "safe-failure":
-      return "unavailable";
-  }
-}
-
-function classifyBatchFeasibilityFailure(
-  error: unknown,
-): BatchFeasibilityPanelFailure {
-  if (error instanceof AccessTokenError) {
-    return "session-expired";
-  }
-  if (!(error instanceof BatchFeasibilityClientError)) {
-    return "unavailable";
-  }
-  switch (error.category) {
-    case "unauthorized":
-      return "session-expired";
-    case "forbidden":
-      return "unauthorized";
-    case "validation-refused":
-      return "planner-refused";
-    case "request-too-large":
-      return "request-too-large";
-    case "response-too-large":
-      return "response-too-large";
-    case "server-shutting-down":
-      return "server-shutting-down";
-    case "safe-failure":
-      return "unavailable";
-  }
-}
-
-function classifyAvdRehearsalVerificationFailure(
-  error: unknown,
-): AvdRehearsalVerificationFailure {
-  if (error instanceof AccessTokenError) {
-    return "session-expired";
-  }
-  if (!(error instanceof RehearsalOutputVerificationClientError)) {
-    return "unavailable";
-  }
-  switch (error.category) {
-    case "unauthorized":
-      return "session-expired";
-    case "forbidden":
-      return "unauthorized";
-    case "validation-refused":
-      return "verification-refused";
-    case "request-too-large":
-      return "request-too-large";
-    case "response-too-large":
-      return "response-too-large";
-    case "server-shutting-down":
-      return "server-shutting-down";
-    case "safe-failure":
-      return "unavailable";
-  }
-}
-
-function classifyPrivateDocumentRehearsalFailure(
-  error: unknown,
-): PrivateDocumentRehearsalPanelFailure {
-  if (error instanceof AccessTokenError) {
-    return "session-expired";
-  }
-  if (
-    !(error instanceof PrivateDocumentRehearsalVerificationClientError)
-  ) {
-    return "unavailable";
-  }
-  switch (error.category) {
-    case "unauthorized":
-      return "session-expired";
-    case "forbidden":
-      return "unauthorized";
-    case "validation-refused":
-      return "verification-refused";
-    case "request-too-large":
-      return "request-too-large";
-    case "response-too-large":
-      return "response-too-large";
-    case "server-shutting-down":
-      return "server-shutting-down";
-    case "safe-failure":
-      return "unavailable";
-  }
-}
-
-function classifyHelpDeskRehearsalFailure(
-  error: unknown,
-): HelpDeskRehearsalPanelFailure {
-  if (error instanceof AccessTokenError) {
-    return "session-expired";
-  }
-  if (!(error instanceof HelpDeskEmailRehearsalVerificationClientError)) {
-    return "unavailable";
-  }
-  switch (error.category) {
-    case "unauthorized":
-      return "session-expired";
-    case "forbidden":
-      return "unauthorized";
-    case "validation-refused":
-      return "verification-refused";
-    case "request-too-large":
-      return "request-too-large";
-    case "response-too-large":
-      return "response-too-large";
-    case "server-shutting-down":
-      return "server-shutting-down";
-    case "safe-failure":
-      return "unavailable";
-  }
-}
-
-function classifyTeamsRehearsalFailure(
-  error: unknown,
-): TeamsRehearsalPanelFailure {
-  if (error instanceof AccessTokenError) {
-    return "session-expired";
-  }
-  if (!(error instanceof TeamsMissedCallRehearsalVerificationClientError)) {
-    return "unavailable";
-  }
-  switch (error.category) {
-    case "unauthorized":
-      return "session-expired";
-    case "forbidden":
-      return "unauthorized";
-    case "validation-refused":
-      return "verification-refused";
-    case "request-too-large":
-      return "request-too-large";
-    case "response-too-large":
-      return "response-too-large";
-    case "server-shutting-down":
-      return "server-shutting-down";
-    case "safe-failure":
-      return "unavailable";
-  }
-}
-
-function classifyOauthApplicationReconRehearsalFailure(
-  error: unknown,
-): OauthApplicationReconRehearsalPanelFailure {
-  if (error instanceof AccessTokenError) {
-    return "session-expired";
-  }
-  if (
-    !(error instanceof OauthApplicationReconRehearsalVerificationClientError)
-  ) {
-    return "unavailable";
-  }
-  switch (error.category) {
-    case "unauthorized":
-      return "session-expired";
-    case "forbidden":
-      return "unauthorized";
-    case "validation-refused":
-      return "verification-refused";
-    case "request-too-large":
-      return "request-too-large";
-    case "response-too-large":
-      return "response-too-large";
-    case "server-shutting-down":
-      return "server-shutting-down";
-    case "safe-failure":
-      return "unavailable";
-  }
-}
-
-function classifyPurviewAuditBoundaryRehearsalFailure(
-  error: unknown,
-): PurviewAuditBoundaryRehearsalPanelFailure {
-  if (error instanceof AccessTokenError) {
-    return "session-expired";
-  }
-  if (
-    !(error instanceof PurviewAuditBoundaryRehearsalVerificationClientError)
-  ) {
-    return "unavailable";
-  }
-  switch (error.category) {
-    case "unauthorized":
-      return "session-expired";
-    case "forbidden":
-      return "unauthorized";
-    case "validation-refused":
-      return "verification-refused";
-    case "request-too-large":
-      return "request-too-large";
-    case "response-too-large":
-      return "response-too-large";
-    case "server-shutting-down":
-      return "server-shutting-down";
-    case "safe-failure":
-      return "unavailable";
-  }
 }
 
 function createSimulatedEmailPanel(
@@ -1714,7 +802,7 @@ function createSimulatedEmailPanel(
 
   panel.append(
     createStatus(
-      "This creates real tenant activity: one internal email from Homer Simpson to Marge Simpson.",
+      "This creates real tenant activity: one internal email from Homer Simpson to Marge Simpson. This page has no email cleanup action; if Microsoft delivers the email, it remains until separately removed.",
       "notice",
     ),
   );
@@ -1759,7 +847,7 @@ function createHelpDeskScenarioPanel(
   panel.className = "api-access";
   panel.append(
     createStatus(
-      "Prepared Outlook email action: one clearly labeled AP2 help desk email from Kobe to Cory. This is not a Teams call, missed call, or voicemail.",
+      "Prepared Outlook email action: one clearly labeled AP2 help desk email from Kobe to Cory. This is not a Teams call, missed call, or voicemail. This page has no email cleanup action; if Microsoft delivers the email, it remains until separately removed.",
       "notice",
     ),
   );
@@ -2071,105 +1159,12 @@ function createContactProofPanel(
   return panel;
 }
 
-function createRehearsalStatusPanel(
-  state: RehearsalStatusState,
-  apiOperationLoading: boolean,
-): HTMLElement {
-  const panel = document.createElement("div");
-  panel.className = "api-access";
-
-  if (state.kind === "loading") {
-    panel.setAttribute("aria-busy", "true");
-    panel.append(createStatus("Checking rehearsal status…"));
-  } else if (state.kind === "success") {
-    panel.append(
-      createStatus("Rehearsal status received."),
-      createRehearsalStatusList(state.status),
-    );
-  } else if (state.kind === "cancelled") {
-    panel.append(
-      createStatus(
-        "Rehearsal status request was cancelled. Try again when ready.",
-        "notice",
-      ),
-    );
-  } else if (state.kind === "error") {
-    panel.append(createStatus(state.message, "error"));
-  }
-
-  panel.append(
-    createButton(
-      "Check rehearsal status",
-      "check-rehearsal",
-      "primary",
-      apiOperationLoading,
-    ),
-  );
-  return panel;
-}
-
-function createApiAccessPanel(
-  state: ApiAccessState,
-  apiOperationLoading: boolean,
-): HTMLElement {
-  const panel = document.createElement("div");
-  panel.className = "api-access";
-
-  if (state.kind === "loading") {
-    panel.setAttribute("aria-busy", "true");
-    panel.append(createStatus("Checking API access…"));
-  } else if (state.kind === "success") {
-    panel.append(
-      createStatus("API access confirmed."),
-      createCallerList(state.caller),
-    );
-  } else if (state.kind === "cancelled") {
-    panel.append(
-      createStatus("API access request was cancelled. Try again when ready.", "notice"),
-    );
-  } else if (state.kind === "error") {
-    panel.append(createStatus(state.message, "error"));
-  }
-
-  panel.append(
-    createButton(
-      "Check API access",
-      "check-api",
-      "primary",
-      apiOperationLoading,
-    ),
-  );
-  return panel;
-}
-
 function createIdentityList(account: AccountIdentity): HTMLDListElement {
   const list = document.createElement("dl");
   list.className = "identity-list";
 
   appendIdentity(list, "Account", account.username);
-  appendIdentity(list, "Tenant ID", account.tenantId);
-  appendIdentity(list, "Account ID", account.accountId);
 
-  return list;
-}
-
-function createCallerList(caller: ApiCallerIdentity): HTMLDListElement {
-  const list = document.createElement("dl");
-  list.className = "identity-list";
-  appendIdentity(list, "Caller type", caller.callerType);
-  appendIdentity(list, "API tenant ID", caller.tenantId);
-  return list;
-}
-
-function createRehearsalStatusList(
-  status: RehearsalStatus,
-): HTMLDListElement {
-  const list = document.createElement("dl");
-  list.className = "identity-list";
-  appendIdentity(list, "App", status.appName);
-  appendIdentity(list, "Region", status.region);
-  appendIdentity(list, "Running status", status.runningStatus);
-  appendIdentity(list, "Latest ready revision", status.latestReadyRevision);
   return list;
 }
 
@@ -2210,9 +1205,6 @@ function isApiOperationBusy(
   contactProof: ContactProofState,
 ): boolean {
   return (
-    state.apiAccess.kind === "loading" ||
-    state.recentOperations.kind === "loading" ||
-    state.rehearsalStatus.kind === "loading" ||
     state.simulatedEmail.kind === "loading" ||
     state.helpDeskScenario.kind === "loading" ||
     state.oneDriveProof.activity !== "idle" ||

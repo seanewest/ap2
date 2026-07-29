@@ -1,17 +1,7 @@
 import { defineConfig } from "vite";
-import {
-  inventoryCanonicalScenarioSurfaces,
-} from "./src/scenarios/scenario-surface-inventory.ts";
-
-const scenarioSurfaceInventory = inventoryCanonicalScenarioSurfaces();
 
 export default defineConfig(({ command }) => ({
   base: command === "serve" ? "/" : "/ap2/",
-  define: {
-    __AP2_SCENARIO_SURFACE_INVENTORY__: JSON.stringify(
-      scenarioSurfaceInventory,
-    ),
-  },
   build: {
     rollupOptions: {
       output: {

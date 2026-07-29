@@ -1,5 +1,8 @@
 # Help-desk email rehearsal output verifier
 
+> The verifier remains available through its CLI, API, client, fixtures, and
+> tests. Its manual JSON panel was removed from the primary SPA.
+
 The offline verifier checks one saved canonical output from the
 [help-desk email contract rehearsal](help-desk-email-rehearsal.md). It does
 not invoke that pipeline, construct its fake operation, send email, call
@@ -77,20 +80,7 @@ exact POST route, caps streamed response bytes, accepts only fixed error
 shapes, and independently binds every summary field to the submitted envelope.
 Its runtime import graph does not invoke the server verifier or rehearsal fake.
 
-## Authenticated operator panel
+## Primary SPA boundary
 
-The authenticated operator shell provides a manual-only **Help-desk email
-rehearsal verification** panel over that bounded client. It validates one
-sanitized PR #103 envelope locally before acquiring operator authorization.
-Only an explicit **Verify help-desk rehearsal** action submits one request.
-
-The panel renders only the fixed contract status, synthetic branch, terminal
-fake state, adapter, receipt, envelope, external claim coverage, and synthetic
-claim count. It never renders the submitted JSON, digests, journal details,
-email content, arbitrary labels, proof references, or backend text.
-
-The panel repeats the evidence boundary: send acceptance cannot prove Inbox
-visibility, post-cleanup absence cannot replace pre-cleanup learner
-observation, and every external claim remains uninspected. Input changes clear
-stale results. The panel has no execution, send, retry, polling, persistence,
-scheduling, upload, or external-evidence ingestion path.
+The primary SPA does not expose this verifier or accept pasted envelopes. The
+bounded API, typed client, offline CLI, fixtures, and tests remain supported.

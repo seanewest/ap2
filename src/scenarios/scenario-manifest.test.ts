@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  createScenarioPlan,
   parseScenarioManifest,
   ScenarioManifestError,
   type ScenarioManifest,
@@ -844,36 +843,4 @@ describe("generalized scenario manifest contract", () => {
     ]);
   });
 
-  it("renders roles, learner interpretation, expiry, and cost", () => {
-    const panel = createScenarioPlan(TEAMS_MISSED_CALL_SCENARIO);
-
-    expect(panel.dataset.scenarioId).toBe(
-      "teams-missed-call-observation",
-    );
-    expect(panel.textContent).toContain("Evidence producerAP2 instructor");
-    expect(panel.textContent).toContain("Workload actorKobe lab user");
-    expect(panel.textContent).toContain(
-      "Learner / observerLearner using Cory's lab Teams view",
-    );
-    expect(panel.textContent).toContain(
-      "What the learner receivesOne Missed incoming call entry",
-    );
-    expect(panel.textContent).toContain(
-      "Expected interpretationThe two entries are evidence of one missed Teams call",
-    );
-    expect(panel.textContent).toContain("Maximum costUSD 0");
-    expect(panel.textContent).not.toContain("credential");
-    expect(panel.textContent).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
-  });
-
-  it("preserves the separate reconnaissance workload and detector", () => {
-    const panel = createScenarioPlan(OAUTH_APPLICATION_RECON_SCENARIO);
-
-    expect(panel.textContent).toContain(
-      "Workload actorReconnaissance workload application",
-    );
-    expect(panel.textContent).toContain(
-      "Detector / observerIndependent audit observer application",
-    );
-  });
 });

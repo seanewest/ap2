@@ -20,15 +20,8 @@ import { HELP_DESK_EMAIL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scr
 import { PRIVATE_DOCUMENT_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-private-document-rehearsal-output.ts";
 import { TEAMS_MISSED_CALL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-teams-missed-call-rehearsal-output.ts";
 import { SCENARIO_API_CLIENT_CAPABILITIES } from "../api/client.ts";
-import { AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./avd-rehearsal-verification-panel.ts";
-import { HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./help-desk-rehearsal-verification-panel.ts";
-import { OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./oauth-application-recon-rehearsal-verification-panel.ts";
 import { CAPABILITY_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
-import { SCENARIO_PLAN_PREVIEW_UI_CAPABILITY } from "./scenario-plan-preview.ts";
-import { SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY } from "./scenario-evidence-verification-panel.ts";
-import { LEARNER_EVIDENCE_BRIEFING_UI_CAPABILITY } from "./learner-evidence-briefing-route.ts";
 import { PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY } from "./private-document-receipt-adapter.ts";
-import { PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./private-document-rehearsal-verification-panel.ts";
 import {
   formatScenarioSurfaceInventory,
   inventoryCanonicalScenarioSurfaces,
@@ -48,13 +41,6 @@ function surfaceDeclarations(): unknown[] {
     REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
     ...SCENARIO_API_CLIENT_CAPABILITIES,
     CAPABILITY_CATALOG_UI_CAPABILITY,
-    SCENARIO_PLAN_PREVIEW_UI_CAPABILITY,
-    SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY,
-    LEARNER_EVIDENCE_BRIEFING_UI_CAPABILITY,
-    AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
-    HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
-    OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
-    PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
     AVD_THREE_VM_REHEARSAL_CAPABILITY,
     HELP_DESK_EMAIL_REHEARSAL_CAPABILITY,
     OAUTH_APPLICATION_RECON_REHEARSAL_CAPABILITY,
@@ -107,11 +93,15 @@ describe("canonical scenario surface inventory", () => {
       expect(row.surfaces["capability-catalog-ui"].status).toBe(
         "implemented",
       );
-      expect(row.surfaces["operator-preview-ui"].status).toBe("implemented");
+      expect(row.surfaces["operator-preview-ui"].status).toBe("missing");
       expect(row.surfaces["operator-verify-ui"]).toEqual({
-        status: "implemented",
-        reason: "operator-receipt-verify-ui-exported",
+        status: "missing",
+        reason: "operator-receipt-verify-ui-missing",
       });
+      expect(row.surfaces["learner-evidence-ui"].status).toBe("missing");
+      expect(
+        row.surfaces["manual-rehearsal-verification-panel"].status,
+      ).toBe("missing");
     }
 
     const avd = first.scenarios.find(
@@ -129,7 +119,7 @@ describe("canonical scenario surface inventory", () => {
     ).toBe("implemented");
     expect(
       avd.surfaces["manual-rehearsal-verification-panel"].status,
-    ).toBe("implemented");
+    ).toBe("missing");
 
     const privateDocument = first.scenarios.find(
       ({ scenarioId }) => scenarioId === "private-document-evidence",
@@ -152,7 +142,7 @@ describe("canonical scenario surface inventory", () => {
     ).toBe("implemented");
     expect(
       privateDocument.surfaces["manual-rehearsal-verification-panel"].status,
-    ).toBe("implemented");
+    ).toBe("missing");
 
     const helpDesk = first.scenarios.find(
       ({ scenarioId }) => scenarioId === "help-desk-email-observation",
@@ -169,18 +159,8 @@ describe("canonical scenario surface inventory", () => {
     ).toBe("implemented");
     expect(
       helpDesk.surfaces["manual-rehearsal-verification-panel"].status,
-    ).toBe("implemented");
-    expect(helpDesk.surfaces["learner-evidence-ui"]).toEqual({
-      status: "implemented",
-      reason: "learner-evidence-ui-exported",
-    });
-    expect(
-      first.scenarios
-        .filter(({ scenarioId }) => scenarioId !== helpDesk.scenarioId)
-        .every(({ surfaces }) =>
-          surfaces["learner-evidence-ui"].status === "missing"
-        ),
-    ).toBe(true);
+    ).toBe("missing");
+    expect(helpDesk.surfaces["learner-evidence-ui"].status).toBe("missing");
 
     const teams = first.scenarios.find(
       ({ scenarioId }) => scenarioId === "teams-missed-call-observation",
@@ -214,7 +194,7 @@ describe("canonical scenario surface inventory", () => {
     ).toBe("implemented");
     expect(
       oauthRecon.surfaces["manual-rehearsal-verification-panel"].status,
-    ).toBe("implemented");
+    ).toBe("missing");
 
     for (
       const row of first.scenarios.filter(
@@ -347,13 +327,14 @@ describe("canonical scenario surface inventory", () => {
     );
 
     const fakeUi = surfaceDeclarations();
-    const verifyUi = fakeUi.find(
-      (candidate) =>
-        (candidate as { surface?: unknown }).surface ===
-        "operator-receipt-verify-ui",
-    ) as Record<string, unknown>;
-    verifyUi.scenarioScope = "explicit-scenarios";
-    verifyUi.scenarioIds = ["help-desk-email-observation"];
+    fakeUi.push({
+      schemaVersion: 1,
+      surface: "operator-receipt-verify-ui",
+      scenarioScope: "explicit-scenarios",
+      manifestSchemaVersion: 2,
+      repositoryBoundary: "contract-only",
+      scenarioIds: ["help-desk-email-observation"],
+    });
     const fakeUiResult = inventoryCanonicalScenarioSurfaces({
       surfaceDeclarations: fakeUi,
     });
@@ -375,11 +356,15 @@ describe("canonical scenario surface inventory", () => {
     })).toContain("DECLARATION_SHAPE");
 
     const wrongOwner = surfaceDeclarations();
-    const unsupportedOwner = structuredClone(
-      AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
-    ) as unknown as Record<string, unknown>;
-    unsupportedOwner.scenarioIds = ["teams-missed-call-observation"];
-    wrongOwner.push(unsupportedOwner);
+    wrongOwner.push({
+      schemaVersion: 1,
+      surface: "manual-rehearsal-verification-panel",
+      scenarioScope: "explicit-scenarios",
+      manifestSchemaVersion: 2,
+      repositoryBoundary: "contract-only",
+      scenarioIds: ["teams-missed-call-observation"],
+      routeOwnerKey: "teams-missed-call-rehearsal-verify",
+    });
     const wrongOwnerResult = inventoryCanonicalScenarioSurfaces({
       surfaceDeclarations: wrongOwner,
     });
@@ -393,7 +378,7 @@ describe("canonical scenario surface inventory", () => {
     ).toBe("missing");
   });
 
-  it("fails closed on authenticated verifier and panel route drift", () => {
+  it("fails closed on authenticated verifier route drift", () => {
     const clientDrift = surfaceDeclarations();
     const avdClient = clientDrift.find(
       (candidate) =>
@@ -416,28 +401,6 @@ describe("canonical scenario surface inventory", () => {
       )?.surfaces[
         "authenticated-rehearsal-verification-api-client"
       ].status,
-    ).toBe("missing");
-
-    const panelDrift = surfaceDeclarations();
-    const privatePanel = panelDrift.find(
-      (candidate) =>
-        (candidate as { surface?: unknown; scenarioIds?: unknown }).surface ===
-          "manual-rehearsal-verification-panel" &&
-        JSON.stringify(
-            (candidate as { scenarioIds?: unknown }).scenarioIds,
-          ) === JSON.stringify(["private-document-evidence"]),
-    ) as Record<string, unknown>;
-    privatePanel.routeOwnerKey = "avd-rehearsal-verify";
-    const panelResult = inventoryCanonicalScenarioSurfaces({
-      surfaceDeclarations: panelDrift,
-    });
-    expect(panelResult.failures.map(({ code }) => code)).toContain(
-      "ROUTE_BINDING_MISMATCH",
-    );
-    expect(
-      panelResult.scenarios.find(
-        ({ scenarioId }) => scenarioId === "private-document-evidence",
-      )?.surfaces["manual-rehearsal-verification-panel"].status,
     ).toBe("missing");
   });
 
