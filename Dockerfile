@@ -1,7 +1,7 @@
-FROM mcr.microsoft.com/playwright:v1.61.1-noble AS build
+FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.61.1-noble@sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6 AS build
 
 WORKDIR /app
-COPY .dockerignore Dockerfile package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./
+COPY .dockerignore Dockerfile container-base-lock.json package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./
 RUN npm ci
 COPY api ./api
 COPY scripts ./scripts
@@ -12,7 +12,7 @@ RUN npm run build:api && rm -f dist-api/*.map
 RUN npm prune --omit=dev
 RUN node scripts/api-container-provenance.ts --output container-provenance.json
 
-FROM mcr.microsoft.com/playwright:v1.61.1-noble
+FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.61.1-noble@sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6
 
 ENV NODE_ENV=production
 WORKDIR /app

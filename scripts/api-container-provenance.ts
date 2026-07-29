@@ -8,10 +8,16 @@ import {
 import { createHash } from "node:crypto";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  pinnedApiContainerBaseReference,
+  readApiContainerBaseLock,
+  type ApiContainerBaseLock,
+} from "./api-container-base.ts";
 
 const INPUT_FILES = [
   ".dockerignore",
   "Dockerfile",
+  "container-base-lock.json",
   "package-lock.json",
   "package.json",
   "tsconfig.api.json",
@@ -55,8 +61,12 @@ export interface ApiContainerProvenance {
   schemaVersion: 1;
   kind: "ap2-api-container-provenance";
   baseImage: {
-    classification: "mutable-version-tag";
+    classification: "pinned-platform-manifest";
+    indexDigest: string;
+    manifestDigest: string;
+    platform: "linux/amd64";
     reference: string;
+    tagReference: string;
     runtimeComponents: "reference-bound-not-enumerated";
   };
   buildInputs: {
@@ -123,10 +133,12 @@ export function createApiContainerProvenance(
   const lockText = readFileSync(join(root, "package-lock.json"), "utf8");
   const packageManifest = parseJson<PackageManifest>(packageText, "package manifest");
   const packageLock = parseJson<PackageLock>(lockText, "package lock");
-  const baseImage = validateContainerContract(
+  const baseLock = readApiContainerBaseLock(root);
+  validateContainerContract(
     dockerfile,
     packageManifest,
     packageLock,
+    baseLock,
   );
   const inputFiles = collectBuildInputs(root);
   const buildArtifacts = options.bindBuildArtifacts
@@ -151,8 +163,13 @@ export function createApiContainerProvenance(
     schemaVersion: 1,
     kind: "ap2-api-container-provenance",
     baseImage: {
-      classification: "mutable-version-tag",
-      reference: baseImage,
+      classification: "pinned-platform-manifest",
+      indexDigest: baseLock.indexDigest,
+      manifestDigest: baseLock.manifestDigest,
+      platform: "linux/amd64",
+      reference: pinnedApiContainerBaseReference(baseLock),
+      tagReference:
+        `${baseLock.registry}/${baseLock.repository}:${baseLock.tag}`,
       runtimeComponents: "reference-bound-not-enumerated",
     },
     buildInputs: {
@@ -194,6 +211,10 @@ export function summarizeApiContainerProvenance(
     status: "pass",
     baseImage: provenance.baseImage.reference,
     baseClassification: provenance.baseImage.classification,
+    baseIndexDigest: provenance.baseImage.indexDigest,
+    baseManifestDigest: provenance.baseImage.manifestDigest,
+    basePlatform: provenance.baseImage.platform,
+    baseTag: provenance.baseImage.tagReference,
     baseRuntimeComponents: provenance.baseImage.runtimeComponents,
     buildInputCount: provenance.buildInputs.fileCount,
     buildInputsDigest: provenance.buildInputs.digest,
@@ -211,7 +232,8 @@ function validateContainerContract(
   dockerfile: string,
   packageManifest: PackageManifest,
   packageLock: PackageLock,
-): string {
+  baseLock: ApiContainerBaseLock,
+): void {
   if (packageLock.lockfileVersion !== 3 || !packageLock.packages?.[""]) {
     throw new Error("API_CONTAINER_PROVENANCE_LOCKFILE_CONTRACT");
   }
@@ -231,16 +253,24 @@ function validateContainerContract(
   if (!playwrightVersion || !/^\d+\.\d+\.\d+$/u.test(playwrightVersion)) {
     throw new Error("API_CONTAINER_PROVENANCE_PLAYWRIGHT_VERSION");
   }
-  const fromLines = [...dockerfile.matchAll(/^FROM\s+(\S+)(?:\s+AS\s+\S+)?$/gimu)]
-    .map((match) => match[1]);
-  const expectedBase = `mcr.microsoft.com/playwright:v${playwrightVersion}-noble`;
+  const fromLines = dockerfile
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => /^FROM\s+/iu.test(line));
+  const expectedTag = `v${playwrightVersion}-noble`;
+  if (baseLock.tag !== expectedTag) {
+    throw new Error("API_CONTAINER_PROVENANCE_BASE_LOCK_STALE");
+  }
+  const expectedBase = pinnedApiContainerBaseReference(baseLock);
   if (
     fromLines.length !== 2 ||
-    fromLines.some((reference) => reference !== expectedBase)
+    fromLines[0] !==
+      `FROM --platform=linux/amd64 ${expectedBase} AS build` ||
+    fromLines[1] !== `FROM --platform=linux/amd64 ${expectedBase}`
   ) {
     throw new Error("API_CONTAINER_PROVENANCE_BASE_DRIFT");
   }
-  const secondStage = dockerfile.search(/^FROM\s+\S+\s*$/mu);
+  const secondStage = [...dockerfile.matchAll(/^FROM\b.*$/gmu)][1]?.index ?? -1;
   if (secondStage < 0) {
     throw new Error("API_CONTAINER_PROVENANCE_BUILD_CONTRACT");
   }
@@ -252,7 +282,7 @@ function validateContainerContract(
   const finalRuns = instructionLines(finalStage, "RUN");
   if (
     JSON.stringify(buildCopies) !== JSON.stringify([
-      "COPY .dockerignore Dockerfile package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./",
+      "COPY .dockerignore Dockerfile container-base-lock.json package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./",
       "COPY api ./api",
       "COPY scripts ./scripts",
       "COPY src/api ./src/api",
@@ -276,7 +306,6 @@ function validateContainerContract(
   ) {
     throw new Error("API_CONTAINER_PROVENANCE_BUILD_CONTRACT");
   }
-  return expectedBase;
 }
 
 function instructionLines(dockerfile: string, instruction: string): string[] {
