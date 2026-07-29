@@ -10,6 +10,8 @@ import {
 const START = "2026-07-26T12:00:00.000Z";
 const END = "2026-07-26T12:15:00.000Z";
 const CLIENT_ID = "7eb78f18-b49c-495c-a571-af03f06b58a9";
+const SERVICE_PRINCIPAL_ID = "17dd8d61-f97f-4a8c-b601-b2a300e0c240";
+const OBSERVER_CLIENT_ID = "10b5f83c-f694-4d33-a5b8-0c93af872e02";
 const GRAPH_RESOURCE_ID = "00000003-0000-0000-c000-000000000000";
 
 function signIn(
@@ -20,6 +22,7 @@ function signIn(
     appDisplayName: "private-app-name",
     createdDateTime: "2026-07-26T12:05:00.1234567Z",
     appId: CLIENT_ID,
+    servicePrincipalId: SERVICE_PRINCIPAL_ID,
     status: { errorCode: 0, failureReason: "private-status-body" },
     signInEventTypes: ["servicePrincipal"],
     resourceId: GRAPH_RESOURCE_ID,
@@ -84,6 +87,7 @@ describe("OAuth reconnaissance sign-in observer", () => {
     const result = await observeOauthReconSignin(
       requiredObservationWindow(START, END),
       credential,
+      OBSERVER_CLIENT_ID,
       request,
     );
 
@@ -93,9 +97,11 @@ describe("OAuth reconnaissance sign-in observer", () => {
     );
     expect(request).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
-      schema: "oauth-recon-signin-observer/v1",
+      schema: "oauth-recon-signin-observer/v2",
       unit: "oauth-recon-signin",
-      observer: "development-automation-app",
+      producer: "development-automation-app",
+      observer: "independent-audit-observer-app",
+      identitySeparated: true,
       count: 2,
       observed: true,
       truncated: true,
@@ -112,6 +118,8 @@ describe("OAuth reconnaissance sign-in observer", () => {
       "private-next-page",
       "must-not-escape",
       CLIENT_ID,
+      SERVICE_PRINCIPAL_ID,
+      OBSERVER_CLIENT_ID,
       GRAPH_RESOURCE_ID,
       "graph.microsoft.com",
     ]) {
@@ -123,13 +131,16 @@ describe("OAuth reconnaissance sign-in observer", () => {
     const result = await observeOauthReconSignin(
       requiredObservationWindow(START, END),
       { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+      OBSERVER_CLIENT_ID,
       vi.fn().mockResolvedValue(Response.json({ value: [] })),
     );
 
     expect(result).toEqual({
-      schema: "oauth-recon-signin-observer/v1",
+      schema: "oauth-recon-signin-observer/v2",
       unit: "oauth-recon-signin",
-      observer: "development-automation-app",
+      producer: "development-automation-app",
+      observer: "independent-audit-observer-app",
+      identitySeparated: true,
       count: 0,
       observed: false,
       truncated: false,
@@ -153,6 +164,7 @@ describe("OAuth reconnaissance sign-in observer", () => {
     const result = await observeOauthReconSignin(
       requiredObservationWindow(START, END),
       { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+      OBSERVER_CLIENT_ID,
       request,
     );
 
@@ -161,6 +173,25 @@ describe("OAuth reconnaissance sign-in observer", () => {
       count: 10,
       truncated: true,
       exactCorrelation: false,
+    });
+  });
+
+  it("does not conflate the producer app ID with its service-principal ID", async () => {
+    const result = await observeOauthReconSignin(
+      requiredObservationWindow(START, END),
+      { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+      OBSERVER_CLIENT_ID,
+      vi.fn().mockResolvedValue(
+        Response.json({
+          value: [signIn({ servicePrincipalId: CLIENT_ID })],
+        }),
+      ),
+    );
+
+    expect(result).toMatchObject({
+      observed: true,
+      exactCorrelation: false,
+      identitySeparated: true,
     });
   });
 
@@ -175,6 +206,7 @@ describe("OAuth reconnaissance sign-in observer", () => {
             new Error("private-auth-detail"),
           ),
         },
+        OBSERVER_CLIENT_ID,
         noRequest,
       ),
     ).rejects.toThrow("Observer authentication failed.");
@@ -184,6 +216,7 @@ describe("OAuth reconnaissance sign-in observer", () => {
       observeOauthReconSignin(
         window,
         { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+        OBSERVER_CLIENT_ID,
         vi.fn().mockRejectedValue(new Error("private-transport-detail")),
       ),
     ).rejects.toThrow("Observer transport failed.");
@@ -192,6 +225,7 @@ describe("OAuth reconnaissance sign-in observer", () => {
       observeOauthReconSignin(
         window,
         { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+        OBSERVER_CLIENT_ID,
         vi.fn().mockResolvedValue(
           new Response("private-http-body", { status: 403 }),
         ),
@@ -208,10 +242,27 @@ describe("OAuth reconnaissance sign-in observer", () => {
         observeOauthReconSignin(
           window,
           { getToken: vi.fn().mockResolvedValue({ token: "token" }) },
+          OBSERVER_CLIENT_ID,
           vi.fn().mockResolvedValue(response),
         ),
       ).rejects.toThrow("Observer response was malformed.");
     }
+  });
+
+  it("fails closed before auth when producer and observer are conflated", async () => {
+    const credential = {
+      getToken: vi.fn().mockResolvedValue({ token: "private-token" }),
+    };
+
+    await expect(
+      observeOauthReconSignin(
+        requiredObservationWindow(START, END),
+        credential,
+        CLIENT_ID,
+        vi.fn(),
+      ),
+    ).rejects.toThrow("Observer application identity must be a distinct");
+    expect(credential.getToken).not.toHaveBeenCalled();
   });
 
   it("starts directly under Node and rejects missing arguments before auth", () => {

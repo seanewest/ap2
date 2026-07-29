@@ -243,6 +243,19 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain(
       "What the learner receivesOne Missed incoming call entry",
     );
+    expect(root.textContent).toContain(
+      "Application reconnaissance and audit observation",
+    );
+    expect(root.textContent).toContain(
+      "Workload actorReconnaissance workload application",
+    );
+    expect(root.textContent).toContain(
+      "Detector / observerIndependent audit observer application",
+    );
+    expect(root.textContent).toContain(
+      "Authentication — Independent audit observer application" +
+        "A separate application-only session with bounded audit-read authority",
+    );
   });
 
   it("restores a signed-in account from cached state", async () => {

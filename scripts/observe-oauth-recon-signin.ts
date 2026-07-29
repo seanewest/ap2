@@ -10,6 +10,8 @@ const GRAPH_SCOPE = "https://graph.microsoft.com/.default";
 const SIGN_INS_URL =
   "https://graph.microsoft.com/beta/auditLogs/signIns";
 const GRAPH_RESOURCE_ID = "00000003-0000-0000-c000-000000000000";
+const DEVELOPMENT_AUTOMATION_SERVICE_PRINCIPAL_ID =
+  "17dd8d61-f97f-4a8c-b601-b2a300e0c240";
 const TOP = 10;
 const MAX_WINDOW_MS = 15 * 60 * 1_000;
 
@@ -27,15 +29,18 @@ interface Window {
 interface SignIn {
   createdTicks: bigint;
   appId: string;
+  servicePrincipalId: string;
   successful: boolean;
   servicePrincipal: boolean;
   resourceId: string;
 }
 
 export interface OauthReconSigninObservation {
-  schema: "oauth-recon-signin-observer/v1";
+  schema: "oauth-recon-signin-observer/v2";
   unit: "oauth-recon-signin";
-  observer: "development-automation-app";
+  producer: "development-automation-app";
+  observer: "independent-audit-observer-app";
+  identitySeparated: true;
   count: number;
   observed: boolean;
   truncated: boolean;
@@ -60,8 +65,10 @@ export function requiredObservationWindow(
 export async function observeOauthReconSignin(
   window: Window,
   credential: GraphCredential,
+  observerClientId: string,
   request: typeof fetch = fetch,
 ): Promise<OauthReconSigninObservation> {
+  requireDistinctObserver(observerClientId);
   let access: { token: string } | null;
   try {
     access = await credential.getToken(GRAPH_SCOPE);
@@ -98,19 +105,29 @@ export async function observeOauthReconSignin(
   const signIns = record.value.map(parseSignIn);
   const observed = signIns.length > 0;
   const exactCorrelation = observed && signIns.every(
-    ({ createdTicks, appId, successful, servicePrincipal, resourceId }) =>
+    ({
+      createdTicks,
+      appId,
+      servicePrincipalId,
+      successful,
+      servicePrincipal,
+      resourceId,
+    }) =>
       createdTicks >= window.startTicks &&
       createdTicks <= window.endTicks &&
       appId === DEVELOPMENT_AUTOMATION_CLIENT_ID &&
+      servicePrincipalId === DEVELOPMENT_AUTOMATION_SERVICE_PRINCIPAL_ID &&
       successful &&
       servicePrincipal &&
       resourceId === GRAPH_RESOURCE_ID,
   );
 
   return {
-    schema: "oauth-recon-signin-observer/v1",
+    schema: "oauth-recon-signin-observer/v2",
     unit: "oauth-recon-signin",
-    observer: "development-automation-app",
+    producer: "development-automation-app",
+    observer: "independent-audit-observer-app",
+    identitySeparated: true,
     count: signIns.length,
     observed,
     truncated: typeof nextLink === "string" || signIns.length === TOP,
@@ -141,6 +158,7 @@ function parseSignIn(value: unknown): SignIn {
     !status ||
     createdTicks === undefined ||
     typeof signIn.appId !== "string" ||
+    typeof signIn.servicePrincipalId !== "string" ||
     !Number.isSafeInteger(status.errorCode) ||
     !Array.isArray(eventTypes) ||
     !eventTypes.every((eventType) => typeof eventType === "string") ||
@@ -151,11 +169,24 @@ function parseSignIn(value: unknown): SignIn {
   return {
     createdTicks,
     appId: signIn.appId,
+    servicePrincipalId: signIn.servicePrincipalId,
     successful: status.errorCode === 0,
     servicePrincipal:
       eventTypes.length === 1 && eventTypes[0] === "servicePrincipal",
     resourceId: signIn.resourceId,
   };
+}
+
+function requireDistinctObserver(value: string): void {
+  if (
+    !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
+      .test(value) ||
+    value.toLowerCase() === DEVELOPMENT_AUTOMATION_CLIENT_ID
+  ) {
+    throw new Error(
+      "Observer application identity must be a distinct canonical client ID.",
+    );
+  }
 }
 
 function canonicalArgumentTicks(value: string): bigint {
@@ -229,13 +260,23 @@ function secureCertificatePath(configured: string | undefined): string {
 
 async function main(): Promise<void> {
   const window = argumentsFrom(process.argv.slice(2));
+  const observerClientId = process.env.AP2_OBSERVER_CLIENT_ID ?? "";
+  requireDistinctObserver(observerClientId);
   const credential = new ClientCertificateCredential(
     STUDENT_TENANT_ID,
-    DEVELOPMENT_AUTOMATION_CLIENT_ID,
-    secureCertificatePath(process.env.AP2_AUTOMATION_CERTIFICATE_PATH),
+    observerClientId,
+    secureCertificatePath(process.env.AP2_OBSERVER_CERTIFICATE_PATH),
   );
   console.log(
-    JSON.stringify(await observeOauthReconSignin(window, credential), null, 2),
+    JSON.stringify(
+      await observeOauthReconSignin(
+        window,
+        credential,
+        observerClientId,
+      ),
+      null,
+      2,
+    ),
   );
 }
 
