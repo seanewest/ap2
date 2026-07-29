@@ -871,6 +871,14 @@ export const NEGATIVE_RECEIPT_FIXTURES: readonly NegativeReceiptFixture[] = [
     }),
     expectedCode: "state-promotion",
   },
+  {
+    name: "recon-rejects-learner-detector-conflation",
+    manifest: OAUTH_APPLICATION_RECON_SCENARIO,
+    receipt: changed(recon, (copy) => {
+      copy.roles.detector = copy.roles.learner;
+    }),
+    expectedCode: "role-conflation",
+  },
 ];
 
 export const RECEIPT_MANIFESTS = [

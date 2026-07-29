@@ -298,6 +298,23 @@ describe("scenario evidence receipts", () => {
     );
   });
 
+  it("preserves an explicitly self-triggered producer/learner contract", () => {
+    const fixture = CANONICAL_RECEIPT_FIXTURES[0]!;
+    const manifest = structuredClone(fixture.manifest);
+    manifest.roles.evidenceProducer = manifest.roles.learner;
+    manifest.trigger = {
+      kind: "self-triggered",
+      rationale:
+        "The learner action is intentionally the event being investigated.",
+    };
+    const receipt = copy(fixture.receipt);
+    receipt.roles.evidenceProducer = receipt.roles.learner;
+
+    expect(
+      verifyScenarioEvidenceReceipt(receipt, manifest).roles.evidenceProducer,
+    ).toBe(receipt.roles.learner);
+  });
+
   it.each([
     ["01234567", "89ab", "4cde", "8fab", "0123456789ab"].join("-"),
     ["learner", "example.invalid"].join("@"),

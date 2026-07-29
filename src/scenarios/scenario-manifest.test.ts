@@ -9,6 +9,8 @@ import { AVD_THREE_VM_SCENARIO } from "./avd-three-vm";
 import { HELP_DESK_EMAIL_SCENARIO } from "./help-desk-email";
 import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon";
 import { PRIVATE_DOCUMENT_EVIDENCE_SCENARIO } from "./private-document-evidence";
+import { PURVIEW_AUDIT_BOUNDARY_SCENARIO } from "./purview-audit-boundary";
+import { SCENARIO_MANIFESTS } from "./scenarios";
 import { TEAMS_MISSED_CALL_SCENARIO } from "./teams-missed-call";
 
 const marker = "test-scenario-001";
@@ -50,6 +52,7 @@ const separatedScenario = {
     },
   ],
   trigger: { kind: "staged" },
+  detection: { kind: "none" },
   prerequisites: [
     {
       id: "fixed-identities",
@@ -228,6 +231,64 @@ describe("generalized scenario manifest contract", () => {
       })
     ).toThrowError(
       "independent detector and workload actor must differ",
+    );
+  });
+
+  it("fails closed when the learner is assigned as an independent detector", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        roles: {
+          ...separatedScenario.roles,
+          detector: "learner",
+        },
+        detection: { kind: "independent" },
+      })
+    ).toThrowError(
+      "independent detector and learner must differ",
+    );
+  });
+
+  it("classifies every runnable and receipt-facing canonical role boundary", () => {
+    const manifests = [
+      ...SCENARIO_MANIFESTS,
+      PURVIEW_AUDIT_BOUNDARY_SCENARIO,
+    ];
+
+    for (const manifest of manifests) {
+      const actorIds = new Set(manifest.actors.map(({ id }) => id));
+      expect(actorIds).toContain(manifest.roles.evidenceProducer);
+      expect(actorIds).toContain(manifest.roles.workloadActor);
+      expect(actorIds).toContain(manifest.roles.learner);
+      expect(manifest.roles.evidenceProducer).not.toBe(manifest.roles.learner);
+
+      if (manifest.detection?.kind === "independent") {
+        expect(manifest.roles.detector).toBeDefined();
+        expect(manifest.roles.detector).not.toBe(manifest.roles.workloadActor);
+        expect(manifest.roles.detector).not.toBe(manifest.roles.learner);
+      } else {
+        expect(manifest.roles.detector).toBeUndefined();
+      }
+      for (const response of manifest.responseActions) {
+        expect([
+          manifest.roles.learner,
+          manifest.roles.responder,
+        ]).toContain(response.ownerActorId);
+      }
+    }
+
+    const controlledHuman = TEAMS_MISSED_CALL_SCENARIO;
+    const learner = controlledHuman.actors.find(
+      ({ id }) => id === controlledHuman.roles.learner,
+    );
+    const observation = controlledHuman.evidence.artifacts[0]?.observation;
+    const observationOperation = controlledHuman.operations.find(
+      ({ key }) => key === observation?.operationKey,
+    );
+    expect(controlledHuman.detection).toEqual({ kind: "none" });
+    expect(learner?.kind).toBe("human");
+    expect(observationOperation?.ownerActorId).toBe(
+      controlledHuman.roles.learner,
     );
   });
 

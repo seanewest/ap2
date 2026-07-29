@@ -55,6 +55,7 @@ export const HELP_DESK_EMAIL_SCENARIO = parseScenarioManifest({
     },
   ],
   trigger: { kind: "staged" },
+  detection: { kind: "none" },
   prerequisites: [
     {
       id: "exact-kobe-cory-identities",

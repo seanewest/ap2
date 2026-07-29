@@ -483,6 +483,13 @@ describe("operation telemetry receipt adapter", () => {
       },
       {
         ...createContract,
+        roles: {
+          ...createContract.roles,
+          detector: createContract.roles.learner,
+        },
+      },
+      {
+        ...createContract,
         operations: [{
           ...createContract.operations[0],
           phase: "cleanup",
