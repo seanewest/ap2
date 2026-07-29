@@ -121,6 +121,65 @@ h2 {
   border-top: 1px solid #d4d8df;
 }
 
+.recent-operations {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1rem;
+  border: 1px solid #b9c9dc;
+  border-radius: 0.85rem;
+  background: #f7fafd;
+}
+
+.recent-operations-disclosure {
+  margin: 0;
+  color: #596579;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.operation-event-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.8rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operation-event {
+  padding: 0.85rem;
+  border-left: 0.3rem solid #6381a5;
+  border-radius: 0.6rem;
+  background: white;
+  box-shadow: 0 0.35rem 1rem rgb(35 47 68 / 7%);
+}
+
+.operation-event--succeeded {
+  border-left-color: #2f7d5a;
+}
+
+.operation-event--refused,
+.operation-event--ambiguous {
+  border-left-color: #aa5b1f;
+}
+
+.operation-event-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35rem 0.8rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.operation-event-details dt {
+  color: #667085;
+}
+
+.operation-event-details dd {
+  margin: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
 .scenario-plan {
   margin-top: 0.4rem;
   padding: 1rem;
@@ -155,5 +214,9 @@ h2 {
 
   .identity-list dd:not(:last-child) {
     margin-bottom: 0.5rem;
+  }
+
+  .operation-event-details {
+    grid-template-columns: 1fr;
   }
 }
