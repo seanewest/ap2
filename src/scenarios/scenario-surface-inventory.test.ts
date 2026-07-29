@@ -122,7 +122,7 @@ describe("canonical scenario surface inventory", () => {
       ({ scenarioId }) => scenarioId === "teams-missed-call-observation",
     )!;
     expect(teams.surfaces.adapter.status).toBe("implemented");
-    expect(teams.surfaces.rehearsal.status).toBe("missing");
+    expect(teams.surfaces.rehearsal.status).toBe("implemented");
 
     for (
       const row of first.scenarios.filter(

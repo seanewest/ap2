@@ -7,6 +7,7 @@ import { AVD_MANIFEST_ADAPTER_CAPABILITY } from "../../scripts/avd-three-vm-mani
 import { AVD_THREE_VM_REHEARSAL_CAPABILITY } from "../../scripts/avd-three-vm-rehearsal.ts";
 import { HELP_DESK_EMAIL_REHEARSAL_CAPABILITY } from "../../scripts/help-desk-email-rehearsal.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY } from "../../scripts/private-document-rehearsal.ts";
+import { TEAMS_MISSED_CALL_REHEARSAL_CAPABILITY } from "../../scripts/teams-missed-call-rehearsal.ts";
 import { SCENARIO_API_CLIENT_CAPABILITIES } from "../api/client.ts";
 import { SCENARIO_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
 import {
@@ -158,6 +159,7 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
   AVD_THREE_VM_REHEARSAL_CAPABILITY,
   HELP_DESK_EMAIL_REHEARSAL_CAPABILITY,
   PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY,
+  TEAMS_MISSED_CALL_REHEARSAL_CAPABILITY,
 ] as const satisfies readonly ScenarioSurfaceCapabilityDeclaration[];
 
 const AUTHORITATIVE_ADAPTER_DECLARATIONS = [
