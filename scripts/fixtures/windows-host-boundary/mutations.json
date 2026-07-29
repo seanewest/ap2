@@ -1,0 +1,122 @@
+[
+  {
+    "name": "windows executable with mixed case and separators",
+    "source": "const target = ['Tool', '.', 'EXE'].join(''); spawn(target);",
+    "category": "WINDOWS_EXECUTABLE_INVOCATION"
+  },
+  {
+    "name": "windows mount indirect execution",
+    "source": "const target = '/mnt/c/Users/shared/tool'; spawn(target);",
+    "category": "WINDOWS_MOUNT_EXECUTION"
+  },
+  {
+    "name": "wsl process bridge",
+    "source": "const bridge = process.env.WSL_INTEROP;",
+    "category": "WSL_PROCESS_BRIDGE"
+  },
+  {
+    "name": "generated windows shell",
+    "source": "const command = `power${'shell'}.exe`; exec(command);",
+    "category": "WINDOWS_SHELL_LAUNCH"
+  },
+  {
+    "name": "windows script host",
+    "source": "spawn('WScript' + '.exe', ['job']);",
+    "category": "WINDOWS_SHELL_LAUNCH"
+  },
+  {
+    "name": "bare windows command shell",
+    "source": "spawn('CmD', ['/c', 'task']);",
+    "category": "WINDOWS_SHELL_LAUNCH"
+  },
+  {
+    "name": "indirect environment windows command shell",
+    "source": "const shell = process.env.ComSpec; spawn(shell, ['/c', 'task']);",
+    "category": "WINDOWS_SHELL_LAUNCH"
+  },
+  {
+    "name": "generated indirect windows command shell",
+    "source": "const shell = ['c', 'md'].join(''); spawn(shell, ['/c', 'task']);",
+    "category": "WINDOWS_SHELL_LAUNCH"
+  },
+  {
+    "name": "windows app package launch",
+    "source": "exec('explorer' + '.exe shell:' + 'AppsFolder');",
+    "category": "WINDOWS_APP_PACKAGE_LAUNCH"
+  },
+  {
+    "name": "foreground window control",
+    "source": "binding.SetForeGroundWindow(handle);",
+    "category": "SHARED_HOST_GUI_CONTROL"
+  },
+  {
+    "name": "send keys input",
+    "source": "automation.SendKeys('{ENTER}');",
+    "category": "SHARED_HOST_INPUT_AUTOMATION"
+  },
+  {
+    "name": "cursor and mouse input",
+    "source": "native.SetCursorPos(x, y); native.mouse_event(1);",
+    "category": "SHARED_HOST_INPUT_AUTOMATION"
+  },
+  {
+    "name": "clipboard control",
+    "source": "exec('Get-' + 'Clipboard');",
+    "category": "SHARED_HOST_INPUT_AUTOMATION"
+  },
+  {
+    "name": "desktop clipboard command",
+    "source": "spawn('wl-' + 'paste');",
+    "category": "SHARED_HOST_INPUT_AUTOMATION"
+  },
+  {
+    "name": "desktop session capture",
+    "source": "capture.CopyFromScreen(bounds);",
+    "category": "SHARED_HOST_SESSION_CAPTURE"
+  },
+  {
+    "name": "store application protocol",
+    "source": "exec('MS-Windows-Store:' + '//home');",
+    "category": "WINDOWS_APP_PACKAGE_LAUNCH"
+  },
+  {
+    "name": "settings application protocol",
+    "source": "exec('start ms-settings:display');",
+    "category": "WINDOWS_APP_PACKAGE_LAUNCH"
+  },
+  {
+    "name": "python command shell",
+    "path": "tools/host-task.py",
+    "source": "import os; os.system('cmd /c task')",
+    "category": "WINDOWS_SHELL_LAUNCH"
+  },
+  {
+    "name": "python subprocess executable",
+    "path": "tools/host-task.py",
+    "source": "import subprocess; subprocess.run(['notepad.exe'])",
+    "category": "WINDOWS_EXECUTABLE_INVOCATION"
+  },
+  {
+    "name": "zx tagged windows mount command",
+    "source": "await $`/mnt/c/shared/tool`;",
+    "category": "WINDOWS_MOUNT_EXECUTION"
+  },
+  {
+    "name": "intrinsic powershell script surface",
+    "path": "tools/host-task.ps1",
+    "source": "Write-Output 'example'",
+    "category": "WINDOWS_SHELL_LAUNCH"
+  },
+  {
+    "name": "package command shell",
+    "path": "package.json",
+    "source": "{\"scripts\":{\"unsafe\":\"cmd /c task\"}}",
+    "category": "WINDOWS_SHELL_LAUNCH"
+  },
+  {
+    "name": "package windows script launch",
+    "path": "package.json",
+    "source": "{\"scripts\":{\"unsafe\":\"tools/host-task.ps1\"}}",
+    "category": "WINDOWS_SHELL_LAUNCH"
+  }
+]
