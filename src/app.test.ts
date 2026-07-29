@@ -18,6 +18,7 @@ import {
   OneDriveInviteFailureError,
   OauthApplicationReconRehearsalVerificationClientError,
   PrivateDocumentRehearsalVerificationClientError,
+  PurviewAuditBoundaryRehearsalVerificationClientError,
   RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
@@ -50,6 +51,9 @@ import {
 import {
   parseOauthApplicationReconRehearsalVerificationRequest,
 } from "./api/oauth-application-recon-rehearsal-verification-contract";
+import {
+  parsePurviewAuditBoundaryRehearsalVerificationRequest,
+} from "./api/purview-audit-boundary-rehearsal-verification-contract";
 import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
 import { CANONICAL_RECEIPT_FIXTURES } from "./scenarios/scenario-evidence-receipt.fixtures";
 import { verifyCanonicalScenarioEvidenceReceipt } from "./scenarios/scenario-evidence-verification";
@@ -70,6 +74,9 @@ import {
 import {
   verifyOauthApplicationReconRehearsalOutput,
 } from "../scripts/verify-oauth-application-recon-rehearsal-output";
+import {
+  verifyPurviewAuditBoundaryRehearsalOutput,
+} from "../scripts/verify-purview-audit-boundary-rehearsal-output";
 
 const privateDocumentRehearsalOutput =
   parsePrivateDocumentRehearsalVerificationRequest(JSON.parse(readFileSync(
@@ -104,6 +111,17 @@ const oauthApplicationReconRehearsalOutput =
 const oauthApplicationReconRehearsalSummary =
   verifyOauthApplicationReconRehearsalOutput(
     oauthApplicationReconRehearsalOutput,
+  );
+const purviewAuditBoundaryRehearsalOutput =
+  parsePurviewAuditBoundaryRehearsalVerificationRequest(
+    JSON.parse(readFileSync(
+      resolve("scripts/fixtures/purview-audit-boundary-rehearsal-output.json"),
+      "utf8",
+    )) as unknown,
+  );
+const purviewAuditBoundaryRehearsalSummary =
+  verifyPurviewAuditBoundaryRehearsalOutput(
+    purviewAuditBoundaryRehearsalOutput,
   );
 
 const account: AccountIdentity = {
@@ -150,6 +168,12 @@ class FakeApi implements AfterPartyApi {
     vi.fn<NonNullable<AfterPartyApi["verifyTeamsMissedCallRehearsalOutput"]>>();
   verifyOauthApplicationReconRehearsalOutput =
     vi.fn<AfterPartyApi["verifyOauthApplicationReconRehearsalOutput"]>();
+  verifyPurviewAuditBoundaryRehearsalOutput =
+    vi.fn<
+      NonNullable<
+        AfterPartyApi["verifyPurviewAuditBoundaryRehearsalOutput"]
+      >
+    >();
   calculateMultiScenarioFeasibility =
     vi.fn<AfterPartyApi["calculateMultiScenarioFeasibility"]>();
   getRecentOperationEvents =
@@ -2443,6 +2467,148 @@ describe("After Party authentication UI", () => {
       expect(panel.textContent).not.toContain(failure.message);
       expect(
         api.verifyOauthApplicationReconRehearsalOutput,
+      ).toHaveBeenCalledTimes(reachesApi ? 1 : 0);
+    },
+  );
+
+  it("verifies Purview audit-boundary output only after explicit signed submission", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.verifyPurviewAuditBoundaryRehearsalOutput.mockResolvedValue(
+      purviewAuditBoundaryRehearsalSummary,
+    );
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".purview-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify(purviewAuditBoundaryRehearsalOutput);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyPurviewAuditBoundaryRehearsalOutput).not.toHaveBeenCalled();
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.verifyPurviewAuditBoundaryRehearsalOutput).toHaveBeenCalledWith(
+      "temporary-token",
+      purviewAuditBoundaryRehearsalOutput,
+    );
+    expect(panel.textContent).toContain("Network-free contract verified");
+    expect(panel.textContent).not.toContain("temporary-token");
+    expect(panel.textContent).not.toContain(
+      purviewAuditBoundaryRehearsalSummary.planDigestSha256,
+    );
+  });
+
+  it("refuses unsafe Purview audit-boundary output before authorization", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".purview-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify({
+      ...purviewAuditBoundaryRehearsalOutput,
+      unsafe: ["operator", "example.invalid"].join("@"),
+    });
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+
+    expect(panel.textContent).toContain("Local validation failed");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyPurviewAuditBoundaryRehearsalOutput).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new AccessTokenError("raw expired session detail"),
+      "operator session expired",
+      false,
+    ],
+    [
+      new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "unauthorized",
+      ),
+      "operator session expired",
+      true,
+    ],
+    [
+      new PurviewAuditBoundaryRehearsalVerificationClientError("forbidden"),
+      "not authorized",
+      true,
+    ],
+    [
+      new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "validation-refused",
+        "OUTPUT_BINDING",
+      ),
+      "inconsistent or tampered",
+      true,
+    ],
+    [
+      new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "request-too-large",
+      ),
+      "request-size limit",
+      true,
+    ],
+    [
+      new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "response-too-large",
+      ),
+      "response-size limit",
+      true,
+    ],
+    [
+      new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "safe-failure",
+      ),
+      "verification is unavailable",
+      true,
+    ],
+  ] as const)(
+    "maps typed Purview audit-boundary failure without rendering detail",
+    async (failure, message, reachesApi) => {
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      authentication.acquireAccessToken.mockImplementation(async () => {
+        if (!reachesApi) throw failure;
+        return "temporary-token";
+      });
+      if (reachesApi) {
+        api.verifyPurviewAuditBoundaryRehearsalOutput.mockRejectedValue(
+          failure,
+        );
+      }
+      await createAfterPartyApp(root, authentication, api).start();
+      const panel = root.querySelector<HTMLElement>(
+        ".purview-rehearsal-verification",
+      )!;
+      const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+      input.value = JSON.stringify(purviewAuditBoundaryRehearsalOutput);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+      await nextTask();
+
+      expect(panel.textContent).toContain(message);
+      expect(panel.textContent).not.toContain(failure.message);
+      expect(
+        api.verifyPurviewAuditBoundaryRehearsalOutput,
       ).toHaveBeenCalledTimes(reachesApi ? 1 : 0);
     },
   );

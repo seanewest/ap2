@@ -22,6 +22,7 @@ import {
   OneDriveInviteFailureError,
   OauthApplicationReconRehearsalVerificationClientError,
   PrivateDocumentRehearsalVerificationClientError,
+  PurviewAuditBoundaryRehearsalVerificationClientError,
   RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
@@ -52,6 +53,9 @@ import {
 import {
   isBoundedOauthApplicationReconRehearsalRequest,
 } from "./api/oauth-application-recon-rehearsal-verification-contract";
+import {
+  isBoundedPurviewAuditBoundaryRehearsalRequest,
+} from "./api/purview-audit-boundary-rehearsal-verification-contract";
 import {
   FIXED_PROOF_BY_ID,
   bindFixedProofActions,
@@ -108,6 +112,11 @@ import {
   type OauthApplicationReconRehearsalPanelClient,
   type OauthApplicationReconRehearsalPanelFailure,
 } from "./scenarios/oauth-application-recon-rehearsal-verification-panel";
+import {
+  createPurviewAuditBoundaryRehearsalVerificationPanel,
+  type PurviewAuditBoundaryRehearsalPanelClient,
+  type PurviewAuditBoundaryRehearsalPanelFailure,
+} from "./scenarios/purview-audit-boundary-rehearsal-verification-panel";
 import {
   createScenarioEvidenceVerificationPanel,
   type ScenarioEvidenceVerificationFailure,
@@ -302,6 +311,27 @@ export function createAfterPartyApp(
         );
       },
       classifyError: classifyOauthApplicationReconRehearsalFailure,
+    };
+  const purviewAuditBoundaryRehearsalVerificationClient:
+    PurviewAuditBoundaryRehearsalPanelClient = {
+      parse: (value) =>
+        isBoundedPurviewAuditBoundaryRehearsalRequest(value)
+          ? value
+          : undefined,
+      verify: async (output) => {
+        const accessToken =
+          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+        if (!api.verifyPurviewAuditBoundaryRehearsalOutput) {
+          throw new PurviewAuditBoundaryRehearsalVerificationClientError(
+            "safe-failure",
+          );
+        }
+        return await api.verifyPurviewAuditBoundaryRehearsalOutput(
+          accessToken,
+          output,
+        );
+      },
+      classifyError: classifyPurviewAuditBoundaryRehearsalFailure,
     };
   const batchFeasibilityClient: BatchFeasibilityPanelClient = {
     evaluate: async (request) => {
@@ -879,6 +909,7 @@ export function createAfterPartyApp(
         helpDeskRehearsalVerificationClient,
         teamsRehearsalVerificationClient,
         oauthApplicationReconRehearsalVerificationClient,
+        purviewAuditBoundaryRehearsalVerificationClient,
         batchFeasibilityClient,
       ),
     );
@@ -984,6 +1015,8 @@ function createShell(
   teamsRehearsalVerificationClient: TeamsRehearsalPanelClient,
   oauthApplicationReconRehearsalVerificationClient:
     OauthApplicationReconRehearsalPanelClient,
+  purviewAuditBoundaryRehearsalVerificationClient:
+    PurviewAuditBoundaryRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const shell = document.createElement("main");
@@ -1014,6 +1047,7 @@ function createShell(
       helpDeskRehearsalVerificationClient,
       teamsRehearsalVerificationClient,
       oauthApplicationReconRehearsalVerificationClient,
+      purviewAuditBoundaryRehearsalVerificationClient,
       batchFeasibilityClient,
     ),
   );
@@ -1033,6 +1067,8 @@ function createStatePanel(
   teamsRehearsalVerificationClient: TeamsRehearsalPanelClient,
   oauthApplicationReconRehearsalVerificationClient:
     OauthApplicationReconRehearsalPanelClient,
+  purviewAuditBoundaryRehearsalVerificationClient:
+    PurviewAuditBoundaryRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const panel = document.createElement("section");
@@ -1142,6 +1178,13 @@ function createStatePanel(
           () =>
             createOauthApplicationReconRehearsalVerificationPanel({
               client: oauthApplicationReconRehearsalVerificationClient,
+            }),
+        ),
+        createPanelBoundary(
+          "Purview audit-boundary rehearsal verification",
+          () =>
+            createPurviewAuditBoundaryRehearsalVerificationPanel({
+              client: purviewAuditBoundaryRehearsalVerificationClient,
             }),
         ),
         createButton("Sign out", "sign-out", "secondary"),
@@ -1377,6 +1420,33 @@ function classifyOauthApplicationReconRehearsalFailure(
   }
   if (
     !(error instanceof OauthApplicationReconRehearsalVerificationClientError)
+  ) {
+    return "unavailable";
+  }
+  switch (error.category) {
+    case "unauthorized":
+      return "session-expired";
+    case "forbidden":
+      return "unauthorized";
+    case "validation-refused":
+      return "verification-refused";
+    case "request-too-large":
+      return "request-too-large";
+    case "response-too-large":
+      return "response-too-large";
+    case "safe-failure":
+      return "unavailable";
+  }
+}
+
+function classifyPurviewAuditBoundaryRehearsalFailure(
+  error: unknown,
+): PurviewAuditBoundaryRehearsalPanelFailure {
+  if (error instanceof AccessTokenError) {
+    return "session-expired";
+  }
+  if (
+    !(error instanceof PurviewAuditBoundaryRehearsalVerificationClientError)
   ) {
     return "unavailable";
   }

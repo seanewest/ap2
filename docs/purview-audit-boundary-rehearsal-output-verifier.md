@@ -17,6 +17,21 @@ fixed safe summary to stdout. Refusal writes one categorical failure to stderr
 and exits nonzero. Neither path echoes the input path or arbitrary input
 values.
 
+## Manual operator panel
+
+The signed-in SPA includes a manual-only Purview audit-boundary rehearsal
+verification panel. It validates the exact bounded envelope locally before
+requesting an operator access token, then calls only the typed authenticated
+verification client when the operator deliberately selects **Verify Purview
+rehearsal**. The panel renders only the fixed safe summary or categorical
+authorization, refusal, size, and unavailable states.
+
+Editing input suppresses a stale pending result, and a pending request blocks
+duplicate submission. The panel does not invoke a rehearsal, submit or read an
+audit search, call Graph or Purview directly, persist input, retry, poll, or
+schedule work. A service shutdown is therefore a fixed unavailable result and
+never an automatic retry.
+
 ## Independent verification
 
 The verifier independently recompiles the dedicated canonical zero-cost
