@@ -111,19 +111,22 @@ they are not additional tenant capabilities.
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
   deleted-policy history.
 - The dedicated Teams Call Canary made its sole authorized audio-only create
-  attempt for Cory, but Microsoft Graph returned a definitive `4xx` before
-  assigning a call identity. No incoming call, callback, or hang-up occurred,
-  so Teams calling is not a proven capability. The retained response class does
-  not establish a root cause. A follow-up contract check found that the prior
-  body already matches Microsoft's current one-target service-hosted example;
+  attempt retained only a `4xx` class. A separately authorized unanswered
+  follow-up then made exactly one create attempt with the corrected diagnostic
+  image. Microsoft Graph definitively returned HTTP `403`, error code `7505`,
+  and `Request authorization tenant mismatch.` before assigning a call
+  identity. No incoming or missed-call UI event, callback, voicemail route, or
+  hang-up occurred, so Teams calling remains unproven. The visible token,
+  application, service principal, Azure Bot, and Cory target tenant bindings
+  were exact; the underlying platform or registration cause is not yet proven.
+  The request matches Microsoft's current one-target service-hosted example;
   the proposed `direction`, `subject`, `source`, and audio-group additions
-  belong to the group-call example. Future failures can retain bounded,
-  sanitized status/error/correlation evidence. The service is on one healthy,
-  exact call-disabled diagnostic replica with literal
+  belong to the group-call example. The service is on one healthy,
+  exact call-disabled replica with literal
   `TEAMS_CALLING_BOT_RUN_CANARY=false`; its application, sole
   `Calls.Initiate.All` grant, fixed Cory installation, protected certificate,
   disabled revisions, exclusive reduced journal, and platform history remain
-  for a separately authorized canary or cleanup.
+  for separately authorized diagnosis or cleanup.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted

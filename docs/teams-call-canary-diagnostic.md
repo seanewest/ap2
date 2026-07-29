@@ -105,3 +105,31 @@ required to make the missed-call learning claim.
 Voicemail is a different experiment. It needs a separately authorized window
 longer than Cory's proven 20-second unanswered delay and a prompt plan; it must
 not be inferred from the 15-second canary.
+
+## Missed-call canary result
+
+Sean gave a fresh `GO` on 2026-07-28 while signed into Teams as Cory and
+deliberately did not answer or dismiss. The one authorized create request used
+the request documented above. Microsoft Graph definitively returned HTTP `403`,
+error code `7505`, and the sanitized message `Request authorization tenant
+mismatch.` before assigning a call identity.
+
+No call, incoming or missed-call UI event, callback, voicemail route, or
+hang-up existed. Sean therefore had no UI observation to provide. The exact
+Microsoft request correlation is retained only in protected evidence.
+
+The result proves that Graph's communications service classified this request
+as a tenant-authorization mismatch. It does not yet prove which hidden
+registration or service condition produced that classification: the token,
+application, service principal, Azure Bot, and Cory target all exposed the same
+verified tenant ID, and current Azure Bot documentation supports single-tenant
+bot identities. The earlier missing-group-fields hypothesis is not supported
+by either the current contract or this response.
+
+The service recovered to
+`ca-ap2-call-18f4cc8ae5--disabled-020613`, one healthy replica with literal
+`TEAMS_CALLING_BOT_RUN_CANARY=false`. The journal records one create attempt,
+zero callbacks, and zero hang-ups. No second call is authorized. A future
+Graph-bot attempt should require a new diagnosis of the platform's tenant
+authorization binding and a new explicit GO; broadening permissions or
+changing to a group-call body would not follow from this result.
