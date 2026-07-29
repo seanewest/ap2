@@ -4,6 +4,10 @@ This audit covers every authenticated manual-only operator panel in the local
 SPA. It runs through the signed Linux-headless product path and makes no tenant,
 cloud, workload, or Windows-host request.
 
+Synchronous construction, fixed failure, and cross-panel containment are
+covered by the separate
+[operator panel failure-isolation audit](operator-panel-failure-isolation-audit.md).
+
 | Panel | Deliberate action | Measured interaction boundary |
 | --- | --- | --- |
 | Recent operations | Refresh recent operations | No automatic read, named region/action, disabled and busy loading state, fixed safe failures |

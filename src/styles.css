@@ -188,6 +188,18 @@ h2 {
   background: #f6f9fd;
 }
 
+.panel-render-failure {
+  padding: 1rem;
+  border: 1px solid #d8b7b7;
+  border-left: 0.3rem solid #a33a3a;
+  border-radius: 0.75rem;
+  background: #fff8f8;
+}
+
+.panel-render-failure h2 {
+  margin-top: 0;
+}
+
 .scenario-catalog {
   display: grid;
   gap: 1rem;
