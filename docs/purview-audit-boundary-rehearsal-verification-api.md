@@ -49,5 +49,5 @@ npm run test:purview-audit-boundary-rehearsal-container
 ```
 
 This receipt-facing Purview boundary remains outside the runnable operator
-scenario registry, so the endpoint does not add a UI or scenario-execution
-surface.
+scenario registry. Its manual verification panel exposes only this pure typed
+client and does not add a scenario-execution surface.
