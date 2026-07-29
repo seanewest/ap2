@@ -80,13 +80,17 @@ Kobe's settings enable only the fixed, clearly labeled Kobe-to-Cory help-desk
 email fallback. The public client must already allow the exact
 `http://localhost/ap2-simulated-user-callback` redirect and have consent for
 delegated `User.Read` and `Mail.Send`. Homer must already have working Student
-CBA. The container needs outbound access to Microsoft login, certificate
-authentication, and Graph endpoints. This application work does not create
-consent, identity, certificate, or tenant configuration.
+CBA for the original simulated email; Kobe must have working Student CBA for
+the help-desk fallback. The container needs outbound access to Microsoft
+login, certificate authentication, and Graph endpoints. This application work
+does not create consent, identity, certificate, or tenant configuration.
 
 The disposable rehearsal assumes one controlled click against one API replica.
-It does not claim exactly-once delivery across callers, replicas, or restarts,
-and intentionally adds no job or durable idempotency system.
+The `/api/help-desk-scenario` operation consumes a singleton process-local
+attempt before authentication or Graph, so success, refusal, and ambiguous
+failure cannot be retried on that replica. It does not claim exactly-once
+delivery across replicas or restarts, and intentionally adds no job or durable
+idempotency system.
 
 ## OneDrive share proof
 
