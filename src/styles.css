@@ -243,6 +243,15 @@ h2 {
   outline-offset: 0.2rem;
 }
 
+.scenario-catalog-plan-link {
+  margin-top: 0.8rem;
+}
+
+.scenario-catalog-plan-link:focus-visible {
+  outline: 0.2rem solid #86aee0;
+  outline-offset: 0.2rem;
+}
+
 .scenario-catalog-details {
   display: grid;
   gap: 1rem;

@@ -87,6 +87,13 @@ gates, setup/cleanup/retention, expiry, cost ceiling, and current
 limitations. Canonical IDs, operation keys, markers, proof references, and raw
 payloads are not rendered.
 
+Each card can populate the existing plan-preview form with that exact
+in-memory canonical scenario and schema version. This is a local navigation
+action only: it resets the form to registry-derived aliases, budget, expiry,
+and response choices, clears any stale result, and moves focus to the scenario
+selector. It does not authenticate, call the planning API, or perform work.
+Only the separate `Preview plan` action may make one planning request.
+
 The separate Purview audit capability is labeled as a read-only boundary, not
 invented as a fifth registry scenario or treated as an execution receipt.
 Application reconnaissance retains its narrower registry claim: the workload

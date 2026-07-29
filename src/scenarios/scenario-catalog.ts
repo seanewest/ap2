@@ -6,8 +6,18 @@ import {
   type ScenarioManifest,
 } from "./scenario-manifest";
 
+export interface ScenarioCatalogSelection {
+  scenarioId: string;
+  schemaVersion: ScenarioManifest["schemaVersion"];
+}
+
+export interface ScenarioCatalogOptions {
+  onPlanPreview?: (selection: ScenarioCatalogSelection) => void;
+}
+
 export function createScenarioCatalog(
   registry: readonly unknown[],
+  options: ScenarioCatalogOptions = {},
 ): HTMLElement {
   const section = document.createElement("section");
   section.className = "scenario-catalog";
@@ -32,8 +42,10 @@ export function createScenarioCatalog(
     }
     const cards = document.createElement("div");
     cards.className = "scenario-catalog-cards";
-    for (const manifest of manifests) {
-      cards.append(createScenarioCard(manifest));
+    for (const [index, manifest] of manifests.entries()) {
+      cards.append(
+        createScenarioCard(manifest, index, options.onPlanPreview),
+      );
     }
     section.append(cards);
   } catch {
@@ -60,7 +72,11 @@ function createPurviewBoundary(): HTMLElement {
   return boundary;
 }
 
-function createScenarioCard(manifest: ScenarioManifest): HTMLElement {
+function createScenarioCard(
+  manifest: ScenarioManifest,
+  index: number,
+  onPlanPreview?: (selection: ScenarioCatalogSelection) => void,
+): HTMLElement {
   const card = document.createElement("article");
   card.className = "scenario-catalog-card";
 
@@ -68,12 +84,31 @@ function createScenarioCard(manifest: ScenarioManifest): HTMLElement {
   heading.textContent = manifest.title;
   const purpose = document.createElement("p");
   purpose.className = "scenario-catalog-purpose";
+  purpose.id = `scenario-catalog-purpose-${index + 1}`;
   purpose.textContent = manifest.summary;
   const details = document.createElement("details");
   const summary = document.createElement("summary");
   summary.textContent = "View catalog details";
   details.append(summary, createScenarioDetails(manifest));
   card.append(heading, purpose, details);
+  if (onPlanPreview) {
+    const preview = document.createElement("button");
+    preview.type = "button";
+    preview.className = "scenario-catalog-plan-link secondary";
+    preview.textContent = "Use in plan preview";
+    preview.setAttribute(
+      "aria-label",
+      `Use ${manifest.title} in plan preview`,
+    );
+    preview.setAttribute("aria-describedby", purpose.id);
+    preview.addEventListener("click", () => {
+      onPlanPreview({
+        scenarioId: manifest.id,
+        schemaVersion: manifest.schemaVersion,
+      });
+    });
+    card.append(preview);
+  }
   return card;
 }
 
