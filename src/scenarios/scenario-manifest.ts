@@ -32,6 +32,7 @@ export interface ScenarioRoleAssignments {
   evidenceProducer: string;
   workloadActor: string;
   learner: string;
+  detector?: string;
   responder?: string;
 }
 
@@ -45,6 +46,10 @@ export type ScenarioTrigger =
   | { kind: "staged" }
   | { kind: "self-triggered"; rationale: string };
 
+export type ScenarioDetection =
+  | { kind: "none" }
+  | { kind: "independent" };
+
 export interface ScenarioManifest {
   schemaVersion: 1;
   id: string;
@@ -54,6 +59,7 @@ export interface ScenarioManifest {
   roles: ScenarioRoleAssignments;
   authentication: readonly ScenarioAuthentication[];
   trigger: ScenarioTrigger;
+  detection?: ScenarioDetection;
   evidence: {
     staging: string;
     learnerReceives: string;
@@ -97,6 +103,9 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
     ),
     workloadActor: text(rolesValue.workloadActor, "roles.workloadActor"),
     learner: text(rolesValue.learner, "roles.learner"),
+    ...(rolesValue.detector === undefined
+      ? {}
+      : { detector: text(rolesValue.detector, "roles.detector") }),
     ...(rolesValue.responder === undefined
       ? {}
       : { responder: text(rolesValue.responder, "roles.responder") }),
@@ -120,6 +129,26 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
   if (!selfConflated && trigger.kind === "self-triggered") {
     throw new ScenarioManifestError(
       "self-triggered requires the evidence producer to be the learner.",
+    );
+  }
+
+  const detection = parseDetection(manifest.detection);
+  if (detection.kind === "independent" && !roles.detector) {
+    throw new ScenarioManifestError(
+      "roles.detector is required when detection.kind is independent.",
+    );
+  }
+  if (
+    detection.kind === "independent" &&
+    roles.detector === roles.workloadActor
+  ) {
+    throw new ScenarioManifestError(
+      "independent detector and workload actor must differ.",
+    );
+  }
+  if (detection.kind === "none" && roles.detector) {
+    throw new ScenarioManifestError(
+      "roles.detector requires detection.kind to be independent.",
     );
   }
 
@@ -164,6 +193,7 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
     roles,
     authentication,
     trigger,
+    detection,
     evidence: {
       staging: text(evidenceValue.staging, "evidence.staging"),
       learnerReceives: text(
@@ -220,6 +250,13 @@ export function createScenarioPlan(value: unknown): HTMLElement {
   );
   appendIdentity(
     roles,
+    "Detector / observer",
+    manifest.detection?.kind === "independent" && manifest.roles.detector
+      ? actorLabel(manifest.roles.detector)
+      : "Not assigned; no independent detection claim",
+  );
+  appendIdentity(
+    roles,
     "Responder",
     manifest.roles.responder
       ? actorLabel(manifest.roles.responder)
@@ -272,6 +309,19 @@ function parseTrigger(value: Record<string, unknown>): ScenarioTrigger {
   }
   throw new ScenarioManifestError(
     "trigger.kind must be staged or self-triggered.",
+  );
+}
+
+function parseDetection(value: unknown): ScenarioDetection {
+  if (value === undefined) {
+    return { kind: "none" };
+  }
+  const detection = record(value, "detection");
+  if (detection.kind === "none" || detection.kind === "independent") {
+    return { kind: detection.kind };
+  }
+  throw new ScenarioManifestError(
+    "detection.kind must be none or independent.",
   );
 }
 

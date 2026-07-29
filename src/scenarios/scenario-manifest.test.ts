@@ -5,6 +5,7 @@ import {
   ScenarioManifestError,
   type ScenarioManifest,
 } from "./scenario-manifest";
+import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon";
 import { TEAMS_MISSED_CALL_SCENARIO } from "./teams-missed-call";
 
 const separatedScenario = {
@@ -123,6 +124,36 @@ describe("scenario manifest role contract", () => {
     );
   });
 
+  it("requires a typed detector for an independent-detection claim", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        detection: { kind: "independent" },
+      })
+    ).toThrowError(
+      new ScenarioManifestError(
+        "roles.detector is required when detection.kind is independent.",
+      ),
+    );
+  });
+
+  it("fails closed on detector and workload-actor conflation", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        roles: {
+          ...separatedScenario.roles,
+          detector: "workload",
+        },
+        detection: { kind: "independent" },
+      })
+    ).toThrowError(
+      new ScenarioManifestError(
+        "independent detector and workload actor must differ.",
+      ),
+    );
+  });
+
   it("rejects an unexplained self-trigger exception", () => {
     expect(() =>
       parseScenarioManifest({
@@ -162,6 +193,38 @@ describe("scenario manifest role contract", () => {
     );
     expect(panel.textContent).toContain(
       "Authentication — Kobe lab userKobe's licensed lab Teams client session",
+    );
+    expect(panel.textContent).not.toContain("credential");
+    expect(panel.textContent).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
+  });
+
+  it("presents the reconnaissance workload and detector as separate apps", () => {
+    const panel = createScenarioPlan(OAUTH_APPLICATION_RECON_SCENARIO);
+
+    expect(panel.dataset.scenarioId).toBe(
+      "oauth-application-reconnaissance",
+    );
+    expect(panel.textContent).toContain(
+      "Workload actorReconnaissance workload application",
+    );
+    expect(panel.textContent).toContain(
+      "Detector / observerIndependent audit observer application",
+    );
+    expect(panel.textContent).toContain(
+      "Authentication — Independent audit observer application" +
+        "A separate application-only session with bounded audit-read authority",
+    );
+    expect(panel.textContent).toContain(
+      "What the learner receivesCounts and reachability for the four checks",
+    );
+    expect(OAUTH_APPLICATION_RECON_SCENARIO.detection).toEqual({
+      kind: "independent",
+    });
+    expect(OAUTH_APPLICATION_RECON_SCENARIO.roles.detector).toBe(
+      "audit-observer-app",
+    );
+    expect(OAUTH_APPLICATION_RECON_SCENARIO.roles.detector).not.toBe(
+      OAUTH_APPLICATION_RECON_SCENARIO.roles.workloadActor,
     );
     expect(panel.textContent).not.toContain("credential");
     expect(panel.textContent).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);

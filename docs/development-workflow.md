@@ -17,6 +17,13 @@ product. A successful Dev canary proves the Microsoft operation and response
 shape. It does not prove that the deployed API has the correct identity,
 permission, configuration, or route.
 
+When a scenario claims an independent detection or audit observation, the
+observer must authenticate as a different application identity from the
+workload actor. Authentication transport remains a separate field: two
+application-only sessions are not independent when they resolve to the same
+client. Environment-validation canaries may reuse a diagnostic identity only
+when they make no learner-scenario or independent-detector claim.
+
 For Azure or another platform, apply the same principle: use the identity that
 matches the behavior being tested. A development identity can prove a platform
 contract, but it does not prove that the eventual product identity or learner
@@ -33,6 +40,8 @@ learner scenario. Every source-backed staged scenario must explicitly assign:
   that performs the underlying operation;
 - **learner/observer** — the person expected to receive, inspect, and interpret
   the evidence; and
+- **detector/observer** — required when the scenario claims an independent
+  audit or detection result, and distinct from the workload actor; and
 - **responder** — the optional actor authorized to remediate after
   interpretation.
 
@@ -40,6 +49,8 @@ The scenario manifest fails closed when the evidence producer and learner
 resolve to the same actor. A scenario may make them the same only by declaring
 an explicit `self-triggered` exercise with a non-empty rationale explaining why
 the learner action is intentionally the event under investigation.
+An `independent` detection claim additionally requires an explicit detector
+role and fails closed when that role resolves to the workload actor.
 
 Actor identity and authentication transport are separate fields. For example,
 Kobe is the workload actor while a licensed Teams client session is the
