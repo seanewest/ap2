@@ -110,8 +110,8 @@ they are not additional tenant capabilities.
 - **Cleanup means no active AP2 artifact or effect.** It does not erase
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
   deleted-policy history.
-- The dedicated Teams Call Canary made its sole authorized audio-only create
-  attempt retained only a `4xx` class. A separately authorized unanswered
+- The dedicated Teams Call Canary's first authorized audio-only create attempt
+  retained only a `4xx` class. A separately authorized unanswered
   follow-up then made exactly one create attempt with the corrected diagnostic
   image. Microsoft Graph definitively returned HTTP `403`, error code `7505`,
   and `Request authorization tenant mismatch.` before assigning a call
