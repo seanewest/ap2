@@ -270,8 +270,8 @@ sign-in, API-access, and sign-out buttons and exposes no token.
 
 The SPA uses MSAL's tab-scoped `sessionStorage`, the supported cache for
 redirect sign-in. It does not use durable `localStorage`; closing the tab ends
-the browser-held session. A same-tab reload may restore the active account
-until explicit sign-out or tab close.
+that tab's MSAL cache, not the wider Entra SSO session. A same-tab reload may
+restore the active account, while explicit sign-out performs logout navigation.
 For one active account, concurrent requests for the exact same scopes share one
 in-flight silent acquisition. A different concurrent scope is refused instead
 of starting another interaction.
