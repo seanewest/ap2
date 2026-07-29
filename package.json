@@ -29,6 +29,7 @@
     "rehearse:help-desk-email": "node scripts/run-help-desk-email-rehearsal.ts",
     "rehearse:oauth-app-recon": "node scripts/run-oauth-application-recon-rehearsal.ts",
     "rehearse:private-document": "node scripts/run-private-document-rehearsal.ts",
+    "rehearse:purview-audit-boundary": "node scripts/run-purview-audit-boundary-rehearsal.ts",
     "rehearse:teams-missed-call": "node scripts/run-teams-missed-call-rehearsal.ts",
     "report:codex": "node scripts/codex-session-report.ts",
     "test:e2e:cba": "playwright test --config playwright.cba.config.ts",

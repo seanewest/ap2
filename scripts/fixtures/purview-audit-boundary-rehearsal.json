@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "label": "REHEARSAL_ONLY",
+  "scenarioId": "purview-sharepoint-audit-boundary",
+  "planDigestSha256": "8332f86c4f6db90697287c12ccfd603165eb383226a25511ccee3df5028e195c",
+  "syntheticInputDigestSha256": "87dc4bae807c8fbb77655a46f833669bdef074dc14f1c797fae4997423d10076"
+}
