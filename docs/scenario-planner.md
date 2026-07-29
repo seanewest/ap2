@@ -6,6 +6,11 @@ it does not execute setup, evidence, learner, response, cleanup, tenant, cloud,
 mail, Teams, or deployment operations. A successful plan is not proof that any
 external operation occurred.
 
+The separate network-free
+[scenario contract compatibility check](scenario-contract-compatibility.md)
+compiles every canonical manifest and compares its sanitized output with the
+receipt and applicable adapter contracts. It never executes the plan.
+
 The compiler accepts only:
 
 - one scenario ID from the canonical registry;
