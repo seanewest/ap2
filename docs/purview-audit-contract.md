@@ -137,6 +137,44 @@ the tenant's application-only endpoint availability, not least-privilege
 deployment readiness. Replacing the broad diagnostic role requires separate
 grant/revoke authority and is not part of this contract discovery.
 
+## Permission migration and revocation readiness
+
+The retained diagnostic detector currently has exactly one
+`AuditLogsQuery.Read.All` assignment
+(`5e1e9171-754d-478c-812c-f1755a9a4c2d`) and no
+`AuditLogsQuery-SharePoint.Read.All` assignment. The repository readiness
+planner already requires only the narrow role, but three protected live
+readiness consumers still require the retained broad role: the exact
+preflight, one-shot search runner, and retained-query reconciler. None is a
+product runtime or hosted workflow.
+
+`src/audit/purview-audit-permission-migration.ts` is a pure, non-mutating
+readiness verifier for a future separately authorized migration. It refuses
+revocation readiness unless:
+
+- the expected and observed detector application and service-principal IDs
+  match exactly;
+- the broad and narrow Graph application-role assignments each exist exactly
+  once, with the narrow assignment itself serving as administrator-consent
+  evidence;
+- the repository planner and all three protected readiness consumers are
+  classified as migrated to the SharePoint-only role;
+- no marked audit run is active and unknown run state fails closed;
+- an independent recovery administrator, exact grant/revoke reconciliation,
+  and exact broad-role regrant rollback are confirmed; and
+- a **new token acquired after confirmed revocation** is planned to prove the
+  narrow role present and broad role absent. A cached token can never prove
+  post-revocation absence.
+
+The frozen order is overlap first, migrate every consumer, reconfirm no active
+marked run, revoke only the exact broad assignment once, reconcile an
+ambiguous delete by reading assignment absence without blind replay, and then
+acquire a fresh token. If the fresh-token or SharePoint readiness check fails,
+the independent administrator may regrant the exact broad role to the exact
+detector service principal once, reading for exactly one matching assignment
+before any retry. The verifier performs none of these mutations and does not
+authorize them.
+
 Both the unique-keyword query and the separately reviewed exact-object-path
 correction later reached terminal `succeeded`. One fresh `$top=10` page from
 each returned two records without a next link. The pages contained the same two
