@@ -229,9 +229,13 @@ function verifyProductionImageContract(): Record<string, unknown> {
   const expectedProvenance = createApiContainerProvenance(process.cwd());
   const expectedProvenanceSummary = {
     baseImage: expectedProvenance.baseImage.reference,
+    baseConfigDigest: expectedProvenance.baseImage.configDigest,
     baseIndexDigest: expectedProvenance.baseImage.indexDigest,
+    baseLayerDescriptorsDigest:
+      expectedProvenance.baseImage.layerDescriptorsDigest,
     baseManifestDigest: expectedProvenance.baseImage.manifestDigest,
     basePlatform: expectedProvenance.baseImage.platform,
+    baseRootfsDiffIdsDigest: expectedProvenance.baseImage.rootfsDiffIdsDigest,
     baseTag: expectedProvenance.baseImage.tagReference,
     buildInputsDigest: expectedProvenance.buildInputs.digest,
     lockfileDigest: expectedProvenance.lockfile.digest,
@@ -298,7 +302,7 @@ function verifyProductionImageContract(): Record<string, unknown> {
     "const bundleDigest = createHash('sha256').update(bundle).digest('hex');",
     "const artifactDigest = createHash('sha256').update(`dist-api/index.js\\0${bundle.byteLength}\\0${bundleDigest}\\n`).digest('hex');",
     "if (provenance.buildArtifacts.classification !== 'bound-build-output' || provenance.buildArtifacts.count !== 1 || provenance.buildArtifacts.digest !== artifactDigest || JSON.stringify(provenance.buildArtifacts.files) !== JSON.stringify([{bytes:bundle.byteLength,digest:bundleDigest,path:'dist-api/index.js'}])) fail('build artifact provenance');",
-    "console.log(JSON.stringify({uid:process.getuid(),gid:process.getgid(),appEntries:app,distEntries:dist,devDependencies:'absent',caches:'absent',rootFilesystem:'read-only',effectiveCapabilities:'none',noNewPrivileges:true,seccomp:'filter',provenance:{baseImage:provenance.baseImage.reference,baseIndexDigest:provenance.baseImage.indexDigest,baseManifestDigest:provenance.baseImage.manifestDigest,basePlatform:provenance.baseImage.platform,baseTag:provenance.baseImage.tagReference,buildArtifactCount:provenance.buildArtifacts.count,buildArtifactsDigest:provenance.buildArtifacts.digest,buildInputsDigest:provenance.buildInputs.digest,documentDigest:createHash('sha256').update(provenanceText).digest('hex'),lockfileDigest:provenance.lockfile.digest,productionComponentCount:provenance.productionComponents.count,productionComponentsDigest:provenance.productionComponents.digest}}));",
+    "console.log(JSON.stringify({uid:process.getuid(),gid:process.getgid(),appEntries:app,distEntries:dist,devDependencies:'absent',caches:'absent',rootFilesystem:'read-only',effectiveCapabilities:'none',noNewPrivileges:true,seccomp:'filter',provenance:{baseImage:provenance.baseImage.reference,baseConfigDigest:provenance.baseImage.configDigest,baseIndexDigest:provenance.baseImage.indexDigest,baseLayerDescriptorsDigest:provenance.baseImage.layerDescriptorsDigest,baseManifestDigest:provenance.baseImage.manifestDigest,basePlatform:provenance.baseImage.platform,baseRootfsDiffIdsDigest:provenance.baseImage.rootfsDiffIdsDigest,baseTag:provenance.baseImage.tagReference,buildArtifactCount:provenance.buildArtifacts.count,buildArtifactsDigest:provenance.buildArtifacts.digest,buildInputsDigest:provenance.buildInputs.digest,documentDigest:createHash('sha256').update(provenanceText).digest('hex'),lockfileDigest:provenance.lockfile.digest,productionComponentCount:provenance.productionComponents.count,productionComponentsDigest:provenance.productionComponents.digest}}));",
   ].join(" ");
   const runtime = JSON.parse(runPodman([
     "run",

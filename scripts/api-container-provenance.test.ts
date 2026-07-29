@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
@@ -15,6 +16,24 @@ import {
 } from "./api-container-provenance.ts";
 
 const temporaryRoots: string[] = [];
+const fixtureRootfsDiffIds = [
+  `sha256:${"1".repeat(64)}`,
+  `sha256:${"2".repeat(64)}`,
+];
+const fixtureLayerDescriptors = fixtureRootfsDiffIds.map((_value, index) => ({
+  mediaType:
+    "application/vnd.docker.image.rootfs.diff.tar.gzip" as const,
+  size: index + 1,
+  digest: `sha256:${String(index + 1).repeat(64)}`,
+}));
+const fixtureLayerDescriptorsDigest = createHash("sha256").update(
+  fixtureLayerDescriptors.map(({ digest, mediaType, size }) =>
+    `${mediaType}\0${size}\0${digest}`
+  ).join("\n") + "\n",
+).digest("hex");
+const fixtureRootfsDigest = createHash("sha256").update(
+  fixtureRootfsDiffIds.join("\n") + "\n",
+).digest("hex");
 
 describe("API container provenance", () => {
   afterEach(() => {
@@ -31,12 +50,15 @@ describe("API container provenance", () => {
     expect(second).toEqual(first);
     expect(first.baseImage).toEqual({
       classification: "pinned-platform-manifest",
+      configDigest: `sha256:${"c".repeat(64)}`,
       indexDigest: `sha256:${"a".repeat(64)}`,
+      layerDescriptorsDigest: fixtureLayerDescriptorsDigest,
       manifestDigest: `sha256:${"b".repeat(64)}`,
       platform: "linux/amd64",
       reference:
         `mcr.microsoft.com/playwright:v1.2.3-noble@sha256:${"b".repeat(64)}`,
       runtimeComponents: "reference-bound-not-enumerated",
+      rootfsDiffIdsDigest: fixtureRootfsDigest,
       tagReference: "mcr.microsoft.com/playwright:v1.2.3-noble",
     });
     expect(first.productionComponents.count).toBe(1);
@@ -59,10 +81,13 @@ describe("API container provenance", () => {
       baseImage:
         `mcr.microsoft.com/playwright:v1.2.3-noble@sha256:${"b".repeat(64)}`,
       baseClassification: "pinned-platform-manifest",
+      baseConfigDigest: `sha256:${"c".repeat(64)}`,
       baseIndexDigest: `sha256:${"a".repeat(64)}`,
+      baseLayerDescriptorsDigest: fixtureLayerDescriptorsDigest,
       baseManifestDigest: `sha256:${"b".repeat(64)}`,
       basePlatform: "linux/amd64",
       baseRuntimeComponents: "reference-bound-not-enumerated",
+      baseRootfsDiffIdsDigest: fixtureRootfsDigest,
       baseTag: "mcr.microsoft.com/playwright:v1.2.3-noble",
       buildInputCount: 10,
       buildInputsDigest: first.buildInputs.digest,
@@ -311,13 +336,17 @@ function fixtureRepository(): string {
     dependencies: { playwright: "1.2.3" },
   }));
   writeFileSync(join(root, "container-base-lock.json"), JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: "ap2-api-container-base-lock",
     registry: "mcr.microsoft.com",
     repository: "playwright",
     tag: "v1.2.3-noble",
     indexDigest: `sha256:${"a".repeat(64)}`,
     manifestDigest: `sha256:${"b".repeat(64)}`,
+    configDigest: `sha256:${"c".repeat(64)}`,
+    layerDescriptorsDigest: fixtureLayerDescriptorsDigest,
+    layerDescriptors: fixtureLayerDescriptors,
+    rootfsDiffIds: fixtureRootfsDiffIds,
     platform: {
       os: "linux",
       architecture: "amd64",
@@ -375,6 +404,10 @@ function mutateBaseLock(
     tag: string;
     indexDigest: string;
     manifestDigest: string;
+    configDigest: string;
+    layerDescriptorsDigest: string;
+    layerDescriptors: unknown[];
+    rootfsDiffIds: string[];
     platform: { architecture: string; os: string };
   }) => void,
 ): void {
@@ -383,6 +416,10 @@ function mutateBaseLock(
     tag: string;
     indexDigest: string;
     manifestDigest: string;
+    configDigest: string;
+    layerDescriptorsDigest: string;
+    layerDescriptors: unknown[];
+    rootfsDiffIds: string[];
     platform: { architecture: string; os: string };
   };
   mutation(lock);

@@ -1,11 +1,41 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "ap2-api-container-base-lock",
   "registry": "mcr.microsoft.com",
   "repository": "playwright",
   "tag": "v1.61.1-noble",
   "indexDigest": "sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48",
   "manifestDigest": "sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6",
+  "configDigest": "sha256:89924b46ec81c1c0eb0055a7d72790b8067a16a5d0d0512e8117a01aa4a5d7ee",
+  "layerDescriptors": [
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 30599864,
+      "digest": "sha256:0e5f8475f38bbc351dc1b0148d9ea94bc5c5f2b710f72e96988b799b681a0b35"
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 104336985,
+      "digest": "sha256:dfbf326447c42cac4a23574f3dd50fbd5cc65de59fa7528491565e168296e7eb"
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 2855716,
+      "digest": "sha256:11a52a28a3f85aa239b382212113cd367a436d14b6e22bdaf64e23f507479677"
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "size": 791266357,
+      "digest": "sha256:0b569fd65eaf953d22f18b17a2ed551fd1c0db5c371dce36f73319df33132848"
+    }
+  ],
+  "layerDescriptorsDigest": "c994fcbdba60af9c42778b0fe1cddf667a1b677ad8694720cbd142b893661031",
+  "rootfsDiffIds": [
+    "sha256:98effb2dfe85d4c431f97d90482075f19e5fc3a57c2dd423d8bdfd4813620043",
+    "sha256:3510962c86ba3c3226d639c3b2587fd5a2d9e09f470ee99c89614aedf5bb9b5b",
+    "sha256:327e4f7d52815156914c4c654c60170bc631bcbaa823df672e37f7b7110909a8",
+    "sha256:94b9e4adef57f1882ab0c94b3b55c33087910f76bc791e21aa076854f1785886"
+  ],
   "platform": {
     "os": "linux",
     "architecture": "amd64"
