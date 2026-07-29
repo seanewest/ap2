@@ -30,6 +30,12 @@ observations. Send acceptance alone leaves artifact, visibility,
 interpretation, response, cleanup, retention, Teams, and voicemail truth
 `uninspected`.
 
+The pure local
+[Teams missed-call adapter](teams-missed-call-receipt-adapter.md) keeps the
+licensed-user staging result separate from Cory-side native history/Activity,
+the learner's bounded report, and terminal cleanup. Neither stage completion
+nor the blocked bot path can prove target-side evidence.
+
 The network-free
 [scenario contract compatibility check](scenario-contract-compatibility.md)
 uses all-`uninspected` probes and canonical fixtures to detect manifest/receipt

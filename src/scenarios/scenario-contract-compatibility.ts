@@ -38,6 +38,12 @@ import {
   type ScenarioPlanRole,
 } from "./scenario-plan.ts";
 import { SCENARIO_MANIFESTS } from "./scenarios.ts";
+import {
+  adaptTeamsMissedCallObservationToReceipt,
+  canonicalTeamsMissedCallReceiptAdapterInput,
+  type TeamsMissedCallReceiptAdapterInput,
+} from "./teams-missed-call-receipt-adapter.ts";
+import { TEAMS_MISSED_CALL_SCENARIO } from "./teams-missed-call.ts";
 
 const MAX_SCENARIOS = 32;
 const MAX_FAILURES = 64;
@@ -51,6 +57,7 @@ const OUTPUT_ADAPTERS = [
   "help-desk-email",
   "operation-telemetry",
   "private-document",
+  "teams-missed-call",
 ] as const;
 const PUBLIC_SCENARIO_IDS = new Set(
   SCENARIO_MANIFESTS.map(({ id }) => id),
@@ -75,6 +82,7 @@ export type CompatibilityDriftCategory =
   | "RESPONSE_DRIFT"
   | "RETENTION_DRIFT"
   | "ROLE_DRIFT"
+  | "TEAMS_MISSED_CALL_ADAPTER_DRIFT"
   | "TELEMETRY_MAPPING_DRIFT";
 
 export interface CompatibilityFailure {
@@ -127,6 +135,7 @@ export interface CompatibilityCheckOptions {
   avdInput?: AvdManifestRunnerAdapterInput;
   helpDeskInput?: HelpDeskEmailReceiptAdapterInput;
   privateDocumentInput?: PrivateDocumentLifecycleReceiptInput;
+  teamsMissedCallInput?: TeamsMissedCallReceiptAdapterInput;
   telemetryBindings?: readonly CompatibilityTelemetryBinding[];
 }
 
@@ -311,6 +320,25 @@ export function checkScenarioContractCompatibility(
           scenarioFailures,
           manifest.id,
           "HELP_DESK_ADAPTER_DRIFT",
+        );
+      }
+    }
+
+    if (manifest.id === TEAMS_MISSED_CALL_SCENARIO.id) {
+      try {
+        verifyScenarioEvidenceReceipt(
+          adaptTeamsMissedCallObservationToReceipt(
+            options.teamsMissedCallInput ??
+              canonicalTeamsMissedCallReceiptAdapterInput(),
+          ),
+          manifest,
+        );
+        adapters.push("teams-missed-call");
+      } catch {
+        addFailure(
+          scenarioFailures,
+          manifest.id,
+          "TEAMS_MISSED_CALL_ADAPTER_DRIFT",
         );
       }
     }

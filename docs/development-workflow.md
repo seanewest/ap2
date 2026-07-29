@@ -78,6 +78,11 @@ The
 [help-desk email receipt adapter](help-desk-email-receipt-adapter.md) is a
 post-run local bridge: provider acceptance proves only its operation result,
 while learner and cleanup truth require their separately owned observations.
+The
+[Teams missed-call receipt adapter](teams-missed-call-receipt-adapter.md)
+applies the same boundary to the human-assisted call path: originator
+completion is distinct from Cory-side native evidence, interpretation, and
+terminal cleanup.
 
 ## Work inside the lab boundary
 

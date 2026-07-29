@@ -30,6 +30,7 @@ export const SCENARIO_ADAPTER_NAMES = [
   "help-desk-email",
   "operation-telemetry",
   "private-document",
+  "teams-missed-call",
 ] as const;
 
 export type ScenarioAdapterName = typeof SCENARIO_ADAPTER_NAMES[number];
