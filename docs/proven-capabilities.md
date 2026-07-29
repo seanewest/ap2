@@ -32,7 +32,7 @@ simulated user was the Microsoft 365 workload actor.
 | Hosted sign-in and API access | GitHub Pages completed operator CBA, acquired the custom delegated API scope, called the cross-origin Container App API, showed safe `/api/whoami` output, and signed out without exposing a token. A Dev app-only call to the same API was also accepted. | Operator for the browser path; Dev diagnostic app for the app-only check | Sign-out survived reload; no tenant artifact |
 | Rehearsal status | An authorized hosted caller caused the API to read the fixed Container App and return its name, region, running state, and latest ready revision. | API MI | Read-only |
 | Fixed email | One controlled hosted action made the fixed Homer-to-Marge `sendMail` attempt. The API received Graph `202`, and a later Defender message trace independently showed the message delivered to Marge's Inbox with Homer as sender. | c91 delegated — Homer | Message and mail/audit history intentionally retained |
-| OneDrive read-only share | The hosted path created the exact 58-byte Homer file and configured Marge's direct read permission. Sean then signed in separately as Marge, found the shared file, and opened its exact harmless contents before using the hosted cleanup action. | c91 delegated — Homer; Marge's separate human browser session for observation | Active path absent and no Marge share remained; deleted-item/recycle-bin history retained |
+| OneDrive read-only share | The hosted path created the exact 58-byte Homer file and configured Marge's direct read permission. Sean then signed in separately as Marge, opened the exact protected direct URL, and read only its expected harmless sentence. The OneDrive Shared view remained empty, so Shared-view discovery failed and interpretation beyond reading is unclaimed. | c91 delegated — Homer; Marge's separate human browser session for observation | The reviewed one-shot cleanup removed the exact permission and file. Producer path, item, and permission reads plus an isolated Marge-authenticated direct-URL read returned `404`; deleted-item/recycle-bin history can remain |
 | Calendar meeting | The hosted path created the fixed Cory meeting for Kobe and Marge, verified the organizer and attendee copies, and exercised explicit cancellation, including recovery after an ambiguous API response. | c91 delegated — Cory | No active Cory event; Kobe and Marge retained one cancelled copy each, with calendar/audit history |
 | Contact | One hosted create and one hosted delete of the fixed Cory contact both succeeded. | c91 delegated — Cory | Exact contact absent |
 | Disabled Inbox rule | One hosted create and one hosted delete of the exact harmless, disabled rule both succeeded. | c91 delegated — Cory | Exact rule absent |
@@ -219,8 +219,9 @@ assigning the learner to either proof role.
   Protected cleanup identities and learner evidence remain outside Git.
 - Immediate Microsoft reads can lag accepted writes. The staged group,
   profile, manager, and calendar canaries waited for natural time rather than
-  retrying mutations. OneDrive's Marge-side access never advanced beyond
-  pending within the bounded verification window.
+  retrying mutations. The OneDrive Shared view never discovered the retained
+  proof, but Marge's exact protected direct URL rendered the expected sentence;
+  direct readability and Shared-view discovery are separate claims.
 - Broad calendar apply is unsupported. The conditional-delete canary showed
   that event `DELETE` did not enforce `If-Match` on the tested route, so the
   repository retains only the read-only schema-v2 calendar preview. Its
