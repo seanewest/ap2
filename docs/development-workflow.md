@@ -96,6 +96,12 @@ consistency only and does not upgrade any external or learner claim.
 Its operator-only API/client preserves that same pure boundary: authorization
 precedes the bounded body read, and the response contains only the fixed safe
 summary or categorical refusal.
+The
+[Purview audit-boundary rehearsal](purview-audit-boundary-rehearsal.md)
+composes the receipt-facing Purview manifest with a synthetic deduplicated
+detector observation. Its verified receipt exercises categorical contract
+composition while its shared envelope keeps every audit, workload, learner,
+response, cleanup, retention, and impact claim externally uninspected.
 
 ## Work inside the lab boundary
 

@@ -50,6 +50,13 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- The receipt-facing Purview audit boundary now has a pure network-free
+  `REHEARSAL_ONLY` pipeline. It compiles the exact manifest in isolation,
+  deduplicates a fixed synthetic two-page observation to one categorical
+  producer-attribution claim, adapts and verifies the candidate receipt, and
+  binds plan/input/receipt/output digests while every external claim remains
+  uninspected. It does not register a runnable UI scenario. See
+  [the Purview audit-boundary rehearsal](docs/purview-audit-boundary-rehearsal.md).
 - Teams missed-call `REHEARSAL_ONLY` outputs now have a pure offline verifier.
   It independently recompiles the plan, reconstructs the exact categorical
   adapter input, invokes the receipt contracts, recomputes both digests, and
