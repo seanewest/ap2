@@ -54,7 +54,9 @@ At each material checkpoint, the Captain checks and updates this docket against 
   It independently recompiles the plan, reconstructs the exact categorical
   adapter input, invokes the receipt contracts, recomputes both digests, and
   enforces the shared all-uninspected envelope without running the fake or a
-  call path. See
+  call path. An authenticated operator-only API/client now exposes that same
+  in-memory verifier with auth-before-body, request/response bounds, and fixed
+  errors. See
   [the Teams rehearsal output verifier](docs/teams-missed-call-rehearsal-verifier.md).
 - The canonical Teams missed-call scenario now has a network-free
   `REHEARSAL_ONLY` pipeline. It compiles the real plan, executes one

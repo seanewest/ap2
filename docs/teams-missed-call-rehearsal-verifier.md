@@ -49,3 +49,22 @@ the independently reconstructed two-surface terminal-absence input and absent
 retention. Missing, extra, reordered, duplicated, unsafe, oversized,
 cross-family, nonterminal, one-surface, coupled, overclaiming, or
 digest/branch/plan-tampered values fail closed.
+
+## Authenticated in-memory API
+
+Operators may submit one bounded sanitized PR #106 envelope to
+`POST /api/teams-missed-call-rehearsal-verification`. The existing JWT and
+operator policy authenticate and authorize the caller before any body read.
+The route accepts exact `application/json`, reads at most 32 KiB, invokes the
+pure verifier synchronously in memory, and returns only its fixed summary or a
+categorical error.
+
+`HttpAfterPartyApi.verifyTeamsMissedCallRehearsalOutput` is the browser-safe
+typed client. It validates the exact request shape before fetch, binds the
+method and path, streams the response under a 4 KiB cap, accepts only fixed
+error categories, and independently binds every summary field to the submitted
+branch, digests, claim count, and all-uninspected state.
+
+The route and client do not execute the rehearsal, fake, or call path; ingest
+telemetry; persist input; schedule work; contact Teams or Graph; or establish
+external proof.

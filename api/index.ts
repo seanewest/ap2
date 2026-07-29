@@ -49,6 +49,9 @@ import {
   InMemoryHelpDeskEmailRehearsalVerificationService,
 } from "./help-desk-email-rehearsal-verification.js";
 import {
+  InMemoryTeamsMissedCallRehearsalVerificationService,
+} from "./teams-missed-call-rehearsal-verification.js";
+import {
   DelegatedGraphOneDriveShareProof,
   GRAPH_FILES_READ_WRITE_SCOPE,
   ProcessLocalOneDriveShareProofBoundary,
@@ -186,6 +189,8 @@ const server = createApiServer({
     new InMemoryPrivateDocumentRehearsalVerificationService(),
   helpDeskEmailRehearsalVerificationService:
     new InMemoryHelpDeskEmailRehearsalVerificationService(),
+  teamsMissedCallRehearsalVerificationService:
+    new InMemoryTeamsMissedCallRehearsalVerificationService(),
   multiScenarioFeasibilityService:
     new InMemoryMultiScenarioFeasibilityService(),
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),

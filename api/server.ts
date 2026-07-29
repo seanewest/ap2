@@ -95,6 +95,17 @@ import {
   type ApiRouteContract,
   type ApiRouteOwnerKey,
 } from "../src/api/api-route-contract.js";
+import {
+  TeamsMissedCallRehearsalVerificationResponseTooLargeError,
+  TeamsMissedCallRehearsalVerificationSafeFailureError,
+  type TeamsMissedCallRehearsalVerificationService,
+} from "./teams-missed-call-rehearsal-verification.js";
+import {
+  TeamsMissedCallRehearsalVerificationError,
+} from "../scripts/verify-teams-missed-call-rehearsal-output.js";
+import {
+  TeamsMissedCallRehearsalContractError,
+} from "../src/api/teams-missed-call-rehearsal-verification-contract.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -118,6 +129,8 @@ export interface ApiDependencies {
     PrivateDocumentRehearsalVerificationService;
   helpDeskEmailRehearsalVerificationService?:
     HelpDeskEmailRehearsalVerificationService;
+  teamsMissedCallRehearsalVerificationService?:
+    TeamsMissedCallRehearsalVerificationService;
   multiScenarioFeasibilityService?: MultiScenarioFeasibilityService;
   allowedOrigin?: string;
 }
@@ -230,6 +243,14 @@ async function route(
       return;
     case "help-desk-email-rehearsal-verify":
       await helpDeskEmailRehearsalVerification(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "teams-missed-call-rehearsal-verify":
+      await teamsMissedCallRehearsalVerification(
         request,
         response,
         dependencies,
@@ -667,6 +688,16 @@ async function handleAuthorizedRequest(
       return;
     }
     if (
+      error instanceof TeamsMissedCallRehearsalVerificationError ||
+      error instanceof TeamsMissedCallRehearsalContractError
+    ) {
+      sendJson(response, 400, {
+        error: "teams_missed_call_rehearsal_refused",
+        category: error.category,
+      });
+      return;
+    }
+    if (
       error instanceof HelpDeskEmailRehearsalVerificationResponseTooLargeError
     ) {
       sendJson(response, 500, {
@@ -675,10 +706,27 @@ async function handleAuthorizedRequest(
       return;
     }
     if (
+      error instanceof
+        TeamsMissedCallRehearsalVerificationResponseTooLargeError
+    ) {
+      sendJson(response, 500, {
+        error: "teams_missed_call_rehearsal_response_too_large",
+      });
+      return;
+    }
+    if (
       error instanceof HelpDeskEmailRehearsalVerificationSafeFailureError
     ) {
       sendJson(response, 500, {
         error: "help_desk_email_rehearsal_verification_failed",
+      });
+      return;
+    }
+    if (
+      error instanceof TeamsMissedCallRehearsalVerificationSafeFailureError
+    ) {
+      sendJson(response, 500, {
+        error: "teams_missed_call_rehearsal_verification_failed",
       });
       return;
     }
@@ -856,6 +904,27 @@ async function helpDeskEmailRehearsalVerification(
     const service = dependencies.helpDeskEmailRehearsalVerificationService;
     if (!service) {
       throw new HelpDeskEmailRehearsalVerificationSafeFailureError();
+    }
+    return service.verify(await readBoundedJson(request, maximumBytes));
+  });
+}
+
+async function teamsMissedCallRehearsalVerification(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+  maximumBytes: number,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new JsonUnsupportedMediaTypeError();
+    }
+    const service = dependencies.teamsMissedCallRehearsalVerificationService;
+    if (!service) {
+      throw new TeamsMissedCallRehearsalVerificationSafeFailureError();
     }
     return service.verify(await readBoundedJson(request, maximumBytes));
   });

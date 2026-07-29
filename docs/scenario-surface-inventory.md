@@ -31,7 +31,7 @@ contain unsafe, stale, duplicate, unknown, or unsupported claims.
 | `help-desk-email-observation` | implemented | implemented | implemented | implemented | implemented | missing | implemented | implemented |
 | `oauth-application-reconnaissance` | implemented | implemented | implemented | implemented | implemented | missing | implemented | implemented |
 | `private-document-evidence` | implemented | implemented | implemented | implemented | missing | missing | implemented | implemented |
-| `teams-missed-call-observation` | implemented | implemented | implemented | implemented | implemented | missing | implemented | implemented |
+| `teams-missed-call-observation` | implemented | implemented | implemented | implemented | implemented | implemented | implemented | implemented |
 
 The table describes source availability only. In particular, `implemented`
 never means that a tenant operation, learner observation, cleanup, detection,

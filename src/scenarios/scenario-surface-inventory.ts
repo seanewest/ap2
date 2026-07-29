@@ -1,6 +1,7 @@
 import { SCENARIO_RECEIPT_API_CAPABILITY } from "../../api/scenario-evidence-verification.ts";
 import { SCENARIO_PLAN_API_CAPABILITY } from "../../api/scenario-plan.ts";
 import { REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY } from "../../api/rehearsal-output-verification.ts";
+import { TEAMS_MISSED_CALL_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/teams-missed-call-rehearsal-verification.ts";
 import { BATCH_FEASIBILITY_API_CAPABILITY } from "../../api/multi-scenario-feasibility.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/private-document-rehearsal-verification.ts";
 import { HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/help-desk-email-rehearsal-verification.ts";
@@ -158,6 +159,7 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
   SCENARIO_PLAN_API_CAPABILITY,
   SCENARIO_RECEIPT_API_CAPABILITY,
   REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
+  TEAMS_MISSED_CALL_REHEARSAL_VERIFICATION_API_CAPABILITY,
   ...SCENARIO_API_CLIENT_CAPABILITIES,
   SCENARIO_CATALOG_UI_CAPABILITY,
   SCENARIO_PLAN_PREVIEW_UI_CAPABILITY,
