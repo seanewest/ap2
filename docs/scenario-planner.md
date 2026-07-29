@@ -104,3 +104,26 @@ A returned plan is readiness guidance only. Authentication permits access to
 the compiler, not to any operation described by the plan. The response does
 not authorize, execute, schedule, persist, or prove setup, evidence creation,
 learner activity, response, cleanup, or any other external operation.
+
+## Authenticated operator preview
+
+The signed-in operator shell exposes the same contract through a
+`Scenario plan preview` form. Scenario and optional-response choices come
+directly from the runtime-validated canonical registry. The form accepts only
+short lowercase role aliases, a bounded USD ceiling, and a positive expiry
+window no longer than the manifest's conservative duration. It derives the UTC
+request timestamps locally and calls `HttpAfterPartyApi.compileScenarioPlan`
+only after the operator selects `Preview plan`.
+
+The result presents ordered phases, role ownership, human-only gates, safe
+evidence categories, learner interpretation, optional response, cleanup,
+retention, terminal reconciliation counts, categorical limitations, and a
+short stable digest. It does not render scenario, operation, step, artifact,
+marker, or proof-reference identifiers. Selection or input changes clear the
+previous result.
+
+There is no automatic submit, retry, polling, persistence, scheduling, or
+execution path. Authorization, compiler, size, and general failures use fixed
+safe messages and never display request echoes or server error bodies. The
+preview disclosure remains visible before and after every request: planning
+does not authorize or perform work and is not proof of an external operation.

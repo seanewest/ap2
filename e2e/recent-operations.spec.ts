@@ -10,8 +10,10 @@ import {
   STUDENT_TENANT_ID,
 } from "../api/identity";
 import { InMemoryOperationTelemetryCollector } from "../api/operation-telemetry-collector";
+import { InMemoryScenarioPlanService } from "../api/scenario-plan";
 import { createApiServer } from "../api/server";
 import { JoseTokenVerifier } from "../api/token-verifier";
+import { SCENARIO_MANIFESTS } from "../src/scenarios/scenarios";
 
 const ISSUER = "https://fixture.invalid/operator/v2.0";
 const AUDIENCE = "api://ap2-local-fixture";
@@ -72,6 +74,7 @@ test.beforeAll(async () => {
       },
     },
     operationTelemetryReader: collector,
+    scenarioPlanService: new InMemoryScenarioPlanService(),
     allowedOrigin: APP_ORIGIN,
   });
   await new Promise<void>((resolve) =>
@@ -164,7 +167,9 @@ test("navigates the read-only scenario catalog without network activity", async 
   await expect(page.getByText("Signed in as Fixture Operator")).toBeVisible();
   const catalog = page.getByRole("region", { name: "Scenario catalog" });
   await expect(catalog).toBeVisible();
-  await expect(catalog.locator(".scenario-catalog-card")).toHaveCount(4);
+  await expect(catalog.locator(".scenario-catalog-card")).toHaveCount(
+    SCENARIO_MANIFESTS.length,
+  );
   await expect(catalog.getByText("Purview audit boundary")).toBeVisible();
   await expect(catalog.getByText(
     "Private three-VM AVD lab substrate",
@@ -207,8 +212,207 @@ test("keeps the catalog descriptive when the API session is unauthorized", async
     "API access needs Microsoft authorization. Try again.",
   )).toBeVisible();
   await expect(catalog).toBeVisible();
-  await expect(catalog.locator(".scenario-catalog-card")).toHaveCount(4);
+  await expect(catalog.locator(".scenario-catalog-card")).toHaveCount(
+    SCENARIO_MANIFESTS.length,
+  );
   await expect(catalog.locator("[data-action]")).toHaveCount(0);
+});
+
+test("previews one deterministic plan per manual signed-operator request", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await configureOperator(page, accessToken);
+  let releaseRequest!: () => void;
+  const requestGate = new Promise<void>((resolve) => {
+    releaseRequest = resolve;
+  });
+  const planRequests: string[] = [];
+  await page.route("**/api/scenario-plan", async (route) => {
+    planRequests.push(route.request().postData() ?? "");
+    await requestGate;
+    await route.continue();
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const preview = page.getByRole("region", {
+    name: "Scenario plan preview",
+  });
+  const button = preview.getByRole("button", { name: "Preview plan" });
+  await expect(preview.getByText("No preview requested")).toBeVisible();
+  expect(planRequests).toHaveLength(0);
+
+  const firstResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === "/api/scenario-plan"
+  );
+  await button.focus();
+  await expect(button).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(
+    preview.getByText("Preparing the deterministic preview…"),
+  ).toBeVisible();
+  await expect(button).toBeDisabled();
+  expect(planRequests).toHaveLength(1);
+  releaseRequest();
+  expect((await firstResponse).status()).toBe(200);
+
+  await expect(preview.getByText("Deterministic preview")).toBeVisible();
+  await expect(preview.getByText("Ordered phases and ownership")).toBeVisible();
+  await expect(preview.getByRole("heading", {
+    name: "Terminal verification",
+    exact: true,
+  })).toBeVisible();
+  await expect(preview.getByText("Categorical limitations")).toBeVisible();
+  await expect(preview.getByText("Plan digest")).toBeVisible();
+  await expect(preview).not.toContainText("teams-missed-call-observation");
+  await expect(preview).not.toContainText("step-");
+  await expect(preview).not.toContainText("ap2-");
+  expect(planRequests[0]).not.toMatch(
+    /@|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}|\/home\/|token|credential/i,
+  );
+
+  const secondResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === "/api/scenario-plan"
+  );
+  await button.click();
+  expect((await secondResponse).status()).toBe(200);
+  expect(planRequests).toHaveLength(2);
+  await preview.locator("input[name='alias-learner']").fill("learner-two");
+  await expect(preview.getByText("No preview requested")).toBeVisible();
+  await expect(preview.getByText("Deterministic preview")).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+  expect(planRequests.map((body) => JSON.parse(body).scenarioId)).toEqual([
+    "teams-missed-call-observation",
+    "teams-missed-call-observation",
+  ]);
+});
+
+test("refuses unsafe preview input locally without an API request", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  let planRequests = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/scenario-plan") {
+      planRequests += 1;
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const preview = page.getByRole("region", {
+    name: "Scenario plan preview",
+  });
+  const button = preview.getByRole("button", { name: "Preview plan" });
+  await preview.getByLabel("Canonical scenario").selectOption({
+    label: "Private three-VM AVD lab substrate",
+  });
+  await preview.getByLabel("Maximum budget (USD)").fill("9");
+  await button.click();
+  await expect(preview.getByText(/must cover the catalog maximum/)).toBeVisible();
+
+  await preview.getByLabel("Maximum budget (USD)").fill("10");
+  await preview.getByLabel(/Expiry window/).fill("0");
+  await button.click();
+  await expect(preview.getByText(/Expiry must be greater than zero/)).toBeVisible();
+
+  await preview.getByLabel(/Expiry window/).fill("1");
+  await preview.getByLabel("Optional response").evaluate((select) => {
+    const option = document.createElement("option");
+    option.value = "999";
+    option.textContent = "Tampered response";
+    select.append(option);
+    (select as HTMLSelectElement).value = "999";
+  });
+  await button.click();
+  await expect(preview.getByText(/response is not supported/)).toBeVisible();
+
+  await preview.getByLabel("Optional response").selectOption("");
+  await preview.locator("input[name='alias-learner']").fill(
+    "learner@example.invalid",
+  );
+  await button.click();
+  await expect(preview.getByText(/raw identifiers are not accepted/)).toBeVisible();
+  await preview.locator("input[name='alias-learner']").fill("session-token");
+  await button.click();
+  await expect(preview.getByText(
+    /credential, token, session, and other raw-identifier terms/,
+  )).toBeVisible();
+  expect(planRequests).toBe(0);
+});
+
+test("maps authenticated preview refusals to fixed safe states", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  let responseKind: "compiler" | "oversized" | "general" = "compiler";
+  await page.route("**/api/scenario-plan", async (route) => {
+    if (responseKind === "compiler") {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "scenario_plan_refused",
+          category: "EXPIRY_INVALID",
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: responseKind === "oversized" ? 413 : 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "raw private upstream body" }),
+    });
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const preview = page.getByRole("region", {
+    name: "Scenario plan preview",
+  });
+  const button = preview.getByRole("button", { name: "Preview plan" });
+
+  await button.click();
+  await expect(preview.getByText(/planner refused/)).toBeVisible();
+  responseKind = "oversized";
+  await button.click();
+  await expect(preview.getByText(/safe preview limit/)).toBeVisible();
+  responseKind = "general";
+  await button.click();
+  await expect(preview.getByText(/preview is unavailable/)).toBeVisible();
+  await expect(preview).not.toContainText("raw private upstream body");
+});
+
+test("distinguishes an expired session from a forbidden operator", async ({
+  browser,
+}) => {
+  const cases = [
+    ["invalid-fixture-token", 401, "session expired"],
+    [
+      fixtureToken({
+        tid: STUDENT_TENANT_ID,
+        oid: "fixture-unapproved-operator",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      }),
+      403,
+      "not authorized",
+    ],
+  ] as const;
+  for (const [token, status, message] of cases) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await configureOperator(page, token);
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    const preview = page.getByRole("region", {
+      name: "Scenario plan preview",
+    });
+    const response = page.waitForResponse((candidate) =>
+      new URL(candidate.url()).pathname === "/api/scenario-plan"
+    );
+    await preview.getByRole("button", { name: "Preview plan" }).click();
+    expect((await response).status()).toBe(status);
+    await expect(preview.getByText(new RegExp(message))).toBeVisible();
+    await context.close();
+  }
 });
 
 async function configureOperator(
