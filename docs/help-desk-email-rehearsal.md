@@ -76,3 +76,14 @@ is also refused.
 
 The implementation has no real operation construction, network transport,
 API route/client, UI, deployment, browser, or Windows-host path.
+
+## Offline output verification
+
+The
+[help-desk rehearsal output verifier](help-desk-email-rehearsal-output-verifier.md)
+checks one saved canonical output without invoking this pipeline or its fake.
+It independently reconstructs the categorical adapter contract, recomputes
+the plan and fake digests, invokes the adapter and receipt verifier directly,
+and applies the shared rehearsal-envelope invariants. Verification remains a
+contract-consistency result, not external email, learner, cleanup, audit,
+Teams, or voicemail proof.

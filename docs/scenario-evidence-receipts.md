@@ -55,6 +55,10 @@ verifier, and the shared rehearsal envelope. Its send, learner-visible,
 retained, and cleaned synthetic branches keep email, Inbox visibility,
 interpretation, response, cleanup, retention, audit/detection, Teams, and
 voicemail external truth `uninspected`.
+The separate
+[offline help-desk rehearsal output verifier](help-desk-email-rehearsal-output-verifier.md)
+checks a saved envelope without invoking the fake or pipeline and returns only
+a fixed safe contract-consistency summary.
 
 ## Receipt shape
 
