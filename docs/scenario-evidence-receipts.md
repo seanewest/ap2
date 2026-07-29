@@ -98,7 +98,9 @@ The six states are intentionally not ordered:
 The verifier never promotes one state to another. A non-`uninspected` claim
 must name an observation source, outcome, observer actor alias, and manifest
 operation. The observer must own that operation. Independent observations must
-use the manifest detector; learner observations must use the learner.
+use a manifest detector distinct from both workload actor and learner; learner
+observations must use the learner. Display labels never establish identity
+separation.
 
 An empty query can prove its own completed query operation or surface
 reachability. It cannot prove producer attribution, artifact absence, or

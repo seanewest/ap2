@@ -1,4 +1,5 @@
 import {
+  findScenarioRoleConflation,
   parseScenarioManifest,
   type ScenarioArtifactKind,
   type ScenarioManifest,
@@ -466,19 +467,17 @@ function verifyRoles(
   receipt: ScenarioEvidenceReceipt,
   manifest: ScenarioManifest,
 ): void {
-  if (receipt.roles.evidenceProducer === receipt.roles.learner) {
+  const exactSelfTriggeredRoles =
+    manifest.trigger.kind === "self-triggered" &&
+    receipt.roles.evidenceProducer === manifest.roles.evidenceProducer &&
+    receipt.roles.learner === manifest.roles.learner;
+  const conflation = findScenarioRoleConflation(receipt.roles, {
+    allowSelfTriggeredLearner: exactSelfTriggeredRoles,
+  });
+  if (conflation !== undefined) {
     throw failure(
       "role-conflation",
-      "evidence producer and learner are conflated.",
-    );
-  }
-  if (
-    receipt.roles.detector !== undefined &&
-    receipt.roles.detector === receipt.roles.workloadActor
-  ) {
-    throw failure(
-      "role-conflation",
-      "detector and workload actor are conflated.",
+      "receipt roles contain a forbidden actor overlap.",
     );
   }
   if (

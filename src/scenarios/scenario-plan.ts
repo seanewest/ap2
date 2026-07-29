@@ -490,6 +490,9 @@ function validatedManifest(value: unknown): ScenarioManifest {
     if (/producer and learner|self-triggered/.test(message)) {
       throw new ScenarioPlanError("SELF_TRIGGER_UNDECLARED");
     }
+    if (/detector and (?:workload actor|learner)/.test(message)) {
+      throw new ScenarioPlanError("ROLE_CONFLATION");
+    }
     if (/cleanup|expiresAt|expiry/.test(message)) {
       throw new ScenarioPlanError(
         /cleanup/.test(message) ? "CLEANUP_MISSING" : "EXPIRY_INVALID",

@@ -384,6 +384,25 @@ describe("scenario execution-plan compiler", () => {
     );
   });
 
+  it("rejects learner and independent-detector conflation before planning", () => {
+    const invalid = {
+      ...OAUTH_APPLICATION_RECON_SCENARIO,
+      id: "learner-detector-conflation",
+      roles: {
+        ...OAUTH_APPLICATION_RECON_SCENARIO.roles,
+        detector: OAUTH_APPLICATION_RECON_SCENARIO.roles.learner,
+      },
+    };
+    expectCategory(
+      {
+        ...REQUESTS["oauth-application-reconnaissance"],
+        scenarioId: "learner-detector-conflation",
+      },
+      "ROLE_CONFLATION",
+      [invalid],
+    );
+  });
+
   it("rejects missing cleanup, evidence, and interpretation", () => {
     const missingCleanup = {
       ...HELP_DESK_EMAIL_SCENARIO,

@@ -49,6 +49,7 @@ export const TEAMS_MISSED_CALL_SCENARIO = parseScenarioManifest({
     },
   ],
   trigger: { kind: "staged" },
+  detection: { kind: "none" },
   prerequisites: [
     {
       id: "licensed-lab-users",

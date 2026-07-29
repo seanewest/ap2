@@ -279,8 +279,20 @@ describe("scenario contract compatibility checker", () => {
         roles.evidenceProducer = roles.learner;
       },
     ],
+    [
+      "learner detector",
+      (value: Record<string, unknown>) => {
+        const roles = value.roles as Record<string, unknown>;
+        roles.detector = roles.learner;
+        value.detection = { kind: "independent" };
+      },
+    ],
   ])("pinpoints %s as role drift", (_name, change) => {
-    const manifest = supportedManifests[1]!;
+    const manifest = _name === "learner detector"
+      ? supportedManifests.find(
+        ({ id }) => id === "oauth-application-reconnaissance",
+      )!
+      : supportedManifests[1]!;
     const result = checkScenarioContractCompatibility({
       catalog: [rawManifest(manifest, change)],
       receiptFixtures: [],

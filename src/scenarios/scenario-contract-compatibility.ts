@@ -1111,7 +1111,7 @@ function classifyManifestError(error: unknown): CompatibilityDriftCategory {
     return "LEARNER_DRIFT";
   }
   if (
-    /roles|role assignment|producer and learner|detector and workload|actor role/i
+    /roles|role assignment|producer and learner|detector and (?:workload|learner)|actor role/i
       .test(message)
   ) return "ROLE_DRIFT";
   if (/response/i.test(message)) {

@@ -159,6 +159,36 @@ export interface ScenarioRoleAssignments {
   responder?: string;
 }
 
+export type ScenarioRoleConflation =
+  | "evidence-producer-learner"
+  | "detector-workload-actor"
+  | "detector-learner";
+
+export function findScenarioRoleConflation(
+  roles: ScenarioRoleAssignments,
+  options: { allowSelfTriggeredLearner?: boolean } = {},
+): ScenarioRoleConflation | undefined {
+  if (
+    roles.evidenceProducer === roles.learner &&
+    options.allowSelfTriggeredLearner !== true
+  ) {
+    return "evidence-producer-learner";
+  }
+  if (
+    roles.detector !== undefined &&
+    roles.detector === roles.workloadActor
+  ) {
+    return "detector-workload-actor";
+  }
+  if (
+    roles.detector !== undefined &&
+    roles.detector === roles.learner
+  ) {
+    return "detector-learner";
+  }
+  return undefined;
+}
+
 export interface ScenarioAuthentication {
   actorId: string;
   transport: ScenarioAuthenticationTransport;
@@ -351,17 +381,22 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
       "roles.detector is required when detection.kind is independent.",
     );
   }
-  if (
-    detection.kind === "independent" &&
-    roles.detector === roles.workloadActor
-  ) {
+  if (detection.kind === "none" && roles.detector) {
+    throw new ScenarioManifestError(
+      "roles.detector requires detection.kind to be independent.",
+    );
+  }
+  const conflation = findScenarioRoleConflation(roles, {
+    allowSelfTriggeredLearner: trigger.kind === "self-triggered",
+  });
+  if (conflation === "detector-workload-actor") {
     throw new ScenarioManifestError(
       "independent detector and workload actor must differ.",
     );
   }
-  if (detection.kind === "none" && roles.detector) {
+  if (conflation === "detector-learner") {
     throw new ScenarioManifestError(
-      "roles.detector requires detection.kind to be independent.",
+      "independent detector and learner must differ.",
     );
   }
 

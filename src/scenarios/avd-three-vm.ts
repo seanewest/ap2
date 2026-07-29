@@ -51,6 +51,7 @@ export const AVD_THREE_VM_SCENARIO = parseScenarioManifest({
     },
   ],
   trigger: { kind: "staged" },
+  detection: { kind: "none" },
   prerequisites: [
     {
       id: "east-us-images-quota",

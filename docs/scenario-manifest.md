@@ -8,8 +8,8 @@ planned learner task cannot be presented as learner evidence.
 `parseScenarioManifest` accepts only schema version 2 and validates these
 bounded sections:
 
-- actors plus distinct evidence-producer, workload-actor, learner, and optional
-  responder roles;
+- actors plus evidence-producer, workload-actor, learner, optional responder,
+  and explicitly absent or independent-detector classification;
 - authentication transports and explicit prerequisites;
 - setup, evidence, response, and cleanup operations with a stable operation
   key, owner, supported capability, and read/mutation effect;
@@ -35,6 +35,7 @@ inventory entry; `cleanup-later` also names its exact cleanup operation.
 The validator rejects:
 
 - producer/learner conflation without an explained `self-triggered` model;
+- an independent detector conflated with either the workload actor or learner;
 - semantic claims unsupported by the artifact kind, including Teams
   missed-call or voicemail claims on Outlook email;
 - planned or merely platform-accepted evidence presented as learner-visible,
@@ -99,6 +100,13 @@ invented as an additional registry scenario or treated as an execution receipt.
 Application reconnaissance retains its narrower registry claim: the workload
 and observer are distinct, while one sign-in or audit record does not prove
 every workload read.
+
+Role separation compares actor IDs, never display labels, actor kinds, or
+authentication transport names. Those fields describe the contract but cannot
+prove that two runtime aliases resolved to distinct principals; the applicable
+identity verifier must establish that before external execution. Controlled
+human evidence, such as the Teams missed-call proof, is classified as a
+learner-owned observation with `detection.kind` set to `none`.
 
 `purview-audit-boundary.ts` is a receipt-facing canonical manifest for the
 already-completed PR #73 audit boundary. It is not registered as a runnable UI

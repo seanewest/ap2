@@ -50,7 +50,9 @@ resolve to the same actor. A scenario may make them the same only by declaring
 an explicit `self-triggered` exercise with a non-empty rationale explaining why
 the learner action is intentionally the event under investigation.
 An `independent` detection claim additionally requires an explicit detector
-role and fails closed when that role resolves to the workload actor.
+role and fails closed when that role resolves to either the workload actor or
+the learner. A controlled-human learner observation remains a learner-view
+claim, not an independent-detector claim.
 
 Actor identity and authentication transport are separate fields. For example,
 Kobe is the workload actor while a licensed Teams client session is the

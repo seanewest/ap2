@@ -121,7 +121,25 @@ describe("parsePurviewAuditCapabilityResult", () => {
       }, validation)
     ).toThrowError(
       new PurviewAuditResultError(
-        "detector and workloadActor must be distinct.",
+        "scenario actor roles contain a forbidden overlap.",
+      ),
+    );
+  });
+
+  it("fails closed when detector and learner are conflated", () => {
+    expect(() =>
+      parsePurviewAuditCapabilityResult({
+        ...base,
+        detector: base.learner,
+        status: "officially-supported",
+        detail: "Invalid actor assignment.",
+      }, {
+        ...validation,
+        detector: base.learner,
+      })
+    ).toThrowError(
+      new PurviewAuditResultError(
+        "scenario actor roles contain a forbidden overlap.",
       ),
     );
   });

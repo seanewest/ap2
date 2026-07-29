@@ -15,6 +15,7 @@ import type {
   EvidenceReceiptClaim,
   ScenarioEvidenceReceipt,
 } from "./scenario-evidence-receipt.ts";
+import { findScenarioRoleConflation } from "./scenario-manifest.ts";
 
 const CONTRACT_ROLES = [
   "evidenceProducer",
@@ -558,13 +559,7 @@ function parseRoles(value: unknown): ScenarioEvidenceReceipt["roles"] {
       ? {}
       : { responder: alias(roles.responder, "responder") }),
   };
-  if (
-    parsed.evidenceProducer === parsed.learner ||
-    (
-      parsed.detector !== undefined &&
-      parsed.detector === parsed.workloadActor
-    )
-  ) {
+  if (findScenarioRoleConflation(parsed) !== undefined) {
     throw new TelemetryReceiptAdapterError(
       "contract",
       "role aliases are conflated.",
