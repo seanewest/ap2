@@ -1,6 +1,7 @@
 import { appendIdentity, createStatus } from "../ui/elements";
 import { isSafeScenarioPlanningRequest } from "../api/client";
 import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
+import { withApiSupportReference } from "../api/support-reference";
 import {
   parseScenarioManifest,
   type ScenarioManifest,
@@ -229,7 +230,10 @@ export function createScenarioPlanPreviewController(
       } catch {
         // Keep the fixed general failure.
       }
-      output.replaceChildren(createStatus(failureMessage(failure), "error"));
+      output.replaceChildren(createStatus(
+        withApiSupportReference(failureMessage(failure), error),
+        "error",
+      ));
       output.focus();
     }).finally(() => {
       if (revision === submittedRevision) {

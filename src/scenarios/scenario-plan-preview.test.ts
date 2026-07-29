@@ -409,6 +409,25 @@ describe("Scenario plan preview", () => {
     expect(preview.textContent).not.toContain("protected data");
   });
 
+  it("renders a validated support reference without rendering error detail", async () => {
+    const supportReference = "r1_0123456789abcdef01234567";
+    const preview = render(client(
+      async () => {
+        throw Object.assign(new Error("raw upstream protected detail"), {
+          supportReference,
+        });
+      },
+      () => "unavailable",
+    ));
+    submit(preview);
+    await settle();
+    expect(preview.textContent).toContain(
+      `Support reference: ${supportReference}.`,
+    );
+    expect(preview.textContent).not.toContain("raw upstream");
+    expect(preview.textContent).not.toContain("protected detail");
+  });
+
   it("rejects oversized and malformed client results safely", async () => {
     const request: ScenarioPlanningRequest = {
       scenarioId: SCENARIO_MANIFESTS[0].id,

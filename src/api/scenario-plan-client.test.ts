@@ -7,6 +7,7 @@ import {
   compileScenarioExecutionPlan,
   type ScenarioPlanningRequest,
 } from "../scenarios/scenario-plan";
+import { API_SUPPORT_REFERENCE_HEADER } from "./support-reference.ts";
 
 const REQUEST = {
   scenarioId: "help-desk-email-observation",
@@ -102,6 +103,24 @@ describe("scenario-plan typed client", () => {
       .rejects.toMatchObject({ category: "safe-failure" });
   });
 
+  it("binds only a valid server support reference to a response failure", async () => {
+    const supportReference = "r1_0123456789abcdef01234567";
+    const client = new HttpAfterPartyApi(
+      "https://api.example.test",
+      vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(
+        { error: "safe_failure" },
+        500,
+        supportReference,
+      )),
+    );
+
+    await expect(client.compileScenarioPlan("signed-token", REQUEST))
+      .rejects.toMatchObject({
+        category: "safe-failure",
+        supportReference,
+      });
+  });
+
   it("rejects unsafe inputs before fetch and malformed or oversized output", async () => {
     const request = vi.fn<typeof fetch>();
     const client = new HttpAfterPartyApi("https://api.example.test", request);
@@ -188,9 +207,18 @@ describe("scenario-plan typed client", () => {
   });
 });
 
-function jsonResponse(value: unknown, status: number): Response {
+function jsonResponse(
+  value: unknown,
+  status: number,
+  supportReference?: string,
+): Response {
   return new Response(JSON.stringify(value), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(supportReference === undefined
+        ? {}
+        : { [API_SUPPORT_REFERENCE_HEADER]: supportReference }),
+    },
   });
 }

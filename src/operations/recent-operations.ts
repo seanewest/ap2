@@ -10,9 +10,9 @@ export type RecentOperationsState =
   | { kind: "loading" }
   | { kind: "success"; snapshot: RecentOperationEvents }
   | { kind: "cancelled" }
-  | { kind: "unauthorized" }
-  | { kind: "server-shutting-down" }
-  | { kind: "error" };
+  | { kind: "unauthorized"; message?: string }
+  | { kind: "server-shutting-down"; message?: string }
+  | { kind: "error"; message?: string };
 
 export function createRecentOperationsPanel(
   state: RecentOperationsState,
@@ -50,21 +50,23 @@ export function createRecentOperationsPanel(
   } else if (state.kind === "unauthorized") {
     panel.append(
       createStatus(
-        "Your API session expired or this account is not authorized. Sign in again, then refresh.",
+        state.message ??
+          "Your API session expired or this account is not authorized. Sign in again, then refresh.",
         "error",
       ),
     );
   } else if (state.kind === "server-shutting-down") {
     panel.append(
       createStatus(
-        SERVER_SHUTTING_DOWN_MESSAGE,
+        state.message ?? SERVER_SHUTTING_DOWN_MESSAGE,
         "error",
       ),
     );
   } else if (state.kind === "error") {
     panel.append(
       createStatus(
-        "Recent operations could not be loaded. No event details were returned.",
+        state.message ??
+          "Recent operations could not be loaded. No event details were returned.",
         "error",
       ),
     );

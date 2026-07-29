@@ -40,6 +40,30 @@ bounded marker hash to connect phases within a consequential operation.
 Request telemetry does not expose or derive that marker and does not claim
 cross-process, cross-instance, or external-system correlation.
 
+## Operator support reference
+
+Authenticated API responses expose the same request-local correlation value in
+the fixed `X-AP2-Support-Reference` response header. The SPA accepts only the
+`r1_` plus 24 lowercase hexadecimal format and appends a valid value to its own
+fixed failure text. It never renders a response body, exception, token,
+identity, marker, path, or arbitrary header value as diagnostic detail. The
+reference is held only by the response/error currently being handled; the SPA
+does not store it, send it back, or use it to retry.
+
+The server generates the value before shutdown, capacity, origin,
+authentication, body, and dispatch checks. An incoming header with the same
+name is ignored, and cross-origin preflight does not allow a browser to supply
+it. The terminal `api_request` record and response therefore share one safe
+lookup value without accepting attacker-selected cardinality.
+
+A support reference identifies the HTTP request, not an external mutation.
+For a pre-dispatch refusal it does not imply that work was admitted. For an
+admitted bounded mutation it does not replace the operation marker, durable
+journal, reconciliation contract, or terminal operation evidence. A connection
+close may leave only the server-side `499` terminal record. In every case the
+reference is diagnostic only: it does not prove absence or success and never
+authorizes an automatic retry.
+
 ## Production-container proof
 
 `npm run test:container` exercises the built production image across readiness,

@@ -32,6 +32,7 @@ import {
 } from "../api/teams-missed-call-rehearsal-verification";
 import { InMemoryScenarioPlanService } from "../api/scenario-plan";
 import { createApiServer } from "../api/server";
+import { StructuredConsoleApiRequestTelemetry } from "../api/api-telemetry";
 import { JoseTokenVerifier } from "../api/token-verifier";
 import { SCENARIO_MANIFESTS } from "../src/scenarios/scenarios";
 import {
@@ -167,6 +168,9 @@ test.beforeAll(async () => {
     teamsMissedCallRehearsalVerificationService:
       new InMemoryTeamsMissedCallRehearsalVerificationService(),
     allowedOrigin: APP_ORIGIN,
+    requestTelemetry: new StructuredConsoleApiRequestTelemetry({
+      write: () => undefined,
+    }),
   });
   await new Promise<void>((resolve) =>
     apiServer.listen(0, "127.0.0.1", resolve)
@@ -1020,6 +1024,9 @@ test("keeps the catalog descriptive when the API session is unauthorized", async
   expect((await response).status()).toBe(401);
   await expect(page.getByText(
     "API access needs Microsoft authorization. Try again.",
+  )).toBeVisible();
+  await expect(page.getByText(
+    /Support reference: r1_[0-9a-f]{24}\./,
   )).toBeVisible();
   await expect(catalog).toBeVisible();
   await expect(catalog.locator(".scenario-catalog-card")).toHaveCount(

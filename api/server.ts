@@ -130,6 +130,10 @@ import {
 } from "../scripts/verify-purview-audit-boundary-rehearsal-output.js";
 import type { ApiRequestTelemetry } from "./api-telemetry.js";
 import { ProcessLocalApiAdmission } from "./process-admission.js";
+import {
+  API_SUPPORT_REFERENCE_HEADER,
+  API_SUPPORT_REFERENCE_PATTERN,
+} from "../src/api/support-reference.js";
 
 export const API_HEADERS_TIMEOUT_MS = 10_000;
 export const API_REQUEST_RECEIVE_TIMEOUT_MS = 15_000;
@@ -191,6 +195,7 @@ export function createApiServer(dependencies: ApiDependencies): Server {
 }
 
 const responseRouteContracts = new WeakMap<ServerResponse, ApiRouteContract>();
+const responseSupportReferences = new WeakMap<ServerResponse, string>();
 const fixedSecurityHeaders = {
   "Cache-Control": "no-store",
   "Content-Security-Policy":
@@ -210,8 +215,31 @@ async function route(
   const contract = findApiRouteContract(request.method, pathname);
   if (contract) responseRouteContracts.set(response, contract);
   const shuttingDown = dependencies.isShuttingDown?.() === true;
+  const origin = request.headers.origin;
+  if (
+    origin &&
+    dependencies.allowedOrigin &&
+    origin === dependencies.allowedOrigin
+  ) {
+    response.setHeader("Access-Control-Allow-Origin", origin);
+    response.setHeader(
+      "Access-Control-Expose-Headers",
+      API_SUPPORT_REFERENCE_HEADER,
+    );
+    response.setHeader("Vary", "Origin");
+  }
   try {
-    dependencies.requestTelemetry?.observe(response, contract, shuttingDown);
+    const supportReference = dependencies.requestTelemetry?.observe(
+      response,
+      contract,
+      shuttingDown,
+    );
+    if (
+      typeof supportReference === "string" &&
+      API_SUPPORT_REFERENCE_PATTERN.test(supportReference)
+    ) {
+      responseSupportReferences.set(response, supportReference);
+    }
   } catch {
     // Request telemetry is observational and never changes API behavior.
   }
@@ -226,14 +254,11 @@ async function route(
     return;
   }
   try {
-  const origin = request.headers.origin;
   if (origin) {
     if (!dependencies.allowedOrigin || origin !== dependencies.allowedOrigin) {
       sendJson(response, 403, { error: "origin_not_allowed" });
       return;
     }
-    response.setHeader("Access-Control-Allow-Origin", origin);
-    response.setHeader("Vary", "Origin");
   }
 
   if (request.method === "OPTIONS") {
@@ -1217,6 +1242,9 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
     return;
   }
   const routeContract = responseRouteContracts.get(response);
+  const supportReference = routeContract?.authorization === "operator"
+    ? responseSupportReferences.get(response)
+    : undefined;
   const maximumBytes = status >= 400
     ? routeContract?.errorMaxBytes
     : routeContract?.responseMaxBytes;
@@ -1235,6 +1263,9 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
   }
   response.writeHead(status, {
     ...fixedSecurityHeaders,
+    ...(supportReference === undefined
+      ? {}
+      : { [API_SUPPORT_REFERENCE_HEADER]: supportReference }),
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(payload, "utf8"),
   });

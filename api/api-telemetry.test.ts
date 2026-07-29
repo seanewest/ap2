@@ -7,6 +7,7 @@ import {
   type ApiRequestTelemetryEvent,
 } from "./api-telemetry.ts";
 import { createApiServer } from "./server.ts";
+import { API_SUPPORT_REFERENCE_HEADER } from "../src/api/support-reference.ts";
 
 const unsafe = "unsafe-body-token-marker@example.test";
 const messages: string[] = [];
@@ -73,9 +74,22 @@ afterAll(async () => {
 
 describe("API request telemetry", () => {
   it("emits one fixed redacted terminal record for each decisive path", async () => {
-    expect((await fetch(`${baseUrl}/health`)).status).toBe(200);
-    expect((await fetch(`${baseUrl}/api/whoami`)).status).toBe(401);
-    expect((await authorizedFetch("/api/whoami")).status).toBe(200);
+    const health = await fetch(`${baseUrl}/health`);
+    expect(health.status).toBe(200);
+    expect(health.headers.get(API_SUPPORT_REFERENCE_HEADER)).toBeNull();
+    const unauthorized = await fetch(`${baseUrl}/api/whoami`, {
+      headers: {
+        [API_SUPPORT_REFERENCE_HEADER]: "r1_aaaaaaaaaaaaaaaaaaaaaaaa",
+      },
+    });
+    expect(unauthorized.status).toBe(401);
+    const authorized = await authorizedFetch("/api/whoami", {
+      headers: { Origin: "https://allowed.example.test" },
+    });
+    expect(authorized.status).toBe(200);
+    expect(authorized.headers.get("Access-Control-Expose-Headers")).toBe(
+      API_SUPPORT_REFERENCE_HEADER,
+    );
     expect((await authorizedFetch("/api/scenario-plan", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
@@ -96,7 +110,16 @@ describe("API request telemetry", () => {
       headers: { Origin: `https://${unsafe}` },
     })).status).toBe(403);
     shuttingDown = true;
-    expect((await fetch(`${baseUrl}/health`)).status).toBe(503);
+    const shutdown = await fetch(`${baseUrl}/api/whoami`, {
+      headers: { Origin: "https://allowed.example.test" },
+    });
+    expect(shutdown.status).toBe(503);
+    expect(shutdown.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://allowed.example.test",
+    );
+    expect(shutdown.headers.get("Access-Control-Expose-Headers")).toBe(
+      API_SUPPORT_REFERENCE_HEADER,
+    );
 
     const events = messages.map(
       (message) => JSON.parse(message) as ApiRequestTelemetryEvent,
@@ -115,10 +138,22 @@ describe("API request telemetry", () => {
       ["scenario-plan-compile", "pure", 400, "refused"],
       ["scenario-plan-compile", "pure", 413, "refused"],
       ["simulated-email-send", "bounded-mutation", 403, "refused"],
-      ["health", "pure", 503, "shutdown-refused"],
+      ["whoami", "pure", 503, "shutdown-refused"],
     ]);
     expect(new Set(events.map(({ correlationId }) => correlationId)).size)
       .toBe(events.length);
+    expect(unauthorized.headers.get(API_SUPPORT_REFERENCE_HEADER)).toBe(
+      events[1]!.correlationId,
+    );
+    expect(unauthorized.headers.get(API_SUPPORT_REFERENCE_HEADER)).not.toBe(
+      "r1_aaaaaaaaaaaaaaaaaaaaaaaa",
+    );
+    expect(authorized.headers.get(API_SUPPORT_REFERENCE_HEADER)).toBe(
+      events[2]!.correlationId,
+    );
+    expect(shutdown.headers.get(API_SUPPORT_REFERENCE_HEADER)).toBe(
+      events[7]!.correlationId,
+    );
     for (const event of events) {
       expect(Object.keys(event).sort()).toEqual([
         "authorization",
