@@ -1,0 +1,6 @@
+{
+  "linuxOperation": "spawn('/usr/bin/env', ['node', '--version']);",
+  "isolatedBrowserOperation": "await page.screenshot({ path: output }); await navigator.clipboard.readText();",
+  "nonExecutingMountReference": "export const exampleDocumentationPath = '/mnt/c/example';",
+  "nonExecutingExecutableReference": "export const downloadName = 'setup.exe';"
+}
