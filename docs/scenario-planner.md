@@ -73,6 +73,12 @@ insufficient budget, missing cleanup/evidence/interpretation/terminal proof,
 unsupported response, contradictory retention, an invalid manifest, or an
 unknown scenario.
 
+For billable plans, the separate
+[lifecycle cost envelope](lifecycle-cost-envelope.md) binds this exact plan to
+a caller-supplied immutable rate card and conservative timing/usage inputs. It
+does not use manifest assumption prose as pricing, query a live price, or
+promote a forecast or ceiling into an observed bill.
+
 ## CLI
 
 The CLI reads exactly one explicit sanitized JSON input file and writes either
