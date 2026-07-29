@@ -76,3 +76,21 @@ typed client. It validates the exact request shape before transport, binds the
 exact POST route, caps streamed response bytes, accepts only fixed error
 shapes, and independently binds every summary field to the submitted envelope.
 Its runtime import graph does not invoke the server verifier or rehearsal fake.
+
+## Authenticated operator panel
+
+The authenticated operator shell provides a manual-only **Help-desk email
+rehearsal verification** panel over that bounded client. It validates one
+sanitized PR #103 envelope locally before acquiring operator authorization.
+Only an explicit **Verify help-desk rehearsal** action submits one request.
+
+The panel renders only the fixed contract status, synthetic branch, terminal
+fake state, adapter, receipt, envelope, external claim coverage, and synthetic
+claim count. It never renders the submitted JSON, digests, journal details,
+email content, arbitrary labels, proof references, or backend text.
+
+The panel repeats the evidence boundary: send acceptance cannot prove Inbox
+visibility, post-cleanup absence cannot replace pre-cleanup learner
+observation, and every external claim remains uninspected. Input changes clear
+stale results. The panel has no execution, send, retry, polling, persistence,
+scheduling, upload, or external-evidence ingestion path.

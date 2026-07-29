@@ -13,6 +13,7 @@ cloud, workload, or Windows-host request.
 | Receipt verification | Verify receipt | Described input, local validation, busy/disabled form, focused live result/refusal, stale replacement |
 | AVD rehearsal verification | Verify rehearsal output | Described input, local validation, busy/disabled form, focused live result/refusal, stale replacement |
 | Private-document rehearsal verification | Verify private-document rehearsal | Described input, local validation, busy/disabled form, focused live result/refusal, stale replacement |
+| Help-desk email rehearsal verification | Verify help-desk rehearsal | Described input, local validation, busy/disabled form, focused live result/refusal, stale replacement |
 
 The shared browser audit fixes the viewport at 320 CSS pixels, requests reduced
 motion, checks region and action names, verifies control-before-submit keyboard

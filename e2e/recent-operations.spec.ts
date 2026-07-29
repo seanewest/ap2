@@ -24,6 +24,9 @@ import {
 import {
   InMemoryPrivateDocumentRehearsalVerificationService,
 } from "../api/private-document-rehearsal-verification";
+import {
+  InMemoryHelpDeskEmailRehearsalVerificationService,
+} from "../api/help-desk-email-rehearsal-verification";
 import { InMemoryScenarioPlanService } from "../api/scenario-plan";
 import { createApiServer } from "../api/server";
 import { JoseTokenVerifier } from "../api/token-verifier";
@@ -38,6 +41,9 @@ import {
 import {
   parsePrivateDocumentRehearsalVerificationRequest,
 } from "../src/api/private-document-rehearsal-verification-contract";
+import {
+  parseHelpDeskEmailRehearsalVerificationRequest,
+} from "../src/api/help-desk-email-rehearsal-verification-contract";
 
 const ISSUER = "https://fixture.invalid/operator/v2.0";
 const AUDIENCE = "api://ap2-local-fixture";
@@ -47,6 +53,11 @@ const APP_ORIGIN = "http://127.0.0.1:5173";
 const PRIVATE_DOCUMENT_REHEARSAL_OUTPUT =
   parsePrivateDocumentRehearsalVerificationRequest(JSON.parse(readFileSync(
     resolve("scripts/fixtures/private-document-rehearsal-output-learner.json"),
+    "utf8",
+  )) as unknown);
+const HELP_DESK_REHEARSAL_OUTPUT =
+  parseHelpDeskEmailRehearsalVerificationRequest(JSON.parse(readFileSync(
+    resolve("scripts/fixtures/help-desk-email-rehearsal-output-cleaned.json"),
     "utf8",
   )) as unknown);
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
@@ -112,6 +123,8 @@ test.beforeAll(async () => {
       new InMemoryRehearsalOutputVerificationService(),
     privateDocumentRehearsalVerificationService:
       new InMemoryPrivateDocumentRehearsalVerificationService(),
+    helpDeskEmailRehearsalVerificationService:
+      new InMemoryHelpDeskEmailRehearsalVerificationService(),
     allowedOrigin: APP_ORIGIN,
   });
   await new Promise<void>((resolve) =>
@@ -201,6 +214,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     "/api/scenario-evidence-verification",
     "/api/rehearsal-output-verification",
     "/api/private-document-rehearsal-verification",
+    "/api/help-desk-email-rehearsal-verification",
   ]);
   let manualRequests = 0;
   page.on("request", (request) => {
@@ -218,6 +232,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     "Receipt verification",
     "AVD rehearsal verification",
     "Private-document rehearsal verification",
+    "Help-desk email rehearsal verification",
   ];
   for (const name of panels) {
     await expect(page.getByRole("region", { name })).toBeVisible();
@@ -236,6 +251,10 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     [
       "Private-document rehearsal verification",
       "Verify private-document rehearsal",
+    ],
+    [
+      "Help-desk email rehearsal verification",
+      "Verify help-desk rehearsal",
     ],
   ] as const;
   for (const [panelName, actionName] of formPanels) {
@@ -271,6 +290,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
       "Receipt verification",
       "AVD rehearsal verification",
       "Private-document rehearsal verification",
+      "Help-desk email rehearsal verification",
     ]
   ) {
     const input = page.getByRole("region", { name: panelName }).locator(
@@ -1477,6 +1497,226 @@ test("distinguishes private-document expired and forbidden sessions", async ({
     );
     await panel.getByRole("button", {
       name: "Verify private-document rehearsal",
+    }).click();
+    expect((await response).status()).toBe(status);
+    await expect(panel.getByText(new RegExp(message))).toBeVisible();
+    await context.close();
+  }
+});
+
+test("manually verifies one help-desk rehearsal through the signed local product path", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await configureOperator(page, accessToken);
+  let requests = 0;
+  let releaseRequest!: () => void;
+  const requestGate = new Promise<void>((resolve) => {
+    releaseRequest = resolve;
+  });
+  await page.route(
+    "**/api/help-desk-email-rehearsal-verification",
+    async (route) => {
+      await requestGate;
+      await route.continue();
+    },
+  );
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/help-desk-email-rehearsal-verification"
+    ) requests += 1;
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Help-desk email rehearsal verification",
+  });
+  const input = panel.getByLabel(
+    "Sanitized help-desk REHEARSAL_ONLY output JSON",
+  );
+  const verify = panel.getByRole("button", {
+    name: "Verify help-desk rehearsal",
+  });
+  await input.fill(JSON.stringify(HELP_DESK_REHEARSAL_OUTPUT));
+  expect(requests).toBe(0);
+
+  const response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/help-desk-email-rehearsal-verification"
+  );
+  await verify.focus();
+  await page.keyboard.press("Enter");
+  await expect(verify).toBeDisabled();
+  await expect(panel.locator("form")).toHaveAttribute("aria-busy", "true");
+  releaseRequest();
+  expect((await response).status()).toBe(200);
+  expect(requests).toBe(1);
+
+  const result = panel.getByRole("region", {
+    name: "Help-desk email rehearsal verification result",
+  });
+  await expect(result).toContainText("Network-free contract verified");
+  await expect(result).toContainText("Learner Observed Cleaned");
+  await expect(result).toContainText("All Uninspected");
+  await expect(result).toContainText(
+    "Send acceptance does not prove Inbox visibility",
+  );
+  await expect(result).toContainText(
+    "cannot replace pre-cleanup learner observation",
+  );
+  await expect(result).not.toContainText("planDigestSha256");
+  await expect(result).not.toContainText("fakeRunDigestSha256");
+  await expect(result).not.toContainText("journalEntries");
+  await expect(
+    panel.locator(".help-desk-rehearsal-verification-output"),
+  ).toBeFocused();
+  expect(
+    await verify.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.animationDuration, style.transitionDuration];
+    }),
+  ).toEqual(["0s", "0s"]);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+
+  await input.pressSequentially(" ");
+  await expect(result).toHaveCount(0);
+  expect(requests).toBe(1);
+});
+
+test("refuses unsafe help-desk rehearsal input locally without authorization", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  let requests = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/help-desk-email-rehearsal-verification"
+    ) requests += 1;
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Help-desk email rehearsal verification",
+  });
+  const input = panel.getByLabel(
+    "Sanitized help-desk REHEARSAL_ONLY output JSON",
+  );
+  const verify = panel.getByRole("button", {
+    name: "Verify help-desk rehearsal",
+  });
+  await input.fill("{");
+  await verify.click();
+  await expect(panel.getByText(/exact bounded PR #103 envelope/)).toBeVisible();
+  await input.fill(JSON.stringify({
+    ...HELP_DESK_REHEARSAL_OUTPUT,
+    label: "LIVE_RESULT",
+  }));
+  await verify.click();
+  await expect(panel.getByText(/exact REHEARSAL_ONLY label/)).toBeVisible();
+  await input.fill(JSON.stringify({
+    ...HELP_DESK_REHEARSAL_OUTPUT,
+    unsafe: ["operator", "example.invalid"].join("@"),
+  }));
+  await verify.click();
+  await expect(panel.getByText(/Local validation failed/)).toBeVisible();
+  expect(requests).toBe(0);
+});
+
+test("distinguishes help-desk tampering and safe transport failures", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Help-desk email rehearsal verification",
+  });
+  const input = panel.getByLabel(
+    "Sanitized help-desk REHEARSAL_ONLY output JSON",
+  );
+  const verify = panel.getByRole("button", {
+    name: "Verify help-desk rehearsal",
+  });
+  const tampered = JSON.parse(JSON.stringify(HELP_DESK_REHEARSAL_OUTPUT)) as {
+    fakeRun: { journalEntries: number };
+  };
+  tampered.fakeRun.journalEntries += 1;
+  let response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/help-desk-email-rehearsal-verification"
+  );
+  await input.fill(JSON.stringify(tampered));
+  await verify.click();
+  expect((await response).status()).toBe(400);
+  await expect(panel.getByText(/inconsistent or tampered/)).toBeVisible();
+
+  let kind: "request-size" | "response-size" | "general" = "request-size";
+  await page.route(
+    "**/api/help-desk-email-rehearsal-verification",
+    async (route) => {
+      if (kind === "response-size") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: `"${"x".repeat(10_000)}"`,
+        });
+        return;
+      }
+      await route.fulfill({
+        status: kind === "request-size" ? 413 : 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "raw private backend payload" }),
+      });
+    },
+  );
+  await input.fill(JSON.stringify(HELP_DESK_REHEARSAL_OUTPUT));
+  await verify.click();
+  await expect(panel.getByText(/request-size limit/)).toBeVisible();
+  kind = "response-size";
+  await verify.click();
+  await expect(panel.getByText(/response-size limit/)).toBeVisible();
+  kind = "general";
+  await verify.click();
+  await expect(panel.getByText(/verification is unavailable/)).toBeVisible();
+  await expect(panel).not.toContainText("raw private backend payload");
+});
+
+test("distinguishes help-desk expired and forbidden sessions", async ({
+  browser,
+}) => {
+  const cases = [
+    ["invalid-fixture-token", 401, "operator session expired"],
+    [
+      fixtureToken({
+        tid: STUDENT_TENANT_ID,
+        oid: "fixture-unapproved-operator",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      }),
+      403,
+      "not authorized",
+    ],
+  ] as const;
+  for (const [token, status, message] of cases) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await configureOperator(page, token);
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    const panel = page.getByRole("region", {
+      name: "Help-desk email rehearsal verification",
+    });
+    await panel.getByLabel(
+      "Sanitized help-desk REHEARSAL_ONLY output JSON",
+    ).fill(JSON.stringify(HELP_DESK_REHEARSAL_OUTPUT));
+    const response = page.waitForResponse((candidate) =>
+      new URL(candidate.url()).pathname ===
+        "/api/help-desk-email-rehearsal-verification"
+    );
+    await panel.getByRole("button", {
+      name: "Verify help-desk rehearsal",
     }).click();
     expect((await response).status()).toBe(status);
     await expect(panel.getByText(new RegExp(message))).toBeVisible();

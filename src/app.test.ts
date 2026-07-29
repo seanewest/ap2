@@ -14,6 +14,7 @@ import {
 import {
   ApiAccessError,
   BatchFeasibilityClientError,
+  HelpDeskEmailRehearsalVerificationClientError,
   OneDriveInviteFailureError,
   PrivateDocumentRehearsalVerificationClientError,
   RehearsalOutputVerificationClientError,
@@ -38,6 +39,9 @@ import { API_ACCESS_SCOPES } from "./api/config";
 import {
   parsePrivateDocumentRehearsalVerificationRequest,
 } from "./api/private-document-rehearsal-verification-contract";
+import {
+  parseHelpDeskEmailRehearsalVerificationRequest,
+} from "./api/help-desk-email-rehearsal-verification-contract";
 import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
 import { CANONICAL_RECEIPT_FIXTURES } from "./scenarios/scenario-evidence-receipt.fixtures";
 import { verifyCanonicalScenarioEvidenceReceipt } from "./scenarios/scenario-evidence-verification";
@@ -49,6 +53,9 @@ import {
 import {
   verifyPrivateDocumentRehearsalOutput,
 } from "../scripts/verify-private-document-rehearsal-output";
+import {
+  verifyHelpDeskEmailRehearsalOutput,
+} from "../scripts/verify-help-desk-email-rehearsal-output";
 
 const privateDocumentRehearsalOutput =
   parsePrivateDocumentRehearsalVerificationRequest(JSON.parse(readFileSync(
@@ -57,6 +64,13 @@ const privateDocumentRehearsalOutput =
   )) as unknown);
 const privateDocumentRehearsalSummary =
   verifyPrivateDocumentRehearsalOutput(privateDocumentRehearsalOutput);
+const helpDeskRehearsalOutput =
+  parseHelpDeskEmailRehearsalVerificationRequest(JSON.parse(readFileSync(
+    resolve("scripts/fixtures/help-desk-email-rehearsal-output-cleaned.json"),
+    "utf8",
+  )) as unknown);
+const helpDeskRehearsalSummary =
+  verifyHelpDeskEmailRehearsalOutput(helpDeskRehearsalOutput);
 
 const account: AccountIdentity = {
   accountId: "student-object-id",
@@ -1972,6 +1986,130 @@ describe("After Party authentication UI", () => {
       expect(panel.textContent).toContain(message);
       expect(panel.textContent).not.toContain(failure.message);
       expect(api.verifyPrivateDocumentRehearsalOutput).toHaveBeenCalledTimes(
+        reachesApi ? 1 : 0,
+      );
+    },
+  );
+
+  it("verifies help-desk output only after explicit signed submission", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.verifyHelpDeskEmailRehearsalOutput.mockResolvedValue(
+      helpDeskRehearsalSummary,
+    );
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".help-desk-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify(helpDeskRehearsalOutput);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyHelpDeskEmailRehearsalOutput).not.toHaveBeenCalled();
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.verifyHelpDeskEmailRehearsalOutput).toHaveBeenCalledWith(
+      "temporary-token",
+      helpDeskRehearsalOutput,
+    );
+    expect(panel.textContent).toContain("Network-free contract verified");
+    expect(panel.textContent).not.toContain("temporary-token");
+    expect(panel.textContent).not.toContain(
+      helpDeskRehearsalSummary.planDigestSha256,
+    );
+  });
+
+  it("refuses unsafe help-desk output before acquiring authorization", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".help-desk-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify({
+      ...helpDeskRehearsalOutput,
+      unsafe: ["operator", "example.invalid"].join("@"),
+    });
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+
+    expect(panel.textContent).toContain("Local validation failed");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyHelpDeskEmailRehearsalOutput).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new AccessTokenError("raw expired session detail"),
+      "operator session expired",
+      false,
+    ],
+    [
+      new HelpDeskEmailRehearsalVerificationClientError("forbidden"),
+      "not authorized",
+      true,
+    ],
+    [
+      new HelpDeskEmailRehearsalVerificationClientError(
+        "validation-refused",
+        "FAKE_CONTRACT_BINDING",
+      ),
+      "inconsistent or tampered",
+      true,
+    ],
+    [
+      new HelpDeskEmailRehearsalVerificationClientError(
+        "response-too-large",
+      ),
+      "response-size limit",
+      true,
+    ],
+    [
+      new HelpDeskEmailRehearsalVerificationClientError("safe-failure"),
+      "verification is unavailable",
+      true,
+    ],
+  ] as const)(
+    "maps typed help-desk failure without rendering detail",
+    async (failure, message, reachesApi) => {
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      authentication.acquireAccessToken.mockImplementation(async () => {
+        if (!reachesApi) throw failure;
+        return "temporary-token";
+      });
+      if (reachesApi) {
+        api.verifyHelpDeskEmailRehearsalOutput.mockRejectedValue(failure);
+      }
+      await createAfterPartyApp(root, authentication, api).start();
+      const panel = root.querySelector<HTMLElement>(
+        ".help-desk-rehearsal-verification",
+      )!;
+      const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+      input.value = JSON.stringify(helpDeskRehearsalOutput);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+      await nextTask();
+
+      expect(panel.textContent).toContain(message);
+      expect(panel.textContent).not.toContain(failure.message);
+      expect(api.verifyHelpDeskEmailRehearsalOutput).toHaveBeenCalledTimes(
         reachesApi ? 1 : 0,
       );
     },

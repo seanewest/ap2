@@ -1,9 +1,9 @@
 import { appendIdentity, createStatus } from "../ui/elements";
-import type {
-  VerifiedHelpDeskEmailRehearsalSummary,
-} from "../../scripts/verify-help-desk-email-rehearsal-output";
-
-const MAX_REQUEST_BYTES = 32 * 1024;
+import {
+  HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
+  type HelpDeskEmailRehearsalVerificationRequest,
+  type VerifiedHelpDeskEmailRehearsalSummary,
+} from "../api/help-desk-email-rehearsal-verification-contract";
 
 export type SafeHelpDeskRehearsalSummary =
   VerifiedHelpDeskEmailRehearsalSummary;
@@ -17,7 +17,7 @@ export type HelpDeskRehearsalPanelFailure =
   | "verification-refused";
 
 export interface HelpDeskRehearsalPanelClient<
-  TInput extends object = object,
+  TInput extends object = HelpDeskEmailRehearsalVerificationRequest,
 > {
   parse(value: unknown): TInput | undefined;
   verify(input: TInput): Promise<SafeHelpDeskRehearsalSummary>;
@@ -25,7 +25,7 @@ export interface HelpDeskRehearsalPanelClient<
 }
 
 export interface HelpDeskRehearsalPanelOptions<
-  TInput extends object = object,
+  TInput extends object = HelpDeskEmailRehearsalVerificationRequest,
 > {
   client: HelpDeskRehearsalPanelClient<TInput>;
 }
@@ -65,7 +65,7 @@ export function createHelpDeskRehearsalVerificationPanel<
   const input = document.createElement("textarea");
   input.name = "helpDeskRehearsalOutput";
   input.rows = 10;
-  input.maxLength = MAX_REQUEST_BYTES;
+  input.maxLength = HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES;
   input.required = true;
   input.autocomplete = "off";
   input.spellcheck = false;
@@ -140,7 +140,10 @@ function parseInput<TInput extends object>(
   parse: (value: unknown) => TInput | undefined,
 ): TInput | "branch" | "empty" | "invalid" | "label" | "too-large" {
   if (text.trim().length === 0) return "empty";
-  if (new TextEncoder().encode(text).byteLength > MAX_REQUEST_BYTES) {
+  if (
+    new TextEncoder().encode(text).byteLength >
+    HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES
+  ) {
     return "too-large";
   }
   let value: unknown;
