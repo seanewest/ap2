@@ -308,6 +308,51 @@ describe("scenario execution-plan compiler", () => {
     });
   });
 
+  it("schedules verified expiry before every billable producer operation", () => {
+    const plannedProducer = {
+      ...AVD_THREE_VM_SCENARIO,
+      id: "planned-avd-expiry-first",
+      evidence: {
+        ...AVD_THREE_VM_SCENARIO.evidence,
+        artifacts: AVD_THREE_VM_SCENARIO.evidence.artifacts.map(
+          (artifact) => ({
+            ...artifact,
+            state: "planned",
+            learnerVisibility: "not-proven",
+            observation: undefined,
+          }),
+        ),
+      },
+      learner: {
+        ...AVD_THREE_VM_SCENARIO.learner,
+        completionState: "not-run",
+      },
+    };
+    const plan = compileScenarioExecutionPlan(
+      {
+        ...REQUESTS["avd-three-vm-substrate"],
+        scenarioId: "planned-avd-expiry-first",
+      },
+      [plannedProducer],
+    );
+    const expiry = plan.steps.findIndex(
+      ({ operationKey }) => operationKey === "schedule-expiry-cleanup",
+    );
+    const deploy = plan.steps.findIndex(
+      ({ operationKey }) =>
+        operationKey === "deploy-private-three-vm-topology",
+    );
+
+    expect(expiry).toBeGreaterThan(-1);
+    expect(deploy).toBeGreaterThan(expiry);
+    expect(plan.steps[expiry]).toMatchObject({
+      phase: "producer-operation",
+      operationCategory: "expiry.schedule",
+      execution: "automated",
+      ambiguityBehavior: "stop-and-reconcile",
+    });
+  });
+
   it("includes only a selected manifest response", () => {
     const request = {
       ...REQUESTS["help-desk-email-observation"],

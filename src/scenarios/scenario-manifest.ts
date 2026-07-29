@@ -780,6 +780,12 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
       "cost.laneMaximum must be greater than zero when resources are billable.",
     );
   }
+  validateLifecycleMarker(operations);
+  validateBillableExpiryContract(
+    resources,
+    operationByKey,
+    lifecycleExpiresAt,
+  );
 
   return {
     schemaVersion: 2,
@@ -818,6 +824,53 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
       assumption: text(costValue.assumption, "cost.assumption"),
     },
   };
+}
+
+function validateLifecycleMarker(
+  operations: readonly ScenarioOperation[],
+): void {
+  const markers = new Set(
+    operations
+      .filter(({ effect }) => effect === "mutation")
+      .map(({ marker }) => marker),
+  );
+  if (markers.size !== 1 || markers.has(undefined)) {
+    throw new ScenarioManifestError(
+      "all mutating operations must share one lifecycle marker.",
+    );
+  }
+}
+
+function validateBillableExpiryContract(
+  resources: readonly ScenarioResource[],
+  operations: ReadonlyMap<string, ScenarioOperation>,
+  lifecycleExpiresAt: string,
+): void {
+  if (!resources.some(({ billable }) => billable)) return;
+  const expiryResources = resources.filter(
+    ({ kind }) => kind === "expiry-schedule",
+  );
+  if (expiryResources.length !== 1) {
+    throw new ScenarioManifestError(
+      "billable resources require one marker-bound expiry schedule.",
+    );
+  }
+  const expiryResource = expiryResources[0]!;
+  const create = operations.get(expiryResource.createOperationKey);
+  const cleanup = operations.get(expiryResource.cleanupOperationKey);
+  if (
+    create?.phase !== "setup" ||
+    create.capability !== "expiry.schedule" ||
+    create.effect !== "mutation" ||
+    cleanup?.phase !== "cleanup" ||
+    cleanup.capability !== "expiry.remove" ||
+    cleanup.effect !== "mutation" ||
+    expiryResource.expiresAt !== lifecycleExpiresAt
+  ) {
+    throw new ScenarioManifestError(
+      "billable expiry schedule must bind setup, cleanup, and lifecycle expiry.",
+    );
+  }
 }
 
 export function createScenarioPlan(value: unknown): HTMLElement {
