@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { SCENARIO_RECEIPT_API_CAPABILITY } from "../../api/scenario-evidence-verification.ts";
 import { SCENARIO_PLAN_API_CAPABILITY } from "../../api/scenario-plan.ts";
 import { REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY } from "../../api/rehearsal-output-verification.ts";
+import { BATCH_FEASIBILITY_API_CAPABILITY } from "../../api/multi-scenario-feasibility.ts";
 import { AVD_MANIFEST_ADAPTER_CAPABILITY } from "../../scripts/avd-three-vm-manifest-adapter.ts";
 import { AVD_THREE_VM_REHEARSAL_CAPABILITY } from "../../scripts/avd-three-vm-rehearsal.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY } from "../../scripts/private-document-rehearsal.ts";
@@ -22,6 +23,7 @@ import { SCENARIO_MANIFESTS } from "./scenarios.ts";
 
 function surfaceDeclarations(): unknown[] {
   return structuredClone([
+    BATCH_FEASIBILITY_API_CAPABILITY,
     SCENARIO_PLAN_API_CAPABILITY,
     SCENARIO_RECEIPT_API_CAPABILITY,
     REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
@@ -67,6 +69,9 @@ describe("canonical scenario surface inventory", () => {
       expect(row.surfaces["authenticated-plan-api-client"].status).toBe(
         "implemented",
       );
+      expect(
+        row.surfaces["authenticated-batch-feasibility-api-client"].status,
+      ).toBe("implemented");
       expect(row.surfaces["operator-read-ui"].status).toBe("implemented");
       expect(row.surfaces["operator-preview-ui"].status).toBe("implemented");
       expect(row.surfaces["operator-verify-ui"]).toEqual({

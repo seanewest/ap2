@@ -21,6 +21,25 @@ aggregate USD ceiling, maximum concurrency, requested duration, earliest
 expiry margin, and ordered categorical blockers. Unknown cost or duration is
 infeasible. Cost arithmetic uses integer cents.
 
+## Authenticated in-memory API
+
+Operators may submit a bounded batch to
+`POST /api/multi-scenario-feasibility`. Each batch item contains a sanitized
+instance alias and the same planning request accepted by
+`POST /api/scenario-plan`; clients do not submit compiled plans. The API
+authenticates and authorizes before reading the body, compiles every item
+through the authoritative scenario compiler, and then invokes this planner
+synchronously in memory.
+
+The typed `HttpAfterPartyApi.calculateMultiScenarioFeasibility` client checks
+the bounded request and streams the result under a hard response cap. It
+imports only browser-safe contract values; the scenario compiler and
+feasibility planner stay in the API bundle.
+
+A returned `feasible` result is conservative planning arithmetic only. The
+endpoint does not execute, schedule, reserve, query quota or availability,
+persist state, collect telemetry, retry, or authorize scenario work.
+
 Run it with one explicit sanitized JSON file:
 
 ```sh

@@ -6,6 +6,19 @@ import {
 } from "./scenario-plan";
 import { parseScenarioManifest } from "./scenario-manifest";
 import { SCENARIO_MANIFESTS } from "./scenarios";
+import {
+  FEASIBILITY_BLOCKERS,
+  type FeasibilityBlocker,
+  type FeasibilityInputFailure,
+  type MultiScenarioFeasibilityResult,
+} from "./multi-scenario-feasibility-contract";
+
+export type {
+  FeasibilityBlocker,
+  FeasibilityInputFailure,
+  MultiScenarioFeasibilityRequest,
+  MultiScenarioFeasibilityResult,
+} from "./multi-scenario-feasibility-contract";
 
 const REQUEST_KEYS = ["schemaVersion", "label", "session", "plans"] as const;
 const SESSION_KEYS = [
@@ -30,26 +43,6 @@ const RAW_IDENTIFIER =
 const STRONG_RAW_IDENTIFIER =
   /(?:@|\/|\\|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f-]{23}|-----BEGIN|eyJ[A-Za-z0-9_-]{20,})/i;
 
-const BLOCKER_ORDER = [
-  "UNKNOWN_COST_OR_DURATION",
-  "INDIVIDUAL_BUDGET_OVERRUN",
-  "INDIVIDUAL_EXPIRY_OVERRUN",
-  "DUPLICATE_INSTANCE",
-  "AGGREGATE_BUDGET_OVERRUN",
-  "CONCURRENCY_OVERRUN",
-  "SESSION_DURATION_OVERRUN",
-  "EXPIRY_MARGIN_INSUFFICIENT",
-  "HUMAN_GATE_NOT_ALLOWED",
-] as const;
-
-export type FeasibilityBlocker = typeof BLOCKER_ORDER[number];
-
-export type FeasibilityInputFailure =
-  | "INPUT_INVALID"
-  | "INPUT_OVERSIZED"
-  | "PLAN_INVALID"
-  | "RAW_IDENTIFIER_REJECTED";
-
 export class MultiScenarioFeasibilityInputError extends Error {
   readonly category: FeasibilityInputFailure;
 
@@ -58,36 +51,6 @@ export class MultiScenarioFeasibilityInputError extends Error {
     this.name = "MultiScenarioFeasibilityInputError";
     this.category = category;
   }
-}
-
-export interface MultiScenarioFeasibilityRequest {
-  schemaVersion: 1;
-  label: "SCENARIO_FEASIBILITY_REQUEST";
-  session: Readonly<{
-    startsAt: string;
-    requestedDurationMinutes: number;
-    aggregateBudgetCeilingUsd: string;
-    concurrencyLimit: number;
-    minimumExpiryMarginMinutes: number;
-    humanGatePolicy: "allow" | "refuse";
-  }>;
-  plans: readonly Readonly<{
-    instanceAlias: string;
-    plan: ScenarioExecutionPlan;
-  }>[];
-}
-
-export interface MultiScenarioFeasibilityResult {
-  schemaVersion: 1;
-  label: "FEASIBILITY_ONLY";
-  status: "feasible" | "infeasible";
-  planCount: number;
-  maximumConcurrency: number;
-  conservativeAggregateUsdCeiling: string | null;
-  requestedSessionDurationMinutes: number;
-  earliestExpiryMarginMinutes: number | null;
-  humanGateCount: number;
-  blockers: readonly FeasibilityBlocker[];
 }
 
 interface ParsedSession {
@@ -193,7 +156,7 @@ export function planMultiScenarioFeasibility(
     blockers.add("HUMAN_GATE_NOT_ALLOWED");
   }
 
-  const orderedBlockers = BLOCKER_ORDER.filter((blocker) =>
+  const orderedBlockers = FEASIBILITY_BLOCKERS.filter((blocker) =>
     blockers.has(blocker)
   );
   return {
@@ -323,7 +286,7 @@ function assessPlan(value: unknown): PlanAssessment {
     plannedMaximumCents,
     generatedAtMs,
     expiresAtMs,
-    blockers: BLOCKER_ORDER.filter((blocker) => blockers.has(blocker)),
+    blockers: FEASIBILITY_BLOCKERS.filter((blocker) => blockers.has(blocker)),
   };
 }
 

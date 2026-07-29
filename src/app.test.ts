@@ -76,6 +76,8 @@ class FakeApi implements AfterPartyApi {
     vi.fn<AfterPartyApi["verifyScenarioEvidenceReceipt"]>();
   verifyRehearsalOutput =
     vi.fn<AfterPartyApi["verifyRehearsalOutput"]>();
+  calculateMultiScenarioFeasibility =
+    vi.fn<AfterPartyApi["calculateMultiScenarioFeasibility"]>();
   getRecentOperationEvents =
     vi.fn<
       (
