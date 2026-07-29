@@ -71,6 +71,9 @@ cost; runtime validation must pass before the UI consumes a manifest.
 The [local scenario planner](scenario-planner.md) can compile that contract
 into a deterministic sanitized readiness plan. Planning remains local and does
 not prove or execute external activity.
+The [lifecycle cost envelope](lifecycle-cost-envelope.md) can bind a future
+billable plan to one supplied, time-bounded rate card. Its conservative result
+is a forecast-only ceiling check, never a live price quote or observed bill.
 The
 [canonical scenario surface inventory](scenario-surface-inventory.md) shows
 which validated scenarios also have repository adapters, rehearsal
