@@ -93,6 +93,9 @@ The
 checks a saved bounded output by independently recompiling and reconstructing
 the categorical adapter/receipt contract. A verified result proves contract
 consistency only and does not upgrade any external or learner claim.
+Its operator-only API/client preserves that same pure boundary: authorization
+precedes the bounded body read, and the response contains only the fixed safe
+summary or categorical refusal.
 
 ## Work inside the lab boundary
 

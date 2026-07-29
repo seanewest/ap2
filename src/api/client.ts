@@ -57,6 +57,14 @@ import {
   apiRouteContract,
   type ApiRouteOwnerKey,
 } from "./api-route-contract.ts";
+import {
+  TEAMS_MISSED_CALL_REHEARSAL_VERIFICATION_FAILURES,
+  isBoundedTeamsMissedCallRehearsalRequest,
+  isVerifiedTeamsMissedCallRehearsalSummary,
+  type TeamsMissedCallRehearsalVerificationFailure,
+  type TeamsMissedCallRehearsalVerificationRequest,
+  type VerifiedTeamsMissedCallRehearsalSummary,
+} from "./teams-missed-call-rehearsal-verification-contract.ts";
 
 export const SCENARIO_API_CLIENT_CAPABILITIES = [
   {
@@ -103,6 +111,14 @@ export const SCENARIO_API_CLIENT_CAPABILITIES = [
     manifestSchemaVersion: 2,
     repositoryBoundary: "contract-only",
     scenarioIds: ["help-desk-email-observation"],
+  },
+  {
+    schemaVersion: 1,
+    surface: "authenticated-rehearsal-verification-client",
+    scenarioScope: "explicit-scenarios",
+    manifestSchemaVersion: 2,
+    repositoryBoundary: "contract-only",
+    scenarioIds: ["teams-missed-call-observation"],
   },
 ] as const satisfies readonly ScenarioSurfaceCapabilityDeclaration[];
 
@@ -346,6 +362,10 @@ export interface AfterPartyApi {
     accessToken: string,
     output: HelpDeskEmailRehearsalVerificationRequest,
   ): Promise<VerifiedHelpDeskEmailRehearsalSummary>;
+  verifyTeamsMissedCallRehearsalOutput?(
+    accessToken: string,
+    output: TeamsMissedCallRehearsalVerificationRequest,
+  ): Promise<VerifiedTeamsMissedCallRehearsalSummary>;
   calculateMultiScenarioFeasibility(
     accessToken: string,
     request: BatchFeasibilityRequest,
@@ -509,6 +529,21 @@ export class HelpDeskEmailRehearsalVerificationClientError extends Error {
   }
 }
 
+export class TeamsMissedCallRehearsalVerificationClientError extends Error {
+  readonly category: RehearsalOutputVerificationClientErrorCategory;
+  readonly refusalCategory?: TeamsMissedCallRehearsalVerificationFailure;
+
+  constructor(
+    category: RehearsalOutputVerificationClientErrorCategory,
+    refusalCategory?: TeamsMissedCallRehearsalVerificationFailure,
+  ) {
+    super(`Teams missed-call rehearsal verification failed: ${category}`);
+    this.name = "TeamsMissedCallRehearsalVerificationClientError";
+    this.category = category;
+    this.refusalCategory = refusalCategory;
+  }
+}
+
 export type BatchFeasibilityClientErrorCategory =
   | "unauthorized"
   | "forbidden"
@@ -556,6 +591,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly rehearsalOutputVerificationUrl: string;
   private readonly privateDocumentRehearsalVerificationUrl: string;
   private readonly helpDeskEmailRehearsalVerificationUrl: string;
+  private readonly teamsMissedCallRehearsalVerificationUrl: string;
   private readonly multiScenarioFeasibilityUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
@@ -595,6 +631,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     this.calendarMeetingCancelUrl = routeUrl(
       baseUrl,
       "calendar-meeting-cancel",
+    );
+    this.teamsMissedCallRehearsalVerificationUrl = routeUrl(
+      baseUrl,
+      "teams-missed-call-rehearsal-verify",
     );
     this.request = request.bind(globalThis);
   }
@@ -1216,6 +1256,139 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       !isVerifiedHelpDeskEmailRehearsalSummary(value, output)
     ) {
       throw new HelpDeskEmailRehearsalVerificationClientError("safe-failure");
+    }
+    return value;
+  }
+
+  async verifyTeamsMissedCallRehearsalOutput(
+    accessToken: string,
+    output: TeamsMissedCallRehearsalVerificationRequest,
+  ): Promise<VerifiedTeamsMissedCallRehearsalSummary> {
+    const contract = apiRouteContract("teams-missed-call-rehearsal-verify");
+    if (!isBoundedTeamsMissedCallRehearsalRequest(output)) {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "validation-refused",
+        "INPUT_SHAPE",
+      );
+    }
+    let body: string;
+    try {
+      body = JSON.stringify(output);
+    } catch {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "validation-refused",
+      );
+    }
+    if (
+      new TextEncoder().encode(body).byteLength > contract.requestMaxBytes
+    ) {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await this.request(
+        this.teamsMissedCallRehearsalVerificationUrl,
+        {
+          method: contract.method,
+          credentials: "omit",
+          redirect: "error",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body,
+        },
+      );
+    } catch {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (response.status === 401) {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "unauthorized",
+      );
+    }
+    if (response.status === 403) {
+      throw new TeamsMissedCallRehearsalVerificationClientError("forbidden");
+    }
+    if (response.status === 413) {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(
+        response.headers.get("content-type") ?? "",
+      )
+    ) {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+
+    let responseText: string;
+    try {
+      responseText = await readBoundedJsonResponse(
+        response,
+        contract.responseMaxBytes,
+      );
+    } catch (error) {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        error instanceof BoundedResponseTooLargeError
+          ? "response-too-large"
+          : "safe-failure",
+      );
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (!response.ok) {
+      if (
+        response.status === 400 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error", "category"]) &&
+        value.error === "teams_missed_call_rehearsal_refused" &&
+        typeof value.category === "string" &&
+        TEAMS_MISSED_CALL_REHEARSAL_VERIFICATION_FAILURES.includes(
+          value.category as TeamsMissedCallRehearsalVerificationFailure,
+        )
+      ) {
+        throw new TeamsMissedCallRehearsalVerificationClientError(
+          "validation-refused",
+          value.category as TeamsMissedCallRehearsalVerificationFailure,
+        );
+      }
+      if (
+        response.status === 500 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error"]) &&
+        value.error ===
+          "teams_missed_call_rehearsal_response_too_large"
+      ) {
+        throw new TeamsMissedCallRehearsalVerificationClientError(
+          "response-too-large",
+        );
+      }
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (
+      response.status !== 200 ||
+      !isVerifiedTeamsMissedCallRehearsalSummary(value, output)
+    ) {
+      throw new TeamsMissedCallRehearsalVerificationClientError(
+        "safe-failure",
+      );
     }
     return value;
   }

@@ -123,6 +123,11 @@ describe("canonical scenario surface inventory", () => {
     )!;
     expect(teams.surfaces.adapter.status).toBe("implemented");
     expect(teams.surfaces.rehearsal.status).toBe("implemented");
+    expect(
+      teams.surfaces[
+        "authenticated-rehearsal-verification-api-client"
+      ].status,
+    ).toBe("implemented");
 
     const oauthRecon = first.scenarios.find(
       ({ scenarioId }) => scenarioId === "oauth-application-reconnaissance",
