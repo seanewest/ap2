@@ -18,6 +18,9 @@ import {
   type ScenarioCompatibilityMatrix,
 } from "./scenario-contract-compatibility.ts";
 import { parseScenarioManifest, type ScenarioManifest } from "./scenario-manifest.ts";
+import {
+  OAUTH_APPLICATION_RECON_RECEIPT_ADAPTER_CAPABILITY,
+} from "./oauth-application-recon-receipt-adapter.ts";
 import { SCENARIO_PLAN_PREVIEW_UI_CAPABILITY } from "./scenario-plan-preview.ts";
 import { SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY } from "./scenario-evidence-verification-panel.ts";
 import { PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY } from "./private-document-receipt-adapter.ts";
@@ -165,6 +168,7 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
 const AUTHORITATIVE_ADAPTER_DECLARATIONS = [
   AVD_MANIFEST_ADAPTER_CAPABILITY,
   HELP_DESK_EMAIL_RECEIPT_ADAPTER_CAPABILITY,
+  OAUTH_APPLICATION_RECON_RECEIPT_ADAPTER_CAPABILITY,
   PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY,
   TEAMS_MISSED_CALL_RECEIPT_ADAPTER_CAPABILITY,
 ] as const satisfies readonly ScenarioAdapterCapabilityDeclaration[];

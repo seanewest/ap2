@@ -28,6 +28,7 @@ export interface ScenarioSurfaceCapabilityDeclaration {
 export const SCENARIO_ADAPTER_NAMES = [
   "avd-manifest",
   "help-desk-email",
+  "oauth-application-recon",
   "operation-telemetry",
   "private-document",
   "teams-missed-call",
