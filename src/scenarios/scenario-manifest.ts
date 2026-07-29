@@ -1,4 +1,4 @@
-import { appendIdentity, createStatus } from "../ui/elements";
+import { appendIdentity, createStatus } from "../ui/elements.ts";
 
 const ACTOR_KINDS = [
   "application",
@@ -46,6 +46,7 @@ const OPERATION_CAPABILITIES = [
   "mail.delete-exact",
   "permission.grant",
   "permission.revoke",
+  "purview.audit-query",
   "sensitive-artifacts.prepare",
   "sensitive-artifacts.remove",
   "teams.audio-call.manual",
@@ -73,6 +74,7 @@ const ARTIFACT_KINDS = [
   "endpoint-posture",
   "outlook-email",
   "application-recon-summary",
+  "purview-audit-summary",
   "private-network-topology",
   "teams-missed-call",
 ] as const;
@@ -98,6 +100,7 @@ const SEMANTIC_CLAIMS = [
   "infrastructure-removed",
   "outlook-email",
   "private-three-vm-topology",
+  "purview-surface-reachability",
   "permissions-revoked",
   "teams-missed-call",
   "teams-voicemail",
@@ -1194,6 +1197,7 @@ function validateSemanticClaims(
     readonly ScenarioSemanticClaim[]
   > = {
     "application-recon-summary": ["application-reconnaissance"],
+    "purview-audit-summary": ["purview-surface-reachability"],
     "outlook-email": ["outlook-email"],
     "teams-missed-call": ["teams-missed-call"],
     "avd-topology": ["avd-ready"],

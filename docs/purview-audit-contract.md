@@ -70,3 +70,8 @@ observation are supported and live-reachable, but operation-level producer
 correlation is not yet live-proven. Do not substitute the earlier
 service-principal sign-in proof or infer application identity from an empty
 result.
+
+The canonical post-run
+[scenario evidence receipt](scenario-evidence-receipts.md) preserves these as
+separate rows: surface reachability and detector separation are proven, while
+producer attribution remains `licensing-or-latency-blocked`.

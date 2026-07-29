@@ -1,7 +1,7 @@
 import {
   parseScenarioManifest,
   type ScenarioManifest,
-} from "./scenario-manifest";
+} from "./scenario-manifest.ts";
 
 const marker = "ap2-application-recon-window";
 
