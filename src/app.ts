@@ -50,7 +50,7 @@ import {
   createButton,
   createStatus,
 } from "./ui/elements";
-import { createScenarioPlan } from "./scenarios/scenario-manifest";
+import { createScenarioCatalog } from "./scenarios/scenario-catalog";
 import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
 
 type ApiAccessState =
@@ -870,7 +870,7 @@ function createStatePanel(
         ),
         createContactProofPanel(contactProof, apiOperationLoading),
         ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
-        ...SCENARIO_MANIFESTS.map(createScenarioPlan),
+        createScenarioCatalog(SCENARIO_MANIFESTS),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;

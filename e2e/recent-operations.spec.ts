@@ -148,6 +148,86 @@ test("manually loads sanitized recent operations through the local product path"
   expect(readRequests).toBe(1);
 });
 
+test("navigates the read-only scenario catalog without network activity", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await configureOperator(page, accessToken);
+  let apiRequests = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.startsWith("/api/")) {
+      apiRequests += 1;
+    }
+  });
+
+  await page.goto("/e2e/recent-operations.html");
+  await expect(page.getByText("Signed in as Fixture Operator")).toBeVisible();
+  const catalog = page.getByRole("region", { name: "Scenario catalog" });
+  await expect(catalog).toBeVisible();
+  await expect(catalog.locator(".scenario-catalog-card")).toHaveCount(4);
+  await expect(catalog.getByText("Purview audit boundary")).toBeVisible();
+  await expect(catalog.getByText(
+    "Private three-VM AVD lab substrate",
+  )).toBeVisible();
+  await expect(catalog.locator(
+    "button, a, form, input, select, textarea, [data-action]",
+  )).toHaveCount(0);
+  apiRequests = 0;
+
+  const firstDetails = catalog.locator("details").first();
+  const firstSummary = firstDetails.locator("summary");
+  await firstSummary.focus();
+  await expect(firstSummary).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(firstDetails).toHaveAttribute("open", "");
+  await expect(firstDetails.getByText("Role separation")).toBeVisible();
+  await page.waitForTimeout(100);
+  expect(apiRequests).toBe(0);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+});
+
+test("keeps the catalog descriptive when the API session is unauthorized", async ({
+  page,
+}) => {
+  await configureOperator(page, "invalid-fixture-token");
+  await page.goto("/e2e/recent-operations.html");
+  const catalog = page.getByRole("region", { name: "Scenario catalog" });
+  await expect(catalog).toBeVisible();
+
+  const response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname === "/api/whoami"
+  );
+  await page.getByRole("button", { name: "Check API access" }).click();
+  expect((await response).status()).toBe(401);
+  await expect(page.getByText(
+    "API access needs Microsoft authorization. Try again.",
+  )).toBeVisible();
+  await expect(catalog).toBeVisible();
+  await expect(catalog.locator(".scenario-catalog-card")).toHaveCount(4);
+  await expect(catalog.locator("[data-action]")).toHaveCount(0);
+});
+
+async function configureOperator(
+  page: import("@playwright/test").Page,
+  token: string,
+): Promise<void> {
+  await page.addInitScript(
+    ({ apiBaseUrl, accessToken }) => {
+      Object.defineProperty(window, "__AP2_LOCAL_OPERATOR__", {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: { apiBaseUrl, accessToken },
+      });
+    },
+    { apiBaseUrl, accessToken: token },
+  );
+}
+
 function fixtureToken(claims: Record<string, unknown>): string {
   const header = Buffer.from(JSON.stringify({
     alg: "RS256",
