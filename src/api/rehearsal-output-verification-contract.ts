@@ -74,7 +74,7 @@ export function isBoundedRehearsalOutputRequest(
   ) {
     return false;
   }
-  return isBoundedSafeValue(value, 0);
+  return isBoundedSafeValue(value, 0) && isExactRehearsalShape(value);
 }
 
 export function isVerifiedRehearsalOutputSummary(
@@ -195,6 +195,164 @@ function isBoundedSafeValue(value: unknown, depth: number): boolean {
         !RAW_REFERENCE_KEY.test(key) &&
         isBoundedSafeValue(entry, depth + 1),
     )
+  );
+}
+
+function isExactRehearsalShape(
+  output: Record<string, unknown>,
+): boolean {
+  const stages = exactRecord(output.stages, [
+    "plan",
+    "run",
+    "observation",
+    "receipt",
+  ]);
+  const journal = exactRecord(output.runnerJournal, [
+    "entries",
+    "duplicateWrites",
+    "transitions",
+  ]);
+  const transitions = journal &&
+    exactRecord(journal.transitions, [
+      "intent",
+      "succeeded",
+      "failed",
+      "ambiguous",
+      "reconciled",
+      "reconciliation-blocked",
+    ]);
+  const observations = exactRecord(output.observations, [
+    "status",
+    "provenance",
+    "evidence",
+    "terminalInputs",
+  ]);
+  const evidence = observations &&
+    exactRecord(observations.evidence, [
+      "proven",
+      "notObserved",
+      "failedOrMissing",
+    ]);
+  const terminalInputs = observations &&
+    exactRecord(observations.terminalInputs, [
+      "cleanup",
+      "roleAbsence",
+      "retention",
+    ]);
+  const receipt = exactRecord(output.receipt, [
+    "status",
+    "verified",
+    "binding",
+    "claimCount",
+    "provenClaims",
+    "uninspectedClaims",
+    "missingCoverage",
+  ]);
+  const binding = receipt &&
+    exactRecord(receipt.binding, [
+      "planDigestSha256",
+      "runStatus",
+      "observationProvenance",
+      "cleanup",
+      "roleAbsence",
+      "retention",
+    ]);
+  const missingCoverage = receipt &&
+    exactRecord(receipt.missingCoverage, [
+      "operations",
+      "artifacts",
+      "learner",
+      "responses",
+      "cleanup",
+      "retention",
+      "terminalProof",
+    ]);
+  if (
+    !stages ||
+    !journal ||
+    !transitions ||
+    !observations ||
+    !evidence ||
+    !terminalInputs ||
+    !receipt ||
+    !binding ||
+    !missingCoverage
+  ) {
+    return false;
+  }
+  return (
+    output.status === "completed" &&
+    output.failure === null &&
+    typeof output.planDigestSha256 === "string" &&
+    SHA256.test(output.planDigestSha256) &&
+    stages.plan === "compiled" &&
+    stages.run === "completed" &&
+    stages.observation === "collected" &&
+    stages.receipt === "verified-incomplete" &&
+    countsAreBounded(journal, ["entries", "duplicateWrites"]) &&
+    countsAreBounded(transitions, [
+      "intent",
+      "succeeded",
+      "failed",
+      "ambiguous",
+      "reconciled",
+      "reconciliation-blocked",
+    ]) &&
+    observations.status === "collected" &&
+    observations.provenance === "synthetic" &&
+    countsAreBounded(evidence, [
+      "proven",
+      "notObserved",
+      "failedOrMissing",
+    ]) &&
+    terminalInputs.cleanup === "synthetic-supplied" &&
+    terminalInputs.roleAbsence === "synthetic-supplied" &&
+    terminalInputs.retention === "synthetic-supplied" &&
+    receipt.status === "verified-incomplete" &&
+    receipt.verified === true &&
+    countsAreBounded(receipt, [
+      "claimCount",
+      "provenClaims",
+      "uninspectedClaims",
+    ]) &&
+    countsAreBounded(missingCoverage, [
+      "operations",
+      "artifacts",
+      "learner",
+      "responses",
+      "cleanup",
+      "retention",
+      "terminalProof",
+    ]) &&
+    binding.planDigestSha256 === output.planDigestSha256 &&
+    binding.runStatus === "completed" &&
+    binding.observationProvenance === "synthetic" &&
+    binding.cleanup === "synthetic-supplied" &&
+    binding.roleAbsence === "synthetic-supplied" &&
+    binding.retention === "synthetic-supplied"
+  );
+}
+
+function exactRecord(
+  value: unknown,
+  expectedKeys: readonly string[],
+): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  const keys = Object.keys(value);
+  return keys.length === expectedKeys.length &&
+      expectedKeys.every((key, index) => keys[index] === key)
+    ? value
+    : undefined;
+}
+
+function countsAreBounded(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+): boolean {
+  return keys.every((key) =>
+    Number.isSafeInteger(value[key]) &&
+    Number(value[key]) >= 0 &&
+    Number(value[key]) <= 10_000
   );
 }
 

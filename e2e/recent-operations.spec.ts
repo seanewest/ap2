@@ -13,6 +13,9 @@ import { InMemoryOperationTelemetryCollector } from "../api/operation-telemetry-
 import {
   InMemoryScenarioEvidenceVerificationService,
 } from "../api/scenario-evidence-verification";
+import {
+  InMemoryRehearsalOutputVerificationService,
+} from "../api/rehearsal-output-verification";
 import { InMemoryScenarioPlanService } from "../api/scenario-plan";
 import { createApiServer } from "../api/server";
 import { JoseTokenVerifier } from "../api/token-verifier";
@@ -21,6 +24,9 @@ import {
   CANONICAL_RECEIPT_FIXTURES,
   NEGATIVE_RECEIPT_FIXTURES,
 } from "../src/scenarios/scenario-evidence-receipt.fixtures";
+import {
+  canonicalAvdThreeVmRehearsalOutput,
+} from "../scripts/verify-avd-three-vm-rehearsal-output";
 
 const ISSUER = "https://fixture.invalid/operator/v2.0";
 const AUDIENCE = "api://ap2-local-fixture";
@@ -84,6 +90,8 @@ test.beforeAll(async () => {
     scenarioPlanService: new InMemoryScenarioPlanService(),
     scenarioEvidenceVerificationService:
       new InMemoryScenarioEvidenceVerificationService(),
+    rehearsalOutputVerificationService:
+      new InMemoryRehearsalOutputVerificationService(),
     allowedOrigin: APP_ORIGIN,
   });
   await new Promise<void>((resolve) =>
@@ -656,6 +664,226 @@ test("distinguishes expired and forbidden receipt verification sessions", async 
         "/api/scenario-evidence-verification"
     );
     await panel.getByRole("button", { name: "Verify receipt" }).click();
+    expect((await response).status()).toBe(status);
+    await expect(panel.getByText(new RegExp(message))).toBeVisible();
+    await context.close();
+  }
+});
+
+test("manually verifies one canonical rehearsal output through the signed local product path", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await configureOperator(page, accessToken);
+  const output = canonicalAvdThreeVmRehearsalOutput();
+  if (output.planDigestSha256 === null) {
+    throw new Error("Canonical rehearsal fixture must include a plan digest.");
+  }
+  let verificationRequests = 0;
+  let releaseRequest!: () => void;
+  const requestGate = new Promise<void>((resolve) => {
+    releaseRequest = resolve;
+  });
+  await page.route("**/api/rehearsal-output-verification", async (route) => {
+    await requestGate;
+    await route.continue();
+  });
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/rehearsal-output-verification"
+    ) {
+      verificationRequests += 1;
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "AVD rehearsal verification",
+  });
+  const input = panel.getByLabel("Sanitized REHEARSAL_ONLY output JSON");
+  const verify = panel.getByRole("button", {
+    name: "Verify rehearsal output",
+  });
+  await expect(panel.getByText("No rehearsal output submitted")).toBeVisible();
+  await input.fill(JSON.stringify(output));
+  expect(verificationRequests).toBe(0);
+
+  const response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/rehearsal-output-verification"
+  );
+  await verify.focus();
+  await expect(verify).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(
+    panel.getByText("Verifying the network-free rehearsal output…"),
+  ).toBeVisible();
+  await expect(verify).toBeDisabled();
+  releaseRequest();
+  expect((await response).status()).toBe(200);
+  expect(verificationRequests).toBe(1);
+
+  const result = panel.getByRole("region", {
+    name: "AVD rehearsal verification result",
+  });
+  await expect(result).toBeVisible();
+  await expect(result).toContainText("Network-free contract verified");
+  await expect(result).toContainText("Terminal Complete");
+  await expect(result).toContainText("Synthetic Only");
+  await expect(result).toContainText("All Uninspected");
+  await expect(result).not.toContainText(output.planDigestSha256);
+  await expect(result).not.toContainText("runnerJournal");
+  await expect(result).not.toContainText("avd-three-vm-substrate");
+  await expect(panel.locator(".avd-rehearsal-verification-output"))
+    .toBeFocused();
+  expect(
+    await verify.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.animationDuration, style.transitionDuration];
+    }),
+  ).toEqual(["0s", "0s"]);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+
+  await input.pressSequentially(" ");
+  await expect(result).toHaveCount(0);
+  await expect(panel.getByText("Input changed")).toBeVisible();
+  expect(verificationRequests).toBe(1);
+});
+
+test("refuses unsafe rehearsal output locally without authorization", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  let apiRequests = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/rehearsal-output-verification"
+    ) {
+      apiRequests += 1;
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "AVD rehearsal verification",
+  });
+  const input = panel.getByLabel("Sanitized REHEARSAL_ONLY output JSON");
+  const verify = panel.getByRole("button", {
+    name: "Verify rehearsal output",
+  });
+
+  await input.fill("{");
+  await verify.click();
+  await expect(panel.getByText(/exact bounded PR #83 envelope/)).toBeVisible();
+  await input.fill(JSON.stringify({
+    ...canonicalAvdThreeVmRehearsalOutput(),
+    label: "LIVE_RESULT",
+  }));
+  await verify.click();
+  await expect(panel.getByText(/exact REHEARSAL_ONLY label/)).toBeVisible();
+  const unsafe = canonicalAvdThreeVmRehearsalOutput();
+  await input.fill(JSON.stringify({
+    ...unsafe,
+    observations: {
+      ...unsafe.observations,
+      unexpectedField: ["operator", "example.invalid"].join("@"),
+    },
+  }));
+  await verify.click();
+  await expect(panel.getByText(/Local validation failed/)).toBeVisible();
+  expect(apiRequests).toBe(0);
+});
+
+test("distinguishes rehearsal tampering, size, and general safe failures", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "AVD rehearsal verification",
+  });
+  const input = panel.getByLabel("Sanitized REHEARSAL_ONLY output JSON");
+  const verify = panel.getByRole("button", {
+    name: "Verify rehearsal output",
+  });
+  const tampered = canonicalAvdThreeVmRehearsalOutput();
+  tampered.runnerJournal.entries += 1;
+
+  let response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/rehearsal-output-verification"
+  );
+  await input.fill(JSON.stringify(tampered));
+  await verify.click();
+  expect((await response).status()).toBe(400);
+  await expect(panel.getByText(/inconsistent or tampered/)).toBeVisible();
+
+  let kind: "request-size" | "response-size" | "general" = "request-size";
+  await page.route("**/api/rehearsal-output-verification", async (route) => {
+    if (kind === "response-size") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: `"${"x".repeat(10_000)}"`,
+      });
+      return;
+    }
+    await route.fulfill({
+      status: kind === "request-size" ? 413 : 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "raw private backend payload" }),
+    });
+  });
+  await input.fill(JSON.stringify(canonicalAvdThreeVmRehearsalOutput()));
+  await verify.click();
+  await expect(panel.getByText(/request-size limit/)).toBeVisible();
+  kind = "response-size";
+  await verify.click();
+  await expect(panel.getByText(/response-size limit/)).toBeVisible();
+  kind = "general";
+  await verify.click();
+  await expect(panel.getByText(/verification is unavailable/)).toBeVisible();
+  await expect(panel).not.toContainText("raw private backend payload");
+});
+
+test("distinguishes expired and forbidden rehearsal verification sessions", async ({
+  browser,
+}) => {
+  const cases = [
+    ["invalid-fixture-token", 401, "operator session expired"],
+    [
+      fixtureToken({
+        tid: STUDENT_TENANT_ID,
+        oid: "fixture-unapproved-operator",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      }),
+      403,
+      "not authorized",
+    ],
+  ] as const;
+  for (const [token, status, message] of cases) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await configureOperator(page, token);
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    const panel = page.getByRole("region", {
+      name: "AVD rehearsal verification",
+    });
+    await panel.getByLabel("Sanitized REHEARSAL_ONLY output JSON").fill(
+      JSON.stringify(canonicalAvdThreeVmRehearsalOutput()),
+    );
+    const response = page.waitForResponse((candidate) =>
+      new URL(candidate.url()).pathname ===
+        "/api/rehearsal-output-verification"
+    );
+    await panel.getByRole("button", {
+      name: "Verify rehearsal output",
+    }).click();
     expect((await response).status()).toBe(status);
     await expect(panel.getByText(new RegExp(message))).toBeVisible();
     await context.close();
