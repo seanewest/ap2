@@ -129,6 +129,7 @@ import {
   PurviewAuditBoundaryRehearsalVerificationError,
 } from "../scripts/verify-purview-audit-boundary-rehearsal-output.js";
 import type { ApiRequestTelemetry } from "./api-telemetry.js";
+import { ProcessLocalApiAdmission } from "./process-admission.js";
 
 export const API_HEADERS_TIMEOUT_MS = 10_000;
 export const API_REQUEST_RECEIVE_TIMEOUT_MS = 15_000;
@@ -171,17 +172,21 @@ export interface ApiDependencies {
 }
 
 export function createApiServer(dependencies: ApiDependencies): Server {
+  const admission = new ProcessLocalApiAdmission();
   const server = createServer({
     headersTimeout: API_HEADERS_TIMEOUT_MS,
     requestTimeout: API_REQUEST_RECEIVE_TIMEOUT_MS,
     connectionsCheckingInterval: API_CONNECTIONS_CHECKING_INTERVAL_MS,
     keepAliveTimeout: API_KEEP_ALIVE_TIMEOUT_MS,
+    maxHeaderSize: 16_384,
   }, (request, response) => {
-    void route(request, response, dependencies).catch(() => {
+    void route(request, response, dependencies, admission).catch(() => {
       sendJson(response, 500, { error: "internal_server_error" });
     });
   });
   server.setTimeout(API_INACTIVITY_TIMEOUT_MS, (socket) => socket.destroy());
+  server.maxHeadersCount = 64;
+  server.maxRequestsPerSocket = 100;
   return server;
 }
 
@@ -199,6 +204,7 @@ async function route(
   request: IncomingMessage,
   response: ServerResponse,
   dependencies: ApiDependencies,
+  admission: ProcessLocalApiAdmission,
 ): Promise<void> {
   const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
   const contract = findApiRouteContract(request.method, pathname);
@@ -213,6 +219,13 @@ async function route(
     sendJson(response, 503, { error: "server_shutting_down" });
     return;
   }
+  const release = admission.tryAcquire(contract);
+  if (!release) {
+    response.setHeader("Connection", "close");
+    sendJson(response, 503, { error: "process_capacity_exceeded" });
+    return;
+  }
+  try {
   const origin = request.headers.origin;
   if (origin) {
     if (!dependencies.allowedOrigin || origin !== dependencies.allowedOrigin) {
@@ -383,6 +396,9 @@ async function route(
       return;
     default:
       assertNeverOwner(contract.ownerKey);
+  }
+  } finally {
+    release();
   }
 }
 

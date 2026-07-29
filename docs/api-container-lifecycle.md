@@ -19,6 +19,13 @@ they do not drain within ten seconds, the existing categorical timeout exits
 the process with status 1; the API does not retry, persist, or resume their
 work. A normal drain exits with status 0.
 
+Before shutdown, one
+[process-local backpressure boundary](api-abuse-backpressure.md) admits
+bounded work by the route registry's side-effect class. A full lane refuses
+immediately without authenticating, reading JSON, queueing, or retrying. This
+single-process boundary does not replace ingress rate/connection controls,
+`maxReplicas=1`, or a durable cross-replica mutation journal.
+
 `npm run test:api-lifecycle-container` builds and exercises the real production
 image. It proves:
 
