@@ -5,6 +5,12 @@ listed only when it was exercised through the hosted product path or by a
 bounded direct canary against the Student tenant. Unit tests, deployment alone,
 and code that has not touched Microsoft are not counted as live proof.
 
+A capability rehearsal or environment-validation canary proves a platform
+contract. It is not automatically a learner scenario. Source-backed learner
+scenarios additionally name the evidence producer, workload actor,
+learner/observer, and optional responder, and explain what evidence the learner
+receives.
+
 Actor shorthand:
 
 - **c91 delegated — user**: the shared `c91c7af4-...` client acquired a
@@ -69,6 +75,18 @@ CBA before their hosted proofs. Those runs corroborate the same product paths;
 they are not additional tenant capabilities.
 
 ## Attack-inspired scenarios
+
+The first source-backed migration is the already-proven controlled Teams
+missed-call observation. Its product card is read-only and performs no tenant
+operation:
+
+| Scenario | Evidence producer / orchestrator | Workload actor | Learner / observer | Responder | Learner receives |
+| --- | --- | --- | --- | --- | --- |
+| Controlled Teams missed-call observation | AP2 instructor, who owns the one-attempt staging boundary | Kobe lab user through a separate licensed Teams client session | Learner using Cory's lab Teams view | None; observation only | One `Missed incoming` call entry and one matching Teams activity item to correlate without returning the call |
+
+The remaining entries below are historical evidence narratives, not migrated
+source manifests. Their attacker/defender wording must not be read as silently
+assigning the learner to either proof role.
 
 | Scenario | Attacker-side unit | Defender-side observation | Boundary still visible |
 | --- | --- | --- | --- |

@@ -22,6 +22,36 @@ matches the behavior being tested. A development identity can prove a platform
 contract, but it does not prove that the eventual product identity or learner
 path works.
 
+## Separate scenario roles
+
+Choosing the Microsoft workload actor is necessary but not sufficient for a
+learner scenario. Every source-backed staged scenario must explicitly assign:
+
+- **evidence producer/orchestrator** — the agent, app, instructor, simulated
+  attacker, or lab harness that stages the evidence;
+- **workload actor** — the Microsoft identity, service principal, or device
+  that performs the underlying operation;
+- **learner/observer** — the person expected to receive, inspect, and interpret
+  the evidence; and
+- **responder** — the optional actor authorized to remediate after
+  interpretation.
+
+The scenario manifest fails closed when the evidence producer and learner
+resolve to the same actor. A scenario may make them the same only by declaring
+an explicit `self-triggered` exercise with a non-empty rationale explaining why
+the learner action is intentionally the event under investigation.
+
+Actor identity and authentication transport are separate fields. For example,
+Kobe is the workload actor while a licensed Teams client session is the
+transport. Changing from a browser to an app-only or delegated token does not
+silently change who Microsoft records as the actor.
+
+The existing fixed proof operations and bounded direct canaries remain
+backward-compatible capability rehearsals. They validate environment and
+operation contracts and are not implicitly learner scenarios. A rehearsal
+becomes a learner scenario only when it is deliberately migrated into the
+validated scenario registry and its learner-facing evidence plan is explicit.
+
 ## Work inside the lab boundary
 
 The tenant and explicitly selected subscriptions are dedicated lab
