@@ -43,6 +43,9 @@ import {
   InMemoryMultiScenarioFeasibilityService,
 } from "./multi-scenario-feasibility.js";
 import {
+  InMemoryPrivateDocumentRehearsalVerificationService,
+} from "./private-document-rehearsal-verification.js";
+import {
   DelegatedGraphOneDriveShareProof,
   GRAPH_FILES_READ_WRITE_SCOPE,
   ProcessLocalOneDriveShareProofBoundary,
@@ -176,6 +179,8 @@ const server = createApiServer({
     new InMemoryScenarioEvidenceVerificationService(),
   rehearsalOutputVerificationService:
     new InMemoryRehearsalOutputVerificationService(),
+  privateDocumentRehearsalVerificationService:
+    new InMemoryPrivateDocumentRehearsalVerificationService(),
   multiScenarioFeasibilityService:
     new InMemoryMultiScenarioFeasibilityService(),
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),

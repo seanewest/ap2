@@ -41,6 +41,16 @@ import {
   type FeasibilityInputFailure,
   type MultiScenarioFeasibilityResult,
 } from "../scenarios/multi-scenario-feasibility-contract.ts";
+import {
+  PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
+  PRIVATE_DOCUMENT_REHEARSAL_MAX_RESPONSE_BYTES,
+  PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_FAILURES,
+  isBoundedPrivateDocumentRehearsalRequest,
+  isVerifiedPrivateDocumentRehearsalSummary,
+  type PrivateDocumentRehearsalVerificationFailure,
+  type PrivateDocumentRehearsalVerificationRequest,
+  type VerifiedPrivateDocumentRehearsalSummary,
+} from "./private-document-rehearsal-verification-contract.ts";
 
 export const SCENARIO_API_CLIENT_CAPABILITIES = [
   {
@@ -71,6 +81,14 @@ export const SCENARIO_API_CLIENT_CAPABILITIES = [
     manifestSchemaVersion: 2,
     repositoryBoundary: "contract-only",
     scenarioIds: ["avd-three-vm-substrate"],
+  },
+  {
+    schemaVersion: 1,
+    surface: "authenticated-rehearsal-verification-client",
+    scenarioScope: "explicit-scenarios",
+    manifestSchemaVersion: 2,
+    repositoryBoundary: "contract-only",
+    scenarioIds: ["private-document-evidence"],
   },
 ] as const satisfies readonly ScenarioSurfaceCapabilityDeclaration[];
 
@@ -306,6 +324,10 @@ export interface AfterPartyApi {
     accessToken: string,
     output: RehearsalOutputVerificationRequest,
   ): Promise<VerifiedRehearsalOutputSummary>;
+  verifyPrivateDocumentRehearsalOutput(
+    accessToken: string,
+    output: PrivateDocumentRehearsalVerificationRequest,
+  ): Promise<VerifiedPrivateDocumentRehearsalSummary>;
   calculateMultiScenarioFeasibility(
     accessToken: string,
     request: BatchFeasibilityRequest,
@@ -439,6 +461,21 @@ export class RehearsalOutputVerificationClientError extends Error {
   }
 }
 
+export class PrivateDocumentRehearsalVerificationClientError extends Error {
+  readonly category: RehearsalOutputVerificationClientErrorCategory;
+  readonly refusalCategory?: PrivateDocumentRehearsalVerificationFailure;
+
+  constructor(
+    category: RehearsalOutputVerificationClientErrorCategory,
+    refusalCategory?: PrivateDocumentRehearsalVerificationFailure,
+  ) {
+    super(`Private-document rehearsal verification failed: ${category}`);
+    this.name = "PrivateDocumentRehearsalVerificationClientError";
+    this.category = category;
+    this.refusalCategory = refusalCategory;
+  }
+}
+
 export type BatchFeasibilityClientErrorCategory =
   | "unauthorized"
   | "forbidden"
@@ -483,6 +520,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly scenarioPlanUrl: string;
   private readonly scenarioEvidenceVerificationUrl: string;
   private readonly rehearsalOutputVerificationUrl: string;
+  private readonly privateDocumentRehearsalVerificationUrl: string;
   private readonly multiScenarioFeasibilityUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
@@ -517,6 +555,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ).toString();
     this.rehearsalOutputVerificationUrl = new URL(
       "api/rehearsal-output-verification",
+      `${baseUrl}/`,
+    ).toString();
+    this.privateDocumentRehearsalVerificationUrl = new URL(
+      "api/private-document-rehearsal-verification",
       `${baseUrl}/`,
     ).toString();
     this.multiScenarioFeasibilityUrl = new URL(
@@ -904,6 +946,139 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       !isVerifiedRehearsalOutputSummary(value, output)
     ) {
       throw new RehearsalOutputVerificationClientError("safe-failure");
+    }
+    return value;
+  }
+
+  async verifyPrivateDocumentRehearsalOutput(
+    accessToken: string,
+    output: PrivateDocumentRehearsalVerificationRequest,
+  ): Promise<VerifiedPrivateDocumentRehearsalSummary> {
+    if (!isBoundedPrivateDocumentRehearsalRequest(output)) {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "validation-refused",
+        "INPUT_SHAPE",
+      );
+    }
+    let body: string;
+    try {
+      body = JSON.stringify(output);
+    } catch {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "validation-refused",
+      );
+    }
+    if (
+      new TextEncoder().encode(body).byteLength >
+      PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES
+    ) {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await this.request(
+        this.privateDocumentRehearsalVerificationUrl,
+        {
+          method: "POST",
+          credentials: "omit",
+          redirect: "error",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body,
+        },
+      );
+    } catch {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (response.status === 401) {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "unauthorized",
+      );
+    }
+    if (response.status === 403) {
+      throw new PrivateDocumentRehearsalVerificationClientError("forbidden");
+    }
+    if (response.status === 413) {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(
+        response.headers.get("content-type") ?? "",
+      )
+    ) {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+
+    let responseText: string;
+    try {
+      responseText = await readBoundedJsonResponse(
+        response,
+        PRIVATE_DOCUMENT_REHEARSAL_MAX_RESPONSE_BYTES,
+      );
+    } catch (error) {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        error instanceof BoundedResponseTooLargeError
+          ? "response-too-large"
+          : "safe-failure",
+      );
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (!response.ok) {
+      if (
+        response.status === 400 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error", "category"]) &&
+        value.error === "private_document_rehearsal_refused" &&
+        typeof value.category === "string" &&
+        PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_FAILURES.includes(
+          value.category as PrivateDocumentRehearsalVerificationFailure,
+        )
+      ) {
+        throw new PrivateDocumentRehearsalVerificationClientError(
+          "validation-refused",
+          value.category as PrivateDocumentRehearsalVerificationFailure,
+        );
+      }
+      if (
+        response.status === 500 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error"]) &&
+        value.error ===
+          "private_document_rehearsal_response_too_large"
+      ) {
+        throw new PrivateDocumentRehearsalVerificationClientError(
+          "response-too-large",
+        );
+      }
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "safe-failure",
+      );
+    }
+    if (
+      response.status !== 200 ||
+      !isVerifiedPrivateDocumentRehearsalSummary(value, output)
+    ) {
+      throw new PrivateDocumentRehearsalVerificationClientError(
+        "safe-failure",
+      );
     }
     return value;
   }

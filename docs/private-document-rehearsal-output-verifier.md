@@ -48,9 +48,27 @@ even though its separate three-round terminal state is synthetically absent.
 
 Missing, extra, reordered, duplicated, malformed, oversized, unsafe, raw,
 digest-tampered, nonterminal, cleanup-gap, branch-mismatched, or overclaiming
-input fails closed. The verifier has no API route, runner or fake execution,
-network access, retry, mutation, persistence, external proof, browser path, or
+input fails closed. The verifier has no runner or fake execution, network
+access, retry, mutation, persistence, external proof, browser path, or
 Windows-host dependency.
+
+## Authenticated in-memory API
+
+Operators may submit one bounded sanitized captured envelope to
+`POST /api/private-document-rehearsal-verification`. Authentication and
+operator authorization complete before the body is read. The route invokes
+this verifier synchronously in memory and returns only its fixed verification
+summary or a categorical refusal.
+
+`HttpAfterPartyApi.verifyPrivateDocumentRehearsalOutput` is the browser-safe
+typed client. It validates the request, streams the response under a hard cap,
+and independently binds the scenario, manifest version, digests, branch,
+contract states, and claim count to the submitted envelope. Its runtime import
+graph excludes the fake lifecycle and server verifier.
+
+The endpoint verifies supplied offline rehearsal data only. It does not run a
+scenario or fake lifecycle, obtain evidence, ingest telemetry, schedule work,
+persist state, mutate a receipt, or prove that external work occurred.
 
 The outer label, canonical JSON, safe-string, plan-binding, terminal, and
 all-uninspected checks use the
