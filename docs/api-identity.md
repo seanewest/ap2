@@ -268,9 +268,10 @@ sign-in, API-access, and sign-out buttons and exposes no token.
 
 ## Operator browser-session lifecycle
 
-The SPA keeps MSAL access tokens in `memoryStorage`; it does not persist tokens
-or claims in local or session storage. Redirect bookkeeping remains MSAL-owned,
-but a page reload without a redirect result starts a new signed-out adapter.
+The SPA uses MSAL's tab-scoped `sessionStorage`, the supported cache for
+redirect sign-in. It does not use durable `localStorage`; closing the tab ends
+that tab's MSAL cache, not the wider Entra SSO session. A same-tab reload may
+restore the active account, while explicit sign-out performs logout navigation.
 For one active account, concurrent requests for the exact same scopes share one
 in-flight silent acquisition. A different concurrent scope is refused instead
 of starting another interaction.

@@ -34,7 +34,7 @@ export const MSAL_BROWSER_CONFIGURATION: Configuration = {
     postLogoutRedirectUri: getApplicationUrl(),
   },
   cache: {
-    cacheLocation: "memoryStorage",
+    cacheLocation: "sessionStorage",
   },
 };
 
