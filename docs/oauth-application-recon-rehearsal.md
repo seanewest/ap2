@@ -11,10 +11,11 @@ npm run rehearse:oauth-app-recon -- \
   scripts/fixtures/oauth-application-recon-rehearsal.json
 ```
 
-The CLI reads exactly one bounded canonical JSON file and writes one bounded
-JSON result to standard output. It does not acquire an OAuth token, call
-Microsoft Graph or an audit service, perform a retry, persist evidence, or
-execute any scenario operation.
+The CLI reads exactly one bounded canonical JSON file. Success writes one
+bounded JSON result to standard output; refusal leaves standard output empty,
+writes one fixed categorical JSON error to standard error, and exits nonzero.
+It does not acquire an OAuth token, call Microsoft Graph or an audit service,
+perform a retry, persist evidence, or execute any scenario operation.
 
 The fake supplies exactly four ordered categorical results:
 

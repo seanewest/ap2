@@ -11,9 +11,11 @@ Run it with one explicit sanitized request file:
 npm run rehearse:avd-three-vm -- request.json
 ```
 
-The command reads only that file and emits a bounded JSON result labeled
-`REHEARSAL_ONLY`. It performs no Azure or Microsoft 365 operation and writes no
-files. A fixed input produces a fixed result.
+The command reads only that file. Success emits a bounded JSON result labeled
+`REHEARSAL_ONLY` to standard output; refusal leaves standard output empty,
+writes one fixed categorical JSON error to standard error, and exits nonzero.
+It performs no Azure or Microsoft 365 operation and writes no files. A fixed
+input produces a fixed result.
 
 ## What a green rehearsal proves
 

@@ -427,6 +427,23 @@ describe("private-document REHEARSAL_ONLY pipeline", () => {
       status: "refused",
       failure: "INPUT_SCHEMA",
     });
+
+    const schemaRejected = spawnSync(
+      process.execPath,
+      [
+        CLI,
+        resolve("scripts/fixtures/help-desk-email-rehearsal-send.json"),
+      ],
+      { encoding: "utf8" },
+    );
+    expect(schemaRejected.status).toBe(2);
+    expect(schemaRejected.stdout).toBe("");
+    expect(JSON.parse(schemaRejected.stderr)).toEqual({
+      schemaVersion: 1,
+      label: "REHEARSAL_ONLY",
+      status: "refused",
+      failure: "INPUT_SCHEMA",
+    });
   });
 });
 

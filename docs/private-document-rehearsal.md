@@ -16,10 +16,12 @@ npm run rehearse:private-document -- \
   scripts/fixtures/private-document-rehearsal-learner.json
 ```
 
-The CLI accepts exactly one regular JSON file of at most 8 KiB and writes only
-deterministic JSON to standard output. The request contains only the schema
-version, `REHEARSAL_ONLY` label, canonical scenario ID, and one of two
-synthetic branches. Extra fields and unsupported values fail closed.
+The CLI accepts exactly one regular JSON file of at most 8 KiB. Success writes
+only deterministic JSON to standard output; refusal leaves standard output
+empty, writes one fixed categorical JSON error to standard error, and exits
+nonzero. The request contains only the schema version, `REHEARSAL_ONLY` label,
+canonical scenario ID, and one of two synthetic branches. Extra fields and
+unsupported values fail closed.
 
 ## Pipeline
 
