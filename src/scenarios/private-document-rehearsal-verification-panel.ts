@@ -1,9 +1,9 @@
 import { appendIdentity, createStatus } from "../ui/elements";
-import type {
-  VerifiedPrivateDocumentRehearsalSummary,
-} from "../../scripts/verify-private-document-rehearsal-output";
-
-const MAX_REQUEST_BYTES = 32 * 1024;
+import {
+  PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
+  type PrivateDocumentRehearsalVerificationRequest,
+  type VerifiedPrivateDocumentRehearsalSummary,
+} from "../api/private-document-rehearsal-verification-contract";
 
 export type SafePrivateDocumentRehearsalSummary =
   VerifiedPrivateDocumentRehearsalSummary;
@@ -17,7 +17,7 @@ export type PrivateDocumentRehearsalPanelFailure =
   | "verification-refused";
 
 export interface PrivateDocumentRehearsalPanelClient<
-  TInput extends object = object,
+  TInput extends object = PrivateDocumentRehearsalVerificationRequest,
 > {
   parse(value: unknown): TInput | undefined;
   verify(input: TInput): Promise<SafePrivateDocumentRehearsalSummary>;
@@ -25,7 +25,7 @@ export interface PrivateDocumentRehearsalPanelClient<
 }
 
 export interface PrivateDocumentRehearsalPanelOptions<
-  TInput extends object = object,
+  TInput extends object = PrivateDocumentRehearsalVerificationRequest,
 > {
   client: PrivateDocumentRehearsalPanelClient<TInput>;
 }
@@ -65,7 +65,7 @@ export function createPrivateDocumentRehearsalVerificationPanel<
   const input = document.createElement("textarea");
   input.name = "privateDocumentRehearsalOutput";
   input.rows = 10;
-  input.maxLength = MAX_REQUEST_BYTES;
+  input.maxLength = PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES;
   input.required = true;
   input.autocomplete = "off";
   input.spellcheck = false;
@@ -142,7 +142,10 @@ function parseInput<TInput extends object>(
   parse: (value: unknown) => TInput | undefined,
 ): TInput | "branch" | "empty" | "invalid" | "label" | "too-large" {
   if (text.trim().length === 0) return "empty";
-  if (new TextEncoder().encode(text).byteLength > MAX_REQUEST_BYTES) {
+  if (
+    new TextEncoder().encode(text).byteLength >
+    PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES
+  ) {
     return "too-large";
   }
   let value: unknown;
