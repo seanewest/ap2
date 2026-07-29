@@ -37,6 +37,9 @@ import {
   InMemoryScenarioEvidenceVerificationService,
 } from "./scenario-evidence-verification.js";
 import {
+  InMemoryRehearsalOutputVerificationService,
+} from "./rehearsal-output-verification.js";
+import {
   DelegatedGraphOneDriveShareProof,
   GRAPH_FILES_READ_WRITE_SCOPE,
   ProcessLocalOneDriveShareProofBoundary,
@@ -168,6 +171,8 @@ const server = createApiServer({
   scenarioPlanService: new InMemoryScenarioPlanService(),
   scenarioEvidenceVerificationService:
     new InMemoryScenarioEvidenceVerificationService(),
+  rehearsalOutputVerificationService:
+    new InMemoryRehearsalOutputVerificationService(),
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
   allowedOrigin: config.allowedOrigin,
 });

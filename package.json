@@ -29,6 +29,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:container": "node scripts/test-api-container.ts",
+    "test:rehearsal-verification-container": "node scripts/test-rehearsal-output-verification-container.ts",
     "test:watch": "vitest",
     "validate:scenario-receipt": "node scripts/validate-scenario-evidence-receipt.ts",
     "verify:avd-three-vm-rehearsal": "node scripts/verify-avd-three-vm-rehearsal-output-cli.ts"

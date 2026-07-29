@@ -23,6 +23,25 @@ that the bounded local rehearsal contracts are internally consistent. It does
 not prove that Azure, Microsoft 365, a learner session, an external detector,
 or cleanup occurred.
 
+## Authenticated in-memory API
+
+Operators may submit the same sanitized envelope to
+`POST /api/rehearsal-output-verification`. The endpoint authenticates and
+authorizes through the existing operator policy before reading a strict JSON
+body, applies deterministic request and response caps, and invokes this
+verifier synchronously in memory. It returns only the verifier's categorical
+refusal or bounded safe summary.
+
+The typed `HttpAfterPartyApi.verifyRehearsalOutput` client streams the response
+under a hard cap and validates every returned field. Its request type reaches
+the PR #83 envelope through a type-only import, so browser code does not load
+the runner or verifier graph.
+
+This endpoint does not run or schedule the rehearsal, obtain observations,
+ingest telemetry, persist a receipt, call an external service, or prove that
+any external work occurred. `synthetic-only` and `all-uninspected` remain
+mandatory result labels.
+
 Every authoritative evidence claim is rebuilt as `uninspected` and checked by
 the receipt verifier. Synthetic observations remain synthetic; they cannot be
 promoted to authentic artifacts, external proof, learner evidence, or
