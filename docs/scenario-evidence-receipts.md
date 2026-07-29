@@ -23,6 +23,11 @@ contains artifact, learner-read, ordered cleanup, and fresh-session terminal
 evidence. It still cannot infer learner interpretation, response, audit, or
 detection.
 
+The network-free
+[scenario contract compatibility check](scenario-contract-compatibility.md)
+uses all-`uninspected` probes and canonical fixtures to detect manifest/receipt
+vocabulary or coverage drift without upgrading any claim.
+
 ## Receipt shape
 
 `verifyScenarioEvidenceReceipt` accepts only schema version 1. A receipt

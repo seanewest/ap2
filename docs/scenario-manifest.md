@@ -121,3 +121,9 @@ not prove learner visibility, so the fixture remains `platform-accepted`,
 producer and learner terminal-read operations let post-run receipts ground
 cleanup and learner-access absence without treating a deletion response as
 absence proof.
+
+The network-free
+[scenario contract compatibility check](scenario-contract-compatibility.md)
+uses the real validators and compiler to detect drift across the registry,
+plans, receipts, and applicable adapters. It reports compatibility only; it
+does not plan or prove external execution.

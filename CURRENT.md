@@ -50,6 +50,13 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- Canonical scenario contracts now have a network-free compatibility check
+  across runtime manifest validation, compiled plans, verified receipts, and
+  applicable AVD, private-document, and operation-telemetry adapters. The
+  deterministic safe matrix covers every canonical scenario and fails
+  categorically on contract drift without executing or proving external work.
+  See
+  [scenario contract compatibility](docs/scenario-contract-compatibility.md).
 - Bounded operation telemetry now has a pure fail-closed bridge to candidate
   post-run receipt operation rows. It preserves completed, refused, ambiguous,
   reconciled, unresolved, and uninspected lifecycle strength while always
