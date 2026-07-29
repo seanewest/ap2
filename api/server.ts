@@ -171,6 +171,14 @@ export function createApiServer(dependencies: ApiDependencies): Server {
 }
 
 const responseRouteContracts = new WeakMap<ServerResponse, ApiRouteContract>();
+const fixedSecurityHeaders = {
+  "Cache-Control": "no-store",
+  "Content-Security-Policy":
+    "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+} as const;
 
 async function route(
   request: IncomingMessage,
@@ -386,6 +394,7 @@ function handleProtectedPreflight(
   }
 
   response.writeHead(204, {
+    ...fixedSecurityHeaders,
     "Access-Control-Allow-Headers": allowedHeaders
       .map((header) =>
         header
@@ -395,7 +404,6 @@ function handleProtectedPreflight(
       )
       .join(", "),
     "Access-Control-Allow-Methods": methods.join(", "),
-    "Cache-Control": "no-store",
   });
   response.end();
 }
@@ -1168,10 +1176,9 @@ function sendJson(response: ServerResponse, status: number, body: unknown): void
     });
   }
   response.writeHead(status, {
-    "Cache-Control": "no-store",
+    ...fixedSecurityHeaders,
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(payload, "utf8"),
-    "X-Content-Type-Options": "nosniff",
   });
   response.end(payload);
 }

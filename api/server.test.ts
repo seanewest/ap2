@@ -256,6 +256,36 @@ describe("local API", () => {
     await expect(response.json()).resolves.toEqual({ status: "ok" });
   });
 
+  it("applies fixed security headers to JSON and body-free preflight paths", async () => {
+    const responses = [
+      await fetch(`${baseUrl}/health`),
+      await fetch(`${baseUrl}/api/whoami`),
+      await fetch(`${baseUrl}/not-found`),
+      await fetch(`${baseUrl}/api/scenario-plan`, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "http://localhost:5173",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "Authorization, Content-Type",
+        },
+      }),
+    ];
+    for (const response of responses) {
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("content-security-policy")).toBe(
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+      );
+      expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(response.headers.get("x-frame-options")).toBe("DENY");
+      expect(response.headers.get("access-control-allow-credentials")).toBeNull();
+    }
+    const preflight = responses.at(-1)!;
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("content-type")).toBeNull();
+    expect(await preflight.text()).toBe("");
+  });
+
   it("refuses unauthenticated operation-event reads", async () => {
     const response = await fetch(`${baseUrl}/api/operation-events`);
     expect(response.status).toBe(401);
