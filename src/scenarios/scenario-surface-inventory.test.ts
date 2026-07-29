@@ -103,11 +103,18 @@ describe("canonical scenario surface inventory", () => {
       ].status,
     ).toBe("missing");
 
+    const helpDesk = first.scenarios.find(
+      ({ scenarioId }) => scenarioId === "help-desk-email-observation",
+    )!;
+    expect(helpDesk.surfaces.adapter.status).toBe("implemented");
+    expect(helpDesk.surfaces.rehearsal.status).toBe("missing");
+
     for (
       const row of first.scenarios.filter(
         ({ scenarioId }) =>
           scenarioId !== "avd-three-vm-substrate" &&
-          scenarioId !== "private-document-evidence",
+          scenarioId !== "private-document-evidence" &&
+          scenarioId !== "help-desk-email-observation",
       )
     ) {
       expect(row.surfaces.adapter.status).toBe("not-applicable");
@@ -254,7 +261,7 @@ describe("canonical scenario surface inventory", () => {
   it("rejects unsupported adapter claims and adapter contract drift", () => {
     const unsupported = adapterDeclarations();
     Object.assign(unsupported[0] as object, {
-      scenarioId: "help-desk-email-observation",
+      scenarioId: "oauth-application-reconnaissance",
     });
     const result = inventoryCanonicalScenarioSurfaces({
       adapterDeclarations: unsupported,

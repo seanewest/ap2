@@ -7,6 +7,9 @@ import { PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY } from "../../scripts/private-doc
 import { SCENARIO_API_CLIENT_CAPABILITIES } from "../api/client.ts";
 import { SCENARIO_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
 import {
+  HELP_DESK_EMAIL_RECEIPT_ADAPTER_CAPABILITY,
+} from "./help-desk-email-receipt-adapter.ts";
+import {
   checkScenarioContractCompatibility,
   type ScenarioCompatibilityMatrix,
 } from "./scenario-contract-compatibility.ts";
@@ -147,6 +150,7 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
 
 const AUTHORITATIVE_ADAPTER_DECLARATIONS = [
   AVD_MANIFEST_ADAPTER_CAPABILITY,
+  HELP_DESK_EMAIL_RECEIPT_ADAPTER_CAPABILITY,
   PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY,
 ] as const satisfies readonly ScenarioAdapterCapabilityDeclaration[];
 

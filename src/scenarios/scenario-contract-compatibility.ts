@@ -4,6 +4,12 @@ import { compileAvdManifestRunnerPlan } from "../../scripts/avd-three-vm-manifes
 import { canonicalAvdManifestDryRunInput } from "../../scripts/dry-run-avd-three-vm-manifest.ts";
 import { AVD_THREE_VM_SCENARIO } from "./avd-three-vm.ts";
 import {
+  adaptHelpDeskEmailOperationToReceipt,
+  canonicalHelpDeskEmailReceiptAdapterInput,
+  type HelpDeskEmailReceiptAdapterInput,
+} from "./help-desk-email-receipt-adapter.ts";
+import { HELP_DESK_EMAIL_SCENARIO } from "./help-desk-email.ts";
+import {
   adaptPrivateDocumentLifecycleToReceipt,
   type PrivateDocumentLifecycleReceiptInput,
 } from "./private-document-receipt-adapter.ts";
@@ -42,6 +48,7 @@ const RAW_VALUE =
   /(?:@|[\\/]|onmicrosoft|tenant-?id|subscription-?id|object-?id|message-?id|resource-?id|credential|certificate|access-?token|refresh-?token|session)/i;
 const OUTPUT_ADAPTERS = [
   "avd-manifest",
+  "help-desk-email",
   "operation-telemetry",
   "private-document",
 ] as const;
@@ -56,6 +63,7 @@ export type CompatibilityDriftCategory =
   | "COST_DRIFT"
   | "EVIDENCE_DRIFT"
   | "EXPIRY_DRIFT"
+  | "HELP_DESK_ADAPTER_DRIFT"
   | "LEARNER_DRIFT"
   | "OPERATION_DRIFT"
   | "PLAN_PHASE_DRIFT"
@@ -117,6 +125,7 @@ export interface CompatibilityCheckOptions {
   receiptFixtures?: readonly ReceiptFixture[];
   planOverrides?: ReadonlyMap<string, PlanSet>;
   avdInput?: AvdManifestRunnerAdapterInput;
+  helpDeskInput?: HelpDeskEmailReceiptAdapterInput;
   privateDocumentInput?: PrivateDocumentLifecycleReceiptInput;
   telemetryBindings?: readonly CompatibilityTelemetryBinding[];
 }
@@ -284,6 +293,25 @@ export function checkScenarioContractCompatibility(
         adapters.push("avd-manifest");
       } catch {
         addFailure(scenarioFailures, manifest.id, "AVD_ADAPTER_DRIFT");
+      }
+    }
+
+    if (manifest.id === HELP_DESK_EMAIL_SCENARIO.id) {
+      try {
+        verifyScenarioEvidenceReceipt(
+          adaptHelpDeskEmailOperationToReceipt(
+            options.helpDeskInput ??
+              canonicalHelpDeskEmailReceiptAdapterInput(),
+          ),
+          manifest,
+        );
+        adapters.push("help-desk-email");
+      } catch {
+        addFailure(
+          scenarioFailures,
+          manifest.id,
+          "HELP_DESK_ADAPTER_DRIFT",
+        );
       }
     }
 

@@ -23,6 +23,13 @@ contains artifact, learner-read, ordered cleanup, and fresh-session terminal
 evidence. It still cannot infer learner interpretation, response, audit, or
 detection.
 
+The pure local
+[help-desk email adapter](help-desk-email-receipt-adapter.md) maps one reduced
+accepted-operation journal and only separately supplied learner/cleanup
+observations. Send acceptance alone leaves artifact, visibility,
+interpretation, response, cleanup, retention, Teams, and voicemail truth
+`uninspected`.
+
 The network-free
 [scenario contract compatibility check](scenario-contract-compatibility.md)
 uses all-`uninspected` probes and canonical fixtures to detect manifest/receipt

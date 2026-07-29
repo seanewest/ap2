@@ -50,6 +50,13 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- The canonical help-desk email scenario now has a pure operation-to-receipt
+  adapter. One reduced accepted journal proves only the send operation;
+  authentic learner-visible email and retained or cleaned state require
+  separate canonical learner observations. Interpretation, response, Teams,
+  voicemail, and unsupported cleanup remain uninspected, and raw evidence
+  fields fail closed. See
+  [the help-desk email receipt adapter](docs/help-desk-email-receipt-adapter.md).
 - Canonical scenario source coverage now has a deterministic network-free
   inventory across manifests, plans, receipts, applicable adapters,
   `REHEARSAL_ONLY` composition, authenticated API/client contracts, and

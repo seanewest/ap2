@@ -486,7 +486,19 @@ describe("scenario contract compatibility checker", () => {
           ({ id }) => id === "help-desk-email-observation",
         )!,
       ).scenarios[0]?.adapters,
-    ).toEqual([]);
+    ).toEqual(["help-desk-email"]);
+  });
+
+  it("validates the canonical help-desk adapter input and pinpoints drift", () => {
+    const manifest = supportedManifests.find(
+      ({ id }) => id === "help-desk-email-observation",
+    )!;
+    const result = checkOne(manifest, {
+      helpDeskInput: {} as never,
+    });
+
+    expect(categories(result)).toEqual(["HELP_DESK_ADAPTER_DRIFT"]);
+    expect(result.scenarios[0]?.adapters).toEqual([]);
   });
 
   it("uses the private-document adapter only for its canonical fixture", () => {
@@ -510,6 +522,7 @@ describe("scenario contract compatibility checker", () => {
     });
     expect(accepted.status).toBe("compatible");
     expect(accepted.scenarios[0]?.adapters).toEqual([
+      "help-desk-email",
       "operation-telemetry",
     ]);
 
