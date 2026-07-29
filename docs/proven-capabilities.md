@@ -218,8 +218,12 @@ assigning the learner to either proof role.
   metadata with no planned or executable action.
 - Mutations are deliberately not retried. Some hosted operations use fixed
   markers, IDs, eTags, browser state, and a process-local busy boundary, but
-  there is no durable queue, database, cross-replica lock, or exactly-once
-  guarantee across callers, replicas, or restarts.
+  the main API has no durable queue, database, cross-replica lock, or
+  exactly-once guarantee across callers, replicas, or restarts. The repository
+  has derived the two production consumers and the required claim/recovery
+  contract, but implementation is blocked on a production shared-store choice;
+  see the
+  [durable operation journal decision](durable-operation-journal-decision.md).
 - Simulated-user MSAL caches exist only in API process memory. The first
   request after a restart may launch an isolated headless CBA browser; later
   consented scopes can be acquired silently while that replica remains alive.
