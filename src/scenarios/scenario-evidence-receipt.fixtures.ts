@@ -4,6 +4,9 @@ import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon";
 import { PURVIEW_AUDIT_BOUNDARY_SCENARIO } from "./purview-audit-boundary";
 import { PRIVATE_DOCUMENT_EVIDENCE_SCENARIO } from "./private-document-evidence";
 import {
+  SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO,
+} from "./sharepoint-trusted-version-lifecycle";
+import {
   type EvidenceReceiptClaim,
   type EvidenceReceiptErrorCode,
   type EvidenceReceiptObservation,
@@ -888,4 +891,5 @@ export const RECEIPT_MANIFESTS = [
   OAUTH_APPLICATION_RECON_SCENARIO,
   PURVIEW_AUDIT_BOUNDARY_SCENARIO,
   PRIVATE_DOCUMENT_EVIDENCE_SCENARIO,
+  SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO,
 ] as const;

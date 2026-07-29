@@ -81,6 +81,7 @@ const CLAIM_ASSERTIONS = [
   "permissions-revoked",
   "private-three-vm-topology",
   "private-document-staged",
+  "sharepoint-trusted-version-staged",
   "purview-surface-reachability",
   "sensitive-artifacts-absent",
   "teams-missed-call",
@@ -118,6 +119,7 @@ const ASSERTIONS_BY_CATEGORY = {
     "permissions-revoked",
     "private-three-vm-topology",
     "private-document-staged",
+    "sharepoint-trusted-version-staged",
     "purview-surface-reachability",
     "sensitive-artifacts-absent",
     "teams-missed-call",
@@ -169,6 +171,7 @@ export interface ScenarioEvidenceReceipt {
   scenario: {
     id: string;
     manifestSchemaVersion: 2;
+    evidenceBindingDigestSha256?: string;
   };
   roles: {
     evidenceProducer: string;
@@ -196,6 +199,7 @@ export interface VerifiedClaimRow {
 export interface VerifiedScenarioEvidenceReceipt {
   scenarioId: string;
   manifestSchemaVersion: 2;
+  evidenceBindingDigestSha256?: string;
   roles: ScenarioEvidenceReceipt["roles"];
   claims: readonly VerifiedClaimRow[];
 }
@@ -247,6 +251,12 @@ export function verifyScenarioEvidenceReceipt(
   return {
     scenarioId: receipt.scenario.id,
     manifestSchemaVersion: 2,
+    ...(receipt.scenario.evidenceBindingDigestSha256 === undefined
+      ? {}
+      : {
+        evidenceBindingDigestSha256:
+          receipt.scenario.evidenceBindingDigestSha256,
+      }),
     roles: receipt.roles,
     claims: [...receipt.claims]
       .sort(compareClaims)
@@ -306,7 +316,11 @@ export function parseScenarioEvidenceReceipt(
     throw failure("shape", "schemaVersion must be 1.");
   }
   const scenario = object(receipt.scenario, "shape");
-  exactKeys(scenario, ["id", "manifestSchemaVersion"]);
+  exactKeys(
+    scenario,
+    ["id", "manifestSchemaVersion", "evidenceBindingDigestSha256"],
+    ["evidenceBindingDigestSha256"],
+  );
   if (scenario.manifestSchemaVersion !== 2) {
     throw failure("shape", "manifestSchemaVersion must be 2.");
   }
@@ -322,6 +336,12 @@ export function parseScenarioEvidenceReceipt(
     scenario: {
       id: alias(scenario.id),
       manifestSchemaVersion: 2,
+      ...(scenario.evidenceBindingDigestSha256 === undefined
+        ? {}
+        : {
+          evidenceBindingDigestSha256:
+            digest(scenario.evidenceBindingDigestSha256),
+        }),
     },
     roles,
     claims: receipt.claims.map(parseClaim),
@@ -418,6 +438,7 @@ function parseArtifactCategory(
         "application-recon-summary",
         "purview-audit-summary",
         "private-network-topology",
+        "sharepoint-version-history",
         "teams-missed-call",
       ],
       "artifact.kind",

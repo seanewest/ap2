@@ -367,6 +367,23 @@ file to the SharePoint recycle bin. The experiment never lists, shares, retries,
 polls, or permanently purges content. Browser state records an uncertain attempt
 before mutation, while exact-path Graph reconciliation owns correctness.
 
+## One SharePoint trusted-version lifecycle
+
+`POST /api/sharepoint-trusted-version-lifecycle` is a separate, JSON-bounded
+operator action with no SPA control. It uses the same fixed API managed
+identity and SharePoint Documents drive, but performs a complete synchronous
+create → trusted v1 read → one harmless v2 write → ordered version read →
+active cleanup lifecycle under one unique marker and short expiry. The route
+returns only sanitized digests, a canonical receipt, and its verifier summary.
+
+The fixed producer application, future independent detector, future human
+learner, and cleanup owner are distinct manifest actors. This run makes no
+detector, learner, interpretation, response, or restoration claim. Ambiguous
+mutations are reconciled by exact reads and never replayed. Successful cleanup
+proves only active file and folder absence; normal recycle-bin and audit
+history remain ordinary service-managed history. See
+[SharePoint trusted-version lifecycle](sharepoint-trusted-version-lifecycle.md).
+
 ## One unsent-draft rehearsal
 
 `POST` and `DELETE /api/draft-proof` are separate explicit actions. They reuse

@@ -27,6 +27,12 @@ contains artifact, learner-read, ordered cleanup, and fresh-session terminal
 evidence. It still cannot infer learner interpretation, response, audit, or
 detection.
 
+The source-backed
+[SharePoint trusted-version lifecycle](sharepoint-trusted-version-lifecycle.md)
+maps its exact ordered two-version result and marker-owned terminal active
+absence into a canonical receipt. It proves only producer-side staging and
+cleanup; the distinct future detector and human learner remain `uninspected`.
+
 The pure local
 [help-desk email adapter](help-desk-email-receipt-adapter.md) maps one reduced
 accepted-operation journal and only separately supplied learner/cleanup

@@ -3,6 +3,9 @@ import { HELP_DESK_EMAIL_SCENARIO } from "./help-desk-email";
 import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon";
 import { PURVIEW_AUDIT_BOUNDARY_SCENARIO } from "./purview-audit-boundary";
 import {
+  SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO,
+} from "./sharepoint-trusted-version-lifecycle";
+import {
   EvidenceReceiptError,
   parseScenarioEvidenceReceipt,
   verifyScenarioEvidenceReceipt,
@@ -18,6 +21,7 @@ export const SCENARIO_EVIDENCE_RECEIPT_MANIFESTS = [
   TEAMS_MISSED_CALL_SCENARIO,
   OAUTH_APPLICATION_RECON_SCENARIO,
   PURVIEW_AUDIT_BOUNDARY_SCENARIO,
+  SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO,
 ] as const;
 const TERMINAL_CLAIM_ID_OVERRIDES = {
   "infrastructure-ready": "terminal-infrastructure",
@@ -33,6 +37,7 @@ export interface SafeVerifiedScenarioEvidenceReceipt {
   kind: "verified-scenario-evidence-receipt";
   scenarioId: string;
   manifestSchemaVersion: 2;
+  evidenceBindingDigestSha256?: string;
   roles: ScenarioEvidenceReceipt["roles"];
   claims: readonly VerifiedClaimRow[];
   missingCoverage: readonly string[];

@@ -90,7 +90,7 @@ describe("unexpected SharePoint document-change lab publication gap", () => {
     );
   });
 
-  it("keeps the authoritative API surface limited to fixed create/remove and pure Purview verification", () => {
+  it("adds only the trusted-version dependency without publishing restoration or a Lab", () => {
     const relevantRoutes = API_ROUTE_CONTRACTS
       .filter(({ ownerKey, path }) =>
         /sharepoint|purview|version|restore/i.test(`${ownerKey} ${path}`)
@@ -108,6 +108,12 @@ describe("unexpected SharePoint document-change lab publication gap", () => {
         path: "/api/purview-audit-boundary-rehearsal-verification",
         ownerKey: "purview-audit-boundary-rehearsal-verify",
         sideEffect: "pure",
+      },
+      {
+        method: "POST",
+        path: "/api/sharepoint-trusted-version-lifecycle",
+        ownerKey: "sharepoint-trusted-version-lifecycle",
+        sideEffect: "bounded-mutation",
       },
       {
         method: "POST",

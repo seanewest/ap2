@@ -31,6 +31,9 @@ import {
 import { loadApiConfig } from "./config.js";
 import { AzureRehearsalStatusProvider } from "./rehearsal-status.js";
 import { GraphSharePointFileProof } from "./sharepoint-file-proof.js";
+import {
+  GraphSharePointTrustedVersionLifecycle,
+} from "./sharepoint-trusted-version-lifecycle.js";
 import { createApiServer } from "./server.js";
 import { InMemoryScenarioPlanService } from "./scenario-plan.js";
 import {
@@ -209,6 +212,8 @@ const server = createApiServer({
   multiScenarioFeasibilityService:
     new InMemoryMultiScenarioFeasibilityService(),
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
+  sharePointTrustedVersionLifecycleOperation:
+    new GraphSharePointTrustedVersionLifecycle(managedIdentity),
   allowedOrigin: config.allowedOrigin,
   isShuttingDown: () => shuttingDown,
   requestTelemetry: new StructuredConsoleApiRequestTelemetry(),
