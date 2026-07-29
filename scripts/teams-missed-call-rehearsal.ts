@@ -40,7 +40,7 @@ const REQUEST_KEYS = [
   "scenarioId",
   "syntheticBranch",
 ] as const;
-const EXTERNAL_CLAIM_KEYS = [
+export const TEAMS_MISSED_CALL_REHEARSAL_EXTERNAL_CLAIMS = [
   "liveCall",
   "nativeMissedCallArtifact",
   "activityItem",
@@ -145,7 +145,10 @@ export interface TeamsMissedCallRehearsalResult {
     observationSource: typeof SYNTHETIC_ONLY_OBSERVATIONS;
     externalEvidence: typeof ALL_EXTERNAL_CLAIMS_UNINSPECTED;
     claims: Readonly<
-      Record<typeof EXTERNAL_CLAIM_KEYS[number], "uninspected">
+      Record<
+        typeof TEAMS_MISSED_CALL_REHEARSAL_EXTERNAL_CLAIMS[number],
+        "uninspected"
+      >
     >;
   }> | null;
 }
@@ -301,16 +304,22 @@ export async function runTeamsMissedCallRehearsal(
   }
 
   const externalClaims = Object.fromEntries(
-    EXTERNAL_CLAIM_KEYS.map((key) => [key, "uninspected"]),
-  ) as Record<typeof EXTERNAL_CLAIM_KEYS[number], "uninspected">;
+    TEAMS_MISSED_CALL_REHEARSAL_EXTERNAL_CLAIMS.map((key) => [
+      key,
+      "uninspected",
+    ]),
+  ) as Record<
+    typeof TEAMS_MISSED_CALL_REHEARSAL_EXTERNAL_CLAIMS[number],
+    "uninspected"
+  >;
   const declaration = declareRehearsalEnvelope({
     label: LABEL,
     status: "completed",
     failure: null,
     syntheticValues: Object.values(fakeRun),
     externalClaims: {
-      total: EXTERNAL_CLAIM_KEYS.length,
-      uninspected: EXTERNAL_CLAIM_KEYS.length,
+      total: TEAMS_MISSED_CALL_REHEARSAL_EXTERNAL_CLAIMS.length,
+      uninspected: TEAMS_MISSED_CALL_REHEARSAL_EXTERNAL_CLAIMS.length,
       nonUninspected: 0,
     },
   });

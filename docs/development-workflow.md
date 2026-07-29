@@ -88,6 +88,11 @@ The
 composes that contract with deterministic synthetic staging and observations.
 Its output keeps every external claim uninspected; it is not a call or evidence
 that Teams, a learner, or cleanup reached any external state.
+The
+[offline Teams rehearsal verifier](teams-missed-call-rehearsal-verifier.md)
+checks a saved bounded output by independently recompiling and reconstructing
+the categorical adapter/receipt contract. A verified result proves contract
+consistency only and does not upgrade any external or learner claim.
 
 ## Work inside the lab boundary
 

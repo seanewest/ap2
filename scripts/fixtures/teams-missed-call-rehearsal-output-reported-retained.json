@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "label": "REHEARSAL_ONLY",
+  "status": "completed",
+  "failure": null,
+  "binding": {
+    "scenarioId": "teams-missed-call-observation",
+    "manifestSchemaVersion": 2,
+    "planDigestSha256": "84d45b6c7222d1997a0501f3cd1f34507bb3705598a98b8d05004d73af444a8f",
+    "fakeRunDigestSha256": "2d7d644cffcec468d7fc360ef4f7db5f3bcd2fc911ae510bb6a2336f19d09e8a",
+    "syntheticBranch": "reported-retained"
+  },
+  "stages": {
+    "plan": "compiled",
+    "fakeLifecycle": "completed",
+    "adapter": "accepted",
+    "receiptVerifier": "accepted",
+    "envelope": "accepted"
+  },
+  "fakeRun": {
+    "stage": "synthetic-one-attempt-completed",
+    "nativeHistory": "synthetic-one-missed-incoming",
+    "activity": "synthetic-one-matching-notification",
+    "report": "synthetic-reported",
+    "retention": "synthetic-retained",
+    "terminalCleanup": "synthetic-uninspected"
+  },
+  "receipt": {
+    "adapterCandidateAccepted": true,
+    "verifierAccepted": true,
+    "candidateClaimCount": 14,
+    "canonicalLearnerInterpretation": "uninspected"
+  },
+  "envelope": {
+    "terminalState": "terminal-complete",
+    "observationSource": "synthetic-only",
+    "externalEvidence": "all-uninspected",
+    "claims": {
+      "liveCall": "uninspected",
+      "nativeMissedCallArtifact": "uninspected",
+      "activityItem": "uninspected",
+      "learnerVisibility": "uninspected",
+      "learnerInterpretation": "uninspected",
+      "response": "uninspected",
+      "cleanup": "uninspected",
+      "retention": "uninspected",
+      "voicemail": "uninspected",
+      "callback": "uninspected",
+      "botPath": "uninspected",
+      "externalIdentity": "uninspected",
+      "externalProof": "uninspected"
+    }
+  }
+}
