@@ -155,6 +155,7 @@ test("navigates the read-only scenario catalog without network activity", async 
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await configureOperator(page, accessToken);
   let apiRequests = 0;
   page.on("request", (request) => {
@@ -174,8 +175,12 @@ test("navigates the read-only scenario catalog without network activity", async 
   await expect(catalog.getByText(
     "Private three-VM AVD lab substrate",
   )).toBeVisible();
+  const planLinks = catalog.getByRole("button", {
+    name: /Use .+ in plan preview/,
+  });
+  await expect(planLinks).toHaveCount(SCENARIO_MANIFESTS.length);
   await expect(catalog.locator(
-    "button, a, form, input, select, textarea, [data-action]",
+    "a, form, input, select, textarea, [data-action]",
   )).toHaveCount(0);
   apiRequests = 0;
 
@@ -186,8 +191,47 @@ test("navigates the read-only scenario catalog without network activity", async 
   await page.keyboard.press("Enter");
   await expect(firstDetails).toHaveAttribute("open", "");
   await expect(firstDetails.getByText("Role separation")).toBeVisible();
+
+  await firstSummary.focus();
+  await page.keyboard.press("Tab");
+  await expect(planLinks.nth(0)).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(catalog.locator("summary").nth(1)).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(planLinks.nth(1)).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(catalog.locator("summary").nth(1)).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(planLinks.nth(0)).toBeFocused();
+
+  await planLinks.nth(2).press("Enter");
+  const preview = page.getByRole("region", {
+    name: "Scenario plan preview",
+  });
+  const scenario = preview.getByLabel("Canonical scenario");
+  await expect(scenario).toBeFocused();
+  await expect(scenario).toHaveValue("2");
+  await expect(preview.getByText(
+    /Selected Private three-VM AVD lab substrate, registry version 2/,
+  )).toBeVisible();
+  await expect(preview.getByLabel("Maximum budget (USD)")).toHaveValue("10");
+  await expect(preview.getByLabel(/Expiry window/)).toHaveValue("5");
+  await expect(preview.getByText("No preview requested")).toHaveCount(0);
+  await planLinks.nth(3).click();
+  await expect(scenario).toHaveValue("3");
+  await planLinks.nth(2).click();
+  await expect(scenario).toHaveValue("2");
+  await planLinks.nth(2).click();
+  await expect(scenario).toBeFocused();
+  await expect(scenario).toHaveValue("2");
   await page.waitForTimeout(100);
   expect(apiRequests).toBe(0);
+  expect(
+    await planLinks.nth(2).evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.animationDuration, style.transitionDuration];
+    }),
+  ).toEqual(["0s", "0s"]);
   expect(
     await page.evaluate(() =>
       document.documentElement.scrollWidth <= window.innerWidth
@@ -234,11 +278,16 @@ test("previews one deterministic plan per manual signed-operator request", async
     await route.continue();
   });
   await page.goto("/e2e/recent-operations.html");
+  await page.getByRole("button", {
+    name: "Use Kobe help-desk email for Cory in plan preview",
+  }).click();
   const preview = page.getByRole("region", {
     name: "Scenario plan preview",
   });
   const button = preview.getByRole("button", { name: "Preview plan" });
-  await expect(preview.getByText("No preview requested")).toBeVisible();
+  await expect(preview.getByText(
+    /Selected Kobe help-desk email for Cory, registry version 2/,
+  )).toBeVisible();
   expect(planRequests).toHaveLength(0);
 
   const firstResponse = page.waitForResponse((response) =>
@@ -285,8 +334,8 @@ test("previews one deterministic plan per manual signed-operator request", async
     ),
   ).toBe(true);
   expect(planRequests.map((body) => JSON.parse(body).scenarioId)).toEqual([
-    "teams-missed-call-observation",
-    "teams-missed-call-observation",
+    SCENARIO_MANIFESTS[1].id,
+    SCENARIO_MANIFESTS[1].id,
   ]);
 });
 

@@ -53,7 +53,7 @@ import {
 } from "./ui/elements";
 import { createScenarioCatalog } from "./scenarios/scenario-catalog";
 import {
-  createScenarioPlanPreview,
+  createScenarioPlanPreviewController,
   type ScenarioPlanPreviewClient,
   type ScenarioPlanPreviewFailure,
 } from "./scenarios/scenario-plan-preview";
@@ -891,11 +891,7 @@ function createStatePanel(
         ),
         createContactProofPanel(contactProof, apiOperationLoading),
         ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
-        createScenarioCatalog(SCENARIO_MANIFESTS),
-        createScenarioPlanPreview({
-          registry: SCENARIO_MANIFESTS,
-          client: scenarioPlanPreviewClient,
-        }),
+        ...createScenarioPlanningFlow(scenarioPlanPreviewClient),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -914,6 +910,21 @@ function createStatePanel(
   }
 
   return panel;
+}
+
+function createScenarioPlanningFlow(
+  client: ScenarioPlanPreviewClient,
+): HTMLElement[] {
+  const preview = createScenarioPlanPreviewController({
+    registry: SCENARIO_MANIFESTS,
+    client,
+  });
+  const catalog = createScenarioCatalog(SCENARIO_MANIFESTS, {
+    onPlanPreview: (selection) => {
+      preview.selectScenario(selection);
+    },
+  });
+  return [catalog, preview.element];
 }
 
 function classifyScenarioPlanPreviewFailure(

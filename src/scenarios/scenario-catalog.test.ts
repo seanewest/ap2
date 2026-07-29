@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { createScenarioCatalog } from "./scenario-catalog";
+import {
+  createScenarioCatalog,
+  type ScenarioCatalogOptions,
+} from "./scenario-catalog";
 import { SCENARIO_MANIFESTS } from "./scenarios";
 
-function render(registry: readonly unknown[] = SCENARIO_MANIFESTS): HTMLElement {
-  const catalog = createScenarioCatalog(registry);
+function render(
+  registry: readonly unknown[] = SCENARIO_MANIFESTS,
+  options: ScenarioCatalogOptions = {},
+): HTMLElement {
+  const catalog = createScenarioCatalog(registry, options);
   document.body.replaceChildren(catalog);
   return catalog;
 }
@@ -123,6 +129,33 @@ describe("Scenario catalog", () => {
     );
   });
 
+  it("offers one explicit local preview handoff without rendering identifiers", () => {
+    const selections: unknown[] = [];
+    const catalog = render(SCENARIO_MANIFESTS, {
+      onPlanPreview: (selection) => selections.push(selection),
+    });
+    const actions = [...catalog.querySelectorAll<HTMLButtonElement>(
+      ".scenario-catalog-plan-link",
+    )];
+    expect(actions).toHaveLength(SCENARIO_MANIFESTS.length);
+    expect(actions.map(({ textContent }) => textContent)).toEqual(
+      SCENARIO_MANIFESTS.map(() => "Use in plan preview"),
+    );
+    expect(actions.map((action) => action.getAttribute("aria-label"))).toEqual(
+      SCENARIO_MANIFESTS.map(({ title }) =>
+        `Use ${title} in plan preview`
+      ),
+    );
+    actions[2]!.click();
+    expect(selections).toEqual([{
+      scenarioId: SCENARIO_MANIFESTS[2].id,
+      schemaVersion: SCENARIO_MANIFESTS[2].schemaVersion,
+    }]);
+    expect(catalog.outerHTML).not.toContain(SCENARIO_MANIFESTS[2].id);
+    expect(catalog.querySelector("form, input, select, textarea, [data-action]"))
+      .toBeNull();
+  });
+
   it("fails closed without leaking validation details", () => {
     const catalog = render([{
       schemaVersion: 2,
@@ -136,6 +169,7 @@ describe("Scenario catalog", () => {
     expect(catalog.textContent).not.toContain("raw-private-marker");
     expect(catalog.querySelectorAll(".scenario-catalog-card")).toHaveLength(0);
     expect(catalog.querySelectorAll("details")).toHaveLength(0);
+    expect(catalog.querySelectorAll("button")).toHaveLength(0);
   });
 });
 

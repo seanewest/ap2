@@ -10,6 +10,7 @@ import type {
   ScenarioPlanRole,
   ScenarioPlanStep,
 } from "./scenario-plan";
+import type { ScenarioCatalogSelection } from "./scenario-catalog";
 
 const INPUT_ROLES = [
   ["evidenceProducer", "Evidence producer"],
@@ -45,9 +46,20 @@ export interface ScenarioPlanPreviewOptions {
   now?: () => Date;
 }
 
+export interface ScenarioPlanPreviewController {
+  element: HTMLElement;
+  selectScenario(selection: ScenarioCatalogSelection): boolean;
+}
+
 export function createScenarioPlanPreview(
   options: ScenarioPlanPreviewOptions,
 ): HTMLElement {
+  return createScenarioPlanPreviewController(options).element;
+}
+
+export function createScenarioPlanPreviewController(
+  options: ScenarioPlanPreviewOptions,
+): ScenarioPlanPreviewController {
   const section = document.createElement("section");
   section.className = "scenario-plan-preview";
   section.setAttribute("aria-labelledby", "scenario-plan-preview-heading");
@@ -74,7 +86,10 @@ export function createScenarioPlanPreview(
       "Plan preview unavailable: canonical registry validation failed. No request can be submitted.",
       "error",
     ));
-    return section;
+    return {
+      element: section,
+      selectScenario: () => false,
+    };
   }
 
   const form = document.createElement("form");
@@ -106,10 +121,11 @@ export function createScenarioPlanPreview(
 
   let revision = 0;
   let loading = false;
-  const clearOutput = (): void => {
+  const clearOutput = (message?: string): void => {
     revision += 1;
     output.replaceChildren(createStatus(
-      "No preview requested. Complete the bounded fields and select Preview plan.",
+      message ??
+        "No preview requested. Complete the bounded fields and select Preview plan.",
     ));
   };
   const selectedManifest = (): ScenarioManifest =>
@@ -118,14 +134,47 @@ export function createScenarioPlanPreview(
   const rebuildControls = (): void => {
     controls.replaceChildren(...createInputControls(selectedManifest()));
     for (const input of controls.querySelectorAll("input, select")) {
-      input.addEventListener("input", clearOutput);
-      input.addEventListener("change", clearOutput);
+      input.addEventListener("input", () => clearOutput());
+      input.addEventListener("change", () => clearOutput());
     }
   };
   scenarioSelect.addEventListener("change", () => {
     rebuildControls();
     clearOutput();
   });
+
+  const selectScenario = (
+    selection: ScenarioCatalogSelection,
+  ): boolean => {
+    const matches = manifests
+      .map((manifest, index) => ({ manifest, index }))
+      .filter(({ manifest }) =>
+        manifest.id === selection.scenarioId &&
+        manifest.schemaVersion === selection.schemaVersion
+      );
+    if (matches.length !== 1) {
+      if (loading) {
+        loading = false;
+        setLoading(form, submit, false);
+      }
+      clearOutput(
+        "Catalog selection unavailable: the exact canonical scenario version could not be resolved.",
+      );
+      return false;
+    }
+    revision += 1;
+    loading = false;
+    scenarioSelect.value = String(matches[0]!.index);
+    rebuildControls();
+    setLoading(form, submit, false);
+    output.replaceChildren(createStatus(
+      `Selected ${matches[0]!.manifest.title}, registry version ${
+        matches[0]!.manifest.schemaVersion
+      }. Review the bounded fields and select Preview plan.`,
+    ));
+    scenarioSelect.focus();
+    return true;
+  };
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -175,7 +224,10 @@ export function createScenarioPlanPreview(
 
   rebuildControls();
   clearOutput();
-  return section;
+  return {
+    element: section,
+    selectScenario,
+  };
 }
 
 function createInputControls(manifest: ScenarioManifest): HTMLElement[] {

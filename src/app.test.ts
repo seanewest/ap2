@@ -30,6 +30,7 @@ import {
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
 import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
+import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
 
 const account: AccountIdentity = {
   accountId: "student-object-id",
@@ -1615,6 +1616,46 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).toContain("You are signed out");
     expect(root.querySelector(".scenario-catalog")).toBeNull();
     expect(root.querySelector(".scenario-plan-preview")).toBeNull();
+  });
+
+  it("moves a catalog scenario into bounded local preview inputs without authentication or API calls", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+
+    const manifest = SCENARIO_MANIFESTS[2];
+    const action = [...root.querySelectorAll<HTMLButtonElement>(
+      ".scenario-catalog-plan-link",
+    )][2]!;
+    action.click();
+
+    const preview = root.querySelector<HTMLElement>(
+      ".scenario-plan-preview",
+    )!;
+    const scenario = preview.querySelector<HTMLSelectElement>(
+      "select[name='scenario']",
+    )!;
+    expect(scenario.value).toBe("2");
+    expect(document.activeElement).toBe(scenario);
+    expect(preview.textContent).toContain(
+      `Selected ${manifest.title}, registry version ${manifest.schemaVersion}`,
+    );
+    expect(
+      preview.querySelector<HTMLInputElement>(
+        "input[name='maximumBudgetUsd']",
+      )!.value,
+    ).toBe(String(manifest.cost.laneMaximum));
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.compileScenarioPlan).not.toHaveBeenCalled();
+
+    action.click();
+    expect(scenario.value).toBe("2");
+    expect(document.activeElement).toBe(scenario);
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.compileScenarioPlan).not.toHaveBeenCalled();
   });
 
   it("requests a scenario preview only after the signed-in operator submits it", async () => {

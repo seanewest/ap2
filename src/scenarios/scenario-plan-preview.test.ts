@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createScenarioPlanPreview,
+  createScenarioPlanPreviewController,
   type ScenarioPlanPreviewClient,
   type ScenarioPlanPreviewFailure,
 } from "./scenario-plan-preview";
@@ -50,6 +51,72 @@ async function settle(): Promise<void> {
 }
 
 describe("Scenario plan preview", () => {
+  it.each(SCENARIO_MANIFESTS.map((manifest, index) => [
+    manifest.title,
+    manifest,
+    index,
+  ] as const))(
+    "selects %s by exact canonical version with safe local defaults and no request",
+    (_title, manifest, index) => {
+      const previewClient = client();
+      const controller = createScenarioPlanPreviewController({
+        registry: SCENARIO_MANIFESTS,
+        client: previewClient,
+        now: () => new Date(NOW),
+      });
+      document.body.replaceChildren(controller.element);
+
+      expect(controller.selectScenario({
+        scenarioId: manifest.id,
+        schemaVersion: manifest.schemaVersion,
+      })).toBe(true);
+      const scenario = controller.element.querySelector<HTMLSelectElement>(
+        "select[name='scenario']",
+      )!;
+      expect(scenario.value).toBe(String(index));
+      expect(document.activeElement).toBe(scenario);
+      expect(controller.element.textContent).toContain(
+        `Selected ${manifest.title}, registry version ${manifest.schemaVersion}`,
+      );
+      expect(
+        controller.element.querySelector<HTMLInputElement>(
+          "input[name='maximumBudgetUsd']",
+        )!.value,
+      ).toBe(String(manifest.cost.laneMaximum));
+      expect(
+        controller.element.querySelector<HTMLInputElement>(
+          "input[name='expiryHours']",
+        )!.value,
+      ).toBe(String(manifest.cost.conservativeDurationHours));
+      expect(
+        [...controller.element.querySelectorAll<HTMLInputElement>(
+          "input[name^='alias-']",
+        )].every(({ value }) => /^[a-z][a-z0-9-]{1,31}$/.test(value)),
+      ).toBe(true);
+      expect(previewClient.preview).not.toHaveBeenCalled();
+    },
+  );
+
+  it("fails closed when the catalog version does not resolve exactly", () => {
+    const previewClient = client();
+    const controller = createScenarioPlanPreviewController({
+      registry: SCENARIO_MANIFESTS,
+      client: previewClient,
+    });
+    document.body.replaceChildren(controller.element);
+    expect(controller.selectScenario({
+      scenarioId: "not-a-canonical-scenario",
+      schemaVersion: SCENARIO_MANIFESTS[0].schemaVersion,
+    })).toBe(false);
+    expect(controller.element.textContent).toContain(
+      "exact canonical scenario version could not be resolved",
+    );
+    expect(controller.element.textContent).not.toContain(
+      "not-a-canonical-scenario",
+    );
+    expect(previewClient.preview).not.toHaveBeenCalled();
+  });
+
   it("starts empty, uses the canonical registry, and submits only manually", () => {
     const previewClient = client();
     const preview = render(previewClient);
@@ -223,6 +290,41 @@ describe("Scenario plan preview", () => {
     expect(previewClient.preview).toHaveBeenCalledTimes(2);
   });
 
+  it("locally changes catalog selection during loading and ignores the stale response", async () => {
+    let resolve!: (plan: ScenarioExecutionPlan) => void;
+    const pending = new Promise<ScenarioExecutionPlan>((done) => {
+      resolve = done;
+    });
+    const previewClient = client(() => pending);
+    const controller = createScenarioPlanPreviewController({
+      registry: SCENARIO_MANIFESTS,
+      client: previewClient,
+      now: () => new Date(NOW),
+    });
+    document.body.replaceChildren(controller.element);
+    submit(controller.element);
+    const request = vi.mocked(previewClient.preview).mock.calls[0]![0];
+
+    const selected = SCENARIO_MANIFESTS[2];
+    expect(controller.selectScenario({
+      scenarioId: selected.id,
+      schemaVersion: selected.schemaVersion,
+    })).toBe(true);
+    expect(controller.element.textContent).toContain(`Selected ${selected.title}`);
+    expect(
+      controller.element.querySelector<HTMLButtonElement>("button")!.disabled,
+    ).toBe(false);
+    expect(previewClient.preview).toHaveBeenCalledOnce();
+
+    resolve(compileScenarioExecutionPlan(request));
+    await settle();
+    expect(controller.element.textContent).toContain(`Selected ${selected.title}`);
+    expect(controller.element.textContent).not.toContain(
+      "Deterministic preview",
+    );
+    expect(previewClient.preview).toHaveBeenCalledOnce();
+  });
+
   it("clears a prior preview whenever scenario or input changes", async () => {
     const preview = render();
     submit(preview);
@@ -242,6 +344,30 @@ describe("Scenario plan preview", () => {
     scenario.value = "2";
     scenario.dispatchEvent(new Event("change", { bubbles: true }));
     expect(preview.textContent).toContain("No preview requested");
+  });
+
+  it("clears a completed preview when a catalog selection changes", async () => {
+    const previewClient = client();
+    const controller = createScenarioPlanPreviewController({
+      registry: SCENARIO_MANIFESTS,
+      client: previewClient,
+      now: () => new Date(NOW),
+    });
+    document.body.replaceChildren(controller.element);
+    submit(controller.element);
+    await settle();
+    expect(controller.element.textContent).toContain("Deterministic preview");
+
+    const selected = SCENARIO_MANIFESTS[3];
+    expect(controller.selectScenario({
+      scenarioId: selected.id,
+      schemaVersion: selected.schemaVersion,
+    })).toBe(true);
+    expect(controller.element.textContent).toContain(`Selected ${selected.title}`);
+    expect(controller.element.textContent).not.toContain(
+      "Deterministic preview",
+    );
+    expect(previewClient.preview).toHaveBeenCalledOnce();
   });
 
   it.each([
