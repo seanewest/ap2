@@ -283,13 +283,27 @@ function parseObservation(
   const observation = record(value);
   exactKeys(
     observation,
-    ["source", "outcome", "observerActorId", "operationKey"],
+    [
+      "source",
+      "outcome",
+      "observerActorId",
+      "operationKey",
+      "identityBindingDigestSha256",
+    ],
+    ["identityBindingDigestSha256"],
   );
+  const identityBindingDigestSha256 =
+    observation.identityBindingDigestSha256 === undefined
+      ? undefined
+      : digest(observation.identityBindingDigestSha256);
   return {
     source: enumeration(observation.source, OBSERVATION_SOURCES),
     outcome: enumeration(observation.outcome, OBSERVATION_OUTCOMES),
     observerActorId: alias(observation.observerActorId),
     operationKey: alias(observation.operationKey),
+    ...(identityBindingDigestSha256 === undefined
+      ? {}
+      : { identityBindingDigestSha256 }),
   };
 }
 
@@ -411,6 +425,13 @@ function alias(value: unknown): string {
     GUID.test(value)
   ) {
     fail("raw-identifier");
+  }
+  return value;
+}
+
+function digest(value: unknown): string {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) {
+    throw new Error("invalid receipt");
   }
   return value;
 }

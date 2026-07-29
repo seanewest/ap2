@@ -195,6 +195,27 @@ export interface ScenarioAuthentication {
   summary: string;
 }
 
+export interface ScenarioApplicationPermissionRequirement {
+  resourceApplicationId: string;
+  applicationRoleId: string;
+  name: string;
+}
+
+export interface ScenarioApplicationIdentityBoundary {
+  producerActorId: string;
+  detectorActorId: string;
+  recoveryOwnerActorId: string;
+  tenantBinding: "same-tenant";
+  tokenAudience: string;
+  producerPermissions: readonly ScenarioApplicationPermissionRequirement[];
+  detectorPermissions: readonly ScenarioApplicationPermissionRequirement[];
+  markerOperationKey: string;
+  observationOperationKey: string;
+  maximumObservationWindowMinutes: number;
+  attribution:
+    "exact-application-service-principal-marker-window";
+}
+
 export type ScenarioTrigger =
   | { kind: "staged" }
   | { kind: "self-triggered"; rationale: string };
@@ -300,6 +321,7 @@ export interface ScenarioManifest {
   actors: readonly ScenarioActor[];
   roles: ScenarioRoleAssignments;
   authentication: readonly ScenarioAuthentication[];
+  applicationIdentityBoundary?: ScenarioApplicationIdentityBoundary;
   trigger: ScenarioTrigger;
   detection?: ScenarioDetection;
   prerequisites: readonly ScenarioPrerequisite[];
@@ -421,7 +443,6 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
       summary: text(authenticationValue.summary, `${path}.summary`),
     };
   });
-
   const prerequisites = boundedArray(
     manifest.prerequisites,
     "prerequisites",
@@ -521,6 +542,15 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
     operations.map((operation) => [operation.key, operation]),
   );
   validateOperationDependencies(operations, operationByKey);
+  const applicationIdentityBoundary =
+    manifest.applicationIdentityBoundary === undefined
+      ? undefined
+      : parseApplicationIdentityBoundary(
+        manifest.applicationIdentityBoundary,
+        roles,
+        actorIds,
+        operationByKey,
+      );
 
   const resources = boundedArray(
     manifest.resources,
@@ -603,6 +633,12 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
     )
   );
   uniqueIds(permissions, "permission");
+  if (applicationIdentityBoundary !== undefined) {
+    validateApplicationIdentityPermissionDeclarations(
+      applicationIdentityBoundary,
+      permissions,
+    );
+  }
 
   const evidenceValue = record(manifest.evidence, "evidence");
   const artifacts = boundedArray(
@@ -820,6 +856,9 @@ export function parseScenarioManifest(value: unknown): ScenarioManifest {
     actors,
     roles,
     authentication,
+    ...(applicationIdentityBoundary === undefined
+      ? {}
+      : { applicationIdentityBoundary }),
     trigger,
     detection,
     prerequisites,
@@ -1067,6 +1106,197 @@ function parseDetection(value: unknown): ScenarioDetection {
   throw new ScenarioManifestError(
     "detection.kind must be none or independent.",
   );
+}
+
+function parseApplicationIdentityBoundary(
+  value: unknown,
+  roles: ScenarioRoleAssignments,
+  actorIds: ReadonlySet<string>,
+  operationByKey: ReadonlyMap<string, ScenarioOperation>,
+): ScenarioApplicationIdentityBoundary {
+  const boundary = record(value, "applicationIdentityBoundary");
+  const producerActorId = id(
+    boundary.producerActorId,
+    "applicationIdentityBoundary.producerActorId",
+  );
+  const detectorActorId = id(
+    boundary.detectorActorId,
+    "applicationIdentityBoundary.detectorActorId",
+  );
+  const recoveryOwnerActorId = id(
+    boundary.recoveryOwnerActorId,
+    "applicationIdentityBoundary.recoveryOwnerActorId",
+  );
+  for (const [path, actorId] of [
+    ["producerActorId", producerActorId],
+    ["detectorActorId", detectorActorId],
+    ["recoveryOwnerActorId", recoveryOwnerActorId],
+  ] as const) {
+    reference(
+      actorIds,
+      actorId,
+      `applicationIdentityBoundary.${path}`,
+      "actor",
+    );
+  }
+  if (
+    producerActorId !== roles.workloadActor ||
+    detectorActorId !== roles.detector
+  ) {
+    throw new ScenarioManifestError(
+      "applicationIdentityBoundary must bind the exact workload and detector actors.",
+    );
+  }
+  if (
+    new Set([
+      producerActorId,
+      detectorActorId,
+      recoveryOwnerActorId,
+    ]).size !== 3
+  ) {
+    throw new ScenarioManifestError(
+      "applicationIdentityBoundary recovery, producer, and detector actors must differ.",
+    );
+  }
+  if (
+    boundary.tenantBinding !== "same-tenant" ||
+    boundary.tokenAudience !== "https://graph.microsoft.com"
+  ) {
+    throw new ScenarioManifestError(
+      "applicationIdentityBoundary must use the fixed same-tenant Microsoft Graph audience.",
+    );
+  }
+  const producerPermissions = parseApplicationPermissionRequirements(
+    boundary.producerPermissions,
+    "applicationIdentityBoundary.producerPermissions",
+  );
+  const detectorPermissions = parseApplicationPermissionRequirements(
+    boundary.detectorPermissions,
+    "applicationIdentityBoundary.detectorPermissions",
+  );
+  const producerRoleIds = new Set(
+    producerPermissions.map(({ applicationRoleId }) => applicationRoleId),
+  );
+  if (
+    detectorPermissions.some(({ applicationRoleId }) =>
+      producerRoleIds.has(applicationRoleId)
+    )
+  ) {
+    throw new ScenarioManifestError(
+      "applicationIdentityBoundary producer and detector permissions must not overlap.",
+    );
+  }
+  const markerOperationKey = id(
+    boundary.markerOperationKey,
+    "applicationIdentityBoundary.markerOperationKey",
+  );
+  const markerOperation = operationByKey.get(markerOperationKey);
+  if (markerOperation?.marker === undefined) {
+    throw new ScenarioManifestError(
+      "applicationIdentityBoundary marker operation must be marker-bound.",
+    );
+  }
+  const observationOperationKey = id(
+    boundary.observationOperationKey,
+    "applicationIdentityBoundary.observationOperationKey",
+  );
+  const observationOperation = operationByKey.get(observationOperationKey);
+  if (
+    observationOperation?.ownerActorId !== detectorActorId ||
+    observationOperation.effect !== "read"
+  ) {
+    throw new ScenarioManifestError(
+      "applicationIdentityBoundary observation must be a detector-owned read.",
+    );
+  }
+  const maximumObservationWindowMinutes = positiveNumber(
+    boundary.maximumObservationWindowMinutes,
+    "applicationIdentityBoundary.maximumObservationWindowMinutes",
+  );
+  if (
+    !Number.isSafeInteger(maximumObservationWindowMinutes) ||
+    maximumObservationWindowMinutes > 60
+  ) {
+    throw new ScenarioManifestError(
+      "applicationIdentityBoundary observation window must be an integer from 1 to 60 minutes.",
+    );
+  }
+  if (
+    boundary.attribution !==
+      "exact-application-service-principal-marker-window"
+  ) {
+    throw new ScenarioManifestError(
+      "applicationIdentityBoundary attribution contract is invalid.",
+    );
+  }
+  return {
+    producerActorId,
+    detectorActorId,
+    recoveryOwnerActorId,
+    tenantBinding: "same-tenant",
+    tokenAudience: "https://graph.microsoft.com",
+    producerPermissions,
+    detectorPermissions,
+    markerOperationKey,
+    observationOperationKey,
+    maximumObservationWindowMinutes,
+    attribution: "exact-application-service-principal-marker-window",
+  };
+}
+
+function parseApplicationPermissionRequirements(
+  value: unknown,
+  path: string,
+): ScenarioApplicationPermissionRequirement[] {
+  const rows = boundedArray(value, path, 1, 16).map((item, index) => {
+    const row = record(item, `${path}[${index}]`);
+    return {
+      resourceApplicationId: uuid(
+        row.resourceApplicationId,
+        `${path}[${index}].resourceApplicationId`,
+      ),
+      applicationRoleId: uuid(
+        row.applicationRoleId,
+        `${path}[${index}].applicationRoleId`,
+      ),
+      name: text(row.name, `${path}[${index}].name`),
+    };
+  });
+  const keys = rows.map(
+    ({ resourceApplicationId, applicationRoleId }) =>
+      `${resourceApplicationId}:${applicationRoleId}`,
+  );
+  uniqueStrings(keys, path);
+  return rows;
+}
+
+function validateApplicationIdentityPermissionDeclarations(
+  boundary: ScenarioApplicationIdentityBoundary,
+  permissions: readonly ScenarioPermission[],
+): void {
+  const declared = permissions
+    .filter(({ actorId }) =>
+      actorId === boundary.producerActorId ||
+      actorId === boundary.detectorActorId
+    )
+    .map(({ actorId, name }) => `${actorId}:${name}`)
+    .sort();
+  const required = [
+    ...boundary.producerPermissions.map(({ name }) =>
+      `${boundary.producerActorId}:${name}`
+    ),
+    ...boundary.detectorPermissions.map(({ name }) =>
+      `${boundary.detectorActorId}:${name}`
+    ),
+  ].sort();
+  if (
+    declared.length !== required.length ||
+    declared.some((value, index) => value !== required[index])
+  ) {
+    throw new ScenarioManifestError(
+      "applicationIdentityBoundary permission requirements must exactly match manifest permissions.",
+    );
+  }
 }
 
 function parsePermission(
@@ -1535,6 +1765,17 @@ function id(value: unknown, path: string): string {
     throw new ScenarioManifestError(
       `${path} must be a lowercase stable identifier.`,
     );
+  }
+  return parsed;
+}
+
+function uuid(value: unknown, path: string): string {
+  const parsed = text(value, path).toLowerCase();
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      .test(parsed)
+  ) {
+    throw new ScenarioManifestError(`${path} must be a canonical UUID.`);
   }
   return parsed;
 }

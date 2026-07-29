@@ -36,6 +36,11 @@ scenario family, malformed or oversized input, unsafe identifiers, a missing,
 duplicated, or reordered read, uncertain pagination, an ambiguous or
 nonterminal fake result, and any attempted detector, learner, or cleanup
 promotion fail closed. The fake is invoked at most once and is never retried.
+The plan also declares the
+[distinct application identity boundary](distinct-application-identity.md),
+but rehearsal output cannot satisfy it: exact installed identities,
+assignments, fresh tokens, and platform correlation remain external and
+uninspected.
 
 A completed result is labeled `REHEARSAL_ONLY`. Its fake observations use only
 fixed `synthetic-*` categories, and the shared envelope declares every external

@@ -252,6 +252,11 @@ describe("OAuth application reconnaissance REHEARSAL_ONLY pipeline", () => {
       freshness: "current-bounded-window",
       collection: "complete-within-bound",
       attribution: "token-event-only",
+      identityBinding: {
+        contract: "distinct-application-identity/v1",
+        planDigestSha256: "a".repeat(64),
+        bindingDigestSha256: "b".repeat(64),
+      },
     }],
     ["learner", {
       state: "visible",

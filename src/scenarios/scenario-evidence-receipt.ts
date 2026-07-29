@@ -145,6 +145,7 @@ export interface EvidenceReceiptObservation {
   outcome: ObservationOutcome;
   observerActorId: string;
   operationKey: string;
+  identityBindingDigestSha256?: string;
 }
 
 export interface EvidenceReceiptClaim {
@@ -433,8 +434,19 @@ function parseObservation(value: unknown): EvidenceReceiptObservation {
   const observation = object(value, "shape");
   exactKeys(
     observation,
-    ["source", "outcome", "observerActorId", "operationKey"],
+    [
+      "source",
+      "outcome",
+      "observerActorId",
+      "operationKey",
+      "identityBindingDigestSha256",
+    ],
+    ["identityBindingDigestSha256"],
   );
+  const identityBindingDigestSha256 =
+    observation.identityBindingDigestSha256 === undefined
+      ? undefined
+      : digest(observation.identityBindingDigestSha256);
   return {
     source: enumeration(
       observation.source,
@@ -448,6 +460,9 @@ function parseObservation(value: unknown): EvidenceReceiptObservation {
     ),
     observerActorId: alias(observation.observerActorId),
     operationKey: alias(observation.operationKey),
+    ...(identityBindingDigestSha256 === undefined
+      ? {}
+      : { identityBindingDigestSha256 }),
   };
 }
 
@@ -627,6 +642,15 @@ function verifyObservation(
     throw failure(
       "invalid-observation",
       "independent observation must use the manifest detector.",
+    );
+  }
+  if (
+    observation.source !== "independent-detector" &&
+    observation.identityBindingDigestSha256 !== undefined
+  ) {
+    throw failure(
+      "invalid-observation",
+      "only an independent detector observation may carry an identity binding digest.",
     );
   }
   if (
@@ -1202,6 +1226,16 @@ function alias(value: unknown): string {
     throw failure(
       "raw-identifier",
       "identifiers must be bounded sanitized aliases.",
+    );
+  }
+  return value;
+}
+
+function digest(value: unknown): string {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) {
+    throw failure(
+      "raw-identifier",
+      "identity binding digest must be lowercase SHA-256.",
     );
   }
   return value;

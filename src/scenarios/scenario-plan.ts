@@ -146,6 +146,19 @@ export interface ScenarioExecutionPlan {
     suppliedCeiling: number;
   };
   selectedResponseId: string | null;
+  applicationIdentityBoundary?: {
+    producerActorId: string;
+    detectorActorId: string;
+    recoveryOwnerActorId: string;
+    directoryBinding: "same-directory";
+    authenticationAudience: string;
+    producerApplicationRoleIds: readonly string[];
+    detectorApplicationRoleIds: readonly string[];
+    markerOperationKey: string;
+    observationOperationKey: string;
+    maximumObservationWindowMinutes: number;
+    runtimeExactIdentityBinding: "required";
+  };
   steps: readonly ScenarioPlanStep[];
   terminalProof: {
     cleanupOperationKeys: readonly string[];
@@ -424,6 +437,37 @@ export function compileScenarioExecutionPlan(
       suppliedCeiling: request.maximumBudgetUsd,
     },
     selectedResponseId: selectedResponse?.id ?? null,
+    ...(manifest.applicationIdentityBoundary === undefined
+      ? {}
+      : {
+        applicationIdentityBoundary: {
+          producerActorId:
+            manifest.applicationIdentityBoundary.producerActorId,
+          detectorActorId:
+            manifest.applicationIdentityBoundary.detectorActorId,
+          recoveryOwnerActorId:
+            manifest.applicationIdentityBoundary.recoveryOwnerActorId,
+          directoryBinding: "same-directory" as const,
+          authenticationAudience:
+            manifest.applicationIdentityBoundary.tokenAudience,
+          producerApplicationRoleIds:
+            manifest.applicationIdentityBoundary.producerPermissions
+              .map(({ applicationRoleId }) => applicationRoleId)
+              .sort(),
+          detectorApplicationRoleIds:
+            manifest.applicationIdentityBoundary.detectorPermissions
+              .map(({ applicationRoleId }) => applicationRoleId)
+              .sort(),
+          markerOperationKey:
+            manifest.applicationIdentityBoundary.markerOperationKey,
+          observationOperationKey:
+            manifest.applicationIdentityBoundary.observationOperationKey,
+          maximumObservationWindowMinutes:
+            manifest.applicationIdentityBoundary
+              .maximumObservationWindowMinutes,
+          runtimeExactIdentityBinding: "required" as const,
+        },
+      }),
     steps,
     terminalProof,
   };

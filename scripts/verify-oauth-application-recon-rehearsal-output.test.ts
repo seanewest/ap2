@@ -83,7 +83,7 @@ describe("offline OAuth application-recon rehearsal output verifier", () => {
   it("accepts the independently committed output fixture", () => {
     const text = readFileSync(FIXTURE, "utf8");
     expect(createHash("sha256").update(text).digest("hex")).toBe(
-      "acb0dc150579606606b61ac4cb81366a622f35b9df46ca31f24c01e8422f7f9d",
+      "5e1bf746d0a0db9953b1b93ec21ed83f1543dab8ace20b1d3c978659230d8325",
     );
     const summary = verifyOauthApplicationReconRehearsalOutput(
       JSON.parse(text),
@@ -95,11 +95,11 @@ describe("offline OAuth application-recon rehearsal output verifier", () => {
       scenarioId: "oauth-application-reconnaissance",
       manifestSchemaVersion: 2,
       planDigestSha256:
-        "684176156e1922802a25500095726183ca02a89fb019f9143de53aa1be201fe7",
+        "f42e9de96b925826282151a093359c676eefb6c02e3cd26b0430c58f58921a44",
       fakeResultDigestSha256:
         "1e10c070c8c8e10d5cc179cacf523cf2156508500ac0de842eaab7218bf79080",
       outputDigestSha256:
-        "1d89edb8b710176d63026723b842d4e1e36f801b3abf058fb36dbc6617a5c9bc",
+        "5bff66e08b05f871c21c5491d85314e64add30ce89bfdab734e2b35182dc378b",
       fakeContract: "ordered-four-read-terminal-verified",
       adapter: "accepted",
       receiptVerifier: "accepted",
