@@ -6,9 +6,11 @@ import {
   ProcessLocalCalendarMeetingBoundary,
 } from "./calendar-meeting.js";
 import {
+  BestEffortOperationTelemetrySink,
   OperationTelemetry,
   StructuredConsoleOperationTelemetrySink,
 } from "./operation-telemetry.js";
+import { InMemoryOperationTelemetryCollector } from "./operation-telemetry-collector.js";
 import { DelegatedGraphCategoryProof } from "./category-proof.js";
 import {
   DelegatedGraphContactProof,
@@ -105,6 +107,8 @@ const coryTokenProvider =
         ],
       })
     : undefined;
+const operationTelemetryCollector =
+  new InMemoryOperationTelemetryCollector();
 const calendarMeetingOperation =
   coryTokenProvider && cory
     ? new ProcessLocalCalendarMeetingBoundary(
@@ -114,7 +118,10 @@ const calendarMeetingOperation =
           fetch,
           new OperationTelemetry(
             CALENDAR_MEETING_RUN_ID,
-            new StructuredConsoleOperationTelemetrySink(),
+            new BestEffortOperationTelemetrySink(
+              new StructuredConsoleOperationTelemetrySink(),
+              operationTelemetryCollector,
+            ),
           ),
         ),
       )
@@ -153,6 +160,7 @@ const server = createApiServer({
   categoryProofOperation,
   draftProofOperation,
   todoTaskProofOperation,
+  operationTelemetryReader: operationTelemetryCollector,
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
   allowedOrigin: config.allowedOrigin,
 });

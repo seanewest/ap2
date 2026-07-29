@@ -18,6 +18,50 @@ export interface RehearsalStatus {
   latestReadyRevision: string;
 }
 
+export const OPERATION_EVENT_ORDERS = ["newest", "oldest"] as const;
+export type OperationEventOrder = typeof OPERATION_EVENT_ORDERS[number];
+export type OperationEventKind = "calendar.create" | "calendar.cancel";
+export type OperationEventPhase = "execution" | "cleanup" | "recovery";
+export type OperationEventOutcome =
+  | "started"
+  | "succeeded"
+  | "refused"
+  | "ambiguous";
+export type OperationEventReason =
+  | "none"
+  | "precondition-refusal"
+  | "upstream-refusal"
+  | "upstream-unavailable"
+  | "invalid-upstream-shape"
+  | "unexpected";
+export type OperationEventAmbiguity =
+  | "none"
+  | "possible-mutation"
+  | "unresolved";
+export type OperationEventRecovery =
+  | "not-applicable"
+  | "not-needed"
+  | "in-progress"
+  | "reconciled"
+  | "unresolved";
+export interface OperationEvent {
+  schemaVersion: 1;
+  markerHash: string;
+  operationKind: OperationEventKind;
+  phase: OperationEventPhase;
+  outcome: OperationEventOutcome;
+  durationMs: number;
+  reason: OperationEventReason;
+  ambiguityState: OperationEventAmbiguity;
+  recoveryState: OperationEventRecovery;
+  upstreamStatus?: number;
+}
+export interface RecentOperationEvents {
+  schemaVersion: 1;
+  order: OperationEventOrder;
+  events: readonly OperationEvent[];
+}
+
 export interface SimulatedEmailResult {
   accepted: true;
   sender: string;
@@ -170,6 +214,10 @@ const SIMULATED_EMAIL_SUBJECT = "Dinner tonight";
 export interface AfterPartyApi {
   checkAccess(accessToken: string): Promise<ApiCallerIdentity>;
   getRehearsalStatus(accessToken: string): Promise<RehearsalStatus>;
+  getRecentOperationEvents?(
+    accessToken: string,
+    order?: OperationEventOrder,
+  ): Promise<RecentOperationEvents>;
   sendSimulatedEmail(accessToken: string): Promise<SimulatedEmailResult>;
   sendHelpDeskScenario(accessToken: string): Promise<HelpDeskScenarioResult>;
   shareOneDriveProof(
@@ -246,6 +294,7 @@ export class OneDriveInviteFailureError extends ApiAccessError {
 export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly whoAmIUrl: string;
   private readonly rehearsalStatusUrl: string;
+  private readonly operationEventsUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
   private readonly oneDriveProofUrl: string;
@@ -263,6 +312,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     this.whoAmIUrl = new URL("api/whoami", `${baseUrl}/`).toString();
     this.rehearsalStatusUrl = new URL(
       "api/rehearsal-status",
+      `${baseUrl}/`,
+    ).toString();
+    this.operationEventsUrl = new URL(
+      "api/operation-events",
       `${baseUrl}/`,
     ).toString();
     this.simulatedEmailUrl = new URL(
@@ -331,6 +384,26 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       region: value.region,
       runningStatus: value.runningStatus,
       latestReadyRevision: value.latestReadyRevision,
+    };
+  }
+
+  async getRecentOperationEvents(
+    accessToken: string,
+    order: OperationEventOrder = "newest",
+  ): Promise<RecentOperationEvents> {
+    if (!OPERATION_EVENT_ORDERS.includes(order)) {
+      throw new ApiAccessError();
+    }
+    const url = new URL(this.operationEventsUrl);
+    url.searchParams.set("order", order);
+    const value = await this.getAuthorizedJson(url.toString(), accessToken);
+    if (!isSafeRecentOperationEvents(value) || value.order !== order) {
+      throw new ApiAccessError();
+    }
+    return {
+      schemaVersion: 1,
+      order,
+      events: value.events.map(copyOperationEvent),
     };
   }
 
@@ -855,6 +928,110 @@ function isSafeRehearsalStatus(value: unknown): value is RehearsalStatus {
     runningStatuses.some((candidate) => candidate === status.runningStatus) &&
     typeof status.latestReadyRevision === "string" &&
     status.latestReadyRevision.length > 0
+  );
+}
+
+function isSafeRecentOperationEvents(
+  value: unknown,
+): value is RecentOperationEvents {
+  if (!hasExactKeys(value, ["schemaVersion", "order", "events"])) {
+    return false;
+  }
+  return (
+    value.schemaVersion === 1 &&
+    OPERATION_EVENT_ORDERS.includes(value.order as OperationEventOrder) &&
+    Array.isArray(value.events) &&
+    value.events.length <= 64 &&
+    value.events.every(isSafeOperationEvent)
+  );
+}
+
+function isSafeOperationEvent(value: unknown): value is OperationEvent {
+  if (
+    !hasExactKeys(value, [
+      "schemaVersion",
+      "markerHash",
+      "operationKind",
+      "phase",
+      "outcome",
+      "durationMs",
+      "reason",
+      "ambiguityState",
+      "recoveryState",
+    ], ["upstreamStatus"])
+  ) {
+    return false;
+  }
+  return (
+    value.schemaVersion === 1 &&
+    typeof value.markerHash === "string" &&
+    /^m1_[0-9a-f]{24}$/.test(value.markerHash) &&
+    (value.operationKind === "calendar.create" ||
+      value.operationKind === "calendar.cancel") &&
+    (value.phase === "execution" ||
+      value.phase === "cleanup" ||
+      value.phase === "recovery") &&
+    (value.outcome === "started" ||
+      value.outcome === "succeeded" ||
+      value.outcome === "refused" ||
+      value.outcome === "ambiguous") &&
+    Number.isInteger(value.durationMs) &&
+    Number(value.durationMs) >= 0 &&
+    Number(value.durationMs) <= 86_400_000 &&
+    (value.reason === "none" ||
+      value.reason === "precondition-refusal" ||
+      value.reason === "upstream-refusal" ||
+      value.reason === "upstream-unavailable" ||
+      value.reason === "invalid-upstream-shape" ||
+      value.reason === "unexpected") &&
+    (value.ambiguityState === "none" ||
+      value.ambiguityState === "possible-mutation" ||
+      value.ambiguityState === "unresolved") &&
+    (value.recoveryState === "not-applicable" ||
+      value.recoveryState === "not-needed" ||
+      value.recoveryState === "in-progress" ||
+      value.recoveryState === "reconciled" ||
+      value.recoveryState === "unresolved") &&
+    (
+      value.upstreamStatus === undefined ||
+      (
+        Number.isInteger(value.upstreamStatus) &&
+        Number(value.upstreamStatus) >= 100 &&
+        Number(value.upstreamStatus) <= 599
+      )
+    )
+  );
+}
+
+function copyOperationEvent(event: OperationEvent): OperationEvent {
+  return {
+    schemaVersion: 1,
+    markerHash: event.markerHash,
+    operationKind: event.operationKind,
+    phase: event.phase,
+    outcome: event.outcome,
+    durationMs: event.durationMs,
+    reason: event.reason,
+    ambiguityState: event.ambiguityState,
+    recoveryState: event.recoveryState,
+    ...(event.upstreamStatus === undefined
+      ? {}
+      : { upstreamStatus: event.upstreamStatus }),
+  };
+}
+
+function hasExactKeys(
+  value: unknown,
+  required: readonly string[],
+  optional: readonly string[] = [],
+): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const keys = Object.keys(value);
+  return (
+    required.every((key) => keys.includes(key)) &&
+    keys.every((key) => required.includes(key) || optional.includes(key))
   );
 }
 

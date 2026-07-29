@@ -12,10 +12,17 @@ The first product-wired consumer is the calendar scenario:
 - a cancellation after process-state loss reports its exact read-only recovery
   phase before the cancellation mutation.
 
-The production API writes one JSON object per event to standard output. A
-future approved sink can implement the same `OperationTelemetrySink` interface
-without changing operation semantics. Sink and clock failures are swallowed;
-they never cause a Microsoft request, retry, success, or failure to change.
+The API writes one JSON object per event to standard output and independently
+offers the same validated event to a bounded process-local collector. Each
+sink is best-effort and isolated from the operation and every other sink.
+Sink and clock failures never cause a Microsoft request, retry, success, or
+failure to change.
+
+An authenticated operator can read a snapshot with
+`GET /api/operation-events?order=newest` (or `oldest`). The route uses the same
+token verification and caller allowlist as the other protected API routes.
+The typed `HttpAfterPartyApi.getRecentOperationEvents` client performs its own
+strict schema check and rejects additional response or event fields.
 
 ## Fixed event contract
 
@@ -57,3 +64,18 @@ Only the stable internal reason category and sanitized HTTP status may describe
 a failure. Tests inject credential-like markers, raw Microsoft error text,
 tenant object content, and a failing sink, then prove those values are absent
 and that the underlying Graph call count remains unchanged.
+
+## Collector bounds and limitations
+
+The collector accepts only the exact schema-v1 field allowlist and validates
+every enum, hash, duration, and status at runtime. It holds at most 64 events,
+prunes events older than 15 minutes, and limits a serialized snapshot to 16
+KiB by dropping the oldest retained events. Sequence and observation time are
+internal only. Snapshot events are copies, deterministic for either requested
+order, and cannot mutate stored events.
+
+This is intentionally not a durable telemetry sink. Events disappear when the
+API process restarts and may be absent after a revision change or process
+failure. No database, queue, background worker, vendor SDK, delivery guarantee,
+or cross-instance aggregation is implied. Choosing and deploying a durable
+sink remains a separate decision.

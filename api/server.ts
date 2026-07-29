@@ -39,6 +39,10 @@ import {
   type OneDriveShareProofOperation,
 } from "./onedrive-share-proof.js";
 import { InvalidTokenError, type TokenVerifier } from "./token-verifier.js";
+import {
+  OPERATION_TELEMETRY_ORDERS,
+  type OperationTelemetryReader,
+} from "./operation-telemetry-collector.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -54,6 +58,7 @@ export interface ApiDependencies {
   sharePointFileProofOperation?: SharePointFileProofOperation;
   draftProofOperation?: DraftProofOperation;
   todoTaskProofOperation?: TodoTaskProofOperation;
+  operationTelemetryReader?: OperationTelemetryReader;
   allowedOrigin?: string;
 }
 
@@ -83,7 +88,9 @@ async function route(
 
   if (
     request.method === "OPTIONS" &&
-    (pathname === "/api/whoami" || pathname === "/api/rehearsal-status")
+    (pathname === "/api/whoami" ||
+      pathname === "/api/rehearsal-status" ||
+      pathname === "/api/operation-events")
   ) {
     handleProtectedPreflight(request, response, origin, ["GET"]);
     return;
@@ -143,6 +150,11 @@ async function route(
 
   if (request.method === "GET" && pathname === "/api/rehearsal-status") {
     await rehearsalStatus(request, response, dependencies);
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/operation-events") {
+    await operationEvents(request, response, dependencies);
     return;
   }
 
@@ -278,6 +290,40 @@ async function rehearsalStatus(
   );
 }
 
+async function operationEvents(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, () => {
+    const order = operationEventOrder(request.url);
+    if (!dependencies.operationTelemetryReader) {
+      throw new Error("Operation telemetry reader is not configured");
+    }
+    return dependencies.operationTelemetryReader.snapshot(order);
+  });
+}
+
+class InvalidOperationEventQueryError extends Error {}
+
+function operationEventOrder(
+  requestUrl: string | undefined,
+): typeof OPERATION_TELEMETRY_ORDERS[number] {
+  const url = new URL(requestUrl ?? "/", "http://localhost");
+  const orderValues = url.searchParams.getAll("order");
+  const order = orderValues.length === 0 ? "newest" : orderValues[0];
+  if (
+    [...url.searchParams.keys()].some((key) => key !== "order") ||
+    orderValues.length > 1 ||
+    !OPERATION_TELEMETRY_ORDERS.includes(
+      order as typeof OPERATION_TELEMETRY_ORDERS[number],
+    )
+  ) {
+    throw new InvalidOperationEventQueryError();
+  }
+  return order as typeof OPERATION_TELEMETRY_ORDERS[number];
+}
+
 async function simulatedEmail(
   request: IncomingMessage,
   response: ServerResponse,
@@ -382,6 +428,10 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof InvalidTokenError || error instanceof InvalidClaimsError) {
       sendUnauthorized(response);
+      return;
+    }
+    if (error instanceof InvalidOperationEventQueryError) {
+      sendJson(response, 400, { error: "invalid_operation_event_query" });
       return;
     }
     if (error instanceof OneDriveProofConflictError) {

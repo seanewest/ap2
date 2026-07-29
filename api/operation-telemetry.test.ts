@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  BestEffortOperationTelemetrySink,
   MAX_OPERATION_DURATION_MS,
   MAX_OPERATION_EVENTS_PER_RUN,
   MAX_OPERATION_MARKER_LENGTH,
@@ -40,6 +41,23 @@ function clock(...values: number[]): () => number {
 }
 
 describe("operation telemetry contract", () => {
+  it("isolates each best-effort sink from operations and other sinks", () => {
+    const received: OperationTelemetryEvent[] = [];
+    const sink = new BestEffortOperationTelemetrySink(
+      { record: () => { throw new Error("collector unavailable"); } },
+      { record: (value) => received.push(value) },
+    );
+    const telemetry = new OperationTelemetry("safe-fanout", sink);
+
+    const run = telemetry.begin("calendar.create", "execution");
+    run.finish("succeeded");
+
+    expect(received.map(({ outcome }) => outcome)).toEqual([
+      "started",
+      "succeeded",
+    ]);
+  });
+
   it("emits only the fixed safe schema with a bounded marker hash", () => {
     const fixture = collector();
     const marker =

@@ -49,6 +49,8 @@ import {
   type InboxRuleProofResult,
 } from "./inbox-rule-proof.js";
 import type { RehearsalStatus } from "./rehearsal-status.js";
+import { InMemoryOperationTelemetryCollector } from "./operation-telemetry-collector.js";
+import type { OperationTelemetryEvent } from "./operation-telemetry.js";
 import {
   SHAREPOINT_FILE_NAME,
   SharePointFileProofConflictError,
@@ -208,6 +210,9 @@ const oneDriveShareProofOperation = {
 };
 const oneDriveOperationBoundary =
   new ProcessLocalOneDriveShareProofBoundary(oneDriveShareProofOperation);
+let telemetryNow = 1_000;
+const operationTelemetryCollector =
+  new InMemoryOperationTelemetryCollector({ clock: () => telemetryNow });
 const server = createApiServer({
   tokenVerifier: new JoseTokenVerifier({
     issuer: ISSUER,
@@ -227,6 +232,7 @@ const server = createApiServer({
   sharePointFileProofOperation,
   draftProofOperation,
   todoTaskProofOperation,
+  operationTelemetryReader: operationTelemetryCollector,
   allowedOrigin: "http://localhost:5173",
 });
 let baseUrl: string;
@@ -248,6 +254,93 @@ describe("local API", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ status: "ok" });
+  });
+
+  it("refuses unauthenticated operation-event reads", async () => {
+    const response = await fetch(`${baseUrl}/api/operation-events`);
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toBe("Bearer");
+  });
+
+  it("authenticates before rejecting a malformed operation-event query", async () => {
+    const response = await fetch(
+      `${baseUrl}/api/operation-events?order=newest&order=oldest`,
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toBe("Bearer");
+  });
+
+  it("serves an empty authenticated operation-event snapshot", async () => {
+    const response = await protectedRequest({
+      tid: STUDENT_TENANT_ID,
+      oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+      scp: REQUIRED_DELEGATED_SCOPE,
+    }, undefined, "/api/operation-events");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      schemaVersion: 1,
+      order: "newest",
+      events: [],
+    });
+  });
+
+  it("serves only sanitized events in explicit deterministic order", async () => {
+    const started: OperationTelemetryEvent = {
+      schemaVersion: 1,
+      markerHash: "m1_0123456789abcdef01234567",
+      operationKind: "calendar.create",
+      phase: "execution",
+      outcome: "started",
+      durationMs: 0,
+      reason: "none",
+      ambiguityState: "none",
+      recoveryState: "not-applicable",
+    };
+    operationTelemetryCollector.record(started);
+    telemetryNow += 1;
+    operationTelemetryCollector.record({
+      ...started,
+      outcome: "succeeded",
+      durationMs: 12,
+      recoveryState: "not-needed",
+      upstreamStatus: 201,
+    });
+    const response = await protectedRequest({
+      tid: STUDENT_TENANT_ID,
+      oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+      scp: REQUIRED_DELEGATED_SCOPE,
+    }, undefined, "/api/operation-events?order=oldest");
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.events.map(({ outcome }: OperationTelemetryEvent) => outcome))
+      .toEqual(["started", "succeeded"]);
+    expect(Object.keys(body.events[1]).sort()).toEqual([
+      "ambiguityState",
+      "durationMs",
+      "markerHash",
+      "operationKind",
+      "outcome",
+      "phase",
+      "reason",
+      "recoveryState",
+      "schemaVersion",
+      "upstreamStatus",
+    ]);
+    expect(JSON.stringify(body)).not.toMatch(
+      /token|identity|tenant|message|body|browser|rawMarker/i,
+    );
+  });
+
+  it("rejects unbounded operation-event query shapes", async () => {
+    const response = await protectedRequest({
+      tid: STUDENT_TENANT_ID,
+      oid: STUDENT_PRODUCT_OPERATOR_OBJECT_ID,
+      scp: REQUIRED_DELEGATED_SCOPE,
+    }, undefined, "/api/operation-events?order=newest&order=oldest");
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid_operation_event_query",
+    });
   });
 
   it.each([
@@ -275,7 +368,7 @@ describe("local API", () => {
     },
   );
 
-  it.each(["/api/whoami", "/api/rehearsal-status"])(
+  it.each(["/api/whoami", "/api/rehearsal-status", "/api/operation-events"])(
     "allows only the configured origin to preflight %s",
     async (path) => {
       const response = await fetch(`${baseUrl}${path}`, {

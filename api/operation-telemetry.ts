@@ -137,6 +137,26 @@ export class StructuredConsoleOperationTelemetrySink
   }
 }
 
+export class BestEffortOperationTelemetrySink
+  implements OperationTelemetrySink
+{
+  readonly #sinks: readonly OperationTelemetrySink[];
+
+  constructor(...sinks: readonly OperationTelemetrySink[]) {
+    this.#sinks = sinks;
+  }
+
+  record(event: Readonly<OperationTelemetryEvent>): void {
+    for (const sink of this.#sinks) {
+      try {
+        sink.record(event);
+      } catch {
+        // Each observational sink is isolated from operations and other sinks.
+      }
+    }
+  }
+}
+
 export class OperationTelemetryRun {
   readonly #markerHash: string;
   readonly #operationKind: OperationKind;
