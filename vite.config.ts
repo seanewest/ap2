@@ -12,6 +12,17 @@ export default defineConfig(({ command }) => ({
       scenarioSurfaceInventory,
     ),
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(moduleId) {
+          return moduleId.endsWith("/src/scenarios/scenario-manifest.ts")
+            ? "scenario-contract"
+            : undefined;
+        },
+      },
+    },
+  },
   server: {
     host: "0.0.0.0",
     port: 5173,
