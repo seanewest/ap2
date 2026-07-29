@@ -405,8 +405,9 @@ test("audits every manual-only operator panel at the shared accessibility bounda
   await page.goto("/e2e/recent-operations.html");
 
   const panels = [
+    "Lab catalog",
+    "Capability building blocks",
     "Recent operations",
-    "Scenario catalog",
     "Scenario surface availability",
     "Scenario plan preview",
     "Scenario batch feasibility",
@@ -495,24 +496,12 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     await expect(page.locator(`#${descriptionId}`)).not.toBeEmpty();
   }
 
-  const catalogAction = page.getByRole("region", {
-    name: "Scenario catalog",
-  }).getByRole("button", { name: /Use .* in plan preview/ }).first();
-  expect(await catalogAction.getAttribute("aria-describedby")).toBeTruthy();
-  for (const action of [refreshOperations, catalogAction]) {
-    expect(
-      await action.evaluate((element) => {
-        const style = getComputedStyle(element);
-        return [style.animationDuration, style.transitionDuration];
-      }),
-    ).toEqual(["0s", "0s"]);
-  }
-  await catalogAction.focus();
-  await page.keyboard.press("Enter");
-  await expect(
-    page.getByRole("region", { name: "Scenario plan preview" })
-      .getByLabel("Canonical scenario"),
-  ).toBeFocused();
+  expect(
+    await refreshOperations.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.animationDuration, style.transitionDuration];
+    }),
+  ).toEqual(["0s", "0s"]);
   expect(manualRequests).toBe(0);
 
   for (const [panelName, actionName] of formPanels.slice(2)) {
@@ -534,7 +523,8 @@ test("contains synchronous render faults to the affected operator panel", async 
 }) => {
   const cases = [
     ["recent-operations-heading", "Recent operations"],
-    ["scenario-catalog-heading", "Scenario catalog"],
+    ["lab-catalog-heading", "Lab catalog"],
+    ["scenario-catalog-heading", "Capability building blocks"],
     ["scenario-plan-preview-heading", "Scenario plan preview"],
     ["batch-feasibility-heading", "Scenario batch feasibility"],
     ["scenario-evidence-verification-heading", "Receipt verification"],
@@ -604,9 +594,9 @@ test("contains synchronous render faults to the affected operator panel", async 
     );
     await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
     await expect(page.getByRole("region", {
-      name: label === "Scenario catalog"
-        ? "Scenario plan preview"
-        : "Scenario catalog",
+      name: label === "Capability building blocks"
+        ? "Lab catalog"
+        : "Capability building blocks",
     })).toBeVisible();
     await page.getByRole("button", { name: "Sign out" }).focus();
     await expect(page.getByRole("button", { name: "Sign out" })).toBeFocused();
@@ -842,7 +832,7 @@ test("restores every generic mutation panel after shutdown non-admission", async
   }
 });
 
-test("navigates the read-only scenario catalog without network activity", async ({
+test("presents an honest empty Lab catalog before read-only capability building blocks", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
@@ -857,21 +847,31 @@ test("navigates the read-only scenario catalog without network activity", async 
 
   await page.goto("/e2e/recent-operations.html");
   await expect(page.getByText("Signed in as Fixture Operator")).toBeVisible();
-  const catalog = page.getByRole("region", { name: "Scenario catalog" });
+  const labs = page.getByRole("region", { name: "Lab catalog" });
+  const catalog = page.getByRole("region", {
+    name: "Capability building blocks",
+  });
+  await expect(labs).toBeVisible();
   await expect(catalog).toBeVisible();
+  await expect(labs.getByText("No complete labs are published yet")).toBeVisible();
+  await expect(labs.getByText(
+    /at least two distinct capability building blocks/,
+  )).toBeVisible();
+  await expect(labs.locator(".lab-catalog-card")).toHaveCount(0);
   await expect(catalog.locator(".scenario-catalog-card")).toHaveCount(
     SCENARIO_MANIFESTS.length,
   );
-  await expect(catalog.getByText("Purview audit boundary")).toBeVisible();
   await expect(catalog.getByText(
-    "Private three-VM AVD lab substrate",
+    "Capability building block — not a lab",
+  )).toHaveCount(SCENARIO_MANIFESTS.length);
+  await expect(catalog.getByText(
+    "Private three-VM AVD substrate",
   )).toBeVisible();
-  const planLinks = catalog.getByRole("button", {
-    name: /Use .+ in plan preview/,
-  });
-  await expect(planLinks).toHaveCount(SCENARIO_MANIFESTS.length);
+  await expect(labs.locator(
+    "button, a, form, input, select, textarea, [data-action]",
+  )).toHaveCount(0);
   await expect(catalog.locator(
-    "a, form, input, select, textarea, [data-action]",
+    "button, a, form, input, select, textarea, [data-action]",
   )).toHaveCount(0);
   apiRequests = 0;
 
@@ -881,48 +881,26 @@ test("navigates the read-only scenario catalog without network activity", async 
   await expect(firstSummary).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(firstDetails).toHaveAttribute("open", "");
-  await expect(firstDetails.getByText("Role separation")).toBeVisible();
+  await expect(firstDetails.getByText(
+    "People in a future learning experience",
+  )).toBeVisible();
+  await expect(firstDetails.getByText(
+    /Not defined by this atomic building block/,
+  )).toBeVisible();
+  await expect(firstDetails.getByText(
+    /fictional identities in the story, not the human learner/,
+  )).toBeVisible();
+  await expect(firstDetails).not.toContainText(
+    /Workload actor|Evidence producer|Trigger|Retention|Cleanup owner|Responder/,
+  );
 
   await firstSummary.focus();
   await page.keyboard.press("Tab");
-  await expect(planLinks.nth(0)).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(catalog.locator("summary").nth(1)).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(planLinks.nth(1)).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
   await expect(catalog.locator("summary").nth(1)).toBeFocused();
   await page.keyboard.press("Shift+Tab");
-  await expect(planLinks.nth(0)).toBeFocused();
-
-  await planLinks.nth(2).press("Enter");
-  const preview = page.getByRole("region", {
-    name: "Scenario plan preview",
-  });
-  const scenario = preview.getByLabel("Canonical scenario");
-  await expect(scenario).toBeFocused();
-  await expect(scenario).toHaveValue("2");
-  await expect(preview.getByText(
-    /Selected Private three-VM AVD lab substrate, registry version 2/,
-  )).toBeVisible();
-  await expect(preview.getByLabel("Maximum budget (USD)")).toHaveValue("10");
-  await expect(preview.getByLabel(/Expiry window/)).toHaveValue("5");
-  await expect(preview.getByText("No preview requested")).toHaveCount(0);
-  await planLinks.nth(3).click();
-  await expect(scenario).toHaveValue("3");
-  await planLinks.nth(2).click();
-  await expect(scenario).toHaveValue("2");
-  await planLinks.nth(2).click();
-  await expect(scenario).toBeFocused();
-  await expect(scenario).toHaveValue("2");
+  await expect(firstSummary).toBeFocused();
   await page.waitForTimeout(100);
   expect(apiRequests).toBe(0);
-  expect(
-    await planLinks.nth(2).evaluate((element) => {
-      const style = getComputedStyle(element);
-      return [style.animationDuration, style.transitionDuration];
-    }),
-  ).toEqual(["0s", "0s"]);
   expect(
     await page.evaluate(() =>
       document.documentElement.scrollWidth <= window.innerWidth
@@ -1010,13 +988,18 @@ test("renders the authoritative scenario surface matrix without network activity
   expect(apiPaths).toEqual([]);
 });
 
-test("keeps the catalog descriptive when the API session is unauthorized", async ({
+test("keeps the lab and capability catalogs descriptive when the API session is unauthorized", async ({
   page,
 }) => {
   await configureOperator(page, "invalid-fixture-token");
   await page.goto("/e2e/recent-operations.html");
-  const catalog = page.getByRole("region", { name: "Scenario catalog" });
+  const labs = page.getByRole("region", { name: "Lab catalog" });
+  const catalog = page.getByRole("region", {
+    name: "Capability building blocks",
+  });
+  await expect(labs).toBeVisible();
   await expect(catalog).toBeVisible();
+  await expect(labs.getByText("No complete labs are published yet")).toBeVisible();
 
   const response = page.waitForResponse((candidate) =>
     new URL(candidate.url()).pathname === "/api/whoami"
@@ -1052,16 +1035,14 @@ test("previews one deterministic plan per manual signed-operator request", async
     await route.continue();
   });
   await page.goto("/e2e/recent-operations.html");
-  await page.getByRole("button", {
-    name: "Use Kobe help-desk email for Cory in plan preview",
-  }).click();
   const preview = page.getByRole("region", {
     name: "Scenario plan preview",
   });
+  await preview.getByLabel("Canonical scenario").selectOption({
+    label: "Kobe help-desk email for Cory",
+  });
   const button = preview.getByRole("button", { name: "Preview plan" });
-  await expect(preview.getByText(
-    /Selected Kobe help-desk email for Cory, registry version 2/,
-  )).toBeVisible();
+  await expect(preview.getByText("No preview requested")).toBeVisible();
   expect(planRequests).toHaveLength(0);
 
   const firstResponse = page.waitForResponse((response) =>
@@ -1554,11 +1535,11 @@ test("opens one signed-operator prepared learner briefing without producer contr
   });
   await page.goto("/e2e/recent-operations.html");
 
-  await page.getByRole("button", {
-    name: "Use Kobe help-desk email for Cory in plan preview",
-  }).click();
   const preview = page.getByRole("region", {
     name: "Scenario plan preview",
+  });
+  await preview.getByLabel("Canonical scenario").selectOption({
+    label: "Kobe help-desk email for Cory",
   });
   await preview.locator("input[name='alias-learner']").fill("learner-cory");
   await preview.getByLabel("Optional response").selectOption("0");

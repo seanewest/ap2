@@ -144,12 +144,10 @@ window no longer than the manifest's conservative duration. It derives the UTC
 request timestamps locally and calls `HttpAfterPartyApi.compileScenarioPlan`
 only after the operator selects `Preview plan`.
 
-Every Scenario catalog card also offers `Use in plan preview`. That local-only
-action resolves the exact canonical scenario and schema version, restores only
-bounded registry-derived defaults, clears a stale result, and moves keyboard
-focus to the preview selector. Repeating or changing this selection is
-deterministic and makes no authentication or API call; the operator must still
-select `Preview plan` explicitly.
+The learner-facing capability catalog has no planning control. Operator
+planning remains in this separate panel, where selecting or changing a
+canonical contract is deterministic and makes no authentication or API call;
+the operator must still select `Preview plan` explicitly.
 
 The result presents ordered phases, role ownership, human-only gates, safe
 evidence categories, learner interpretation, optional response, cleanup,

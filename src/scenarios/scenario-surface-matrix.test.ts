@@ -50,7 +50,7 @@ describe("scenario surface availability matrix", () => {
       "Learner briefing",
     ]);
     expect(panel.querySelector("[data-surface='receipt']")).toBeNull();
-    expect(panel.querySelector("[data-surface='operator-read-ui']")).toBeNull();
+    expect(panel.querySelector("[data-surface='capability-catalog-ui']")).toBeNull();
   });
 
   it("preserves implemented, missing, and not-applicable semantics", () => {

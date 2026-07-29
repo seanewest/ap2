@@ -25,7 +25,7 @@ import {
 import { AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./avd-rehearsal-verification-panel.ts";
 import { HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./help-desk-rehearsal-verification-panel.ts";
 import { OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./oauth-application-recon-rehearsal-verification-panel.ts";
-import { SCENARIO_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
+import { CAPABILITY_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
 import {
   HELP_DESK_EMAIL_RECEIPT_ADAPTER_CAPABILITY,
 } from "./help-desk-email-receipt-adapter.ts";
@@ -84,7 +84,7 @@ export const SCENARIO_INVENTORY_SURFACES = [
   "authenticated-rehearsal-verification-api-client",
   "manual-rehearsal-verification-panel",
   "learner-evidence-ui",
-  "operator-read-ui",
+  "capability-catalog-ui",
   "operator-preview-ui",
   "operator-verify-ui",
 ] as const;
@@ -120,8 +120,8 @@ export type ScenarioSurfaceReason =
   | "manual-rehearsal-verification-panel-missing"
   | "learner-evidence-ui-exported"
   | "learner-evidence-ui-missing"
-  | "operator-catalog-exported"
-  | "operator-catalog-missing"
+  | "capability-catalog-exported"
+  | "capability-catalog-missing"
   | "operator-plan-preview-exported"
   | "operator-plan-preview-missing"
   | "operator-receipt-verify-ui-exported"
@@ -187,7 +187,7 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
   REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
   TEAMS_MISSED_CALL_REHEARSAL_VERIFICATION_API_CAPABILITY,
   ...SCENARIO_API_CLIENT_CAPABILITIES,
-  SCENARIO_CATALOG_UI_CAPABILITY,
+  CAPABILITY_CATALOG_UI_CAPABILITY,
   SCENARIO_PLAN_PREVIEW_UI_CAPABILITY,
   SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY,
   LEARNER_EVIDENCE_BRIEFING_UI_CAPABILITY,
@@ -792,12 +792,12 @@ function inventoryRow(
         )
         ? cell("implemented", "learner-evidence-ui-exported")
         : cell("missing", "learner-evidence-ui-missing"),
-      "operator-read-ui": supports(
-          declarations.get("operator-catalog-ui"),
+      "capability-catalog-ui": supports(
+          declarations.get("capability-catalog-ui"),
           manifest.id,
         )
-        ? cell("implemented", "operator-catalog-exported")
-        : cell("missing", "operator-catalog-missing"),
+        ? cell("implemented", "capability-catalog-exported")
+        : cell("missing", "capability-catalog-missing"),
       "operator-preview-ui": supports(
           declarations.get("operator-plan-preview-ui"),
           manifest.id,
@@ -1030,7 +1030,7 @@ function mapSurface(
     "manual-rehearsal-verification-panel":
       "manual-rehearsal-verification-panel",
     "offline-rehearsal-verifier": "offline-rehearsal-verifier",
-    "operator-catalog-ui": "operator-read-ui",
+    "capability-catalog-ui": "capability-catalog-ui",
     "operator-plan-preview-ui": "operator-preview-ui",
     "operator-receipt-verify-ui": "operator-verify-ui",
     "rehearsal-only": "rehearsal",

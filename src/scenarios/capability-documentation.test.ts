@@ -11,7 +11,7 @@ describe("canonical capability documentation", () => {
   it("lists every canonical scenario exactly once in the source-backed table", () => {
     const sourceBacked = section(
       ledger,
-      "## Attack-inspired scenarios",
+      "## Source-backed capability building blocks",
       "The remaining entries below are historical evidence narratives",
     );
     const documented = tableTitles(sourceBacked);
@@ -75,7 +75,11 @@ function tableTitles(source: string): string[] {
     .split("\n")
     .filter((line) => line.startsWith("| "))
     .map((line) => line.split("|")[1]?.trim() ?? "")
-    .filter((title) => title !== "Scenario" && !/^-+$/.test(title));
+    .filter((title) =>
+      title !== "Scenario" &&
+      title !== "Capability building block" &&
+      !/^-+$/.test(title)
+    );
 }
 
 function semanticTokens(value: string): string[] {

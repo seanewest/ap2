@@ -21,7 +21,7 @@ context:
 | Panel | Existing non-render failure behavior |
 | --- | --- |
 | Recent operations | Typed fixed loading/empty/unauthorized/error states; malformed snapshot is contained by the render boundary |
-| Scenario catalog | Malformed registry fails locally without partial cards |
+| Capability building blocks | Malformed registry fails locally without partial cards |
 | Scenario plan preview | Malformed registry, typed refusal/size/error, and stale completion stay local |
 | Scenario batch feasibility | Malformed registry, typed refusal/size/error, and stale completion stay local |
 | Receipt verification | Pre-auth validation, typed refusal/size/error, duplicate blocking, and stale completion stay local |

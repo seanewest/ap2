@@ -23,7 +23,7 @@ import { SCENARIO_API_CLIENT_CAPABILITIES } from "../api/client.ts";
 import { AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./avd-rehearsal-verification-panel.ts";
 import { HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./help-desk-rehearsal-verification-panel.ts";
 import { OAUTH_APPLICATION_RECON_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./oauth-application-recon-rehearsal-verification-panel.ts";
-import { SCENARIO_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
+import { CAPABILITY_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
 import { SCENARIO_PLAN_PREVIEW_UI_CAPABILITY } from "./scenario-plan-preview.ts";
 import { SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY } from "./scenario-evidence-verification-panel.ts";
 import { LEARNER_EVIDENCE_BRIEFING_UI_CAPABILITY } from "./learner-evidence-briefing-route.ts";
@@ -47,7 +47,7 @@ function surfaceDeclarations(): unknown[] {
     SCENARIO_RECEIPT_API_CAPABILITY,
     REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
     ...SCENARIO_API_CLIENT_CAPABILITIES,
-    SCENARIO_CATALOG_UI_CAPABILITY,
+    CAPABILITY_CATALOG_UI_CAPABILITY,
     SCENARIO_PLAN_PREVIEW_UI_CAPABILITY,
     SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY,
     LEARNER_EVIDENCE_BRIEFING_UI_CAPABILITY,
@@ -104,7 +104,9 @@ describe("canonical scenario surface inventory", () => {
       expect(
         row.surfaces["authenticated-batch-feasibility-api-client"].status,
       ).toBe("implemented");
-      expect(row.surfaces["operator-read-ui"].status).toBe("implemented");
+      expect(row.surfaces["capability-catalog-ui"].status).toBe(
+        "implemented",
+      );
       expect(row.surfaces["operator-preview-ui"].status).toBe("implemented");
       expect(row.surfaces["operator-verify-ui"]).toEqual({
         status: "implemented",

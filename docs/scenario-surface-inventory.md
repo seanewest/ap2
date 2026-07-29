@@ -42,12 +42,13 @@ declarations currently exist.
 
 ## Authenticated operator matrix
 
-The authenticated SPA renders a compact read-only matrix by calling the same
-`inventoryCanonicalScenarioSurfaces()` function in process. It does not copy
+The authenticated SPA renders a compact read-only capability-surface matrix by
+calling the same `inventoryCanonicalScenarioSurfaces()` function in process. It does not copy
 the inventory declarations, fetch an API, or infer tenant, cloud, workload, or
 external readiness. The matrix shows the exact manifest/plan, adapter,
 rehearsal, offline-verifier, authenticated rehearsal-verification API/client,
-manual-panel, and learner-briefing cells for all five canonical families.
+manual-panel and learner-briefing cells for all five canonical building-block
+families. The same inventory verifies the capability-catalog declaration.
 
 The UI labels `missing` as “Missing — not a failure” and `not-applicable` as
 “Deliberately absent.” Pending remains a separate concept, but the
