@@ -8,6 +8,7 @@ import { AVD_THREE_VM_SCENARIO } from "../src/scenarios/avd-three-vm.ts";
 import { HELP_DESK_EMAIL_SCENARIO } from "../src/scenarios/help-desk-email.ts";
 import { OAUTH_APPLICATION_RECON_SCENARIO } from "../src/scenarios/oauth-application-recon.ts";
 import { PURVIEW_AUDIT_BOUNDARY_SCENARIO } from "../src/scenarios/purview-audit-boundary.ts";
+import { PRIVATE_DOCUMENT_EVIDENCE_SCENARIO } from "../src/scenarios/private-document-evidence.ts";
 import {
   EvidenceReceiptError,
   formatVerifiedClaimTable,
@@ -23,6 +24,7 @@ const RECEIPT_MANIFESTS = [
   TEAMS_MISSED_CALL_SCENARIO,
   OAUTH_APPLICATION_RECON_SCENARIO,
   PURVIEW_AUDIT_BOUNDARY_SCENARIO,
+  PRIVATE_DOCUMENT_EVIDENCE_SCENARIO,
 ];
 
 export type ReceiptCliFailure =

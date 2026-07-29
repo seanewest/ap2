@@ -79,6 +79,7 @@ const CLAIM_ASSERTIONS = [
   "outlook-email",
   "permissions-revoked",
   "private-three-vm-topology",
+  "private-document-staged",
   "purview-surface-reachability",
   "sensitive-artifacts-absent",
   "teams-missed-call",
@@ -115,6 +116,7 @@ const ASSERTIONS_BY_CATEGORY = {
     "outlook-email",
     "permissions-revoked",
     "private-three-vm-topology",
+    "private-document-staged",
     "purview-surface-reachability",
     "sensitive-artifacts-absent",
     "teams-missed-call",
@@ -408,6 +410,7 @@ function parseArtifactCategory(
         "cleanup-state",
         "endpoint-posture",
         "outlook-email",
+        "private-document",
         "application-recon-summary",
         "purview-audit-summary",
         "private-network-topology",
@@ -832,11 +835,44 @@ function verifyGrounding(
   }
   if (claim.category === "artifact") {
     const artifact = artifacts.get(claim.subject.id)!;
+    const privateDocumentStagingCapabilities = [
+      "private-document.folder-create",
+      "private-document.file-create",
+      "private-document.permission-create",
+    ];
+    const privateDocumentStagingOperations = manifest.operations.filter(
+      (operation) =>
+        privateDocumentStagingCapabilities.includes(operation.capability),
+    );
+    const observedArtifact =
+      artifact.observation !== undefined &&
+      observation.operationKey === artifact.observation.operationKey;
+    const acceptedArtifact =
+      manifest.id === "private-document-evidence" &&
+      artifact.id === "private-text-document" &&
+      artifact.kind === "private-document" &&
+      artifact.semanticClaims.includes("private-document-staged") &&
+      artifact.state === "platform-accepted" &&
+      artifact.observation === undefined &&
+      artifact.sourceOperationKey === "grant-direct-learner-read" &&
+      observation.operationKey === artifact.sourceOperationKey &&
+      observation.source === "local-reconciliation" &&
+      observation.outcome === "exact-reconciliation" &&
+      privateDocumentStagingOperations.length ===
+        privateDocumentStagingCapabilities.length &&
+      new Set(
+        privateDocumentStagingOperations.map((operation) =>
+          operation.capability
+        ),
+      ).size === privateDocumentStagingCapabilities.length &&
+      privateDocumentStagingOperations
+        .every((operation) =>
+          hasProvenOperation(claims, operation.key)
+        );
     if (
       claim.artifact?.kind !== artifact.kind ||
       claim.artifact.authenticity !== artifact.authenticity ||
-      artifact.observation === undefined ||
-      observation.operationKey !== artifact.observation.operationKey
+      (!observedArtifact && !acceptedArtifact)
     ) {
       throw failure(
         "ungrounded-claim",
@@ -851,8 +887,23 @@ function verifyGrounding(
   }
   if (claim.category === "learner-visibility") {
     const artifact = artifacts.get(claim.subject.id)!;
+    const operation = operations.get(observation.operationKey);
+    const exactLearnerRead =
+      observation.operationKey === "read-private-document-exact" &&
+      operation?.phase === "evidence" &&
+      operation.effect === "read" &&
+      operation.capability === "artifact.read-exact" &&
+      operation.ownerActorId === manifest.roles.learner;
     if (
-      artifact.learnerVisibility !== "observed" ||
+      (
+        artifact.learnerVisibility !== "observed" &&
+        !(
+          manifest.id === "private-document-evidence" &&
+          artifact.id === "private-text-document" &&
+          artifact.kind === "private-document" &&
+          exactLearnerRead
+        )
+      ) ||
       observation.source !== "learner-view" ||
       observation.outcome !== "learner-inspection"
     ) {
@@ -1077,6 +1128,17 @@ function hasProvenArtifact(
   return claims.some((claim) =>
     claim.category === "artifact" &&
     claim.subject.id === artifactId &&
+    claim.state === "proven"
+  );
+}
+
+function hasProvenOperation(
+  claims: readonly EvidenceReceiptClaim[],
+  operationKey: string,
+): boolean {
+  return claims.some((claim) =>
+    claim.category === "operation" &&
+    claim.subject.id === operationKey &&
     claim.state === "proven"
   );
 }

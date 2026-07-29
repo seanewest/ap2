@@ -49,3 +49,30 @@ completed three spaced terminal rounds: the producer saw the folder, item, and
 permission surface absent, while the learner had no access to the exact item.
 No active artifact, share, temporary grant, token cache, or credential was
 retained.
+
+## Scenario receipt adapter
+
+`private-document-receipt-adapter.ts` is a pure local bridge from the reduced
+lifecycle result, categorical journal, and terminal absence summary to a
+candidate scenario evidence receipt. It performs no network call, retry,
+mutation, execution, persistence, or protected-evidence read.
+
+The input uses one sanitized run correlation only to reject mixed journals; the
+correlation is never copied into the receipt. Exact folder, file, permission,
+user, drive, tenant, path, marker, response, credential, and session values are
+not accepted receipt fields.
+
+The adapter accepts only the ordered one-shot lifecycle:
+
+1. folder, file, and direct permission creation reach exact desired state;
+2. the bounded learner read is recorded separately;
+3. permission, file, and empty-folder deletion each reach exact absence after
+   their propagation reads; and
+4. three complete fresh-session terminal rounds prove producer object and
+   learner access absence.
+
+The cleaned canary receipt proves only platform-accepted private-document
+staging and cleanup. Learner visibility stays `uninspected`. A successful
+synthetic lifecycle can prove visibility only through the canonical
+learner-owned exact evidence read with a `learner-inspection` observation.
+Interpretation, response, audit, and detection are never inferred.
