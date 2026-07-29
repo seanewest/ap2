@@ -20,6 +20,78 @@ import {
 } from "./client";
 
 describe("HTTP After Party API client", () => {
+  it("reads only strict sanitized operation events in the requested order", async () => {
+    const response = {
+      schemaVersion: 1,
+      order: "oldest",
+      events: [{
+        schemaVersion: 1,
+        markerHash: "m1_0123456789abcdef01234567",
+        operationKind: "calendar.cancel",
+        phase: "cleanup",
+        outcome: "ambiguous",
+        durationMs: 23,
+        reason: "upstream-unavailable",
+        ambiguityState: "possible-mutation",
+        recoveryState: "unresolved",
+        upstreamStatus: 503,
+      }],
+    };
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(response),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example/base",
+      request,
+    );
+
+    await expect(
+      client.getRecentOperationEvents("temporary-token", "oldest"),
+    ).resolves.toEqual(response);
+    expect(request).toHaveBeenCalledWith(
+      "https://student-api.example/base/api/operation-events?order=oldest",
+      {
+        method: "GET",
+        credentials: "omit",
+        redirect: "error",
+        headers: { Authorization: "Bearer temporary-token" },
+      },
+    );
+  });
+
+  it.each([
+    ["an arbitrary response field", {
+      schemaVersion: 1,
+      order: "newest",
+      events: [],
+      rawToken: "must-not-enter",
+    }],
+    ["an arbitrary event field", {
+      schemaVersion: 1,
+      order: "newest",
+      events: [{
+        schemaVersion: 1,
+        markerHash: "m1_0123456789abcdef01234567",
+        operationKind: "calendar.create",
+        phase: "execution",
+        outcome: "started",
+        durationMs: 0,
+        reason: "none",
+        ambiguityState: "none",
+        recoveryState: "not-applicable",
+        messageBody: "must-not-enter",
+      }],
+    }],
+  ])("rejects operation telemetry with %s", async (_label, body) => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(body));
+    await expect(
+      new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      ).getRecentOperationEvents("token"),
+    ).rejects.toEqual(new ApiAccessError());
+  });
+
   it.each([
     ["createDraftProof", "POST", 201, {
       state: "configured",

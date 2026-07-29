@@ -88,6 +88,7 @@ describe("API simulated-user wiring", () => {
       categoryProofOperation: expect.anything(),
       draftProofOperation: expect.anything(),
       todoTaskProofOperation: expect.anything(),
+      operationTelemetryReader: expect.anything(),
     });
   });
 });
