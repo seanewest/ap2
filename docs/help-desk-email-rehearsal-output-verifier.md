@@ -58,5 +58,21 @@ token-like, digest-tampered, nonterminal, branch-mismatched, cleanup-gap,
 retained-as-cleaned, cross-family, and evidence-overclaim inputs. It also
 rejects adapter/verifier/envelope or claim-count drift.
 
-The implementation has no fake lifecycle, runner, send, network, retry,
-mutation, API route/client, UI, browser, or Windows-host path.
+The verifier implementation has no fake lifecycle, runner, send, network,
+retry, mutation, UI, browser, or Windows-host path.
+
+## Authenticated in-memory API
+
+Operators may submit one bounded sanitized output envelope to
+`POST /api/help-desk-email-rehearsal-verification`. Authentication and
+operator authorization complete before content-type validation or body read.
+The route calls the PR #107 verifier synchronously in memory and returns only
+its fixed safe summary or categorical refusal. It does not execute the
+scenario, invoke the fake or send operation, ingest telemetry, schedule work,
+persist state, or establish external proof.
+
+`HttpAfterPartyApi.verifyHelpDeskEmailRehearsalOutput` is the browser-safe
+typed client. It validates the exact request shape before transport, binds the
+exact POST route, caps streamed response bytes, accepts only fixed error
+shapes, and independently binds every summary field to the submitted envelope.
+Its runtime import graph does not invoke the server verifier or rehearsal fake.

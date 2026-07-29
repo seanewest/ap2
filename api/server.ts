@@ -87,6 +87,18 @@ import {
   PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
   PrivateDocumentRehearsalContractError,
 } from "../src/api/private-document-rehearsal-verification-contract.js";
+import {
+  HelpDeskEmailRehearsalVerificationResponseTooLargeError,
+  HelpDeskEmailRehearsalVerificationSafeFailureError,
+  type HelpDeskEmailRehearsalVerificationService,
+} from "./help-desk-email-rehearsal-verification.js";
+import {
+  HelpDeskEmailRehearsalVerificationError,
+} from "../scripts/verify-help-desk-email-rehearsal-output.js";
+import {
+  HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
+  HelpDeskEmailRehearsalContractError,
+} from "../src/api/help-desk-email-rehearsal-verification-contract.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -108,6 +120,8 @@ export interface ApiDependencies {
   rehearsalOutputVerificationService?: RehearsalOutputVerificationService;
   privateDocumentRehearsalVerificationService?:
     PrivateDocumentRehearsalVerificationService;
+  helpDeskEmailRehearsalVerificationService?:
+    HelpDeskEmailRehearsalVerificationService;
   multiScenarioFeasibilityService?: MultiScenarioFeasibilityService;
   allowedOrigin?: string;
 }
@@ -184,6 +198,7 @@ async function route(
     (pathname === "/api/scenario-evidence-verification" ||
       pathname === "/api/rehearsal-output-verification" ||
       pathname === "/api/private-document-rehearsal-verification" ||
+      pathname === "/api/help-desk-email-rehearsal-verification" ||
       pathname === "/api/multi-scenario-feasibility")
   ) {
     handleProtectedPreflight(
@@ -271,6 +286,13 @@ async function route(
       response,
       dependencies,
     );
+    return;
+  }
+  if (
+    request.method === "POST" &&
+    pathname === "/api/help-desk-email-rehearsal-verification"
+  ) {
+    await helpDeskEmailRehearsalVerification(request, response, dependencies);
     return;
   }
   if (
@@ -649,6 +671,32 @@ async function handleAuthorizedRequest(
       });
       return;
     }
+    if (
+      error instanceof HelpDeskEmailRehearsalVerificationError ||
+      error instanceof HelpDeskEmailRehearsalContractError
+    ) {
+      sendJson(response, 400, {
+        error: "help_desk_email_rehearsal_refused",
+        category: error.category,
+      });
+      return;
+    }
+    if (
+      error instanceof HelpDeskEmailRehearsalVerificationResponseTooLargeError
+    ) {
+      sendJson(response, 500, {
+        error: "help_desk_email_rehearsal_response_too_large",
+      });
+      return;
+    }
+    if (
+      error instanceof HelpDeskEmailRehearsalVerificationSafeFailureError
+    ) {
+      sendJson(response, 500, {
+        error: "help_desk_email_rehearsal_verification_failed",
+      });
+      return;
+    }
     if (error instanceof BatchFeasibilityRefusalError) {
       sendJson(response, 400, {
         error: "batch_feasibility_refused",
@@ -809,6 +857,31 @@ async function privateDocumentRehearsalVerification(
       await readBoundedJson(
         request,
         PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
+      ),
+    );
+  });
+}
+
+async function helpDeskEmailRehearsalVerification(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new JsonUnsupportedMediaTypeError();
+    }
+    const service = dependencies.helpDeskEmailRehearsalVerificationService;
+    if (!service) {
+      throw new HelpDeskEmailRehearsalVerificationSafeFailureError();
+    }
+    return service.verify(
+      await readBoundedJson(
+        request,
+        HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
       ),
     );
   });

@@ -51,6 +51,16 @@ import {
   type PrivateDocumentRehearsalVerificationRequest,
   type VerifiedPrivateDocumentRehearsalSummary,
 } from "./private-document-rehearsal-verification-contract.ts";
+import {
+  HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
+  HELP_DESK_EMAIL_REHEARSAL_MAX_RESPONSE_BYTES,
+  HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_FAILURES,
+  isBoundedHelpDeskEmailRehearsalRequest,
+  isVerifiedHelpDeskEmailRehearsalSummary,
+  type HelpDeskEmailRehearsalVerificationFailure,
+  type HelpDeskEmailRehearsalVerificationRequest,
+  type VerifiedHelpDeskEmailRehearsalSummary,
+} from "./help-desk-email-rehearsal-verification-contract.ts";
 
 export const SCENARIO_API_CLIENT_CAPABILITIES = [
   {
@@ -89,6 +99,14 @@ export const SCENARIO_API_CLIENT_CAPABILITIES = [
     manifestSchemaVersion: 2,
     repositoryBoundary: "contract-only",
     scenarioIds: ["private-document-evidence"],
+  },
+  {
+    schemaVersion: 1,
+    surface: "authenticated-rehearsal-verification-client",
+    scenarioScope: "explicit-scenarios",
+    manifestSchemaVersion: 2,
+    repositoryBoundary: "contract-only",
+    scenarioIds: ["help-desk-email-observation"],
   },
 ] as const satisfies readonly ScenarioSurfaceCapabilityDeclaration[];
 
@@ -328,6 +346,10 @@ export interface AfterPartyApi {
     accessToken: string,
     output: PrivateDocumentRehearsalVerificationRequest,
   ): Promise<VerifiedPrivateDocumentRehearsalSummary>;
+  verifyHelpDeskEmailRehearsalOutput(
+    accessToken: string,
+    output: HelpDeskEmailRehearsalVerificationRequest,
+  ): Promise<VerifiedHelpDeskEmailRehearsalSummary>;
   calculateMultiScenarioFeasibility(
     accessToken: string,
     request: BatchFeasibilityRequest,
@@ -476,6 +498,21 @@ export class PrivateDocumentRehearsalVerificationClientError extends Error {
   }
 }
 
+export class HelpDeskEmailRehearsalVerificationClientError extends Error {
+  readonly category: RehearsalOutputVerificationClientErrorCategory;
+  readonly refusalCategory?: HelpDeskEmailRehearsalVerificationFailure;
+
+  constructor(
+    category: RehearsalOutputVerificationClientErrorCategory,
+    refusalCategory?: HelpDeskEmailRehearsalVerificationFailure,
+  ) {
+    super(`Help-desk email rehearsal verification failed: ${category}`);
+    this.name = "HelpDeskEmailRehearsalVerificationClientError";
+    this.category = category;
+    this.refusalCategory = refusalCategory;
+  }
+}
+
 export type BatchFeasibilityClientErrorCategory =
   | "unauthorized"
   | "forbidden"
@@ -521,6 +558,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly scenarioEvidenceVerificationUrl: string;
   private readonly rehearsalOutputVerificationUrl: string;
   private readonly privateDocumentRehearsalVerificationUrl: string;
+  private readonly helpDeskEmailRehearsalVerificationUrl: string;
   private readonly multiScenarioFeasibilityUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
@@ -559,6 +597,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ).toString();
     this.privateDocumentRehearsalVerificationUrl = new URL(
       "api/private-document-rehearsal-verification",
+      `${baseUrl}/`,
+    ).toString();
+    this.helpDeskEmailRehearsalVerificationUrl = new URL(
+      "api/help-desk-email-rehearsal-verification",
       `${baseUrl}/`,
     ).toString();
     this.multiScenarioFeasibilityUrl = new URL(
@@ -1079,6 +1121,126 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new PrivateDocumentRehearsalVerificationClientError(
         "safe-failure",
       );
+    }
+    return value;
+  }
+
+  async verifyHelpDeskEmailRehearsalOutput(
+    accessToken: string,
+    output: HelpDeskEmailRehearsalVerificationRequest,
+  ): Promise<VerifiedHelpDeskEmailRehearsalSummary> {
+    if (!isBoundedHelpDeskEmailRehearsalRequest(output)) {
+      throw new HelpDeskEmailRehearsalVerificationClientError(
+        "validation-refused",
+        "INPUT_SHAPE",
+      );
+    }
+    let body: string;
+    try {
+      body = JSON.stringify(output);
+    } catch {
+      throw new HelpDeskEmailRehearsalVerificationClientError(
+        "validation-refused",
+      );
+    }
+    if (
+      new TextEncoder().encode(body).byteLength >
+      HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES
+    ) {
+      throw new HelpDeskEmailRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+
+    let response: Response;
+    try {
+      response = await this.request(
+        this.helpDeskEmailRehearsalVerificationUrl,
+        {
+          method: "POST",
+          credentials: "omit",
+          redirect: "error",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body,
+        },
+      );
+    } catch {
+      throw new HelpDeskEmailRehearsalVerificationClientError("safe-failure");
+    }
+    if (response.status === 401) {
+      throw new HelpDeskEmailRehearsalVerificationClientError("unauthorized");
+    }
+    if (response.status === 403) {
+      throw new HelpDeskEmailRehearsalVerificationClientError("forbidden");
+    }
+    if (response.status === 413) {
+      throw new HelpDeskEmailRehearsalVerificationClientError(
+        "request-too-large",
+      );
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(
+        response.headers.get("content-type") ?? "",
+      )
+    ) {
+      throw new HelpDeskEmailRehearsalVerificationClientError("safe-failure");
+    }
+
+    let responseText: string;
+    try {
+      responseText = await readBoundedJsonResponse(
+        response,
+        HELP_DESK_EMAIL_REHEARSAL_MAX_RESPONSE_BYTES,
+      );
+    } catch (error) {
+      throw new HelpDeskEmailRehearsalVerificationClientError(
+        error instanceof BoundedResponseTooLargeError
+          ? "response-too-large"
+          : "safe-failure",
+      );
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new HelpDeskEmailRehearsalVerificationClientError("safe-failure");
+    }
+    if (!response.ok) {
+      if (
+        response.status === 400 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error", "category"]) &&
+        value.error === "help_desk_email_rehearsal_refused" &&
+        typeof value.category === "string" &&
+        HELP_DESK_EMAIL_REHEARSAL_VERIFICATION_FAILURES.includes(
+          value.category as HelpDeskEmailRehearsalVerificationFailure,
+        )
+      ) {
+        throw new HelpDeskEmailRehearsalVerificationClientError(
+          "validation-refused",
+          value.category as HelpDeskEmailRehearsalVerificationFailure,
+        );
+      }
+      if (
+        response.status === 500 &&
+        isScenarioRecord(value) &&
+        hasExactScenarioKeys(value, ["error"]) &&
+        value.error === "help_desk_email_rehearsal_response_too_large"
+      ) {
+        throw new HelpDeskEmailRehearsalVerificationClientError(
+          "response-too-large",
+        );
+      }
+      throw new HelpDeskEmailRehearsalVerificationClientError("safe-failure");
+    }
+    if (
+      response.status !== 200 ||
+      !isVerifiedHelpDeskEmailRehearsalSummary(value, output)
+    ) {
+      throw new HelpDeskEmailRehearsalVerificationClientError("safe-failure");
     }
     return value;
   }
