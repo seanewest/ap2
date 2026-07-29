@@ -23,8 +23,20 @@ import {
   REHEARSAL_VERIFIED_LABEL,
   type SharedRehearsalInvariantFailure,
 } from "../src/scenarios/rehearsal-envelope-invariants.ts";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.ts";
 
 const MAX_OUTPUT_BYTES = 256 * 1024;
+
+export const AVD_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "offline-rehearsal-verifier",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: ["avd-three-vm-substrate"],
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type { RehearsalOutputVerificationFailure };
 

@@ -4,6 +4,19 @@ import {
   type PrivateDocumentRehearsalVerificationRequest,
   type VerifiedPrivateDocumentRehearsalSummary,
 } from "../api/private-document-rehearsal-verification-contract";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "./scenario-surface-capability";
+
+export const PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_PANEL_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "manual-rehearsal-verification-panel",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: ["private-document-evidence"],
+  routeOwnerKey: "private-document-rehearsal-verify",
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type SafePrivateDocumentRehearsalSummary =
   VerifiedPrivateDocumentRehearsalSummary;

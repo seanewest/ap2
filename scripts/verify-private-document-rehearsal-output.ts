@@ -29,6 +29,9 @@ import type {
   PrivateDocumentRehearsalVerificationFailure,
   VerifiedPrivateDocumentRehearsalSummary,
 } from "../src/api/private-document-rehearsal-verification-contract.ts";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.ts";
 
 export type {
   PrivateDocumentRehearsalVerificationFailure,
@@ -47,6 +50,15 @@ const EXTERNAL_CLAIMS = [
   "retention",
 ] as const;
 const CORRELATION = "run-contract";
+
+export const PRIVATE_DOCUMENT_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "offline-rehearsal-verifier",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: ["private-document-evidence"],
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export class PrivateDocumentRehearsalVerificationError extends Error {
   readonly category: PrivateDocumentRehearsalVerificationFailure;

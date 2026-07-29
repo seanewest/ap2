@@ -9,9 +9,20 @@ import { AVD_MANIFEST_ADAPTER_CAPABILITY } from "../../scripts/avd-three-vm-mani
 import { AVD_THREE_VM_REHEARSAL_CAPABILITY } from "../../scripts/avd-three-vm-rehearsal.ts";
 import { HELP_DESK_EMAIL_REHEARSAL_CAPABILITY } from "../../scripts/help-desk-email-rehearsal.ts";
 import { OAUTH_APPLICATION_RECON_REHEARSAL_CAPABILITY } from "../../scripts/oauth-application-recon-rehearsal.ts";
+import { OAUTH_APPLICATION_RECON_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-oauth-application-recon-rehearsal-output.ts";
 import { PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY } from "../../scripts/private-document-rehearsal.ts";
 import { TEAMS_MISSED_CALL_REHEARSAL_CAPABILITY } from "../../scripts/teams-missed-call-rehearsal.ts";
+import { AVD_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-avd-three-vm-rehearsal-output.ts";
+import { HELP_DESK_EMAIL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-help-desk-email-rehearsal-output.ts";
+import { PRIVATE_DOCUMENT_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-private-document-rehearsal-output.ts";
+import { TEAMS_MISSED_CALL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-teams-missed-call-rehearsal-output.ts";
 import { SCENARIO_API_CLIENT_CAPABILITIES } from "../api/client.ts";
+import {
+  API_ROUTE_OWNER_KEYS,
+  type ApiRouteOwnerKey,
+} from "../api/api-route-contract.ts";
+import { AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./avd-rehearsal-verification-panel.ts";
+import { HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./help-desk-rehearsal-verification-panel.ts";
 import { SCENARIO_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
 import {
   HELP_DESK_EMAIL_RECEIPT_ADAPTER_CAPABILITY,
@@ -26,6 +37,7 @@ import {
 } from "./oauth-application-recon-receipt-adapter.ts";
 import { SCENARIO_PLAN_PREVIEW_UI_CAPABILITY } from "./scenario-plan-preview.ts";
 import { SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY } from "./scenario-evidence-verification-panel.ts";
+import { PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_PANEL_CAPABILITY } from "./private-document-rehearsal-verification-panel.ts";
 import { PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY } from "./private-document-receipt-adapter.ts";
 import {
   SCENARIO_ADAPTER_NAMES,
@@ -62,10 +74,12 @@ export const SCENARIO_INVENTORY_SURFACES = [
   "receipt",
   "adapter",
   "rehearsal",
+  "offline-rehearsal-verifier",
   "authenticated-batch-feasibility-api-client",
   "authenticated-plan-api-client",
   "authenticated-receipt-api-client",
   "authenticated-rehearsal-verification-api-client",
+  "manual-rehearsal-verification-panel",
   "operator-read-ui",
   "operator-preview-ui",
   "operator-verify-ui",
@@ -88,6 +102,8 @@ export type ScenarioSurfaceReason =
   | "no-applicable-adapter-declared"
   | "rehearsal-only-exported"
   | "rehearsal-not-declared"
+  | "offline-rehearsal-verifier-exported"
+  | "offline-rehearsal-verifier-missing"
   | "authenticated-batch-feasibility-api-client-exported"
   | "authenticated-batch-feasibility-api-client-missing"
   | "authenticated-plan-api-client-exported"
@@ -96,6 +112,8 @@ export type ScenarioSurfaceReason =
   | "authenticated-receipt-api-client-missing"
   | "authenticated-rehearsal-verification-api-client-exported"
   | "authenticated-rehearsal-verification-api-client-missing"
+  | "manual-rehearsal-verification-panel-exported"
+  | "manual-rehearsal-verification-panel-missing"
   | "operator-catalog-exported"
   | "operator-catalog-missing"
   | "operator-plan-preview-exported"
@@ -114,6 +132,7 @@ export type ScenarioInventoryFailureCode =
   | "REGISTRY_DUPLICATE"
   | "REGISTRY_INCOMPLETE"
   | "REGISTRY_INVALID"
+  | "ROUTE_BINDING_MISMATCH"
   | "SCENARIO_UNKNOWN"
   | "STALE_MANIFEST_VERSION"
   | "UNSUPPORTED_ADAPTER_CLAIM"
@@ -164,11 +183,19 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
   SCENARIO_CATALOG_UI_CAPABILITY,
   SCENARIO_PLAN_PREVIEW_UI_CAPABILITY,
   SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY,
+  AVD_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
+  HELP_DESK_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
+  PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_PANEL_CAPABILITY,
   AVD_THREE_VM_REHEARSAL_CAPABILITY,
   HELP_DESK_EMAIL_REHEARSAL_CAPABILITY,
   OAUTH_APPLICATION_RECON_REHEARSAL_CAPABILITY,
   PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY,
   TEAMS_MISSED_CALL_REHEARSAL_CAPABILITY,
+  AVD_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
+  HELP_DESK_EMAIL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
+  OAUTH_APPLICATION_RECON_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
+  PRIVATE_DOCUMENT_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
+  TEAMS_MISSED_CALL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY,
 ] as const satisfies readonly ScenarioSurfaceCapabilityDeclaration[];
 
 const AUTHORITATIVE_ADAPTER_DECLARATIONS = [
@@ -226,6 +253,7 @@ export function inventoryCanonicalScenarioSurfaces(
     manifestIds,
     failures,
   );
+  validateRehearsalRouteBindings(manifests, surfaces, failures);
   validateDeclarationAuthority(
     surfaces,
     AUTHORITATIVE_SURFACE_DECLARATIONS,
@@ -391,6 +419,7 @@ function surfaceDeclaration(
     "manifestSchemaVersion",
     "repositoryBoundary",
     "scenarioIds",
+    "routeOwnerKey",
   ]);
   if (
     value.schemaVersion !== 1 ||
@@ -411,6 +440,17 @@ function surfaceDeclaration(
   if (
     value.scenarioScope === "canonical-registry" &&
     value.scenarioIds !== undefined
+  ) {
+    throw new InventoryInputError("DECLARATION_SHAPE");
+  }
+  const routedSurface = value.surface ===
+      "authenticated-rehearsal-verification-api" ||
+    value.surface === "authenticated-rehearsal-verification-client" ||
+    value.surface === "manual-rehearsal-verification-panel";
+  if (
+    (routedSurface &&
+      !isApiRouteOwnerKey(value.routeOwnerKey)) ||
+    (!routedSurface && value.routeOwnerKey !== undefined)
   ) {
     throw new InventoryInputError("DECLARATION_SHAPE");
   }
@@ -441,6 +481,9 @@ function surfaceDeclaration(
     manifestSchemaVersion: 2,
     repositoryBoundary: "contract-only",
     ...(scenarioIds === undefined ? {} : { scenarioIds }),
+    ...(isApiRouteOwnerKey(value.routeOwnerKey)
+      ? { routeOwnerKey: value.routeOwnerKey }
+      : {}),
   };
 }
 
@@ -524,6 +567,58 @@ function validateAdapterAuthority(
         "UNSUPPORTED_ADAPTER_CLAIM",
       );
       declarations.delete(declaration.scenarioId);
+    }
+  }
+}
+
+function validateRehearsalRouteBindings(
+  manifests: readonly ScenarioManifest[],
+  declarations: ReadonlyMap<
+    ScenarioSurfaceDeclarationName,
+    readonly ScenarioSurfaceCapabilityDeclaration[]
+  >,
+  failures: ScenarioSurfaceInventoryFailure[],
+): void {
+  for (const { id } of manifests) {
+    const api = supportingDeclaration(
+      declarations.get("authenticated-rehearsal-verification-api"),
+      id,
+    );
+    const client = supportingDeclaration(
+      declarations.get("authenticated-rehearsal-verification-client"),
+      id,
+    );
+    if (
+      api !== undefined &&
+      client !== undefined &&
+      api.routeOwnerKey !== client.routeOwnerKey
+    ) {
+      addFailure(
+        failures,
+        id,
+        "authenticated-rehearsal-verification-api-client",
+        "ROUTE_BINDING_MISMATCH",
+      );
+    }
+    const panel = supportingDeclaration(
+      declarations.get("manual-rehearsal-verification-panel"),
+      id,
+    );
+    if (
+      panel !== undefined &&
+      (
+        api === undefined ||
+        client === undefined ||
+        panel.routeOwnerKey !== api.routeOwnerKey ||
+        panel.routeOwnerKey !== client.routeOwnerKey
+      )
+    ) {
+      addFailure(
+        failures,
+        id,
+        "manual-rehearsal-verification-panel",
+        "ROUTE_BINDING_MISMATCH",
+      );
     }
   }
 }
@@ -614,6 +709,12 @@ function inventoryRow(
         )
         ? cell("implemented", "rehearsal-only-exported")
         : cell("missing", "rehearsal-not-declared"),
+      "offline-rehearsal-verifier": supports(
+          declarations.get("offline-rehearsal-verifier"),
+          manifest.id,
+        )
+        ? cell("implemented", "offline-rehearsal-verifier-exported")
+        : cell("missing", "offline-rehearsal-verifier-missing"),
       "authenticated-batch-feasibility-api-client": supports(
           declarations.get("authenticated-batch-feasibility-api"),
           manifest.id,
@@ -650,14 +751,11 @@ function inventoryRow(
           )
         ? cell("implemented", "authenticated-receipt-api-client-exported")
         : cell("missing", "authenticated-receipt-api-client-missing"),
-      "authenticated-rehearsal-verification-api-client": supports(
-          declarations.get("authenticated-rehearsal-verification-api"),
+      "authenticated-rehearsal-verification-api-client":
+        rehearsalVerificationRouteOwner(
+          declarations,
           manifest.id,
-        ) &&
-          supports(
-            declarations.get("authenticated-rehearsal-verification-client"),
-            manifest.id,
-          )
+        ) !== undefined
         ? cell(
           "implemented",
           "authenticated-rehearsal-verification-api-client-exported",
@@ -665,6 +763,19 @@ function inventoryRow(
         : cell(
           "missing",
           "authenticated-rehearsal-verification-api-client-missing",
+        ),
+      "manual-rehearsal-verification-panel":
+        manualRehearsalPanelRouteMatches(
+          declarations,
+          manifest.id,
+        )
+        ? cell(
+          "implemented",
+          "manual-rehearsal-verification-panel-exported",
+        )
+        : cell(
+          "missing",
+          "manual-rehearsal-verification-panel-missing",
         ),
       "operator-read-ui": supports(
           declarations.get("operator-catalog-ui"),
@@ -699,6 +810,65 @@ function supports(
       declaration.scenarioScope === "canonical-registry" ||
       declaration.scenarioIds?.includes(scenarioId) === true,
   ) === true;
+}
+
+function supportingDeclaration(
+  declarations:
+    | readonly ScenarioSurfaceCapabilityDeclaration[]
+    | undefined,
+  scenarioId: string,
+): ScenarioSurfaceCapabilityDeclaration | undefined {
+  return declarations?.find(
+    (declaration) =>
+      declaration.scenarioScope === "canonical-registry" ||
+      declaration.scenarioIds?.includes(scenarioId) === true,
+  );
+}
+
+function rehearsalVerificationRouteOwner(
+  declarations: ReadonlyMap<
+    ScenarioSurfaceDeclarationName,
+    readonly ScenarioSurfaceCapabilityDeclaration[]
+  >,
+  scenarioId: string,
+): ApiRouteOwnerKey | undefined {
+  const api = supportingDeclaration(
+    declarations.get("authenticated-rehearsal-verification-api"),
+    scenarioId,
+  );
+  const client = supportingDeclaration(
+    declarations.get("authenticated-rehearsal-verification-client"),
+    scenarioId,
+  );
+  return api !== undefined &&
+      client !== undefined &&
+      api.routeOwnerKey === client.routeOwnerKey
+    ? api.routeOwnerKey
+    : undefined;
+}
+
+function manualRehearsalPanelRouteMatches(
+  declarations: ReadonlyMap<
+    ScenarioSurfaceDeclarationName,
+    readonly ScenarioSurfaceCapabilityDeclaration[]
+  >,
+  scenarioId: string,
+): boolean {
+  const routeOwnerKey = rehearsalVerificationRouteOwner(
+    declarations,
+    scenarioId,
+  );
+  const panel = supportingDeclaration(
+    declarations.get("manual-rehearsal-verification-panel"),
+    scenarioId,
+  );
+  return routeOwnerKey !== undefined &&
+    panel?.routeOwnerKey === routeOwnerKey;
+}
+
+function isApiRouteOwnerKey(value: unknown): value is ApiRouteOwnerKey {
+  return typeof value === "string" &&
+    API_ROUTE_OWNER_KEYS.includes(value as ApiRouteOwnerKey);
 }
 
 function declarationsOverlap(
@@ -841,6 +1011,9 @@ function mapSurface(
       "authenticated-rehearsal-verification-api-client",
     "authenticated-receipt-api": "authenticated-receipt-api-client",
     "authenticated-receipt-client": "authenticated-receipt-api-client",
+    "manual-rehearsal-verification-panel":
+      "manual-rehearsal-verification-panel",
+    "offline-rehearsal-verifier": "offline-rehearsal-verifier",
     "operator-catalog-ui": "operator-read-ui",
     "operator-plan-preview-ui": "operator-preview-ui",
     "operator-receipt-verify-ui": "operator-verify-ui",

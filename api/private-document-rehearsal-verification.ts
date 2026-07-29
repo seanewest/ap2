@@ -21,6 +21,7 @@ export const PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY = {
   manifestSchemaVersion: 2,
   repositoryBoundary: "contract-only",
   scenarioIds: ["private-document-evidence"],
+  routeOwnerKey: "private-document-rehearsal-verify",
 } as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type PrivateDocumentRehearsalVerifier = (

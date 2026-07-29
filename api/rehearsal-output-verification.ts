@@ -19,6 +19,7 @@ export const REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY = {
   manifestSchemaVersion: 2,
   repositoryBoundary: "contract-only",
   scenarioIds: ["avd-three-vm-substrate"],
+  routeOwnerKey: "avd-rehearsal-verify",
 } as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type RehearsalOutputVerifier = (

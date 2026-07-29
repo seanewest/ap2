@@ -23,30 +23,38 @@ Missing cells are useful inventory, not validation failures. The inventory
 becomes invalid only when authoritative declarations contradict one another or
 contain unsafe, stale, duplicate, unknown, or unsupported claims.
 
-## Current repository coverage
+## Current rehearsal-family coverage
 
-| Scenario | Manifest / plan / receipt | Adapter | Rehearsal | Authenticated plan API/client | Authenticated receipt API/client | Authenticated rehearsal verification API/client | Operator read / preview | Operator verify |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `avd-three-vm-substrate` | implemented | implemented | implemented | implemented | implemented | implemented | implemented | implemented |
-| `help-desk-email-observation` | implemented | implemented | implemented | implemented | implemented | missing | implemented | implemented |
-| `oauth-application-reconnaissance` | implemented | implemented | implemented | implemented | implemented | missing | implemented | implemented |
-| `private-document-evidence` | implemented | implemented | implemented | implemented | missing | missing | implemented | implemented |
-| `teams-missed-call-observation` | implemented | implemented | implemented | implemented | implemented | implemented | implemented | implemented |
+| Scenario | Manifest / plan / receipt | Adapter | `REHEARSAL_ONLY` pipeline | Offline verifier | Authenticated rehearsal verification API/client | Manual-only rehearsal panel |
+| --- | --- | --- | --- | --- | --- | --- |
+| `avd-three-vm-substrate` | implemented | implemented | implemented | implemented | implemented | implemented |
+| `help-desk-email-observation` | implemented | implemented | implemented | implemented | implemented | implemented |
+| `oauth-application-reconnaissance` | implemented | implemented | implemented | implemented | missing | missing |
+| `private-document-evidence` | implemented | implemented | implemented | implemented | implemented | implemented |
+| `teams-missed-call-observation` | implemented | implemented | implemented | implemented | implemented | missing |
 
 The table describes source availability only. In particular, `implemented`
 never means that a tenant operation, learner observation, cleanup, detection,
-or other external result succeeded.
+or other external result succeeded. `missing` means no source-owned capability
+is exported; it is not a validation failure and does not invent whether the
+surface is deliberately absent or future work. No pending capability
+declarations currently exist.
 
 ## Authority and failure boundary
 
 The inventory consumes the validated canonical registry and the existing
 cross-contract compatibility result. Optional surfaces publish small fixed
-capability declarations beside the API, client, adapter, rehearsal, or
-operator code that owns them. It does not discover support from filenames,
-documentation prose, dynamic imports, or network responses.
+capability declarations beside the API, client, adapter, rehearsal, offline
+verifier, manual panel, or operator code that owns them. Paired authenticated
+verification API/client declarations must bind the same owner in the
+authoritative API route contract registry. A manual panel must bind that same
+owner. Route paths remain defined only by the route registry. The inventory
+does not discover support from filenames, documentation prose, dynamic
+imports, or network responses.
 
 The checker rejects duplicate or unknown scenario IDs, stale manifest
 versions, unsafe identifiers, live-proof language, fabricated API or UI
-claims, unsupported adapter mappings, and contradictory declarations. Output
-never includes actor aliases, operation keys, markers, proof references,
-paths, credentials, tokens, payloads, or arbitrary errors.
+claims, unsupported adapter mappings, mismatched family ownership, route
+binding drift, and contradictory declarations. Output never includes actor
+aliases, operation keys, markers, proof references, paths, credentials,
+tokens, payloads, or arbitrary errors.

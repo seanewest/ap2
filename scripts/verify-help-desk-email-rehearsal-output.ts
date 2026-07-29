@@ -25,6 +25,9 @@ import {
   type HelpDeskEmailRehearsalResult,
   type HelpDeskEmailSyntheticBranch,
 } from "./help-desk-email-rehearsal.ts";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.ts";
 
 const MAX_OUTPUT_BYTES = 32 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -39,6 +42,15 @@ const EXTERNAL_CLAIMS = [
   "teamsCall",
   "voicemail",
 ] as const;
+
+export const HELP_DESK_EMAIL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "offline-rehearsal-verifier",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: ["help-desk-email-observation"],
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type HelpDeskEmailRehearsalVerificationFailure =
   | "ADAPTER_REFUSED"
