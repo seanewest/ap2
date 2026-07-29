@@ -35,6 +35,9 @@ import { createApiServer } from "../api/server";
 import { JoseTokenVerifier } from "../api/token-verifier";
 import { SCENARIO_MANIFESTS } from "../src/scenarios/scenarios";
 import {
+  inventoryCanonicalScenarioSurfaces,
+} from "../src/scenarios/scenario-surface-inventory";
+import {
   CANONICAL_RECEIPT_FIXTURES,
   NEGATIVE_RECEIPT_FIXTURES,
 } from "../src/scenarios/scenario-evidence-receipt.fixtures";
@@ -243,6 +246,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
   const panels = [
     "Recent operations",
     "Scenario catalog",
+    "Scenario surface availability",
     "Scenario plan preview",
     "Scenario batch feasibility",
     "Receipt verification",
@@ -442,6 +446,85 @@ test("navigates the read-only scenario catalog without network activity", async 
       document.documentElement.scrollWidth <= window.innerWidth
     ),
   ).toBe(true);
+});
+
+test("renders the authoritative scenario surface matrix without network activity", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await configureOperator(page, accessToken);
+  const apiPaths: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith("/api/") && !path.endsWith(".ts")) {
+      apiPaths.push(path);
+    }
+  });
+
+  await page.goto("/e2e/recent-operations.html");
+  const matrix = page.getByRole("region", {
+    name: "Scenario surface availability",
+  });
+  await expect(matrix).toBeVisible();
+  await expect(matrix.getByRole("table")).toHaveCount(1);
+  await expect(matrix.getByRole("row")).toHaveCount(6);
+  await expect(matrix.getByRole("columnheader")).toHaveCount(7);
+  await expect(matrix.getByRole("rowheader")).toHaveCount(5);
+  await expect(matrix.getByText(
+    /product-source surface availability only/,
+  )).toBeVisible();
+  await expect(matrix.getByText(
+    /not external evidence, scenario readiness/,
+  )).toBeVisible();
+  await expect(matrix.getByText(
+    /Pending is distinct from missing/,
+  )).toBeVisible();
+
+  const inventory = inventoryCanonicalScenarioSurfaces();
+  const bodyRows = matrix.locator("tbody tr");
+  for (const [index, row] of inventory.scenarios.entries()) {
+    const rendered = bodyRows.nth(index);
+    await expect(rendered.getByRole("rowheader")).toHaveText(row.scenarioId);
+    for (
+      const surface of [
+        "manifest",
+        "plan",
+        "adapter",
+        "rehearsal",
+        "offline-rehearsal-verifier",
+        "authenticated-rehearsal-verification-api-client",
+        "manual-rehearsal-verification-panel",
+      ] as const
+    ) {
+      const expected = row.surfaces[surface].status === "implemented"
+        ? /Implemented/
+        : row.surfaces[surface].status === "missing"
+        ? /Missing — not a failure/
+        : /Deliberately absent/;
+      await expect(
+        rendered.locator(`[data-surface='${surface}']`),
+      ).toHaveText(expected);
+    }
+  }
+  await expect(matrix.locator(
+    "button, a, form, input, select, textarea, [data-action]",
+  )).toHaveCount(0);
+  const tableWrap = matrix.locator(".scenario-surface-matrix-table-wrap");
+  await tableWrap.focus();
+  await expect(tableWrap).toBeFocused();
+  expect(
+    await tableWrap.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.animationDuration, style.transitionDuration];
+    }),
+  ).toEqual(["0s", "0s"]);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+  expect(apiPaths).toEqual([]);
 });
 
 test("keeps the catalog descriptive when the API session is unauthorized", async ({

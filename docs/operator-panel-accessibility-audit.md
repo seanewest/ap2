@@ -8,6 +8,7 @@ cloud, workload, or Windows-host request.
 | --- | --- | --- |
 | Recent operations | Refresh recent operations | No automatic read, named region/action, disabled and busy loading state, fixed safe failures |
 | Scenario catalog | Use in plan preview | Local-only keyboard action, described action, deterministic focus transfer, no request |
+| Scenario surface availability | None | Semantic caption/table/headings, focusable narrow-viewport scroll region, fixed status legend, no request or action |
 | Scenario plan preview | Preview plan | Named controls, local validation, busy/disabled form, focused live result/refusal, stale replacement |
 | Scenario batch feasibility | Evaluate feasibility | Named controls, local validation, busy/disabled form, focused live result/refusal, stale replacement |
 | Receipt verification | Verify receipt | Described input, local validation, busy/disabled form, focused live result/refusal, stale replacement |

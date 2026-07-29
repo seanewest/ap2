@@ -71,6 +71,9 @@ import {
 } from "./ui/elements";
 import { createScenarioCatalog } from "./scenarios/scenario-catalog";
 import {
+  createScenarioSurfaceMatrix,
+} from "./scenarios/scenario-surface-matrix";
+import {
   createBatchFeasibilityPanel,
   type BatchFeasibilityPanelClient,
   type BatchFeasibilityPanelFailure,
@@ -1051,6 +1054,7 @@ function createStatePanel(
         createContactProofPanel(contactProof, apiOperationLoading),
         ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
         ...createScenarioPlanningFlow(scenarioPlanPreviewClient),
+        createScenarioSurfaceMatrix(),
         createBatchFeasibilityPanel({
           registry: SCENARIO_MANIFESTS,
           client: batchFeasibilityClient,
