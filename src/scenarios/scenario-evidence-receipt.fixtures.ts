@@ -734,12 +734,12 @@ const purview = applyTruth(
         id: PURVIEW_AUDIT_BOUNDARY_SCENARIO.id,
       },
       assertion: "producer-attribution",
-      state: "licensing-or-latency-blocked",
+      state: "ambiguous",
       observation: observed(
         PURVIEW_AUDIT_BOUNDARY_SCENARIO,
         "read-bounded-audit-status",
         "independent-detector",
-        "query-blocked",
+        "query-empty",
       ),
     },
     terminal(

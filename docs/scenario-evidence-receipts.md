@@ -153,7 +153,7 @@ no protected run data:
 | Three-VM AVD | Infrastructure, Intune, Defender, terminal cleanup, the final-cleanup artifact's retention, and bounded spend are separate proven rows. The learner session and retention of earlier readiness artifacts remain uninspected. |
 | Teams missed call | The platform-native missed-call artifact and call are proven through a human-operated path. Unattended automation, voicemail, and retained-history cleanup remain uninspected. |
 | Application reconnaissance | Workload execution, distinct detector, exact producer attribution, and the authentic summary are separate proven rows. Learner interpretation and ephemeral retention cleanup remain uninspected. |
-| Purview boundary | App-only surface reachability and detector separation are proven. Operation-level producer attribution remains `licensing-or-latency-blocked`; learner visibility and local-window cleanup remain uninspected. |
+| Purview boundary | App-only surface reachability and detector separation are proven. Both retained searches succeeded, but their bounded pages contained no exact matching attribution record, so operation-level producer attribution remains `ambiguous`; learner visibility and local-window cleanup remain uninspected. |
 | Private document | Exact producer-side folder, file, and direct-permission reconciliation proves platform-accepted staging. Ordered cleanup plus three fresh-session terminal rounds prove active-state absence. Learner visibility remains uninspected unless the exact learner-owned evidence read records learner inspection. Interpretation, response, audit, and detection remain unclaimed. |
 
 Each fixture has a paired negative form that attempts one forbidden promotion.

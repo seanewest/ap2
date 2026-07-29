@@ -115,12 +115,14 @@ At each material checkpoint, the Captain checks and updates this docket against 
   `AuditLogsQuery-SharePoint.Read.All` as the product-minimum application
   permission. A fixed detector distinct from the API managed-identity producer
   reached the live endpoint using already-retained diagnostic authority. One
-  historical keyword query succeeded with zero records, while one reviewed
-  exact-path correction remained `notStarted` through all three bounded status
-  reads; no records page was read for that correction. Authorization stayed
-  unchanged and no content or workload mutation occurred. Operation-level
-  producer attribution is therefore `licensing-or-latency-blocked`, not
-  proven. Do not repeat either search or the workload event under this lane.
+  historical keyword query and one reviewed exact-path correction are now both
+  terminal `succeeded`. One fresh capped page from each contained two records
+  but no exact marker-bound record satisfying the frozen producer, operation,
+  target, time, and correlation contract. Authorization stayed unchanged and
+  no content or workload mutation occurred. The capability is therefore
+  `observed-but-incomplete`; operation-level producer attribution remains
+  ambiguous, not proven. Do not repeat either search or the workload event
+  under this lane.
   See [the fail-closed audit contract](docs/purview-audit-contract.md).
 - The one authorized Teams Call Canary create was submitted exactly once for
   Cory with audio-only service-hosted media. Microsoft Graph returned a

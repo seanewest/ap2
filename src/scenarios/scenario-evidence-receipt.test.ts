@@ -151,6 +151,22 @@ describe("scenario evidence receipts", () => {
     );
   });
 
+  it("keeps successful unmatched Purview attribution ambiguous", () => {
+    const fixture = CANONICAL_RECEIPT_FIXTURES[4]!;
+    const verified = verifyScenarioEvidenceReceipt(
+      fixture.receipt,
+      fixture.manifest,
+    );
+
+    expect(
+      verified.claims.find((row) => row.claimId === "producer-attribution"),
+    ).toMatchObject({
+      state: "ambiguous",
+      observationSource: "independent-detector",
+      observationOutcome: "query-empty",
+    });
+  });
+
   it("does not infer learner visibility from a blocked query", () => {
     const fixture = CANONICAL_RECEIPT_FIXTURES[4]!;
     const receipt = copy(fixture.receipt);

@@ -61,17 +61,18 @@ permission to search for one historical, already-cleaned file rehearsal
 performed by the API managed identity. No permission or workload mutation was
 needed.
 
-One unique-keyword query succeeded and returned zero records. A separately
-reviewed exact-object-path correction was accepted once but remained
-`notStarted` through three capped status reads, so its records endpoint was not
-read. Authorization postflight was unchanged. The outcome is therefore
-`licensing-or-latency-blocked`: Graph Audit Search and distinct app-only
-observation are supported and live-reachable, but operation-level producer
-correlation is not yet live-proven. Do not substitute the earlier
-service-principal sign-in proof or infer application identity from an empty
-result.
+Both the unique-keyword query and the separately reviewed exact-object-path
+correction later reached terminal `succeeded`. One fresh `$top=10` page from
+each returned two records without a next link, but neither contained an exact
+marker-bound record satisfying the frozen producer application, operation,
+target type, event window, and correlation contract. The outcome is therefore
+`observed-but-incomplete`: Graph Audit Search and distinct app-only observation
+are supported and live-reachable, while operation-level producer correlation
+remains ambiguous and unproven. Do not substitute the earlier
+service-principal sign-in proof or infer application identity or artifact
+absence from the unmatched pages.
 
 The canonical post-run
 [scenario evidence receipt](scenario-evidence-receipts.md) preserves these as
 separate rows: surface reachability and detector separation are proven, while
-producer attribution remains `licensing-or-latency-blocked`.
+producer attribution remains `ambiguous`.

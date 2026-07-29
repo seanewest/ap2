@@ -10,7 +10,7 @@ export const PURVIEW_AUDIT_BOUNDARY_SCENARIO = parseScenarioManifest({
   id: "purview-sharepoint-audit-boundary",
   title: "Purview SharePoint operation-audit boundary",
   summary:
-    "A distinct detector reaches Microsoft Graph Purview Audit Search while operation-level producer attribution remains explicitly blocked.",
+    "A distinct detector reaches Microsoft Graph Purview Audit Search while operation-level producer attribution remains explicitly ambiguous.",
   actors: [
     {
       id: "purview-lab-harness",
@@ -118,7 +118,7 @@ export const PURVIEW_AUDIT_BOUNDARY_SCENARIO = parseScenarioManifest({
     staging:
       "The detector queries only the already-retained historical evidence window.",
     learnerReceives:
-      "A sanitized result that proves surface reachability and preserves blocked operation attribution.",
+      "A sanitized result that proves surface reachability and preserves ambiguous operation attribution.",
     artifacts: [
       {
         id: "purview-query-boundary",
@@ -134,7 +134,7 @@ export const PURVIEW_AUDIT_BOUNDARY_SCENARIO = parseScenarioManifest({
         observation: {
           operationKey: "read-bounded-audit-status",
           proofReference:
-            "canonical:purview-audit-contract/licensing-or-latency-blocked",
+            "canonical:purview-audit-contract/observed-but-incomplete",
         },
       },
     ],
@@ -143,7 +143,7 @@ export const PURVIEW_AUDIT_BOUNDARY_SCENARIO = parseScenarioManifest({
     task:
       "Explain why accepted or empty audit searches do not prove producer attribution.",
     expectedInterpretation:
-      "The app-only surface and distinct detector are proven; operation-level producer attribution remains licensing or latency blocked.",
+      "The app-only surface and distinct detector are proven; successful unmatched result pages leave operation-level producer attribution ambiguous.",
     completionState: "not-run",
     evidenceArtifactIds: ["purview-query-boundary"],
   },
