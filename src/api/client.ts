@@ -3,6 +3,19 @@ import type {
   ScenarioPlanErrorCategory,
   ScenarioPlanningRequest,
 } from "../scenarios/scenario-plan";
+import type {
+  EvidenceReceiptErrorCode,
+  ScenarioEvidenceReceipt,
+} from "../scenarios/scenario-evidence-receipt";
+import type {
+  SafeVerifiedScenarioEvidenceReceipt,
+} from "../scenarios/scenario-evidence-verification";
+import {
+  EVIDENCE_RECEIPT_ERROR_CODES,
+  isExactSafeVerifiedReceipt,
+  parseScenarioEvidenceReceiptRequest,
+  ScenarioEvidenceContractError,
+} from "./scenario-evidence-verification-contract.ts";
 
 export interface ApiCallerIdentity {
   callerType: "delegated" | "app-only";
@@ -228,6 +241,10 @@ export interface AfterPartyApi {
     accessToken: string,
     request: ScenarioPlanningRequest,
   ): Promise<ScenarioExecutionPlan>;
+  verifyScenarioEvidenceReceipt(
+    accessToken: string,
+    receipt: ScenarioEvidenceReceipt,
+  ): Promise<SafeVerifiedScenarioEvidenceReceipt>;
   sendSimulatedEmail(accessToken: string): Promise<SimulatedEmailResult>;
   sendHelpDeskScenario(accessToken: string): Promise<HelpDeskScenarioResult>;
   shareOneDriveProof(
@@ -311,6 +328,29 @@ export class ScenarioPlanClientError extends Error {
   }
 }
 
+export type ScenarioEvidenceVerificationClientErrorCategory =
+  | "unauthorized"
+  | "forbidden"
+  | "validation-refused"
+  | "request-too-large"
+  | "response-too-large"
+  | "safe-failure";
+
+export class ScenarioEvidenceVerificationClientError extends Error {
+  readonly category: ScenarioEvidenceVerificationClientErrorCategory;
+  readonly refusalCategory?: EvidenceReceiptErrorCode;
+
+  constructor(
+    category: ScenarioEvidenceVerificationClientErrorCategory,
+    refusalCategory?: EvidenceReceiptErrorCode,
+  ) {
+    super(`Scenario evidence receipt request failed: ${category}`);
+    this.name = "ScenarioEvidenceVerificationClientError";
+    this.category = category;
+    this.refusalCategory = refusalCategory;
+  }
+}
+
 export class OneDriveInviteFailureError extends ApiAccessError {
   readonly diagnostic: OneDriveInviteFailure;
 
@@ -328,6 +368,7 @@ export class HttpAfterPartyApi implements AfterPartyApi {
   private readonly rehearsalStatusUrl: string;
   private readonly operationEventsUrl: string;
   private readonly scenarioPlanUrl: string;
+  private readonly scenarioEvidenceVerificationUrl: string;
   private readonly simulatedEmailUrl: string;
   private readonly helpDeskScenarioUrl: string;
   private readonly oneDriveProofUrl: string;
@@ -353,6 +394,10 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     ).toString();
     this.scenarioPlanUrl = new URL(
       "api/scenario-plan",
+      `${baseUrl}/`,
+    ).toString();
+    this.scenarioEvidenceVerificationUrl = new URL(
+      "api/scenario-evidence-verification",
       `${baseUrl}/`,
     ).toString();
     this.simulatedEmailUrl = new URL(
@@ -489,7 +534,12 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       throw new ScenarioPlanClientError("safe-failure");
     }
 
-    const responseText = await readBoundedScenarioPlanResponse(response);
+    let responseText: string;
+    try {
+      responseText = await readBoundedJsonResponse(response, 65_536);
+    } catch {
+      throw new ScenarioPlanClientError("safe-failure");
+    }
     let value: unknown;
     try {
       value = JSON.parse(responseText) as unknown;
@@ -518,6 +568,110 @@ export class HttpAfterPartyApi implements AfterPartyApi {
       !isSafeScenarioExecutionPlan(value, planningRequest)
     ) {
       throw new ScenarioPlanClientError("safe-failure");
+    }
+    return value;
+  }
+
+  async verifyScenarioEvidenceReceipt(
+    accessToken: string,
+    receipt: ScenarioEvidenceReceipt,
+  ): Promise<SafeVerifiedScenarioEvidenceReceipt> {
+    let parsedReceipt: ScenarioEvidenceReceipt;
+    try {
+      parsedReceipt = parseScenarioEvidenceReceiptRequest(receipt);
+    } catch (error) {
+      if (error instanceof ScenarioEvidenceContractError) {
+        throw new ScenarioEvidenceVerificationClientError(
+          "validation-refused",
+          error.code,
+        );
+      }
+      throw new ScenarioEvidenceVerificationClientError("safe-failure");
+    }
+    const body = JSON.stringify(receipt);
+    if (new TextEncoder().encode(body).byteLength > 131_072) {
+      throw new ScenarioEvidenceVerificationClientError("request-too-large");
+    }
+
+    let response: Response;
+    try {
+      response = await this.request(this.scenarioEvidenceVerificationUrl, {
+        method: "POST",
+        credentials: "omit",
+        redirect: "error",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+    } catch {
+      throw new ScenarioEvidenceVerificationClientError("safe-failure");
+    }
+    if (response.status === 401) {
+      throw new ScenarioEvidenceVerificationClientError("unauthorized");
+    }
+    if (response.status === 403) {
+      throw new ScenarioEvidenceVerificationClientError("forbidden");
+    }
+    if (response.status === 413) {
+      throw new ScenarioEvidenceVerificationClientError("request-too-large");
+    }
+    if (
+      !/^application\/json(?:;\s*charset=utf-8)?$/i.test(
+        response.headers.get("content-type") ?? "",
+      )
+    ) {
+      throw new ScenarioEvidenceVerificationClientError("safe-failure");
+    }
+
+    let responseText: string;
+    try {
+      responseText = await readBoundedJsonResponse(response, 131_072);
+    } catch (error) {
+      throw new ScenarioEvidenceVerificationClientError(
+        error instanceof BoundedResponseTooLargeError
+          ? "response-too-large"
+          : "safe-failure",
+      );
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(responseText) as unknown;
+    } catch {
+      throw new ScenarioEvidenceVerificationClientError("safe-failure");
+    }
+    if (!response.ok) {
+      if (
+        response.status === 400 &&
+        isScenarioRecord(value) &&
+        value.error === "scenario_evidence_receipt_refused" &&
+        typeof value.category === "string" &&
+        EVIDENCE_RECEIPT_ERROR_CODES.includes(
+          value.category as EvidenceReceiptErrorCode,
+        )
+      ) {
+        throw new ScenarioEvidenceVerificationClientError(
+          "validation-refused",
+          value.category as EvidenceReceiptErrorCode,
+        );
+      }
+      if (
+        response.status === 500 &&
+        isScenarioRecord(value) &&
+        value.error === "scenario_evidence_receipt_response_too_large"
+      ) {
+        throw new ScenarioEvidenceVerificationClientError(
+          "response-too-large",
+        );
+      }
+      throw new ScenarioEvidenceVerificationClientError("safe-failure");
+    }
+    if (
+      response.status !== 200 ||
+      !isExactSafeVerifiedReceipt(value, parsedReceipt)
+    ) {
+      throw new ScenarioEvidenceVerificationClientError("safe-failure");
     }
     return value;
   }
@@ -1637,16 +1791,17 @@ function hasExactScenarioKeys(
   );
 }
 
-async function readBoundedScenarioPlanResponse(
+async function readBoundedJsonResponse(
   response: Response,
+  maximumBytes: number,
 ): Promise<string> {
   const declaredLength = response.headers.get("content-length");
   if (
     declaredLength !== null &&
     (!/^(0|[1-9][0-9]*)$/.test(declaredLength) ||
-      Number(declaredLength) > 65_536)
+      Number(declaredLength) > maximumBytes)
   ) {
-    throw new ScenarioPlanClientError("safe-failure");
+    throw new BoundedResponseTooLargeError();
   }
   try {
     if (response.body === null) {
@@ -1661,9 +1816,9 @@ async function readBoundedScenarioPlanResponse(
         break;
       }
       totalBytes += value.byteLength;
-      if (totalBytes > 65_536) {
+      if (totalBytes > maximumBytes) {
         await reader.cancel();
-        throw new ScenarioPlanClientError("safe-failure");
+        throw new BoundedResponseTooLargeError();
       }
       chunks.push(value);
     }
@@ -1675,9 +1830,12 @@ async function readBoundedScenarioPlanResponse(
     }
     return new TextDecoder("utf-8", { fatal: true }).decode(body);
   } catch (error) {
-    if (error instanceof ScenarioPlanClientError) {
+    if (error instanceof BoundedResponseTooLargeError) {
       throw error;
     }
-    throw new ScenarioPlanClientError("safe-failure");
+    throw new BoundedResponseReadError();
   }
 }
+
+class BoundedResponseTooLargeError extends Error {}
+class BoundedResponseReadError extends Error {}

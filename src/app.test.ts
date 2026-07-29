@@ -64,6 +64,8 @@ class FakeAuthentication implements Authentication {
 class FakeApi implements AfterPartyApi {
   checkAccess = vi.fn<(accessToken: string) => Promise<ApiCallerIdentity>>();
   compileScenarioPlan = vi.fn<AfterPartyApi["compileScenarioPlan"]>();
+  verifyScenarioEvidenceReceipt =
+    vi.fn<AfterPartyApi["verifyScenarioEvidenceReceipt"]>();
   getRecentOperationEvents =
     vi.fn<
       (

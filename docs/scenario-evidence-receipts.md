@@ -136,3 +136,25 @@ The command reads one regular file of at most 256 KiB, selects the built-in
 canonical manifest by sanitized scenario ID, performs no network request, and
 prints a deterministic tab-separated claim table. Failure output is only
 `INVALID` plus a categorical code; it never echoes input data or file paths.
+
+## Authenticated API and typed client
+
+An established AP2 operator can submit the same sanitized receipt to
+`POST /api/scenario-evidence-verification`. The route applies the existing
+bearer-token verifier and operator policy before reading the body. It accepts
+only `application/json`, caps request and response bodies at 128 KiB, rejects
+unknown fields and raw identifiers, and verifies synchronously in memory.
+
+Successful output contains only the normalized deterministic claim rows and a
+`missingCoverage` list of claim IDs whose supplied state is `uninspected`.
+Other honest terminal states remain visible in their claim rows and are not
+silently promoted. Invalid receipts return one fixed categorical verifier
+code. The typed client validates the bounded request shape and deterministic
+claim IDs before sending, streams the response with the same hard cap, and
+accepts only an exactly matching normalized role/claim result. Manifest and
+evidence-strength verification remain server-side.
+
+This endpoint verifies the internal consistency and permitted strength of
+receipt data supplied by an operator. It does not collect telemetry, obtain or
+inspect evidence, authorize or execute a scenario, persist a receipt, schedule
+work, or prove that any external operation occurred.
