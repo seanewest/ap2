@@ -125,6 +125,11 @@ At each material checkpoint, the Captain checks and updates this docket against 
   or workload mutation occurred. Do not repeat either search or the workload
   event under this lane.
   See [the fail-closed audit contract](docs/purview-audit-contract.md).
+- A pure categorical adapter now maps an exact deduplicated live Purview
+  operation observation into the existing Purview boundary receipt. It proves
+  only the detector record match, surface, and producer attribution while
+  leaving learner, response, cleanup, and retention coverage uninspected. See
+  [the Purview receipt adapter](docs/purview-operation-receipt-adapter.md).
 - The one authorized Teams Call Canary create was submitted exactly once for
   Cory with audio-only service-hosted media. Microsoft Graph returned a
   definitive HTTP `403` / code `7505` tenant-mismatch refusal before assigning
