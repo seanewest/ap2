@@ -335,4 +335,23 @@ describe("three-VM REHEARSAL_ONLY pipeline", () => {
       rmSync(directory, { recursive: true, force: true });
     }
   });
+
+  it("writes categorical schema refusals only to stderr", () => {
+    const run = spawnSync(
+      process.execPath,
+      [
+        "scripts/run-avd-three-vm-rehearsal.ts",
+        "scripts/fixtures/help-desk-email-rehearsal-send.json",
+      ],
+      { cwd: process.cwd(), encoding: "utf8" },
+    );
+    expect(run.status).toBe(2);
+    expect(run.stdout).toBe("");
+    expect(JSON.parse(run.stderr)).toEqual({
+      schemaVersion: 1,
+      label: "REHEARSAL_ONLY",
+      status: "refused",
+      failure: "INPUT_SCHEMA",
+    });
+  });
 });

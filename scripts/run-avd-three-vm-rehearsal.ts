@@ -26,20 +26,23 @@ async function main(args: readonly string[]): Promise<number> {
     if (!stat.isFile() || stat.size > MAX_REQUEST_BYTES) return refuse();
     const value: unknown = JSON.parse(readFileSync(inputPath, "utf8"));
     const result = await runAvdThreeVmRehearsal(value);
+    if (result.status === "refused") {
+      return refuse(result.failure ?? "INPUT_SCHEMA");
+    }
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    return result.status === "refused" ? 2 : 0;
+    return 0;
   } catch {
     return refuse();
   }
 }
 
-function refuse(): 2 {
+function refuse(failure = "INPUT_SCHEMA"): 2 {
   process.stderr.write(
     `${JSON.stringify({
       schemaVersion: 1,
       label: "REHEARSAL_ONLY",
       status: "refused",
-      failure: "INPUT_SCHEMA",
+      failure,
     })}\n`,
   );
   return 2;

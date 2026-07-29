@@ -20,10 +20,12 @@ npm run rehearse:help-desk-email -- \
   scripts/fixtures/help-desk-email-rehearsal-cleaned.json
 ```
 
-The CLI accepts exactly one regular JSON file of at most 8 KiB. It writes one
-deterministic safe JSON envelope to standard output. Requests contain only the
-schema version, `REHEARSAL_ONLY` label, canonical scenario ID, and one fixed
-synthetic branch. Missing, extra, unsafe, and cross-family fields fail closed.
+The CLI accepts exactly one regular JSON file of at most 8 KiB. Success writes
+one deterministic safe JSON envelope to standard output. Refusal leaves
+standard output empty, writes one fixed categorical JSON error to standard
+error, and exits nonzero. Requests contain only the schema version,
+`REHEARSAL_ONLY` label, canonical scenario ID, and one fixed synthetic branch.
+Missing, extra, unsafe, and cross-family fields fail closed.
 
 ## Pipeline
 

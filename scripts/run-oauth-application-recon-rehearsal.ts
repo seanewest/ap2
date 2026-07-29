@@ -47,8 +47,11 @@ async function main(args: readonly string[]): Promise<number> {
       parsed.value,
       createDeterministicOauthApplicationReconFakeFourRead(),
     );
+    if (result.status !== "completed") {
+      return refuse(result.failure ?? "INPUT_SCHEMA");
+    }
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    return result.status === "completed" ? 0 : 2;
+    return 0;
   } catch {
     return refuse("INPUT_SCHEMA");
   }

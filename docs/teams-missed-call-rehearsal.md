@@ -10,9 +10,11 @@ npm run rehearse:teams-missed-call -- \
   scripts/fixtures/teams-missed-call-rehearsal-stage-only.json
 ```
 
-The CLI reads at most 8 KiB from that one file, accepts canonical JSON only,
-and prints a bounded categorical result. It performs no call, API request,
-retry, tenant mutation, browser action, or persistence.
+The CLI reads at most 8 KiB from that one file and accepts canonical JSON only.
+Success prints a bounded categorical result to standard output; refusal leaves
+standard output empty, writes one fixed categorical JSON error to standard
+error, and exits nonzero. It performs no call, API request, retry, tenant
+mutation, browser action, or persistence.
 
 ## Synthetic branches
 
