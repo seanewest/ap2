@@ -50,6 +50,7 @@
     "verify:avd-three-vm-rehearsal": "node scripts/verify-avd-three-vm-rehearsal-output-cli.ts",
     "verify:help-desk-email-rehearsal": "node scripts/verify-help-desk-email-rehearsal-output-cli.ts",
     "verify:oauth-app-recon-rehearsal": "node scripts/verify-oauth-application-recon-rehearsal-output-cli.ts",
+    "verify:purview-audit-boundary-rehearsal": "node scripts/verify-purview-audit-boundary-rehearsal-output-cli.ts",
     "verify:private-document-rehearsal": "node scripts/verify-private-document-rehearsal-output-cli.ts",
     "verify:teams-missed-call-rehearsal": "node scripts/verify-teams-missed-call-rehearsal-output-cli.ts"
   },
