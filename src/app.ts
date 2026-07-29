@@ -18,6 +18,7 @@ import {
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
   OneDriveInviteFailureError,
+  ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
   type AfterPartyApi,
   type ApiCallerIdentity,
@@ -52,6 +53,11 @@ import {
   createStatus,
 } from "./ui/elements";
 import { createScenarioCatalog } from "./scenarios/scenario-catalog";
+import {
+  createScenarioEvidenceVerificationPanel,
+  type ScenarioEvidenceVerificationFailure,
+  type ScenarioEvidenceVerificationPanelClient,
+} from "./scenarios/scenario-evidence-verification-panel";
 import {
   createScenarioPlanPreviewController,
   type ScenarioPlanPreviewClient,
@@ -160,6 +166,15 @@ export function createAfterPartyApp(
     },
     classifyError: classifyScenarioPlanPreviewFailure,
   };
+  const scenarioEvidenceVerificationClient:
+    ScenarioEvidenceVerificationPanelClient = {
+      verify: async (receipt) => {
+        const accessToken =
+          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+        return await api.verifyScenarioEvidenceReceipt(accessToken, receipt);
+      },
+      classifyError: classifyScenarioEvidenceVerificationFailure,
+    };
   let contactProof: ContactProofState = {
     stage: "not-started",
     activity: "idle",
@@ -715,7 +730,12 @@ export function createAfterPartyApp(
 
   const render = (): void => {
     root.replaceChildren(
-      createShell(state, contactProof, scenarioPlanPreviewClient),
+      createShell(
+        state,
+        contactProof,
+        scenarioPlanPreviewClient,
+        scenarioEvidenceVerificationClient,
+      ),
     );
     root
       .querySelector<HTMLButtonElement>("[data-action='sign-in']")
@@ -811,6 +831,7 @@ function createShell(
   state: ViewState,
   contactProof: ContactProofState,
   scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
+  scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
 ): HTMLElement {
   const shell = document.createElement("main");
   shell.className = "shell";
@@ -830,7 +851,12 @@ function createShell(
     "Sign in with your Microsoft work or school account to continue.";
   shell.append(
     introduction,
-    createStatePanel(state, contactProof, scenarioPlanPreviewClient),
+    createStatePanel(
+      state,
+      contactProof,
+      scenarioPlanPreviewClient,
+      scenarioEvidenceVerificationClient,
+    ),
   );
 
   return shell;
@@ -840,6 +866,7 @@ function createStatePanel(
   state: ViewState,
   contactProof: ContactProofState,
   scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
+  scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
 ): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "auth-panel";
@@ -892,6 +919,9 @@ function createStatePanel(
         createContactProofPanel(contactProof, apiOperationLoading),
         ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
         ...createScenarioPlanningFlow(scenarioPlanPreviewClient),
+        createScenarioEvidenceVerificationPanel({
+          client: scenarioEvidenceVerificationClient,
+        }),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -944,6 +974,31 @@ function classifyScenarioPlanPreviewFailure(
     case "validation-refused":
       return "compiler-refused";
     case "request-too-large":
+      return "response-too-large";
+    case "safe-failure":
+      return "unavailable";
+  }
+}
+
+function classifyScenarioEvidenceVerificationFailure(
+  error: unknown,
+): ScenarioEvidenceVerificationFailure {
+  if (error instanceof AccessTokenError) {
+    return "session-expired";
+  }
+  if (!(error instanceof ScenarioEvidenceVerificationClientError)) {
+    return "unavailable";
+  }
+  switch (error.category) {
+    case "unauthorized":
+      return "session-expired";
+    case "forbidden":
+      return "unauthorized";
+    case "validation-refused":
+      return "verification-refused";
+    case "request-too-large":
+      return "request-too-large";
+    case "response-too-large":
       return "response-too-large";
     case "safe-failure":
       return "unavailable";
