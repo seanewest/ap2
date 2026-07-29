@@ -1,6 +1,7 @@
 import { AVD_THREE_VM_SCENARIO } from "./avd-three-vm";
 import { HELP_DESK_EMAIL_SCENARIO } from "./help-desk-email";
 import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon";
+import { PRIVATE_DOCUMENT_EVIDENCE_SCENARIO } from "./private-document-evidence";
 import { TEAMS_MISSED_CALL_SCENARIO } from "./teams-missed-call";
 
 export const SCENARIO_MANIFESTS = [
@@ -8,4 +9,5 @@ export const SCENARIO_MANIFESTS = [
   HELP_DESK_EMAIL_SCENARIO,
   AVD_THREE_VM_SCENARIO,
   OAUTH_APPLICATION_RECON_SCENARIO,
+  PRIVATE_DOCUMENT_EVIDENCE_SCENARIO,
 ] as const;

@@ -12,6 +12,7 @@ See:
 - [Identities](docs/identities.md)
 - [Proven capabilities](docs/proven-capabilities.md)
 - [Pass 3 development workflow](docs/development-workflow.md)
+- [Private document evidence contract](docs/private-document-evidence.md)
 - [Lab reset strategy](docs/lab-reset-strategy.md)
 
 ## Developer bootstrap

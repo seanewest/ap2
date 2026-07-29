@@ -104,3 +104,10 @@ in a separate
 back to the exact manifest roles, operations, artifacts, learner contract,
 response, cleanup, and retention without changing the plan or embedding raw
 evidence.
+
+`private-document-evidence.ts` describes the cleanup-first delegated document
+contract. A distinct producer stages one private harmless text artifact and
+one direct learner-only read grant, then removes the permission, file, and
+empty run folder. The canary reached producer-side platform acceptance but did
+not prove learner visibility, so the fixture remains `platform-accepted`,
+`not-proven`, and `not-run`, with no audit or detection claim.
