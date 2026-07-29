@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAfterPartyApp } from "./app";
 import {
@@ -13,6 +15,7 @@ import {
   ApiAccessError,
   BatchFeasibilityClientError,
   OneDriveInviteFailureError,
+  PrivateDocumentRehearsalVerificationClientError,
   RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
@@ -32,6 +35,9 @@ import {
   type TodoTaskProofResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
+import {
+  parsePrivateDocumentRehearsalVerificationRequest,
+} from "./api/private-document-rehearsal-verification-contract";
 import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
 import { CANONICAL_RECEIPT_FIXTURES } from "./scenarios/scenario-evidence-receipt.fixtures";
 import { verifyCanonicalScenarioEvidenceReceipt } from "./scenarios/scenario-evidence-verification";
@@ -40,6 +46,17 @@ import {
   canonicalAvdThreeVmRehearsalOutput,
   verifyAvdThreeVmRehearsalOutput,
 } from "../scripts/verify-avd-three-vm-rehearsal-output";
+import {
+  verifyPrivateDocumentRehearsalOutput,
+} from "../scripts/verify-private-document-rehearsal-output";
+
+const privateDocumentRehearsalOutput =
+  parsePrivateDocumentRehearsalVerificationRequest(JSON.parse(readFileSync(
+    resolve("scripts/fixtures/private-document-rehearsal-output-learner.json"),
+    "utf8",
+  )) as unknown);
+const privateDocumentRehearsalSummary =
+  verifyPrivateDocumentRehearsalOutput(privateDocumentRehearsalOutput);
 
 const account: AccountIdentity = {
   accountId: "student-object-id",
@@ -1829,6 +1846,130 @@ describe("After Party authentication UI", () => {
       expect(panel.textContent).toContain(message);
       expect(panel.textContent).not.toContain(failure.message);
       expect(api.calculateMultiScenarioFeasibility).toHaveBeenCalledTimes(
+        reachesApi ? 1 : 0,
+      );
+    },
+  );
+
+  it("verifies private-document output only after explicit signed submission", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.verifyPrivateDocumentRehearsalOutput.mockResolvedValue(
+      privateDocumentRehearsalSummary,
+    );
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".private-document-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify(privateDocumentRehearsalOutput);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyPrivateDocumentRehearsalOutput).not.toHaveBeenCalled();
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.verifyPrivateDocumentRehearsalOutput).toHaveBeenCalledWith(
+      "temporary-token",
+      privateDocumentRehearsalOutput,
+    );
+    expect(panel.textContent).toContain("Network-free contract verified");
+    expect(panel.textContent).not.toContain("temporary-token");
+    expect(panel.textContent).not.toContain(
+      privateDocumentRehearsalSummary.planDigestSha256,
+    );
+  });
+
+  it("refuses unsafe private-document output before acquiring authorization", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".private-document-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify({
+      ...privateDocumentRehearsalOutput,
+      unsafe: ["operator", "example.invalid"].join("@"),
+    });
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+
+    expect(panel.textContent).toContain("Local validation failed");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyPrivateDocumentRehearsalOutput).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new AccessTokenError("raw expired session detail"),
+      "operator session expired",
+      false,
+    ],
+    [
+      new PrivateDocumentRehearsalVerificationClientError("forbidden"),
+      "not authorized",
+      true,
+    ],
+    [
+      new PrivateDocumentRehearsalVerificationClientError(
+        "validation-refused",
+        "FAKE_CONTRACT_BINDING",
+      ),
+      "inconsistent or tampered",
+      true,
+    ],
+    [
+      new PrivateDocumentRehearsalVerificationClientError(
+        "response-too-large",
+      ),
+      "response-size limit",
+      true,
+    ],
+    [
+      new PrivateDocumentRehearsalVerificationClientError("safe-failure"),
+      "verification is unavailable",
+      true,
+    ],
+  ] as const)(
+    "maps typed private-document failure without rendering detail",
+    async (failure, message, reachesApi) => {
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      authentication.acquireAccessToken.mockImplementation(async () => {
+        if (!reachesApi) throw failure;
+        return "temporary-token";
+      });
+      if (reachesApi) {
+        api.verifyPrivateDocumentRehearsalOutput.mockRejectedValue(failure);
+      }
+      await createAfterPartyApp(root, authentication, api).start();
+      const panel = root.querySelector<HTMLElement>(
+        ".private-document-rehearsal-verification",
+      )!;
+      const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+      input.value = JSON.stringify(privateDocumentRehearsalOutput);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+      await nextTask();
+
+      expect(panel.textContent).toContain(message);
+      expect(panel.textContent).not.toContain(failure.message);
+      expect(api.verifyPrivateDocumentRehearsalOutput).toHaveBeenCalledTimes(
         reachesApi ? 1 : 0,
       );
     },

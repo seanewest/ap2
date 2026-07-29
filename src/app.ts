@@ -19,6 +19,7 @@ import {
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
   OneDriveInviteFailureError,
+  PrivateDocumentRehearsalVerificationClientError,
   RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
@@ -36,6 +37,9 @@ import { API_ACCESS_SCOPES } from "./api/config";
 import {
   isBoundedRehearsalOutputRequest,
 } from "./api/rehearsal-output-verification-contract";
+import {
+  isBoundedPrivateDocumentRehearsalRequest,
+} from "./api/private-document-rehearsal-verification-contract";
 import {
   FIXED_PROOF_BY_ID,
   bindFixedProofActions,
@@ -68,6 +72,11 @@ import {
   type AvdRehearsalVerificationFailure,
   type AvdRehearsalVerificationPanelClient,
 } from "./scenarios/avd-rehearsal-verification-panel";
+import {
+  createPrivateDocumentRehearsalVerificationPanel,
+  type PrivateDocumentRehearsalPanelClient,
+  type PrivateDocumentRehearsalPanelFailure,
+} from "./scenarios/private-document-rehearsal-verification-panel";
 import {
   createScenarioEvidenceVerificationPanel,
   type ScenarioEvidenceVerificationFailure,
@@ -200,6 +209,20 @@ export function createAfterPartyApp(
         return await api.verifyRehearsalOutput(accessToken, output);
       },
       classifyError: classifyAvdRehearsalVerificationFailure,
+    };
+  const privateDocumentRehearsalVerificationClient:
+    PrivateDocumentRehearsalPanelClient = {
+      parse: (value) =>
+        isBoundedPrivateDocumentRehearsalRequest(value) ? value : undefined,
+      verify: async (output) => {
+        const accessToken =
+          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+        return await api.verifyPrivateDocumentRehearsalOutput(
+          accessToken,
+          output,
+        );
+      },
+      classifyError: classifyPrivateDocumentRehearsalFailure,
     };
   const batchFeasibilityClient: BatchFeasibilityPanelClient = {
     evaluate: async (request) => {
@@ -773,6 +796,7 @@ export function createAfterPartyApp(
         scenarioPlanPreviewClient,
         scenarioEvidenceVerificationClient,
         avdRehearsalVerificationClient,
+        privateDocumentRehearsalVerificationClient,
         batchFeasibilityClient,
       ),
     );
@@ -872,6 +896,8 @@ function createShell(
   scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
   scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
   avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
+  privateDocumentRehearsalVerificationClient:
+    PrivateDocumentRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const shell = document.createElement("main");
@@ -898,6 +924,7 @@ function createShell(
       scenarioPlanPreviewClient,
       scenarioEvidenceVerificationClient,
       avdRehearsalVerificationClient,
+      privateDocumentRehearsalVerificationClient,
       batchFeasibilityClient,
     ),
   );
@@ -911,6 +938,8 @@ function createStatePanel(
   scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
   scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
   avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
+  privateDocumentRehearsalVerificationClient:
+    PrivateDocumentRehearsalPanelClient,
   batchFeasibilityClient: BatchFeasibilityPanelClient,
 ): HTMLElement {
   const panel = document.createElement("section");
@@ -973,6 +1002,9 @@ function createStatePanel(
         }),
         createAvdRehearsalVerificationPanel({
           client: avdRehearsalVerificationClient,
+        }),
+        createPrivateDocumentRehearsalVerificationPanel({
+          client: privateDocumentRehearsalVerificationClient,
         }),
         createButton("Sign out", "sign-out", "secondary"),
       );
@@ -1089,6 +1121,33 @@ function classifyAvdRehearsalVerificationFailure(
     return "session-expired";
   }
   if (!(error instanceof RehearsalOutputVerificationClientError)) {
+    return "unavailable";
+  }
+  switch (error.category) {
+    case "unauthorized":
+      return "session-expired";
+    case "forbidden":
+      return "unauthorized";
+    case "validation-refused":
+      return "verification-refused";
+    case "request-too-large":
+      return "request-too-large";
+    case "response-too-large":
+      return "response-too-large";
+    case "safe-failure":
+      return "unavailable";
+  }
+}
+
+function classifyPrivateDocumentRehearsalFailure(
+  error: unknown,
+): PrivateDocumentRehearsalPanelFailure {
+  if (error instanceof AccessTokenError) {
+    return "session-expired";
+  }
+  if (
+    !(error instanceof PrivateDocumentRehearsalVerificationClientError)
+  ) {
     return "unavailable";
   }
   switch (error.category) {

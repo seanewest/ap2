@@ -1,6 +1,8 @@
 import { generateKeyPairSync, sign } from "node:crypto";
+import { readFileSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { resolve } from "node:path";
 import { createLocalJWKSet, type JWK } from "jose";
 import { expect, test } from "@playwright/test";
 import { defaultCallerPolicy } from "../api/auth-policy";
@@ -19,6 +21,9 @@ import {
 import {
   InMemoryRehearsalOutputVerificationService,
 } from "../api/rehearsal-output-verification";
+import {
+  InMemoryPrivateDocumentRehearsalVerificationService,
+} from "../api/private-document-rehearsal-verification";
 import { InMemoryScenarioPlanService } from "../api/scenario-plan";
 import { createApiServer } from "../api/server";
 import { JoseTokenVerifier } from "../api/token-verifier";
@@ -30,12 +35,20 @@ import {
 import {
   canonicalAvdThreeVmRehearsalOutput,
 } from "../scripts/verify-avd-three-vm-rehearsal-output";
+import {
+  parsePrivateDocumentRehearsalVerificationRequest,
+} from "../src/api/private-document-rehearsal-verification-contract";
 
 const ISSUER = "https://fixture.invalid/operator/v2.0";
 const AUDIENCE = "api://ap2-local-fixture";
 const KEY_ID = "local-fixture-key";
 const NOW = 2_000_000_000;
 const APP_ORIGIN = "http://127.0.0.1:5173";
+const PRIVATE_DOCUMENT_REHEARSAL_OUTPUT =
+  parsePrivateDocumentRehearsalVerificationRequest(JSON.parse(readFileSync(
+    resolve("scripts/fixtures/private-document-rehearsal-output-learner.json"),
+    "utf8",
+  )) as unknown);
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
 });
@@ -97,6 +110,8 @@ test.beforeAll(async () => {
       new InMemoryScenarioEvidenceVerificationService(),
     rehearsalOutputVerificationService:
       new InMemoryRehearsalOutputVerificationService(),
+    privateDocumentRehearsalVerificationService:
+      new InMemoryPrivateDocumentRehearsalVerificationService(),
     allowedOrigin: APP_ORIGIN,
   });
   await new Promise<void>((resolve) =>
@@ -1110,6 +1125,231 @@ test("distinguishes expired and forbidden rehearsal verification sessions", asyn
     );
     await panel.getByRole("button", {
       name: "Verify rehearsal output",
+    }).click();
+    expect((await response).status()).toBe(status);
+    await expect(panel.getByText(new RegExp(message))).toBeVisible();
+    await context.close();
+  }
+});
+
+test("manually verifies one private-document rehearsal through the signed local product path", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await configureOperator(page, accessToken);
+  let requests = 0;
+  let releaseRequest!: () => void;
+  const requestGate = new Promise<void>((resolve) => {
+    releaseRequest = resolve;
+  });
+  await page.route(
+    "**/api/private-document-rehearsal-verification",
+    async (route) => {
+      await requestGate;
+      await route.continue();
+    },
+  );
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/private-document-rehearsal-verification"
+    ) {
+      requests += 1;
+    }
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Private-document rehearsal verification",
+  });
+  const input = panel.getByLabel(
+    "Sanitized private-document REHEARSAL_ONLY output JSON",
+  );
+  const verify = panel.getByRole("button", {
+    name: "Verify private-document rehearsal",
+  });
+  await input.fill(JSON.stringify(PRIVATE_DOCUMENT_REHEARSAL_OUTPUT));
+  expect(requests).toBe(0);
+
+  const response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/private-document-rehearsal-verification"
+  );
+  await verify.focus();
+  await page.keyboard.press("Enter");
+  await expect(verify).toBeDisabled();
+  await expect(panel.getByText(/Verifying the network-free/)).toBeVisible();
+  releaseRequest();
+  expect((await response).status()).toBe(200);
+  expect(requests).toBe(1);
+
+  const result = panel.getByRole("region", {
+    name: "Private-document rehearsal verification result",
+  });
+  await expect(result).toContainText("Network-free contract verified");
+  await expect(result).toContainText("Learner Observation");
+  await expect(result).toContainText("All Uninspected");
+  await expect(result).toContainText(
+    "does not prove live learner visibility",
+  );
+  await expect(result).toContainText(
+    "cannot substitute for pre-cleanup access",
+  );
+  await expect(result).not.toContainText("planDigestSha256");
+  await expect(result).not.toContainText("fakeRunDigestSha256");
+  await expect(result).not.toContainText("journalEntries");
+  await expect(
+    panel.locator(".private-document-rehearsal-verification-output"),
+  ).toBeFocused();
+  expect(
+    await verify.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [style.animationDuration, style.transitionDuration];
+    }),
+  ).toEqual(["0s", "0s"]);
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+
+  await input.pressSequentially(" ");
+  await expect(result).toHaveCount(0);
+  expect(requests).toBe(1);
+});
+
+test("refuses unsafe private-document rehearsal input locally without authorization", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  let requests = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname ===
+        "/api/private-document-rehearsal-verification"
+    ) requests += 1;
+  });
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Private-document rehearsal verification",
+  });
+  const input = panel.getByLabel(
+    "Sanitized private-document REHEARSAL_ONLY output JSON",
+  );
+  const verify = panel.getByRole("button", {
+    name: "Verify private-document rehearsal",
+  });
+
+  await input.fill("{");
+  await verify.click();
+  await expect(panel.getByText(/exact bounded PR #90 envelope/)).toBeVisible();
+  await input.fill(JSON.stringify({
+    ...PRIVATE_DOCUMENT_REHEARSAL_OUTPUT,
+    label: "LIVE_RESULT",
+  }));
+  await verify.click();
+  await expect(panel.getByText(/exact REHEARSAL_ONLY label/)).toBeVisible();
+  await input.fill(JSON.stringify({
+    ...PRIVATE_DOCUMENT_REHEARSAL_OUTPUT,
+    unsafe: ["operator", "example.invalid"].join("@"),
+  }));
+  await verify.click();
+  await expect(panel.getByText(/Local validation failed/)).toBeVisible();
+  expect(requests).toBe(0);
+});
+
+test("distinguishes private-document tampering and safe transport failures", async ({
+  page,
+}) => {
+  await configureOperator(page, accessToken);
+  await page.goto("/e2e/recent-operations.html");
+  const panel = page.getByRole("region", {
+    name: "Private-document rehearsal verification",
+  });
+  const input = panel.getByLabel(
+    "Sanitized private-document REHEARSAL_ONLY output JSON",
+  );
+  const verify = panel.getByRole("button", {
+    name: "Verify private-document rehearsal",
+  });
+  const tampered = JSON.parse(
+    JSON.stringify(PRIVATE_DOCUMENT_REHEARSAL_OUTPUT),
+  ) as {
+    fakeRun: { journalEntries: number };
+  };
+  tampered.fakeRun.journalEntries += 1;
+  let response = page.waitForResponse((candidate) =>
+    new URL(candidate.url()).pathname ===
+      "/api/private-document-rehearsal-verification"
+  );
+  await input.fill(JSON.stringify(tampered));
+  await verify.click();
+  expect((await response).status()).toBe(400);
+  await expect(panel.getByText(/inconsistent or tampered/)).toBeVisible();
+
+  let kind: "request-size" | "response-size" | "general" = "request-size";
+  await page.route(
+    "**/api/private-document-rehearsal-verification",
+    async (route) => {
+      if (kind === "response-size") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: `"${"x".repeat(10_000)}"`,
+        });
+        return;
+      }
+      await route.fulfill({
+        status: kind === "request-size" ? 413 : 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "raw private backend payload" }),
+      });
+    },
+  );
+  await input.fill(JSON.stringify(PRIVATE_DOCUMENT_REHEARSAL_OUTPUT));
+  await verify.click();
+  await expect(panel.getByText(/request-size limit/)).toBeVisible();
+  kind = "response-size";
+  await verify.click();
+  await expect(panel.getByText(/response-size limit/)).toBeVisible();
+  kind = "general";
+  await verify.click();
+  await expect(panel.getByText(/verification is unavailable/)).toBeVisible();
+  await expect(panel).not.toContainText("raw private backend payload");
+});
+
+test("distinguishes private-document expired and forbidden sessions", async ({
+  browser,
+}) => {
+  const cases = [
+    ["invalid-fixture-token", 401, "operator session expired"],
+    [
+      fixtureToken({
+        tid: STUDENT_TENANT_ID,
+        oid: "fixture-unapproved-operator",
+        scp: REQUIRED_DELEGATED_SCOPE,
+      }),
+      403,
+      "not authorized",
+    ],
+  ] as const;
+  for (const [token, status, message] of cases) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await configureOperator(page, token);
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    const panel = page.getByRole("region", {
+      name: "Private-document rehearsal verification",
+    });
+    await panel.getByLabel(
+      "Sanitized private-document REHEARSAL_ONLY output JSON",
+    ).fill(JSON.stringify(PRIVATE_DOCUMENT_REHEARSAL_OUTPUT));
+    const response = page.waitForResponse((candidate) =>
+      new URL(candidate.url()).pathname ===
+        "/api/private-document-rehearsal-verification"
+    );
+    await panel.getByRole("button", {
+      name: "Verify private-document rehearsal",
     }).click();
     expect((await response).status()).toBe(status);
     await expect(panel.getByText(new RegExp(message))).toBeVisible();
