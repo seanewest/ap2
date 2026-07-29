@@ -5,6 +5,7 @@ import { SCENARIO_RECEIPT_API_CAPABILITY } from "../../api/scenario-evidence-ver
 import { SCENARIO_PLAN_API_CAPABILITY } from "../../api/scenario-plan.ts";
 import { REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY } from "../../api/rehearsal-output-verification.ts";
 import { BATCH_FEASIBILITY_API_CAPABILITY } from "../../api/multi-scenario-feasibility.ts";
+import { PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY } from "../../api/private-document-rehearsal-verification.ts";
 import { AVD_MANIFEST_ADAPTER_CAPABILITY } from "../../scripts/avd-three-vm-manifest-adapter.ts";
 import { AVD_THREE_VM_REHEARSAL_CAPABILITY } from "../../scripts/avd-three-vm-rehearsal.ts";
 import { HELP_DESK_EMAIL_REHEARSAL_CAPABILITY } from "../../scripts/help-desk-email-rehearsal.ts";
@@ -25,6 +26,7 @@ import { SCENARIO_MANIFESTS } from "./scenarios.ts";
 function surfaceDeclarations(): unknown[] {
   return structuredClone([
     BATCH_FEASIBILITY_API_CAPABILITY,
+    PRIVATE_DOCUMENT_REHEARSAL_VERIFICATION_API_CAPABILITY,
     SCENARIO_PLAN_API_CAPABILITY,
     SCENARIO_RECEIPT_API_CAPABILITY,
     REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
@@ -108,7 +110,7 @@ describe("canonical scenario surface inventory", () => {
       privateDocument.surfaces[
         "authenticated-rehearsal-verification-api-client"
       ].status,
-    ).toBe("missing");
+    ).toBe("implemented");
 
     const helpDesk = first.scenarios.find(
       ({ scenarioId }) => scenarioId === "help-desk-email-observation",

@@ -75,6 +75,18 @@ import {
 import {
   BATCH_FEASIBILITY_MAX_REQUEST_BYTES,
 } from "../src/api/multi-scenario-feasibility-contract.js";
+import {
+  PrivateDocumentRehearsalVerificationResponseTooLargeError,
+  PrivateDocumentRehearsalVerificationSafeFailureError,
+  type PrivateDocumentRehearsalVerificationService,
+} from "./private-document-rehearsal-verification.js";
+import {
+  PrivateDocumentRehearsalVerificationError,
+} from "../scripts/verify-private-document-rehearsal-output.js";
+import {
+  PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
+  PrivateDocumentRehearsalContractError,
+} from "../src/api/private-document-rehearsal-verification-contract.js";
 
 export interface ApiDependencies {
   tokenVerifier: TokenVerifier;
@@ -94,6 +106,8 @@ export interface ApiDependencies {
   scenarioPlanService?: ScenarioPlanService;
   scenarioEvidenceVerificationService?: ScenarioEvidenceVerificationService;
   rehearsalOutputVerificationService?: RehearsalOutputVerificationService;
+  privateDocumentRehearsalVerificationService?:
+    PrivateDocumentRehearsalVerificationService;
   multiScenarioFeasibilityService?: MultiScenarioFeasibilityService;
   allowedOrigin?: string;
 }
@@ -169,6 +183,7 @@ async function route(
     request.method === "OPTIONS" &&
     (pathname === "/api/scenario-evidence-verification" ||
       pathname === "/api/rehearsal-output-verification" ||
+      pathname === "/api/private-document-rehearsal-verification" ||
       pathname === "/api/multi-scenario-feasibility")
   ) {
     handleProtectedPreflight(
@@ -245,6 +260,17 @@ async function route(
     pathname === "/api/rehearsal-output-verification"
   ) {
     await rehearsalOutputVerification(request, response, dependencies);
+    return;
+  }
+  if (
+    request.method === "POST" &&
+    pathname === "/api/private-document-rehearsal-verification"
+  ) {
+    await privateDocumentRehearsalVerification(
+      request,
+      response,
+      dependencies,
+    );
     return;
   }
   if (
@@ -596,6 +622,33 @@ async function handleAuthorizedRequest(
       });
       return;
     }
+    if (
+      error instanceof PrivateDocumentRehearsalVerificationError ||
+      error instanceof PrivateDocumentRehearsalContractError
+    ) {
+      sendJson(response, 400, {
+        error: "private_document_rehearsal_refused",
+        category: error.category,
+      });
+      return;
+    }
+    if (
+      error instanceof
+        PrivateDocumentRehearsalVerificationResponseTooLargeError
+    ) {
+      sendJson(response, 500, {
+        error: "private_document_rehearsal_response_too_large",
+      });
+      return;
+    }
+    if (
+      error instanceof PrivateDocumentRehearsalVerificationSafeFailureError
+    ) {
+      sendJson(response, 500, {
+        error: "private_document_rehearsal_verification_failed",
+      });
+      return;
+    }
     if (error instanceof BatchFeasibilityRefusalError) {
       sendJson(response, 400, {
         error: "batch_feasibility_refused",
@@ -732,6 +785,31 @@ async function rehearsalOutputVerification(
     }
     return service.verify(
       await readBoundedJson(request, REHEARSAL_OUTPUT_MAX_REQUEST_BYTES),
+    );
+  });
+}
+
+async function privateDocumentRehearsalVerification(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new JsonUnsupportedMediaTypeError();
+    }
+    const service = dependencies.privateDocumentRehearsalVerificationService;
+    if (!service) {
+      throw new PrivateDocumentRehearsalVerificationSafeFailureError();
+    }
+    return service.verify(
+      await readBoundedJson(
+        request,
+        PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
+      ),
     );
   });
 }

@@ -25,6 +25,15 @@ import {
   REHEARSAL_VERIFIED_LABEL,
   type SharedRehearsalInvariantFailure,
 } from "../src/scenarios/rehearsal-envelope-invariants.ts";
+import type {
+  PrivateDocumentRehearsalVerificationFailure,
+  VerifiedPrivateDocumentRehearsalSummary,
+} from "../src/api/private-document-rehearsal-verification-contract.ts";
+
+export type {
+  PrivateDocumentRehearsalVerificationFailure,
+  VerifiedPrivateDocumentRehearsalSummary,
+} from "../src/api/private-document-rehearsal-verification-contract.ts";
 
 const MAX_OUTPUT_BYTES = 32 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -39,20 +48,6 @@ const EXTERNAL_CLAIMS = [
 ] as const;
 const CORRELATION = "run-contract";
 
-export type PrivateDocumentRehearsalVerificationFailure =
-  | "ADAPTER_REFUSED"
-  | "BRANCH_MISMATCH"
-  | "CLEANUP_GAP"
-  | "EVIDENCE_OVERCLAIM"
-  | "FAKE_CONTRACT_BINDING"
-  | "INPUT_OVERSIZED"
-  | "INPUT_SHAPE"
-  | "NON_CANONICAL_JSON"
-  | "PLAN_BINDING"
-  | "RECEIPT_REFUSED"
-  | "RUN_NONTERMINAL"
-  | "UNSAFE_CONTENT";
-
 export class PrivateDocumentRehearsalVerificationError extends Error {
   readonly category: PrivateDocumentRehearsalVerificationFailure;
 
@@ -61,22 +56,6 @@ export class PrivateDocumentRehearsalVerificationError extends Error {
     this.name = "PrivateDocumentRehearsalVerificationError";
     this.category = category;
   }
-}
-
-export interface VerifiedPrivateDocumentRehearsalSummary {
-  schemaVersion: 1;
-  label: typeof REHEARSAL_VERIFIED_LABEL;
-  status: "verified";
-  scenarioId: "private-document-evidence";
-  manifestSchemaVersion: 2;
-  planDigestSha256: string;
-  fakeRunDigestSha256: string;
-  syntheticBranch: PrivateDocumentSyntheticBranch;
-  fakeContract: "ordered-terminal-verified";
-  adapter: "accepted";
-  receiptVerifier: "accepted";
-  externalEvidence: "all-uninspected";
-  claimCount: number;
 }
 
 export function verifyPrivateDocumentRehearsalOutput(
