@@ -12,6 +12,7 @@ import {
 import {
   ApiAccessError,
   OneDriveInviteFailureError,
+  RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
   type AfterPartyApi,
@@ -34,6 +35,10 @@ import { compileScenarioExecutionPlan } from "./scenarios/scenario-plan";
 import { CANONICAL_RECEIPT_FIXTURES } from "./scenarios/scenario-evidence-receipt.fixtures";
 import { verifyCanonicalScenarioEvidenceReceipt } from "./scenarios/scenario-evidence-verification";
 import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
+import {
+  canonicalAvdThreeVmRehearsalOutput,
+  verifyAvdThreeVmRehearsalOutput,
+} from "../scripts/verify-avd-three-vm-rehearsal-output";
 
 const account: AccountIdentity = {
   accountId: "student-object-id",
@@ -214,6 +219,7 @@ describe("After Party authentication UI", () => {
     expect(signInButton().textContent).toBe("Sign in with Microsoft");
     expect(apiButton()).toBeNull();
     expect(rehearsalButton()).toBeNull();
+    expect(root.querySelector(".avd-rehearsal-verification")).toBeNull();
     expect(simulatedEmailButton()).toBeNull();
     expect(oneDriveShareButton()).toBeNull();
     expect(oneDriveVerifyButton()).toBeNull();
@@ -1760,6 +1766,136 @@ describe("After Party authentication UI", () => {
     expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
     expect(api.verifyScenarioEvidenceReceipt).not.toHaveBeenCalled();
   });
+
+  it("verifies one canonical rehearsal output only after explicit signed submission", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    const output = canonicalAvdThreeVmRehearsalOutput();
+    api.verifyRehearsalOutput.mockResolvedValue(
+      verifyAvdThreeVmRehearsalOutput(output),
+    );
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".avd-rehearsal-verification",
+    )!;
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify(output);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyRehearsalOutput).not.toHaveBeenCalled();
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.verifyRehearsalOutput).toHaveBeenCalledOnce();
+    expect(api.verifyRehearsalOutput).toHaveBeenCalledWith(
+      "temporary-token",
+      output,
+    );
+    expect(panel.textContent).toContain("Network-free contract verified");
+    expect(panel.textContent).toContain("All Uninspected");
+    expect(panel.textContent).not.toContain(output.planDigestSha256);
+    expect(panel.textContent).not.toContain("runnerJournal");
+    expect(panel.textContent).not.toContain("temporary-token");
+  });
+
+  it("refuses unsafe rehearsal fields before acquiring operator authorization", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    await createAfterPartyApp(root, authentication, api).start();
+    const panel = root.querySelector<HTMLElement>(
+      ".avd-rehearsal-verification",
+    )!;
+    const output = canonicalAvdThreeVmRehearsalOutput();
+    const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+    input.value = JSON.stringify({
+      ...output,
+      observations: {
+        ...output.observations,
+        unexpectedField: ["operator", "example.invalid"].join("@"),
+      },
+    });
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+
+    expect(panel.textContent).toContain("Local validation failed");
+    expect(authentication.acquireAccessToken).not.toHaveBeenCalled();
+    expect(api.verifyRehearsalOutput).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      new AccessTokenError("raw expired session detail"),
+      "operator session expired",
+      false,
+    ],
+    [
+      new RehearsalOutputVerificationClientError("forbidden"),
+      "not authorized",
+      true,
+    ],
+    [
+      new RehearsalOutputVerificationClientError(
+        "validation-refused",
+        "CLEANUP_GAP",
+      ),
+      "inconsistent or tampered",
+      true,
+    ],
+    [
+      new RehearsalOutputVerificationClientError("response-too-large"),
+      "response-size limit",
+      true,
+    ],
+    [
+      new RehearsalOutputVerificationClientError("safe-failure"),
+      "verification is unavailable",
+      true,
+    ],
+  ] as const)(
+    "maps typed rehearsal verification failure without rendering detail",
+    async (failure, message, reachesApi) => {
+      authentication.initialize.mockResolvedValue({
+        kind: "signed-in",
+        account,
+        source: "cache",
+      });
+      authentication.acquireAccessToken.mockImplementation(async () => {
+        if (!reachesApi) {
+          throw failure;
+        }
+        return "temporary-token";
+      });
+      if (reachesApi) {
+        api.verifyRehearsalOutput.mockRejectedValue(failure);
+      }
+      await createAfterPartyApp(root, authentication, api).start();
+      const panel = root.querySelector<HTMLElement>(
+        ".avd-rehearsal-verification",
+      )!;
+      const input = panel.querySelector<HTMLTextAreaElement>("textarea")!;
+      input.value = JSON.stringify(canonicalAvdThreeVmRehearsalOutput());
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      panel.querySelector<HTMLFormElement>("form")!.requestSubmit();
+      await nextTask();
+
+      expect(panel.textContent).toContain(message);
+      expect(panel.textContent).not.toContain(failure.message);
+      expect(api.verifyRehearsalOutput).toHaveBeenCalledTimes(
+        reachesApi ? 1 : 0,
+      );
+    },
+  );
 
   it.each([
     [

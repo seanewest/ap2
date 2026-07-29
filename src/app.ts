@@ -18,6 +18,7 @@ import {
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
   OneDriveInviteFailureError,
+  RehearsalOutputVerificationClientError,
   ScenarioEvidenceVerificationClientError,
   ScenarioPlanClientError,
   type AfterPartyApi,
@@ -31,6 +32,9 @@ import {
   type SimulatedEmailResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
+import {
+  isBoundedRehearsalOutputRequest,
+} from "./api/rehearsal-output-verification-contract";
 import {
   FIXED_PROOF_BY_ID,
   bindFixedProofActions,
@@ -53,6 +57,11 @@ import {
   createStatus,
 } from "./ui/elements";
 import { createScenarioCatalog } from "./scenarios/scenario-catalog";
+import {
+  createAvdRehearsalVerificationPanel,
+  type AvdRehearsalVerificationFailure,
+  type AvdRehearsalVerificationPanelClient,
+} from "./scenarios/avd-rehearsal-verification-panel";
 import {
   createScenarioEvidenceVerificationPanel,
   type ScenarioEvidenceVerificationFailure,
@@ -174,6 +183,17 @@ export function createAfterPartyApp(
         return await api.verifyScenarioEvidenceReceipt(accessToken, receipt);
       },
       classifyError: classifyScenarioEvidenceVerificationFailure,
+    };
+  const avdRehearsalVerificationClient:
+    AvdRehearsalVerificationPanelClient = {
+      parse: (value) =>
+        isBoundedRehearsalOutputRequest(value) ? value : undefined,
+      verify: async (output) => {
+        const accessToken =
+          await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+        return await api.verifyRehearsalOutput(accessToken, output);
+      },
+      classifyError: classifyAvdRehearsalVerificationFailure,
     };
   let contactProof: ContactProofState = {
     stage: "not-started",
@@ -735,6 +755,7 @@ export function createAfterPartyApp(
         contactProof,
         scenarioPlanPreviewClient,
         scenarioEvidenceVerificationClient,
+        avdRehearsalVerificationClient,
       ),
     );
     root
@@ -832,6 +853,7 @@ function createShell(
   contactProof: ContactProofState,
   scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
   scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
+  avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
 ): HTMLElement {
   const shell = document.createElement("main");
   shell.className = "shell";
@@ -856,6 +878,7 @@ function createShell(
       contactProof,
       scenarioPlanPreviewClient,
       scenarioEvidenceVerificationClient,
+      avdRehearsalVerificationClient,
     ),
   );
 
@@ -867,6 +890,7 @@ function createStatePanel(
   contactProof: ContactProofState,
   scenarioPlanPreviewClient: ScenarioPlanPreviewClient,
   scenarioEvidenceVerificationClient: ScenarioEvidenceVerificationPanelClient,
+  avdRehearsalVerificationClient: AvdRehearsalVerificationPanelClient,
 ): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "auth-panel";
@@ -921,6 +945,9 @@ function createStatePanel(
         ...createScenarioPlanningFlow(scenarioPlanPreviewClient),
         createScenarioEvidenceVerificationPanel({
           client: scenarioEvidenceVerificationClient,
+        }),
+        createAvdRehearsalVerificationPanel({
+          client: avdRehearsalVerificationClient,
         }),
         createButton("Sign out", "sign-out", "secondary"),
       );
@@ -987,6 +1014,31 @@ function classifyScenarioEvidenceVerificationFailure(
     return "session-expired";
   }
   if (!(error instanceof ScenarioEvidenceVerificationClientError)) {
+    return "unavailable";
+  }
+  switch (error.category) {
+    case "unauthorized":
+      return "session-expired";
+    case "forbidden":
+      return "unauthorized";
+    case "validation-refused":
+      return "verification-refused";
+    case "request-too-large":
+      return "request-too-large";
+    case "response-too-large":
+      return "response-too-large";
+    case "safe-failure":
+      return "unavailable";
+  }
+}
+
+function classifyAvdRehearsalVerificationFailure(
+  error: unknown,
+): AvdRehearsalVerificationFailure {
+  if (error instanceof AccessTokenError) {
+    return "session-expired";
+  }
+  if (!(error instanceof RehearsalOutputVerificationClientError)) {
     return "unavailable";
   }
   switch (error.category) {
