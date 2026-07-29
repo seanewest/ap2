@@ -194,6 +194,17 @@ export const API_ROUTE_CONTRACTS = [
       ...PURE,
     },
   ),
+  route(
+    "POST",
+    "/api/sharepoint-trusted-version-lifecycle",
+    "sharepoint-trusted-version-lifecycle",
+    {
+      ...jsonRequest(512),
+      ...MUTATION_RESPONSE,
+      responseMaxBytes: 32_768,
+      ...BOUNDED_MUTATION,
+    },
+  ),
   ...mutationPair("/api/onedrive-share-proof", "onedrive-proof"),
   ...mutationPair("/api/contact-proof", "contact-proof"),
   ...mutationPair("/api/inbox-rule-proof", "inbox-rule-proof"),

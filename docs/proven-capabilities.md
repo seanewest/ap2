@@ -97,6 +97,13 @@ The remaining entries below are historical evidence narratives, not migrated
 source manifests. Their attacker/defender wording must not be read as silently
 assigning the learner to either proof role.
 
+The receipt-only
+[SharePoint trusted-version staging dependency](sharepoint-trusted-version-lifecycle.md)
+is also source-backed but intentionally absent from the SPA scenario registry:
+the existing API identity writes one trusted and one harmless changed version,
+binds their ordered exact bytes, and proves active cleanup. Its future detector
+and learner remain uninspected, and it does not add restoration or a Lab.
+
 | Scenario | Attacker-side unit | Defender-side observation | Boundary still visible |
 | --- | --- | --- | --- |
 | OAuth application mail staging | The Dev diagnostic app placed one marker-bound draft in Cory's mailbox without Cory signing in. The draft has no recipient, attachment, link, or send-family action. | A separate aggregate Drafts inventory found exactly one true, recipient-free, attachment-free, low-importance AP2-marked draft. | This adds app-only actor semantics to the already-proven draft capability; it does not prove delivery or message influence. The draft remains privately identifiable for deferred cleanup. |

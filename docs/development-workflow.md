@@ -127,6 +127,11 @@ Its
 invoke only the authoritative offline verifier. Authorization precedes the
 bounded body read, and fixed safe responses cannot promote contract
 verification into external Purview, workload, learner, or cleanup proof.
+The
+[SharePoint trusted-version lifecycle](sharepoint-trusted-version-lifecycle.md)
+is the source-backed producer-side dependency for a future document-change
+lab. Its exact version bytes and active cleanup receipt do not imply Purview
+attribution, learner visibility, restoration, or lab completion.
 
 ## Work inside the lab boundary
 

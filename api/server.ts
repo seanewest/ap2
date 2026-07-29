@@ -30,6 +30,17 @@ import {
   SharePointFileProofConflictError,
   type SharePointFileProofOperation,
 } from "./sharepoint-file-proof.js";
+import {
+  TrustedVersionLifecycleError,
+  type SharePointTrustedVersionLifecycleOperation,
+} from "./sharepoint-trusted-version-lifecycle.js";
+import {
+  adaptTrustedVersionLifecycleToReceipt,
+  TrustedVersionReceiptAdapterError,
+} from "../src/scenarios/sharepoint-trusted-version-receipt-adapter.js";
+import {
+  verifyCanonicalScenarioEvidenceReceipt,
+} from "../src/scenarios/scenario-evidence-verification.js";
 import type { SimulatedEmailOperation } from "./simulated-email.js";
 import type { HelpDeskScenarioOperation } from "./help-desk-scenario.js";
 import {
@@ -153,6 +164,8 @@ export interface ApiDependencies {
   inboxRuleProofOperation?: InboxRuleProofOperation;
   categoryProofOperation?: CategoryProofOperation;
   sharePointFileProofOperation?: SharePointFileProofOperation;
+  sharePointTrustedVersionLifecycleOperation?:
+    SharePointTrustedVersionLifecycleOperation;
   draftProofOperation?: DraftProofOperation;
   todoTaskProofOperation?: TodoTaskProofOperation;
   operationTelemetryReader?: OperationTelemetryReader;
@@ -373,6 +386,14 @@ async function route(
       return;
     case "batch-feasibility-calculate":
       await multiScenarioFeasibility(
+        request,
+        response,
+        dependencies,
+        contract.requestMaxBytes,
+      );
+      return;
+    case "sharepoint-trusted-version-lifecycle":
+      await sharePointTrustedVersionLifecycle(
         request,
         response,
         dependencies,
@@ -648,6 +669,35 @@ function fixedProofOperation(
     default:
       return assertNeverOwner(ownerKey);
   }
+}
+
+async function sharePointTrustedVersionLifecycle(
+  request: IncomingMessage,
+  response: ServerResponse,
+  dependencies: ApiDependencies,
+  maximumBytes: number,
+): Promise<void> {
+  await handleAuthorizedRequest(request, response, dependencies, async () => {
+    if (
+      request.headers["content-type"] !== "application/json" ||
+      request.headers["content-encoding"] !== undefined
+    ) {
+      throw new JsonUnsupportedMediaTypeError();
+    }
+    const operation =
+      dependencies.sharePointTrustedVersionLifecycleOperation;
+    if (!operation) {
+      throw new Error(
+        "SharePoint trusted-version lifecycle is not configured",
+      );
+    }
+    const lifecycle = await operation.run(
+      await readBoundedJson(request, maximumBytes),
+    );
+    const receipt = adaptTrustedVersionLifecycleToReceipt(lifecycle);
+    const verification = verifyCanonicalScenarioEvidenceReceipt(receipt);
+    return { lifecycle, receipt, verification };
+  }, 201);
 }
 
 async function calendarMeeting(
@@ -966,6 +1016,24 @@ async function handleAuthorizedRequest(
     }
     if (error instanceof SharePointFileProofConflictError) {
       sendJson(response, 409, { error: "sharepoint_file_state_conflict" });
+      return;
+    }
+    if (error instanceof TrustedVersionLifecycleError) {
+      const status = error.code === "invalid-input"
+        ? 400
+        : error.code === "marker-reused" || error.code === "state-conflict"
+        ? 409
+        : 502;
+      sendJson(response, status, {
+        error: "sharepoint_trusted_version_lifecycle_refused",
+        category: error.code,
+      });
+      return;
+    }
+    if (error instanceof TrustedVersionReceiptAdapterError) {
+      sendJson(response, 500, {
+        error: "sharepoint_trusted_version_receipt_failed",
+      });
       return;
     }
     if (error instanceof DraftProofConflictError) {

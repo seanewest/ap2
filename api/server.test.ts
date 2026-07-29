@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { generateKeyPairSync, sign } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { createLocalJWKSet, type JWK } from "jose";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -56,6 +56,9 @@ import {
   SharePointFileProofConflictError,
   type SharePointFileProofResult,
 } from "./sharepoint-file-proof.js";
+import type {
+  SharePointTrustedVersionLifecycleResult,
+} from "./sharepoint-trusted-version-lifecycle.js";
 import { createApiServer } from "./server.js";
 import {
   HOMER_USER_PRINCIPAL_NAME,
@@ -178,6 +181,77 @@ const sharePointFileProofOperation = {
   create: vi.fn().mockResolvedValue(sharePointFileResults.configured),
   remove: vi.fn().mockResolvedValue(sharePointFileResults.removed),
 };
+const trustedVersionJournal = [
+  ["expiry", "prepared"],
+  ["folder-create", "intent"],
+  ["folder-create", "succeeded"],
+  ["file-create", "intent"],
+  ["file-create", "succeeded"],
+  ["file-create", "reconciled"],
+  ["version-write", "intent"],
+  ["version-write", "succeeded"],
+  ["version-write", "reconciled"],
+  ["version-read", "observed"],
+  ["version-read", "reconciled"],
+  ["file-delete", "intent"],
+  ["file-delete", "succeeded"],
+  ["folder-delete", "intent"],
+  ["folder-delete", "succeeded"],
+  ["expiry", "removed"],
+  ["terminal-absence", "observed"],
+].map(([operation, transition], index) => ({
+  sequence: index + 1,
+  operation,
+  transition,
+})) as SharePointTrustedVersionLifecycleResult["journal"];
+const trustedVersionResult = {
+  schemaVersion: 1,
+  kind: "sharepoint-trusted-version-lifecycle-result",
+  status: "completed-cleaned",
+  scenarioId: "sharepoint-trusted-version-lifecycle",
+  producer: "sharepoint-producer-app",
+  cleanupOwner: "trusted-version-cleanup-owner",
+  learnerVisibility: "uninspected",
+  detectorObservation: "uninspected",
+  learnerInterpretation: "uninspected",
+  response: "uninspected",
+  markerDigestSha256: "1".repeat(64),
+  fileIdentityDigestSha256: "2".repeat(64),
+  startedAt: "2026-07-29T12:00:00.000Z",
+  completedAt: "2026-07-29T12:01:00.000Z",
+  expiresAt: "2026-07-29T12:10:00.000Z",
+  versions: [
+    {
+      ordinal: "changed-v2",
+      platformVersionDigestSha256: "3".repeat(64),
+      contentDigestSha256:
+        "94cd34f6b04b653c612bee9857c43d715f6d1bf7cf7dd45dccf069a46738cfb7",
+      size: 70,
+      lastModifiedAt: "2026-07-29T12:00:02.000Z",
+    },
+    {
+      ordinal: "trusted-v1",
+      platformVersionDigestSha256: "4".repeat(64),
+      contentDigestSha256:
+        "cdae891928cc374e3915058db6c6c9152a0a5105ae329cfca10fa26d692532af",
+      size: 49,
+      lastModifiedAt: "2026-07-29T12:00:01.000Z",
+    },
+  ],
+  journal: trustedVersionJournal,
+  journalDigestSha256: createHash("sha256")
+    .update(JSON.stringify(trustedVersionJournal))
+    .digest("hex"),
+  terminal: {
+    activeFile: "absent",
+    activeFolder: "absent",
+    recycleAndAuditHistory: "ordinary-platform-history-retained",
+    expiry: "removed",
+  },
+} as const satisfies SharePointTrustedVersionLifecycleResult;
+const sharePointTrustedVersionLifecycleOperation = {
+  run: vi.fn().mockResolvedValue(trustedVersionResult),
+};
 const draftResults = {
   configured: { state: "configured", subject: DRAFT_SUBJECT },
   removed: { state: "removed", subject: DRAFT_SUBJECT },
@@ -230,6 +304,7 @@ const server = createApiServer({
   inboxRuleProofOperation,
   categoryProofOperation,
   sharePointFileProofOperation,
+  sharePointTrustedVersionLifecycleOperation,
   draftProofOperation,
   todoTaskProofOperation,
   operationTelemetryReader: operationTelemetryCollector,
@@ -1020,6 +1095,63 @@ describe("local API", () => {
     await expect(response.json()).resolves.toEqual({
       error: "sharepoint_file_state_conflict",
     });
+  });
+
+  it("runs the bounded SharePoint trusted-version route only after operator authorization", async () => {
+    sharePointTrustedVersionLifecycleOperation.run.mockClear();
+    const unauthorized = await fetch(
+      `${baseUrl}/api/sharepoint-trusted-version-lifecycle`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{",
+      },
+    );
+    expect(unauthorized.status).toBe(401);
+    expect(sharePointTrustedVersionLifecycleOperation.run).not.toHaveBeenCalled();
+
+    const response = await fetch(
+      `${baseUrl}/api/sharepoint-trusted-version-lifecycle`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${fixtureToken({
+            tid: STUDENT_TENANT_ID,
+            idtyp: "app",
+            azp: DEVELOPMENT_AUTOMATION_CLIENT_ID,
+            roles: [REQUIRED_APPLICATION_ROLE],
+          })}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({
+          schemaVersion: 1,
+          marker: "ap2-spv-abc123def456",
+          expiresAt: "2026-07-29T12:10:00.000Z",
+        }),
+      },
+    );
+    const body = await response.json();
+    expect({ status: response.status, body }).toEqual({
+      status: 201,
+      body: expect.any(Object),
+    });
+    expect(body).toMatchObject({
+      lifecycle: {
+        status: "completed-cleaned",
+        learnerVisibility: "uninspected",
+        detectorObservation: "uninspected",
+      },
+      verification: {
+        kind: "verified-scenario-evidence-receipt",
+        scenarioId: "sharepoint-trusted-version-lifecycle",
+      },
+    });
+    expect(JSON.stringify(body)).not.toMatch(
+      /ap2-spv-abc123def456|@|\/home\/|token|driveId|file-id/i,
+    );
+    expect(sharePointTrustedVersionLifecycleOperation.run)
+      .toHaveBeenCalledTimes(1);
   });
 
   it.each([
