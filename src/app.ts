@@ -24,6 +24,7 @@ import {
   type HelpDeskScenarioResult,
   type OneDriveInviteFailure,
   type OneDriveProofResult,
+  type RecentOperationEvents,
   type RehearsalStatus,
   type SimulatedEmailResult,
 } from "./api/client";
@@ -40,6 +41,10 @@ import {
   type FixedProofId,
   type FixedProofStates,
 } from "./operations/fixed-proofs";
+import {
+  createRecentOperationsPanel,
+  type RecentOperationsState,
+} from "./operations/recent-operations";
 import {
   appendIdentity,
   createButton,
@@ -116,6 +121,7 @@ type ViewState =
       kind: "signed-in";
       account: AccountIdentity;
       apiAccess: ApiAccessState;
+      recentOperations: RecentOperationsState;
       rehearsalStatus: RehearsalStatusState;
       simulatedEmail: SimulatedEmailState;
       helpDeskScenario: HelpDeskScenarioState;
@@ -269,6 +275,55 @@ export function createAfterPartyApp(
           : "Rehearsal status could not be checked. Try again.";
       setSignedInPatch(account, {
         rehearsalStatus: { kind: "error", message },
+      });
+    }
+  };
+
+  const refreshRecentOperations = async (): Promise<void> => {
+    if (
+      state.kind !== "signed-in" ||
+      isApiOperationBusy(state, contactProof)
+    ) {
+      return;
+    }
+    const account = state.account;
+    setSignedInPatch(account, {
+      recentOperations: { kind: "loading" },
+    });
+
+    try {
+      const accessToken =
+        await authentication.acquireAccessToken(API_ACCESS_SCOPES);
+      const getRecentOperationEvents = api.getRecentOperationEvents;
+      if (!getRecentOperationEvents) {
+        throw new Error("Recent operations client is not configured.");
+      }
+      const snapshot: RecentOperationEvents =
+        await getRecentOperationEvents.call(api, accessToken, "newest");
+      setSignedInPatch(account, {
+        recentOperations: { kind: "success", snapshot },
+      });
+    } catch (error) {
+      if (error instanceof AccessTokenCancelledError) {
+        setSignedInPatch(account, {
+          recentOperations: { kind: "cancelled" },
+        });
+        return;
+      }
+      const unauthorized =
+        error instanceof AccessTokenError ||
+        (
+          error instanceof ApiAccessError &&
+          (
+            error.message ===
+              "API access needs Microsoft authorization. Try again." ||
+            error.message === "This account is not allowed to use the API."
+          )
+        );
+      setSignedInPatch(account, {
+        recentOperations: {
+          kind: unauthorized ? "unauthorized" : "error",
+        },
       });
     }
   };
@@ -659,6 +714,11 @@ export function createAfterPartyApp(
       .querySelector<HTMLButtonElement>("[data-action='check-rehearsal']")
       ?.addEventListener("click", () => void checkRehearsalStatus());
     root
+      .querySelector<HTMLButtonElement>(
+        "[data-action='refresh-recent-operations']",
+      )
+      ?.addEventListener("click", () => void refreshRecentOperations());
+    root
       .querySelector<HTMLButtonElement>("[data-action='send-simulated-email']")
       ?.addEventListener("click", () => void sendSimulatedEmail());
     root
@@ -706,6 +766,7 @@ export function createAfterPartyApp(
               kind: "signed-in",
               account: startup.account,
               apiAccess: { kind: "idle" },
+              recentOperations: { kind: "idle" },
               rehearsalStatus: { kind: "idle" },
               simulatedEmail: { kind: "idle" },
               helpDeskScenario: { kind: "idle" },
@@ -783,6 +844,10 @@ function createStatePanel(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
         createApiAccessPanel(state.apiAccess, apiOperationLoading),
+        createRecentOperationsPanel(
+          state.recentOperations,
+          apiOperationLoading,
+        ),
         createRehearsalStatusPanel(
           state.rehearsalStatus,
           apiOperationLoading,
@@ -1328,6 +1393,7 @@ function isApiOperationBusy(
 ): boolean {
   return (
     state.apiAccess.kind === "loading" ||
+    state.recentOperations.kind === "loading" ||
     state.rehearsalStatus.kind === "loading" ||
     state.simulatedEmail.kind === "loading" ||
     state.helpDeskScenario.kind === "loading" ||

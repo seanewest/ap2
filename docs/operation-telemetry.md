@@ -24,6 +24,17 @@ token verification and caller allowlist as the other protected API routes.
 The typed `HttpAfterPartyApi.getRecentOperationEvents` client performs its own
 strict schema check and rejects additional response or event fields.
 
+The signed-in operator view includes a **Recent operations** panel backed by
+that typed client. It loads only when the operator selects **Refresh recent
+operations**; there is no polling, automatic retry, or background refresh.
+The panel presents fixed labels for operation, phase, outcome, reason,
+ambiguity, recovery, bounded duration, and optional HTTP status. It never
+renders the marker hash or invents an event timestamp that the API does not
+provide. Loading, empty, session/authorization, capacity, and general failure
+states use fixed text rather than upstream error bodies.
+The panel also states that a snapshot contains at most 64 events and that the
+16 KiB response bound can omit older events before that count is reached.
+
 ## Fixed event contract
 
 Each schema-v1 event contains only:
@@ -79,3 +90,8 @@ API process restarts and may be absent after a revision change or process
 failure. No database, queue, background worker, vendor SDK, delivery guarantee,
 or cross-instance aggregation is implied. Choosing and deploying a durable
 sink remains a separate decision.
+
+The local operator product-path test runs the real SPA and API in isolated
+headless Chromium. It uses a runtime-generated signed fixture token, verifies
+the same operator authorization boundary, and leaves screenshots, traces, and
+video disabled.

@@ -18,6 +18,7 @@
     "package:calling-bot-app": "node scripts/package-teams-calling-bot-app.ts",
     "report:codex": "node scripts/codex-session-report.ts",
     "test:e2e:cba": "playwright test --config playwright.cba.config.ts",
+    "test:e2e:local": "playwright test --config playwright.local.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:container": "node scripts/test-api-container.ts",

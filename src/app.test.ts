@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAfterPartyApp } from "./app";
 import {
   AccessTokenCancelledError,
+  AccessTokenError,
   AuthenticationCancelledError,
   AuthenticationError,
   type AccountIdentity,
@@ -20,6 +21,7 @@ import {
   type HelpDeskScenarioResult,
   type InboxRuleProofResult,
   type OneDriveProofResult,
+  type RecentOperationEvents,
   type RehearsalStatus,
   type SharePointFileProofResult,
   type SimulatedEmailResult,
@@ -58,6 +60,13 @@ class FakeAuthentication implements Authentication {
 
 class FakeApi implements AfterPartyApi {
   checkAccess = vi.fn<(accessToken: string) => Promise<ApiCallerIdentity>>();
+  getRecentOperationEvents =
+    vi.fn<
+      (
+        accessToken: string,
+        order?: "newest" | "oldest",
+      ) => Promise<RecentOperationEvents>
+    >();
   getRehearsalStatus =
     vi.fn<(accessToken: string) => Promise<RehearsalStatus>>();
   sendSimulatedEmail =
@@ -1546,6 +1555,158 @@ describe("After Party authentication UI", () => {
       expect(contactRemoveButton()?.disabled).toBe(removeDisabled);
     },
   );
+
+  it("shows recent operations only after a signed-in operator manually refreshes", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.getRecentOperationEvents.mockResolvedValue({
+      schemaVersion: 1,
+      order: "newest",
+      events: [{
+        schemaVersion: 1,
+        markerHash: "m1_0123456789abcdef01234567",
+        operationKind: "calendar.create",
+        phase: "execution",
+        outcome: "succeeded",
+        durationMs: 25,
+        reason: "none",
+        ambiguityState: "none",
+        recoveryState: "not-needed",
+        upstreamStatus: 201,
+      }],
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    expect(root.textContent).toContain("Recent operations");
+    expect(root.textContent).toContain("Select Refresh");
+    expect(api.getRecentOperationEvents).not.toHaveBeenCalled();
+
+    recentOperationsButton()?.click();
+    await nextTask();
+
+    expect(authentication.acquireAccessToken).toHaveBeenCalledWith(
+      API_ACCESS_SCOPES,
+    );
+    expect(api.getRecentOperationEvents).toHaveBeenCalledWith(
+      "temporary-token",
+      "newest",
+    );
+    expect(root.textContent).toContain("Calendar create");
+    expect(root.textContent).toContain("Succeeded");
+    expect(root.textContent).not.toContain("m1_0123456789abcdef01234567");
+    expect(root.textContent).not.toContain("temporary-token");
+  });
+
+  it("disables refresh and other API actions while loading", async () => {
+    const deferred = createDeferred<RecentOperationEvents>();
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.getRecentOperationEvents.mockReturnValue(deferred.promise);
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    recentOperationsButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain("Loading recent operations");
+    expect(recentOperationsButton()?.disabled).toBe(true);
+    expect(apiButton()?.disabled).toBe(true);
+    recentOperationsButton()?.click();
+    expect(api.getRecentOperationEvents).toHaveBeenCalledOnce();
+
+    deferred.resolve({ schemaVersion: 1, order: "newest", events: [] });
+    await nextTask();
+    expect(root.textContent).toContain("No recent operations");
+    expect(recentOperationsButton()?.disabled).toBe(false);
+  });
+
+  it("allows one later manual refresh without automatic polling", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.getRecentOperationEvents.mockResolvedValue({
+      schemaVersion: 1,
+      order: "newest",
+      events: [],
+    });
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+    await nextTask();
+    expect(api.getRecentOperationEvents).not.toHaveBeenCalled();
+
+    recentOperationsButton()?.click();
+    await nextTask();
+    expect(api.getRecentOperationEvents).toHaveBeenCalledTimes(1);
+
+    recentOperationsButton()?.click();
+    await nextTask();
+    expect(api.getRecentOperationEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a session-expired state without exposing authorization details", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockRejectedValue(
+      new AccessTokenError("raw identity and tenant detail"),
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    recentOperationsButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain(
+      "session expired or this account is not authorized",
+    );
+    expect(root.textContent).not.toContain("raw identity and tenant detail");
+    expect(api.getRecentOperationEvents).not.toHaveBeenCalled();
+  });
+
+  it("shows a fixed general failure without rendering an error body", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.getRecentOperationEvents.mockRejectedValue(
+      new Error("raw upstream response body and secret"),
+    );
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    recentOperationsButton()?.click();
+    await nextTask();
+
+    const panel = root.querySelector(".recent-operations")!;
+    expect(panel.textContent).toContain(
+      "Recent operations could not be loaded. No event details were returned.",
+    );
+    expect(panel.textContent).not.toContain(
+      "raw upstream response body and secret",
+    );
+  });
+
+  function recentOperationsButton(): HTMLButtonElement | null {
+    return root.querySelector(
+      "[data-action='refresh-recent-operations']",
+    );
+  }
 
   function signInButton(): HTMLButtonElement {
     return root.querySelector<HTMLButtonElement>("[data-action='sign-in']")!;
