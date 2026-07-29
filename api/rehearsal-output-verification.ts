@@ -8,6 +8,18 @@ import {
   type RehearsalOutputVerificationRequest,
   type VerifiedRehearsalOutputSummary,
 } from "../src/api/rehearsal-output-verification-contract.js";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.js";
+
+export const REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "authenticated-rehearsal-verification-api",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: ["avd-three-vm-substrate"],
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type RehearsalOutputVerifier = (
   value: unknown,
@@ -33,10 +45,13 @@ export class RehearsalOutputVerificationResponseTooLargeError extends Error {
 
 export class InMemoryRehearsalOutputVerificationService
   implements RehearsalOutputVerificationService {
+  private readonly verifier: RehearsalOutputVerifier;
+
   constructor(
-    private readonly verifier: RehearsalOutputVerifier =
-      verifyAvdThreeVmRehearsalOutput,
-  ) {}
+    verifier: RehearsalOutputVerifier = verifyAvdThreeVmRehearsalOutput,
+  ) {
+    this.verifier = verifier;
+  }
 
   verify(value: unknown): VerifiedRehearsalOutputSummary {
     let verified: VerifiedRehearsalOutputSummary;

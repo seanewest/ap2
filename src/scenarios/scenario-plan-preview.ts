@@ -11,6 +11,17 @@ import type {
   ScenarioPlanStep,
 } from "./scenario-plan";
 import type { ScenarioCatalogSelection } from "./scenario-catalog";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "./scenario-surface-capability";
+
+export const SCENARIO_PLAN_PREVIEW_UI_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "operator-plan-preview-ui",
+  scenarioScope: "canonical-registry",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 const INPUT_ROLES = [
   ["evidenceProducer", "Evidence producer"],

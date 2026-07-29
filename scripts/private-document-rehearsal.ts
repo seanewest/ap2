@@ -32,9 +32,20 @@ import {
   type ScenarioExecutionPlan,
   type ScenarioPlanningRequest,
 } from "../src/scenarios/scenario-plan.ts";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.ts";
 
 const LABEL = "REHEARSAL_ONLY";
 const SCENARIO_ID = "private-document-evidence";
+export const PRIVATE_DOCUMENT_REHEARSAL_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "rehearsal-only",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: [SCENARIO_ID],
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 const MANIFEST_SCHEMA_VERSION = 2;
 const FAKE_CORRELATION = "run-contract";
 const FAKE_MARKER = "ap2doc-20260831T225959Z-a1b2c3";

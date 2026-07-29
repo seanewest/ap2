@@ -69,6 +69,11 @@ cost; runtime validation must pass before the UI consumes a manifest.
 The [local scenario planner](scenario-planner.md) can compile that contract
 into a deterministic sanitized readiness plan. Planning remains local and does
 not prove or execute external activity.
+The
+[canonical scenario surface inventory](scenario-surface-inventory.md) shows
+which validated scenarios also have repository adapters, rehearsal
+composition, authenticated API/client support, and operator surfaces. It is a
+source-coverage view, not readiness or live proof.
 
 ## Work inside the lab boundary
 
