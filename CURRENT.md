@@ -164,6 +164,12 @@ At each material checkpoint, the Captain checks and updates this docket against 
   or workload mutation occurred. Do not repeat either search or the workload
   event under this lane.
   See [the fail-closed audit contract](docs/purview-audit-contract.md).
+  A pure migration-readiness verifier now freezes the separate broad-to-narrow
+  permission transition, including exact detector binding, consumer migration,
+  quiescence, fresh-token proof, ambiguity reconciliation, independent-admin
+  recovery, and broad-role regrant rollback. Current live readiness remains
+  blocked because the narrow role is not assigned and protected diagnostic
+  scripts still require the broad role; no permission was changed.
 - A pure categorical adapter now maps an exact deduplicated live Purview
   operation observation into the existing Purview boundary receipt. It proves
   only the detector record match, surface, and producer attribution while
