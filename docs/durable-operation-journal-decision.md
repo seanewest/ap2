@@ -75,6 +75,24 @@ that reconciler may transition ambiguity to terminal success or terminal
 failure. An unavailable or inconclusive read leaves the record ambiguous and
 returns a decision-ready conflict.
 
+An ambiguous conditional-store create or transition response grants no
+ownership and permits no mutation or automatic write retry. Reconcile it first
+with one exact read of the immutable key, schema version, record version, and
+lease owner. A reconciled `prepared` record permits only the next conditional
+transition. Dispatch is allowed only after an unambiguous conditional
+transition to `executing`, or when the exact read proves the caller owns the
+expected `executing` state, lease, and record version. Otherwise preserve the
+record and return conflict.
+
+Missing, malformed, or corrupt schema versions, immutable tuple fields, record
+versions/ETags, states, lease owners, or lease expiries fail closed. The API
+must not overwrite, recreate, expire, or compact such a record into an
+executable state. Once a record reached `executing`, lease expiry or target
+absence alone cannot prove terminal failure because the original external
+request may still complete. Only authoritative operation-specific
+reconciliation may establish terminal failure; without that proof, the
+ambiguous tombstone remains and replay stays forbidden.
+
 Terminal records suppress replay. A marker is immutable and unique to one
 scenario lifetime. Detailed records may be compacted after the scenario's
 declared retention window, but a minimal terminal or ambiguous tombstone must
