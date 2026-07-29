@@ -3,6 +3,7 @@ import {
   ScenarioEvidenceContractError,
 } from "../api/scenario-evidence-verification-contract";
 import { appendIdentity, createStatus } from "../ui/elements";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
 import type {
   ScenarioEvidenceReceipt,
 } from "./scenario-evidence-receipt";
@@ -35,6 +36,7 @@ const SENSITIVE_TERM =
 export type ScenarioEvidenceVerificationFailure =
   | "request-too-large"
   | "response-too-large"
+  | "server-shutting-down"
   | "session-expired"
   | "unauthorized"
   | "unavailable"
@@ -334,6 +336,8 @@ function failureMessage(
       return "Receipt verification stopped at the safe response-size limit.";
     case "unavailable":
       return "Receipt verification is unavailable. No result was accepted; retry manually only after checking the input and session.";
+    case "server-shutting-down":
+      return SERVER_SHUTTING_DOWN_MESSAGE;
   }
 }
 

@@ -40,10 +40,16 @@ describe("rehearsal output verification typed client", () => {
     [401, "unauthorized"],
     [403, "forbidden"],
     [413, "request-too-large"],
+    [503, "server-shutting-down"],
     [500, "safe-failure"],
   ] as const)("maps HTTP %s to fixed category %s", async (status, category) => {
     const client = clientReturning(
-      jsonResponse({ error: "arbitrary private detail" }, status),
+      jsonResponse(
+        status === 503
+          ? { error: "server_shutting_down" }
+          : { error: "arbitrary private detail" },
+        status,
+      ),
     );
 
     await expect(

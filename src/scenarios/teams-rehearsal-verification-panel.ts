@@ -1,4 +1,5 @@
 import { appendIdentity, createStatus } from "../ui/elements";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
 import {
   TEAMS_MISSED_CALL_REHEARSAL_MAX_REQUEST_BYTES,
   type TeamsMissedCallRehearsalVerificationRequest,
@@ -8,6 +9,7 @@ import {
 export type TeamsRehearsalPanelFailure =
   | "request-too-large"
   | "response-too-large"
+  | "server-shutting-down"
   | "session-expired"
   | "unauthorized"
   | "unavailable"
@@ -250,6 +252,8 @@ function failureMessage(failure: TeamsRehearsalPanelFailure): string {
       return "Teams rehearsal verification stopped at the safe response-size limit.";
     case "unavailable":
       return "Teams rehearsal verification is unavailable. No result was accepted; retry manually only after checking the input and session.";
+    case "server-shutting-down":
+      return SERVER_SHUTTING_DOWN_MESSAGE;
   }
 }
 

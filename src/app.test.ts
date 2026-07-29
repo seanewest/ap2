@@ -39,6 +39,7 @@ import {
   type TodoTaskProofResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "./api/server-shutdown";
 import {
   parsePrivateDocumentRehearsalVerificationRequest,
 } from "./api/private-document-rehearsal-verification-contract";
@@ -1722,6 +1723,52 @@ describe("After Party authentication UI", () => {
     expect(root.textContent).not.toContain("temporary-token");
   });
 
+  it("clears a stale recent-operations snapshot on shutdown refusal", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    authentication.acquireAccessToken.mockResolvedValue("temporary-token");
+    api.getRecentOperationEvents
+      .mockResolvedValueOnce({
+        schemaVersion: 1,
+        order: "newest",
+        events: [{
+          schemaVersion: 1,
+          markerHash: "m1_0123456789abcdef01234567",
+          operationKind: "calendar.create",
+          phase: "execution",
+          outcome: "succeeded",
+          durationMs: 25,
+          reason: "none",
+          ambiguityState: "none",
+          recoveryState: "not-needed",
+        }],
+      })
+      .mockRejectedValueOnce(
+        new ApiAccessError(
+          SERVER_SHUTTING_DOWN_MESSAGE,
+          "server-shutting-down",
+        ),
+      );
+    const app = createAfterPartyApp(root, authentication, api);
+    await app.start();
+
+    recentOperationsButton()?.click();
+    await nextTask();
+    expect(root.textContent).toContain("Calendar create");
+
+    recentOperationsButton()?.click();
+    await nextTask();
+
+    expect(root.textContent).toContain("API is shutting down");
+    expect(root.textContent).not.toContain("Calendar create");
+    expect(root.textContent).not.toContain("m1_0123456789abcdef01234567");
+    expect(api.getRecentOperationEvents).toHaveBeenCalledTimes(2);
+    expect(recentOperationsButton()?.disabled).toBe(false);
+  });
+
   it("contains a malformed recent-operations snapshot to that panel", async () => {
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",
@@ -1923,6 +1970,11 @@ describe("After Party authentication UI", () => {
       true,
     ],
     [
+      new BatchFeasibilityClientError("server-shutting-down"),
+      "API is shutting down",
+      true,
+    ],
+    [
       new BatchFeasibilityClientError("safe-failure"),
       "evaluation is unavailable",
       true,
@@ -2039,6 +2091,13 @@ describe("After Party authentication UI", () => {
         "response-too-large",
       ),
       "response-size limit",
+      true,
+    ],
+    [
+      new PrivateDocumentRehearsalVerificationClientError(
+        "server-shutting-down",
+      ),
+      "API is shutting down",
       true,
     ],
     [
@@ -2166,6 +2225,13 @@ describe("After Party authentication UI", () => {
       true,
     ],
     [
+      new HelpDeskEmailRehearsalVerificationClientError(
+        "server-shutting-down",
+      ),
+      "API is shutting down",
+      true,
+    ],
+    [
       new HelpDeskEmailRehearsalVerificationClientError("safe-failure"),
       "verification is unavailable",
       true,
@@ -2287,6 +2353,13 @@ describe("After Party authentication UI", () => {
         "response-too-large",
       ),
       "response-size limit",
+      true,
+    ],
+    [
+      new TeamsMissedCallRehearsalVerificationClientError(
+        "server-shutting-down",
+      ),
+      "API is shutting down",
       true,
     ],
     [
@@ -2431,6 +2504,13 @@ describe("After Party authentication UI", () => {
     ],
     [
       new OauthApplicationReconRehearsalVerificationClientError(
+        "server-shutting-down",
+      ),
+      "API is shutting down",
+      true,
+    ],
+    [
+      new OauthApplicationReconRehearsalVerificationClientError(
         "safe-failure",
       ),
       "verification is unavailable",
@@ -2569,6 +2649,13 @@ describe("After Party authentication UI", () => {
         "response-too-large",
       ),
       "response-size limit",
+      true,
+    ],
+    [
+      new PurviewAuditBoundaryRehearsalVerificationClientError(
+        "server-shutting-down",
+      ),
+      "No request was accepted",
       true,
     ],
     [
@@ -2764,6 +2851,11 @@ describe("After Party authentication UI", () => {
       true,
     ],
     [
+      new RehearsalOutputVerificationClientError("server-shutting-down"),
+      "API is shutting down",
+      true,
+    ],
+    [
       new RehearsalOutputVerificationClientError("safe-failure"),
       "verification is unavailable",
       true,
@@ -2828,6 +2920,11 @@ describe("After Party authentication UI", () => {
       true,
     ],
     [
+      new ScenarioEvidenceVerificationClientError("server-shutting-down"),
+      "API is shutting down",
+      true,
+    ],
+    [
       new ScenarioEvidenceVerificationClientError("safe-failure"),
       "verification is unavailable",
       true,
@@ -2881,6 +2978,11 @@ describe("After Party authentication UI", () => {
     [
       new ScenarioPlanClientError("validation-refused", "EXPIRY_INVALID"),
       "planner refused",
+      true,
+    ],
+    [
+      new ScenarioPlanClientError("server-shutting-down"),
+      "API is shutting down",
       true,
     ],
     [

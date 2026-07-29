@@ -287,6 +287,7 @@ describe("scenario batch feasibility panel", () => {
 
   it.each([
     ["session-expired", "operator session expired"],
+    ["server-shutting-down", "API is shutting down"],
     ["unauthorized", "not authorized"],
     ["planner-refused", "planner refused"],
     ["request-too-large", "request-size limit"],

@@ -58,10 +58,16 @@ describe("Teams missed-call rehearsal verification typed client", () => {
     [401, "unauthorized"],
     [403, "forbidden"],
     [413, "request-too-large"],
+    [503, "server-shutting-down"],
     [500, "safe-failure"],
   ] as const)("maps HTTP %s to fixed category %s", async (status, category) => {
     await expect(
-      clientReturning(jsonResponse({ detail: "arbitrary" }, status))
+      clientReturning(jsonResponse(
+        status === 503
+          ? { error: "server_shutting_down" }
+          : { detail: "arbitrary" },
+        status,
+      ))
         .verifyTeamsMissedCallRehearsalOutput("signed-token", fixture()),
     ).rejects.toMatchObject({ category });
   });

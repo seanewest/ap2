@@ -1,5 +1,6 @@
 import { appendIdentity, createStatus } from "../ui/elements";
 import { isSafeScenarioPlanningRequest } from "../api/client";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
 import {
   parseScenarioManifest,
   type ScenarioManifest,
@@ -42,6 +43,7 @@ const MAX_PLAN_STEPS = 128;
 export type ScenarioPlanPreviewFailure =
   | "compiler-refused"
   | "response-too-large"
+  | "server-shutting-down"
   | "session-expired"
   | "unauthorized"
   | "unavailable";
@@ -590,6 +592,8 @@ function failureMessage(failure: ScenarioPlanPreviewFailure): string {
       return "The planner response exceeded the safe preview limit and was not displayed.";
     case "unavailable":
       return "Plan preview is unavailable. No work was performed; try again only with a new manual request.";
+    case "server-shutting-down":
+      return SERVER_SHUTTING_DOWN_MESSAGE;
   }
 }
 

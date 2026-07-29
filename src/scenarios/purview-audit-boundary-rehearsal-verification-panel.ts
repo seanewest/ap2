@@ -4,6 +4,7 @@ import {
   type VerifiedPurviewAuditBoundaryRehearsalSummary,
 } from "../api/purview-audit-boundary-rehearsal-verification-contract";
 import { appendIdentity, createStatus } from "../ui/elements.ts";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown.ts";
 import type {
   ScenarioSurfaceCapabilityDeclaration,
 } from "./scenario-surface-capability.ts";
@@ -21,6 +22,7 @@ export const PURVIEW_AUDIT_BOUNDARY_REHEARSAL_VERIFICATION_PANEL_CAPABILITY = {
 export type PurviewAuditBoundaryRehearsalPanelFailure =
   | "request-too-large"
   | "response-too-large"
+  | "server-shutting-down"
   | "session-expired"
   | "unauthorized"
   | "unavailable"
@@ -266,6 +268,8 @@ function failureMessage(
       return "Purview rehearsal verification stopped at the safe request-size limit.";
     case "response-too-large":
       return "Purview rehearsal verification stopped at the safe response-size limit.";
+    case "server-shutting-down":
+      return SERVER_SHUTTING_DOWN_MESSAGE;
     case "unavailable":
       return "Purview rehearsal verification is unavailable. No result was accepted; retry manually only after checking the input and session.";
   }

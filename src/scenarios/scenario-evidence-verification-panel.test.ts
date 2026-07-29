@@ -225,6 +225,7 @@ describe("Scenario evidence verification panel", () => {
 
   it.each([
     ["session-expired", "operator session expired"],
+    ["server-shutting-down", "API is shutting down"],
     ["unauthorized", "not authorized"],
     ["verification-refused", "claims do not satisfy"],
     ["request-too-large", "request-size limit"],

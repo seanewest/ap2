@@ -53,6 +53,13 @@ import {
 import {
   parseTeamsMissedCallRehearsalVerificationRequest,
 } from "../src/api/teams-missed-call-rehearsal-verification-contract";
+import {
+  parseOauthApplicationReconRehearsalVerificationRequest,
+} from "../src/api/oauth-application-recon-rehearsal-verification-contract";
+import {
+  parsePurviewAuditBoundaryRehearsalVerificationRequest,
+} from "../src/api/purview-audit-boundary-rehearsal-verification-contract";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../src/api/server-shutdown";
 
 const ISSUER = "https://fixture.invalid/operator/v2.0";
 const AUDIENCE = "api://ap2-local-fixture";
@@ -76,6 +83,22 @@ const TEAMS_REHEARSAL_OUTPUT =
     ),
     "utf8",
   )) as unknown);
+const OAUTH_APPLICATION_RECON_REHEARSAL_OUTPUT =
+  parseOauthApplicationReconRehearsalVerificationRequest(JSON.parse(
+    readFileSync(
+      resolve(
+        "scripts/fixtures/oauth-application-recon-rehearsal-output.json",
+      ),
+      "utf8",
+    ),
+  ) as unknown);
+const PURVIEW_AUDIT_BOUNDARY_REHEARSAL_OUTPUT =
+  parsePurviewAuditBoundaryRehearsalVerificationRequest(JSON.parse(
+    readFileSync(
+      resolve("scripts/fixtures/purview-audit-boundary-rehearsal-output.json"),
+      "utf8",
+    ),
+  ) as unknown);
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
 });
@@ -235,6 +258,7 @@ test("audits every manual-only operator panel at the shared accessibility bounda
     "/api/help-desk-email-rehearsal-verification",
     "/api/teams-missed-call-rehearsal-verification",
     "/api/oauth-application-recon-rehearsal-verification",
+    "/api/purview-audit-boundary-rehearsal-verification",
   ]);
   let manualRequests = 0;
   page.on("request", (request) => {
@@ -464,6 +488,220 @@ test("contains synchronous render faults to the affected operator panel", async 
       ),
     ).toBe(true);
     expect(apiPaths).toEqual([]);
+    await context.close();
+  }
+});
+
+test("maps one fixed shutdown refusal across every authenticated operator surface", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await configureOperator(page, accessToken);
+  const shutdownPaths = new Set([
+    "/api/whoami",
+    "/api/rehearsal-status",
+    "/api/operation-events",
+    "/api/scenario-plan",
+    "/api/multi-scenario-feasibility",
+    "/api/scenario-evidence-verification",
+    "/api/rehearsal-output-verification",
+    "/api/private-document-rehearsal-verification",
+    "/api/help-desk-email-rehearsal-verification",
+    "/api/teams-missed-call-rehearsal-verification",
+    "/api/oauth-application-recon-rehearsal-verification",
+    "/api/purview-audit-boundary-rehearsal-verification",
+  ]);
+  const requests = new Map<string, number>();
+  await page.route("**/api/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (!shutdownPaths.has(path)) {
+      await route.continue();
+      return;
+    }
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": APP_ORIGIN,
+          "Access-Control-Allow-Headers": "authorization,content-type",
+          "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+        },
+      });
+      return;
+    }
+    requests.set(path, (requests.get(path) ?? 0) + 1);
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": APP_ORIGIN },
+      body: JSON.stringify({ error: "server_shutting_down" }),
+    });
+  });
+  await page.goto("/e2e/recent-operations.html");
+  expect([...requests.values()].reduce((total, count) => total + count, 0))
+    .toBe(0);
+
+  await page.getByRole("button", { name: "Check API access" }).click();
+  await expect(page.getByText(SERVER_SHUTTING_DOWN_MESSAGE)).toHaveCount(1);
+  await page.getByRole("button", { name: "Check rehearsal status" }).click();
+  await expect(page.getByText(SERVER_SHUTTING_DOWN_MESSAGE)).toHaveCount(2);
+
+  const recent = page.getByRole("region", { name: "Recent operations" });
+  await recent.getByRole("button", {
+    name: "Refresh recent operations",
+  }).click();
+  await expect(recent.getByText(SERVER_SHUTTING_DOWN_MESSAGE)).toBeVisible();
+  await expect(recent).not.toContainText("Calendar create");
+
+  const cases = [
+    {
+      panel: "Scenario plan preview",
+      action: "Preview plan",
+    },
+    {
+      panel: "Scenario batch feasibility",
+      action: "Evaluate feasibility",
+    },
+    {
+      panel: "Receipt verification",
+      action: "Verify receipt",
+      input: "Sanitized receipt JSON",
+      value: JSON.stringify(CANONICAL_RECEIPT_FIXTURES[0]!.receipt),
+    },
+    {
+      panel: "AVD rehearsal verification",
+      action: "Verify rehearsal output",
+      input: "Sanitized REHEARSAL_ONLY output JSON",
+      value: JSON.stringify(canonicalAvdThreeVmRehearsalOutput()),
+    },
+    {
+      panel: "Private-document rehearsal verification",
+      action: "Verify private-document rehearsal",
+      input: "Sanitized private-document REHEARSAL_ONLY output JSON",
+      value: JSON.stringify(PRIVATE_DOCUMENT_REHEARSAL_OUTPUT),
+    },
+    {
+      panel: "Help-desk email rehearsal verification",
+      action: "Verify help-desk rehearsal",
+      input: "Sanitized help-desk REHEARSAL_ONLY output JSON",
+      value: JSON.stringify(HELP_DESK_REHEARSAL_OUTPUT),
+    },
+    {
+      panel: "Teams missed-call rehearsal verification",
+      action: "Verify Teams rehearsal",
+      input: "Sanitized Teams REHEARSAL_ONLY output JSON",
+      value: JSON.stringify(TEAMS_REHEARSAL_OUTPUT),
+    },
+    {
+      panel: "Application-reconnaissance rehearsal verification",
+      action: "Verify application-reconnaissance rehearsal",
+      input:
+        "Sanitized application-reconnaissance REHEARSAL_ONLY output JSON",
+      value: JSON.stringify(OAUTH_APPLICATION_RECON_REHEARSAL_OUTPUT),
+    },
+    {
+      panel: "Purview audit-boundary rehearsal verification",
+      action: "Verify Purview rehearsal",
+      input: "Sanitized Purview audit-boundary output JSON",
+      value: JSON.stringify(PURVIEW_AUDIT_BOUNDARY_REHEARSAL_OUTPUT),
+    },
+  ] as const;
+
+  for (const item of cases) {
+    const panel = page.getByRole("region", { name: item.panel });
+    if ("input" in item) {
+      await panel.getByLabel(item.input).fill(item.value);
+    }
+    const action = panel.getByRole("button", { name: item.action });
+    await action.focus();
+    await page.keyboard.press("Enter");
+    await expect(panel.getByText(SERVER_SHUTTING_DOWN_MESSAGE)).toBeVisible();
+    await expect(action).toBeEnabled();
+    await expect(panel.locator("[aria-live='polite']")).toBeFocused();
+    await expect(panel).not.toContainText("server_shutting_down");
+  }
+
+  await page.waitForTimeout(50);
+  expect(Object.fromEntries(requests)).toEqual({
+    "/api/whoami": 1,
+    "/api/rehearsal-status": 1,
+    "/api/operation-events": 1,
+    "/api/scenario-plan": 1,
+    "/api/multi-scenario-feasibility": 1,
+    "/api/scenario-evidence-verification": 1,
+    "/api/rehearsal-output-verification": 1,
+    "/api/private-document-rehearsal-verification": 1,
+    "/api/help-desk-email-rehearsal-verification": 1,
+    "/api/teams-missed-call-rehearsal-verification": 1,
+    "/api/oauth-application-recon-rehearsal-verification": 1,
+    "/api/purview-audit-boundary-rehearsal-verification": 1,
+  });
+  expect(
+    await page.evaluate(() =>
+      document.documentElement.scrollWidth <= window.innerWidth
+    ),
+  ).toBe(true);
+});
+
+test("restores every generic mutation panel after shutdown non-admission", async ({
+  browser,
+}) => {
+  const cases = [
+    ["Send one internal email: Homer → Marge", "/api/simulated-email"],
+    ["Create one help desk email: Kobe → Cory", "/api/help-desk-scenario"],
+    ["Create and share OneDrive proof", "/api/onedrive-share-proof"],
+    ["Create calendar meeting", "/api/calendar-meeting"],
+    ["Create contact proof", "/api/contact-proof"],
+    ["Create disabled Inbox rule", "/api/inbox-rule-proof"],
+    ["Create Outlook category proof", "/api/category-proof"],
+    ["Create SharePoint file proof", "/api/sharepoint-file-proof"],
+    ["Create unsent draft proof", "/api/draft-proof"],
+    ["Create To Do task proof", "/api/todo-task-proof"],
+  ] as const;
+
+  for (const [actionName, path] of cases) {
+    const context = await browser.newContext({
+      viewport: { width: 320, height: 800 },
+    });
+    const page = await context.newPage();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await configureOperator(page, accessToken);
+    let requests = 0;
+    await page.route(`**${path}`, async (route) => {
+      if (route.request().method() === "OPTIONS") {
+        await route.fulfill({
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin": APP_ORIGIN,
+            "Access-Control-Allow-Headers": "authorization,content-type",
+            "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+          },
+        });
+        return;
+      }
+      requests += 1;
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": APP_ORIGIN },
+        body: JSON.stringify({ error: "server_shutting_down" }),
+      });
+    });
+    await page.goto(`${APP_ORIGIN}/e2e/recent-operations.html`);
+    const action = page.getByRole("button", { name: actionName });
+    const panel = action.locator("..");
+
+    await action.click();
+
+    await expect(panel.getByText(SERVER_SHUTTING_DOWN_MESSAGE)).toBeVisible();
+    await expect(action).toBeEnabled();
+    await expect(panel).not.toContainText(
+      /last change outcome is uncertain|creation is uncertain|last change is uncertain/,
+    );
+    expect(requests).toBe(1);
+    await page.waitForTimeout(25);
+    expect(requests).toBe(1);
     await context.close();
   }
 });
@@ -738,6 +976,7 @@ test("previews one deterministic plan per manual signed-operator request", async
 test("refuses unsafe preview input locally without an API request", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date("2026-07-29T07:00:00Z"));
   await configureOperator(page, accessToken);
   let planRequests = 0;
   page.on("request", (request) => {

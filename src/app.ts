@@ -155,6 +155,7 @@ type HelpDeskScenarioState =
   | { kind: "loading" }
   | { kind: "success"; result: HelpDeskScenarioResult }
   | { kind: "cancelled" }
+  | { kind: "server-shutting-down"; message: string }
   | { kind: "error"; message: string };
 
 type OneDriveProofStage =
@@ -512,15 +513,19 @@ export function createAfterPartyApp(
         error instanceof AccessTokenError ||
         (
           error instanceof ApiAccessError &&
-          (
-            error.message ===
-              "API access needs Microsoft authorization. Try again." ||
-            error.message === "This account is not allowed to use the API."
-          )
+          (error.category === "unauthorized" ||
+            error.category === "forbidden")
         );
+      const serverShuttingDown =
+        error instanceof ApiAccessError &&
+        error.category === "server-shutting-down";
       setSignedInPatch(account, {
         recentOperations: {
-          kind: unauthorized ? "unauthorized" : "error",
+          kind: unauthorized
+            ? "unauthorized"
+            : serverShuttingDown
+            ? "server-shutting-down"
+            : "error",
         },
       });
     }
@@ -566,7 +571,9 @@ export function createAfterPartyApp(
   const sendHelpDeskScenario = async (): Promise<void> => {
     if (
       state.kind !== "signed-in" ||
-      state.helpDeskScenario.kind !== "idle" ||
+      !["idle", "server-shutting-down"].includes(
+        state.helpDeskScenario.kind,
+      ) ||
       isApiOperationBusy(state, contactProof)
     ) {
       return;
@@ -595,7 +602,12 @@ export function createAfterPartyApp(
           ? error.message
           : "The help desk email was not confirmed. Do not repeat it.";
       setSignedInPatch(account, {
-        helpDeskScenario: { kind: "error", message },
+        helpDeskScenario: {
+          kind: isServerShuttingDownError(error)
+            ? "server-shutting-down"
+            : "error",
+          message,
+        },
       });
     }
   };
@@ -668,6 +680,17 @@ export function createAfterPartyApp(
             activity: "idle",
             message: error.message,
             inviteFailure: error.diagnostic,
+          },
+        });
+        return;
+      }
+      if (isServerShuttingDownError(error)) {
+        persistOneDriveStage(storage, account, previousStage);
+        setSignedInPatch(account, {
+          oneDriveProof: {
+            stage: previousStage,
+            activity: "idle",
+            message: error.message,
           },
         });
         return;
@@ -746,6 +769,17 @@ export function createAfterPartyApp(
         });
         return;
       }
+      if (isServerShuttingDownError(error)) {
+        persistCalendarMeetingStage(storage, account, previousStage);
+        setSignedInPatch(account, {
+          calendarMeeting: {
+            stage: previousStage,
+            activity: "idle",
+            message: error.message,
+          },
+        });
+        return;
+      }
       const message =
         error instanceof AccessTokenError || error instanceof ApiAccessError
           ? error.message
@@ -799,8 +833,11 @@ export function createAfterPartyApp(
         return;
       }
       const cancelled = error instanceof AccessTokenCancelledError;
+      const serverShuttingDown = isServerShuttingDownError(error);
       setContactProof({
-        stage: cancelled ? previousStage : "uncertain",
+        stage: cancelled || serverShuttingDown
+          ? previousStage
+          : "uncertain",
         activity: "idle",
         message: cancelled
           ? "The contact action was cancelled before it started."
@@ -871,7 +908,10 @@ export function createAfterPartyApp(
         return;
       }
       const cancelled = error instanceof AccessTokenCancelledError;
-      const failureStage = cancelled ? previousStage : attemptedStage;
+      const serverShuttingDown = isServerShuttingDownError(error);
+      const failureStage = cancelled || serverShuttingDown
+        ? previousStage
+        : attemptedStage;
       if (!cancelled) {
         persistFixedProofStage(
           storage,
@@ -1255,9 +1295,18 @@ function classifyScenarioPlanPreviewFailure(
       return "compiler-refused";
     case "request-too-large":
       return "response-too-large";
+    case "server-shutting-down":
+      return "server-shutting-down";
     case "safe-failure":
       return "unavailable";
   }
+}
+
+function isServerShuttingDownError(
+  error: unknown,
+): error is ApiAccessError {
+  return error instanceof ApiAccessError &&
+    error.category === "server-shutting-down";
 }
 
 function classifyScenarioEvidenceVerificationFailure(
@@ -1280,6 +1329,8 @@ function classifyScenarioEvidenceVerificationFailure(
       return "request-too-large";
     case "response-too-large":
       return "response-too-large";
+    case "server-shutting-down":
+      return "server-shutting-down";
     case "safe-failure":
       return "unavailable";
   }
@@ -1305,6 +1356,8 @@ function classifyBatchFeasibilityFailure(
       return "request-too-large";
     case "response-too-large":
       return "response-too-large";
+    case "server-shutting-down":
+      return "server-shutting-down";
     case "safe-failure":
       return "unavailable";
   }
@@ -1330,6 +1383,8 @@ function classifyAvdRehearsalVerificationFailure(
       return "request-too-large";
     case "response-too-large":
       return "response-too-large";
+    case "server-shutting-down":
+      return "server-shutting-down";
     case "safe-failure":
       return "unavailable";
   }
@@ -1357,6 +1412,8 @@ function classifyPrivateDocumentRehearsalFailure(
       return "request-too-large";
     case "response-too-large":
       return "response-too-large";
+    case "server-shutting-down":
+      return "server-shutting-down";
     case "safe-failure":
       return "unavailable";
   }
@@ -1382,6 +1439,8 @@ function classifyHelpDeskRehearsalFailure(
       return "request-too-large";
     case "response-too-large":
       return "response-too-large";
+    case "server-shutting-down":
+      return "server-shutting-down";
     case "safe-failure":
       return "unavailable";
   }
@@ -1407,6 +1466,8 @@ function classifyTeamsRehearsalFailure(
       return "request-too-large";
     case "response-too-large":
       return "response-too-large";
+    case "server-shutting-down":
+      return "server-shutting-down";
     case "safe-failure":
       return "unavailable";
   }
@@ -1434,6 +1495,8 @@ function classifyOauthApplicationReconRehearsalFailure(
       return "request-too-large";
     case "response-too-large":
       return "response-too-large";
+    case "server-shutting-down":
+      return "server-shutting-down";
     case "safe-failure":
       return "unavailable";
   }
@@ -1461,6 +1524,8 @@ function classifyPurviewAuditBoundaryRehearsalFailure(
       return "request-too-large";
     case "response-too-large":
       return "response-too-large";
+    case "server-shutting-down":
+      return "server-shutting-down";
     case "safe-failure":
       return "unavailable";
   }
@@ -1542,7 +1607,10 @@ function createHelpDeskScenarioPanel(
         "notice",
       ),
     );
-  } else if (state.kind === "error") {
+  } else if (
+    state.kind === "error" ||
+    state.kind === "server-shutting-down"
+  ) {
     panel.append(createStatus(state.message, "error"));
   }
 
@@ -1551,7 +1619,8 @@ function createHelpDeskScenarioPanel(
       "Create one help desk email: Kobe → Cory",
       "send-help-desk-scenario",
       "primary",
-      apiOperationLoading || state.kind !== "idle",
+      apiOperationLoading ||
+        !["idle", "server-shutting-down"].includes(state.kind),
     ),
   );
   return panel;

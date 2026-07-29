@@ -203,6 +203,7 @@ describe("Teams rehearsal verification panel", () => {
 
   it.each([
     ["session-expired", "operator session expired"],
+    ["server-shutting-down", "API is shutting down"],
     ["unauthorized", "not authorized"],
     ["verification-refused", "inconsistent or tampered"],
     ["request-too-large", "request-size limit"],

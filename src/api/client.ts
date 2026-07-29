@@ -81,6 +81,10 @@ import {
   type TeamsMissedCallRehearsalVerificationRequest,
   type VerifiedTeamsMissedCallRehearsalSummary,
 } from "./teams-missed-call-rehearsal-verification-contract.ts";
+import {
+  SERVER_SHUTTING_DOWN_MESSAGE,
+  isExactServerShuttingDown,
+} from "./server-shutdown.ts";
 
 export const SCENARIO_API_CLIENT_CAPABILITIES = [
   {
@@ -461,19 +465,34 @@ export interface AfterPartyApi {
   >;
 }
 
+export type ApiAccessErrorCategory =
+  | "unauthorized"
+  | "forbidden"
+  | "server-shutting-down"
+  | "safe-failure";
+
 export class ApiAccessError extends Error {
-  constructor(message = "The API could not complete the access check. Try again.") {
+  readonly category: ApiAccessErrorCategory;
+
+  constructor(
+    message = "The API could not complete the access check. Try again.",
+    category: ApiAccessErrorCategory = "safe-failure",
+  ) {
     super(message);
     this.name = "ApiAccessError";
+    this.category = category;
   }
 }
+
+export type ServerShutdownClientErrorCategory = "server-shutting-down";
 
 export type ScenarioPlanClientErrorCategory =
   | "unauthorized"
   | "forbidden"
   | "validation-refused"
   | "request-too-large"
-  | "safe-failure";
+  | "safe-failure"
+  | ServerShutdownClientErrorCategory;
 
 export class ScenarioPlanClientError extends Error {
   readonly category: ScenarioPlanClientErrorCategory;
@@ -496,7 +515,8 @@ export type ScenarioEvidenceVerificationClientErrorCategory =
   | "validation-refused"
   | "request-too-large"
   | "response-too-large"
-  | "safe-failure";
+  | "safe-failure"
+  | ServerShutdownClientErrorCategory;
 
 export class ScenarioEvidenceVerificationClientError extends Error {
   readonly category: ScenarioEvidenceVerificationClientErrorCategory;
@@ -519,7 +539,8 @@ export type RehearsalOutputVerificationClientErrorCategory =
   | "validation-refused"
   | "request-too-large"
   | "response-too-large"
-  | "safe-failure";
+  | "safe-failure"
+  | ServerShutdownClientErrorCategory;
 
 export class RehearsalOutputVerificationClientError extends Error {
   readonly category: RehearsalOutputVerificationClientErrorCategory;
@@ -621,7 +642,8 @@ export type BatchFeasibilityClientErrorCategory =
   | "validation-refused"
   | "request-too-large"
   | "response-too-large"
-  | "safe-failure";
+  | "safe-failure"
+  | ServerShutdownClientErrorCategory;
 
 export class BatchFeasibilityClientError extends Error {
   readonly category: BatchFeasibilityClientErrorCategory;
@@ -841,6 +863,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new ScenarioPlanClientError("safe-failure");
     }
+    throwIfServerShuttingDown(
+      response,
+      value,
+      () => new ScenarioPlanClientError("server-shutting-down"),
+    );
     if (!response.ok) {
       if (
         response.status === 400 &&
@@ -942,6 +969,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new ScenarioEvidenceVerificationClientError("safe-failure");
     }
+    throwIfServerShuttingDown(
+      response,
+      value,
+      () =>
+        new ScenarioEvidenceVerificationClientError(
+          "server-shutting-down",
+        ),
+    );
     if (!response.ok) {
       if (
         response.status === 400 &&
@@ -1052,6 +1087,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new RehearsalOutputVerificationClientError("safe-failure");
     }
+    throwIfServerShuttingDown(
+      response,
+      value,
+      () =>
+        new RehearsalOutputVerificationClientError(
+          "server-shutting-down",
+        ),
+    );
     if (!response.ok) {
       if (
         response.status === 400 &&
@@ -1179,6 +1222,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "safe-failure",
       );
     }
+    throwIfServerShuttingDown(
+      response,
+      value,
+      () =>
+        new PrivateDocumentRehearsalVerificationClientError(
+          "server-shutting-down",
+        ),
+    );
     if (!response.ok) {
       if (
         response.status === 400 &&
@@ -1304,6 +1355,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new HelpDeskEmailRehearsalVerificationClientError("safe-failure");
     }
+    throwIfServerShuttingDown(
+      response,
+      value,
+      () =>
+        new HelpDeskEmailRehearsalVerificationClientError(
+          "server-shutting-down",
+        ),
+    );
     if (!response.ok) {
       if (
         response.status === 400 &&
@@ -1432,6 +1491,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "safe-failure",
       );
     }
+    throwIfServerShuttingDown(
+      response,
+      value,
+      () =>
+        new TeamsMissedCallRehearsalVerificationClientError(
+          "server-shutting-down",
+        ),
+    );
     if (!response.ok) {
       if (
         response.status === 400 &&
@@ -1569,6 +1636,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "safe-failure",
       );
     }
+    throwIfServerShuttingDown(
+      response,
+      value,
+      () =>
+        new OauthApplicationReconRehearsalVerificationClientError(
+          "server-shutting-down",
+        ),
+    );
     if (!response.ok) {
       if (
         response.status === 400 &&
@@ -1708,6 +1783,14 @@ export class HttpAfterPartyApi implements AfterPartyApi {
         "safe-failure",
       );
     }
+    throwIfServerShuttingDown(
+      response,
+      value,
+      () =>
+        new PurviewAuditBoundaryRehearsalVerificationClientError(
+          "server-shutting-down",
+        ),
+    );
     if (!response.ok) {
       if (
         response.status === 400 &&
@@ -1829,6 +1912,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     } catch {
       throw new BatchFeasibilityClientError("safe-failure");
     }
+    throwIfServerShuttingDown(
+      response,
+      value,
+      () => new BatchFeasibilityClientError("server-shutting-down"),
+    );
     if (!response.ok) {
       if (
         response.status === 400 &&
@@ -2172,11 +2260,11 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     expectedStatus?: number,
     failureContext?: "onedrive-invite" | "calendar",
   ): Promise<unknown> {
+    const contract = apiRouteContract(ownerKey);
     let response: Response;
     try {
-      const method = apiRouteContract(ownerKey).method;
       response = await this.request(url, {
-        method,
+        method: contract.method,
         credentials: "omit",
         redirect: "error",
         headers: {
@@ -2188,10 +2276,29 @@ export class HttpAfterPartyApi implements AfterPartyApi {
     }
 
     if (response.status === 401) {
-      throw new ApiAccessError("API access needs Microsoft authorization. Try again.");
+      throw new ApiAccessError(
+        "API access needs Microsoft authorization. Try again.",
+        "unauthorized",
+      );
     }
     if (response.status === 403) {
-      throw new ApiAccessError("This account is not allowed to use the API.");
+      throw new ApiAccessError(
+        "This account is not allowed to use the API.",
+        "forbidden",
+      );
+    }
+    if (response.status === 503) {
+      const isShuttingDown = await readServerShuttingDown(
+        response,
+        contract.errorMaxBytes,
+      );
+      if (isShuttingDown) {
+        throw new ApiAccessError(
+          SERVER_SHUTTING_DOWN_MESSAGE,
+          "server-shutting-down",
+        );
+      }
+      throw new ApiAccessError();
     }
     if (response.status === 409) {
       const error = await readErrorCode(response);
@@ -2306,6 +2413,19 @@ async function readErrorCode(response: Response): Promise<string | undefined> {
       : undefined;
   } catch {
     return undefined;
+  }
+}
+
+async function readServerShuttingDown(
+  response: Response,
+  maximumBytes: number,
+): Promise<boolean> {
+  try {
+    const text = await readBoundedJsonResponse(response, maximumBytes);
+    const value: unknown = JSON.parse(text) as unknown;
+    return isExactServerShuttingDown(value);
+  } catch {
+    return false;
   }
 }
 
@@ -2984,6 +3104,19 @@ function hasExactScenarioKeys(
     Object.keys(value).length === expected.length &&
     hasOnlyKeys(value, expected)
   );
+}
+
+function throwIfServerShuttingDown(
+  response: Response,
+  value: unknown,
+  createError: () => Error,
+): void {
+  if (
+    response.status === 503 &&
+    isExactServerShuttingDown(value)
+  ) {
+    throw createError();
+  }
 }
 
 async function readBoundedJsonResponse(

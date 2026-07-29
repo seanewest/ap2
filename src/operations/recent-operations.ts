@@ -3,6 +3,7 @@ import type {
   RecentOperationEvents,
 } from "../api/client";
 import { appendIdentity, createButton, createStatus } from "../ui/elements";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
 
 export type RecentOperationsState =
   | { kind: "idle" }
@@ -10,6 +11,7 @@ export type RecentOperationsState =
   | { kind: "success"; snapshot: RecentOperationEvents }
   | { kind: "cancelled" }
   | { kind: "unauthorized" }
+  | { kind: "server-shutting-down" }
   | { kind: "error" };
 
 export function createRecentOperationsPanel(
@@ -49,6 +51,13 @@ export function createRecentOperationsPanel(
     panel.append(
       createStatus(
         "Your API session expired or this account is not authorized. Sign in again, then refresh.",
+        "error",
+      ),
+    );
+  } else if (state.kind === "server-shutting-down") {
+    panel.append(
+      createStatus(
+        SERVER_SHUTTING_DOWN_MESSAGE,
         "error",
       ),
     );

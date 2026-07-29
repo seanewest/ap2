@@ -4,6 +4,7 @@ import {
   type VerifiedOauthApplicationReconRehearsalSummary,
 } from "../api/oauth-application-recon-rehearsal-verification-contract";
 import { appendIdentity, createStatus } from "../ui/elements";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
 import type {
   ScenarioSurfaceCapabilityDeclaration,
 } from "./scenario-surface-capability";
@@ -24,6 +25,7 @@ export type SafeOauthApplicationReconRehearsalSummary =
 export type OauthApplicationReconRehearsalPanelFailure =
   | "request-too-large"
   | "response-too-large"
+  | "server-shutting-down"
   | "session-expired"
   | "unauthorized"
   | "unavailable"
@@ -277,6 +279,8 @@ function failureMessage(
       return "Application-reconnaissance verification stopped at the safe response-size limit.";
     case "unavailable":
       return "Application-reconnaissance verification is unavailable. No result was accepted; retry manually only after checking the input and session.";
+    case "server-shutting-down":
+      return SERVER_SHUTTING_DOWN_MESSAGE;
   }
 }
 
