@@ -67,3 +67,12 @@ is also refused. No refusal echoes input or backend data.
 
 The pipeline has no API route, UI, live transport, tenant call, deployment,
 mutation, browser path, Windows-host dependency, or output-file write.
+
+## Offline output verification
+
+The
+[private-document rehearsal output verifier](private-document-rehearsal-output-verifier.md)
+checks one saved canonical output without invoking this pipeline or its fake
+lifecycle. It independently recomputes the plan and fake-contract digests,
+reconstructs the ordered adapter input, invokes the authoritative receipt
+verifier, and keeps every external claim uninspected.

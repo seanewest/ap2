@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "label": "REHEARSAL_ONLY",
+  "status": "completed",
+  "failure": null,
+  "binding": {
+    "scenarioId": "private-document-evidence",
+    "manifestSchemaVersion": 2,
+    "planDigestSha256": "02ce5d2a5eb202b31424bc8b53abdc0cc0d9e1154978f31db19ad5bff8ff173a",
+    "fakeRunDigestSha256": "d88bf6859c51aa38ff0c55121135b8971c8d3474bf0fa8f90bba3e2558c4846b",
+    "syntheticBranch": "cleaned-canary"
+  },
+  "stages": {
+    "plan": "compiled",
+    "fakeLifecycle": "completed",
+    "adapter": "accepted",
+    "receiptVerifier": "accepted"
+  },
+  "fakeRun": {
+    "lifecycleStatus": "blocked-cleanup",
+    "journalEntries": 30,
+    "learnerObservation": "synthetic-not-proven",
+    "initialTerminalProducerAbsence": "synthetic-absent",
+    "initialTerminalLearnerAbsence": "synthetic-not-proven",
+    "freshTerminal": {
+      "rounds": 3,
+      "producerFolder": "synthetic-absent",
+      "producerItem": "synthetic-absent",
+      "producerPermission": "synthetic-absent",
+      "learnerAccess": "synthetic-absent"
+    }
+  },
+  "receipt": {
+    "adapterCandidateAccepted": true,
+    "verifierAccepted": true,
+    "candidateClaimCount": 18,
+    "externalEvidence": {
+      "producerStaging": "uninspected",
+      "learnerVisibility": "uninspected",
+      "learnerInterpretation": "uninspected",
+      "auditOrDetection": "uninspected",
+      "response": "uninspected",
+      "cleanup": "uninspected",
+      "retention": "uninspected"
+    }
+  }
+}
