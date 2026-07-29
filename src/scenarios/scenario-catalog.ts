@@ -5,6 +5,17 @@ import {
   type ScenarioEvidenceArtifact,
   type ScenarioManifest,
 } from "./scenario-manifest";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "./scenario-surface-capability";
+
+export const SCENARIO_CATALOG_UI_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "operator-catalog-ui",
+  scenarioScope: "canonical-registry",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export interface ScenarioCatalogSelection {
   scenarioId: string;

@@ -26,6 +26,34 @@ import {
   type RehearsalOutputVerificationRequest,
   type VerifiedRehearsalOutputSummary,
 } from "./rehearsal-output-verification-contract.ts";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../scenarios/scenario-surface-capability";
+
+export const SCENARIO_API_CLIENT_CAPABILITIES = [
+  {
+    schemaVersion: 1,
+    surface: "authenticated-plan-client",
+    scenarioScope: "canonical-registry",
+    manifestSchemaVersion: 2,
+    repositoryBoundary: "contract-only",
+  },
+  {
+    schemaVersion: 1,
+    surface: "authenticated-receipt-client",
+    scenarioScope: "canonical-registry",
+    manifestSchemaVersion: 2,
+    repositoryBoundary: "contract-only",
+  },
+  {
+    schemaVersion: 1,
+    surface: "authenticated-rehearsal-verification-client",
+    scenarioScope: "explicit-scenarios",
+    manifestSchemaVersion: 2,
+    repositoryBoundary: "contract-only",
+    scenarioIds: ["avd-three-vm-substrate"],
+  },
+] as const satisfies readonly ScenarioSurfaceCapabilityDeclaration[];
 
 export interface ApiCallerIdentity {
   callerType: "delegated" | "app-only";

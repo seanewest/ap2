@@ -2,6 +2,9 @@ import {
   parseScenarioManifest,
   type ScenarioManifest,
 } from "../src/scenarios/scenario-manifest.ts";
+import type {
+  ScenarioAdapterCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.ts";
 import {
   REQUIRED_TEMPORARY_ROLES,
   buildFrozenLabPlan,
@@ -10,6 +13,13 @@ import {
 } from "./avd-three-vm-runner.ts";
 
 const EXPECTED_SCENARIO_ID = "avd-three-vm-substrate";
+export const AVD_MANIFEST_ADAPTER_CAPABILITY = {
+  schemaVersion: 1,
+  adapter: "avd-manifest",
+  scenarioId: EXPECTED_SCENARIO_ID,
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+} as const satisfies ScenarioAdapterCapabilityDeclaration;
 const SAFE_ALIAS = /^[a-z][a-z0-9-]{2,63}$/;
 const RAW_GUID =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;

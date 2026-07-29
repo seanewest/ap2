@@ -49,3 +49,8 @@ For every registry manifest, the checker:
 
 The checker reports drift; it does not repair a manifest, plan, receipt, or
 adapter. The owning contract must be corrected deliberately.
+
+The separate
+[canonical scenario surface inventory](scenario-surface-inventory.md) reports
+which higher repository surfaces exist after compatibility passes. Missing
+API, rehearsal, or operator cells remain honest and do not weaken this check.

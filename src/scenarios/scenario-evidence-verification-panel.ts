@@ -9,6 +9,17 @@ import type {
 import type {
   SafeVerifiedScenarioEvidenceReceipt,
 } from "./scenario-evidence-verification";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "./scenario-surface-capability";
+
+export const SCENARIO_RECEIPT_VERIFICATION_UI_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "operator-receipt-verify-ui",
+  scenarioScope: "canonical-registry",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 const MAX_RECEIPT_BYTES = 131_072;
 const GUID =

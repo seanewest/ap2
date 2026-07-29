@@ -50,6 +50,12 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- Canonical scenario source coverage now has a deterministic network-free
+  inventory across manifests, plans, receipts, applicable adapters,
+  `REHEARSAL_ONLY` composition, authenticated API/client contracts, and
+  operator read/preview/verify surfaces. Missing cells remain explicit and do
+  not imply external failure or proof. See
+  [canonical scenario surface inventory](docs/scenario-surface-inventory.md).
 - Canonical scenario contracts now have a network-free compatibility check
   across runtime manifest validation, compiled plans, verified receipts, and
   applicable AVD, private-document, and operation-telemetry adapters. The

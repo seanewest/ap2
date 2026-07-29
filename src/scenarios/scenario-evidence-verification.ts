@@ -12,7 +12,7 @@ import {
 } from "./scenario-evidence-receipt";
 import { TEAMS_MISSED_CALL_SCENARIO } from "./teams-missed-call";
 
-const RECEIPT_MANIFESTS = [
+export const SCENARIO_EVIDENCE_RECEIPT_MANIFESTS = [
   HELP_DESK_EMAIL_SCENARIO,
   AVD_THREE_VM_SCENARIO,
   TEAMS_MISSED_CALL_SCENARIO,
@@ -43,7 +43,7 @@ export function verifyCanonicalScenarioEvidenceReceipt(
 ): SafeVerifiedScenarioEvidenceReceipt {
   const receipt = parseScenarioEvidenceReceipt(value);
   validateClaimIds(receipt);
-  const manifest = RECEIPT_MANIFESTS.find(
+  const manifest = SCENARIO_EVIDENCE_RECEIPT_MANIFESTS.find(
     ({ id }) => id === receipt.scenario.id,
   );
   if (manifest === undefined) {

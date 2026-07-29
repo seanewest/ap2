@@ -5,9 +5,19 @@ import {
   type ScenarioExecutionPlan,
   type ScenarioPlanningRequest,
 } from "../src/scenarios/scenario-plan.js";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.js";
 
 export const SCENARIO_PLAN_MAX_REQUEST_BYTES = 8_192;
 export const SCENARIO_PLAN_MAX_RESPONSE_BYTES = 65_536;
+export const SCENARIO_PLAN_API_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "authenticated-plan-api",
+  scenarioScope: "canonical-registry",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 
 export type ScenarioPlanCompiler = (
   request: ScenarioPlanningRequest,
@@ -32,10 +42,13 @@ export class ScenarioPlanResponseTooLargeError extends Error {
 }
 
 export class InMemoryScenarioPlanService implements ScenarioPlanService {
+  private readonly compiler: ScenarioPlanCompiler;
+
   constructor(
-    private readonly compiler: ScenarioPlanCompiler =
-      compileScenarioExecutionPlan,
-  ) {}
+    compiler: ScenarioPlanCompiler = compileScenarioExecutionPlan,
+  ) {
+    this.compiler = compiler;
+  }
 
   compile(value: unknown): ScenarioExecutionPlan {
     const request = parseScenarioPlanningRequest(value);

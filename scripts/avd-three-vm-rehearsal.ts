@@ -15,6 +15,9 @@ import {
   type ScenarioExecutionPlan,
   type ScenarioPlanningRequest,
 } from "../src/scenarios/scenario-plan.ts";
+import type {
+  ScenarioSurfaceCapabilityDeclaration,
+} from "../src/scenarios/scenario-surface-capability.ts";
 import {
   compileAvdManifestRunnerPlan,
   type AvdManifestRunnerAdapterInput,
@@ -36,6 +39,14 @@ import {
 } from "./avd-three-vm-runner.ts";
 
 const LABEL = "REHEARSAL_ONLY";
+export const AVD_THREE_VM_REHEARSAL_CAPABILITY = {
+  schemaVersion: 1,
+  surface: "rehearsal-only",
+  scenarioScope: "explicit-scenarios",
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+  scenarioIds: [AVD_THREE_VM_SCENARIO.id],
+} as const satisfies ScenarioSurfaceCapabilityDeclaration;
 const REQUEST_KEYS = [
   "schemaVersion",
   "label",

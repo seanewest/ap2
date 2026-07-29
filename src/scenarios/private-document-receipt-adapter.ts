@@ -13,8 +13,18 @@ import {
   type ObservationSource,
   type ScenarioEvidenceReceipt,
 } from "./scenario-evidence-receipt.ts";
+import type {
+  ScenarioAdapterCapabilityDeclaration,
+} from "./scenario-surface-capability.ts";
 
 const SCENARIO_ID = "private-document-evidence";
+export const PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY = {
+  schemaVersion: 1,
+  adapter: "private-document",
+  scenarioId: SCENARIO_ID,
+  manifestSchemaVersion: 2,
+  repositoryBoundary: "contract-only",
+} as const satisfies ScenarioAdapterCapabilityDeclaration;
 const MAX_EVENTS = 40;
 const SAFE_CORRELATION = /^run-[a-z0-9]{1,32}$/;
 const GUID =
