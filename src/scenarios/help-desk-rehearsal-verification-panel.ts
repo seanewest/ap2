@@ -1,4 +1,5 @@
 import { appendIdentity, createStatus } from "../ui/elements";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
 import {
   HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
   type HelpDeskEmailRehearsalVerificationRequest,
@@ -24,6 +25,7 @@ export type SafeHelpDeskRehearsalSummary =
 export type HelpDeskRehearsalPanelFailure =
   | "request-too-large"
   | "response-too-large"
+  | "server-shutting-down"
   | "session-expired"
   | "unauthorized"
   | "unavailable"
@@ -258,6 +260,8 @@ function failureMessage(failure: HelpDeskRehearsalPanelFailure): string {
       return "Help-desk verification stopped at the safe response-size limit.";
     case "unavailable":
       return "Help-desk verification is unavailable. No result was accepted; retry manually only after checking the input and session.";
+    case "server-shutting-down":
+      return SERVER_SHUTTING_DOWN_MESSAGE;
   }
 }
 

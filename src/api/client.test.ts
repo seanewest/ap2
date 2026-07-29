@@ -20,6 +20,71 @@ import {
 } from "./client";
 
 describe("HTTP After Party API client", () => {
+  const sharedAuthorizedMethods = [
+    "checkAccess",
+    "getRehearsalStatus",
+    "getRecentOperationEvents",
+    "sendSimulatedEmail",
+    "sendHelpDeskScenario",
+    "shareOneDriveProof",
+    "removeOneDriveProof",
+    "createCalendarMeeting",
+    "cancelCalendarMeeting",
+    "createContactProof",
+    "removeContactProof",
+    "createInboxRuleProof",
+    "removeInboxRuleProof",
+    "createCategoryProof",
+    "removeCategoryProof",
+    "createSharePointFileProof",
+    "removeSharePointFileProof",
+    "createDraftProof",
+    "removeDraftProof",
+    "createTodoTaskProof",
+    "removeTodoTaskProof",
+  ] as const;
+
+  it.each(sharedAuthorizedMethods)(
+    "maps the exact shutdown refusal once through %s",
+    async (method) => {
+      const response = Response.json({ error: "server_shutting_down" }, {
+        status: 503,
+      });
+      const request = vi.fn<typeof fetch>().mockResolvedValue(response);
+      const client = new HttpAfterPartyApi(
+        "https://student-api.example",
+        request,
+      );
+      const invoke = client[method] as (token: string) => Promise<unknown>;
+
+      await expect(invoke.call(client, "temporary-token")).rejects.toEqual(
+        new ApiAccessError(
+          "The API is shutting down. No request was accepted. Try again manually after service readiness is restored.",
+          "server-shutting-down",
+        ),
+      );
+      expect(request).toHaveBeenCalledOnce();
+      expect(response.bodyUsed).toBe(true);
+    },
+  );
+
+  it("does not promote an expanded 503 body to the shutdown category", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        error: "server_shutting_down",
+        detail: "arbitrary private detail",
+      }, { status: 503 }),
+    );
+    const client = new HttpAfterPartyApi(
+      "https://student-api.example",
+      request,
+    );
+
+    await expect(client.checkAccess("temporary-token")).rejects.toEqual(
+      new ApiAccessError(),
+    );
+  });
+
   it("reads only strict sanitized operation events in the requested order", async () => {
     const response = {
       schemaVersion: 1,
@@ -870,19 +935,26 @@ describe("HTTP After Party API client", () => {
   });
 
   it.each([
-    [401, "API access needs Microsoft authorization. Try again."],
-    [403, "This account is not allowed to use the API."],
-    [500, "The API could not complete the access check. Try again."],
-  ])("returns a safe error for HTTP %i", async (status, message) => {
+    [401, "API access needs Microsoft authorization. Try again.", "unauthorized"],
+    [403, "This account is not allowed to use the API.", "forbidden"],
+    [
+      500,
+      "The API could not complete the access check. Try again.",
+      "safe-failure",
+    ],
+  ] as const)(
+    "returns a safe error for HTTP %i",
+    async (status, message, category) => {
     const request = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response("provider detail", { status }));
     const client = new HttpAfterPartyApi("https://student-api.example", request);
 
     await expect(client.checkAccess("sensitive-access-token")).rejects.toEqual(
-      new ApiAccessError(message),
+      new ApiAccessError(message, category),
     );
-  });
+    },
+  );
 
   it("rejects malformed success data and network failure safely", async () => {
     const malformedRequest = vi.fn<typeof fetch>().mockResolvedValue(

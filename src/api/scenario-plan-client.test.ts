@@ -52,12 +52,18 @@ describe("scenario-plan typed client", () => {
     [401, "unauthorized"],
     [403, "forbidden"],
     [413, "request-too-large"],
+    [503, "server-shutting-down"],
     [500, "safe-failure"],
   ] as const)("maps HTTP %s to fixed category %s", async (status, category) => {
     const client = new HttpAfterPartyApi(
       "https://api.example.test",
       vi.fn<typeof fetch>().mockResolvedValue(
-        jsonResponse({ error: "arbitrary upstream text" }, status),
+        jsonResponse(
+          status === 503
+            ? { error: "server_shutting_down" }
+            : { error: "arbitrary upstream text" },
+          status,
+        ),
       ),
     );
 

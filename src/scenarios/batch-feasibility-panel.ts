@@ -1,5 +1,6 @@
 import { appendIdentity, createStatus } from "../ui/elements";
 import { isSafeScenarioPlanningRequest } from "../api/client";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
 import {
   BATCH_FEASIBILITY_MAX_PLANS,
   isBoundedBatchFeasibilityRequest,
@@ -36,6 +37,7 @@ export type BatchFeasibilityPanelFailure =
   | "planner-refused"
   | "request-too-large"
   | "response-too-large"
+  | "server-shutting-down"
   | "session-expired"
   | "unauthorized"
   | "unavailable";
@@ -542,6 +544,8 @@ function failureMessage(failure: BatchFeasibilityPanelFailure): string {
       return "Feasibility evaluation stopped at the safe response-size limit.";
     case "unavailable":
       return "Feasibility evaluation is unavailable. No result was accepted; retry manually only after checking the batch and session.";
+    case "server-shutting-down":
+      return SERVER_SHUTTING_DOWN_MESSAGE;
   }
 }
 

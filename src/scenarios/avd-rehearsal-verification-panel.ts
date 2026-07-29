@@ -1,4 +1,5 @@
 import { appendIdentity, createStatus } from "../ui/elements";
+import { SERVER_SHUTTING_DOWN_MESSAGE } from "../api/server-shutdown";
 import {
   REHEARSAL_OUTPUT_MAX_REQUEST_BYTES,
   type RehearsalOutputVerificationRequest,
@@ -24,6 +25,7 @@ export type SafeAvdRehearsalVerificationSummary =
 export type AvdRehearsalVerificationFailure =
   | "request-too-large"
   | "response-too-large"
+  | "server-shutting-down"
   | "session-expired"
   | "unauthorized"
   | "unavailable"
@@ -261,6 +263,8 @@ function failureMessage(
       return "Rehearsal verification stopped at the safe response-size limit.";
     case "unavailable":
       return "Rehearsal verification is unavailable. No result was accepted; retry manually only after checking the input and session.";
+    case "server-shutting-down":
+      return SERVER_SHUTTING_DOWN_MESSAGE;
   }
 }
 

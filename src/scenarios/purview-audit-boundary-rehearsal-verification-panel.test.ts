@@ -252,6 +252,7 @@ describe("Purview audit-boundary rehearsal verification panel", () => {
     ["verification-refused", "inconsistent or tampered"],
     ["request-too-large", "request-size limit"],
     ["response-too-large", "response-size limit"],
+    ["server-shutting-down", "No request was accepted"],
     ["unavailable", "verification is unavailable"],
   ] as const)("maps %s to a fixed safe state", async (failure, message) => {
     const detail = new Error("raw backend detail");

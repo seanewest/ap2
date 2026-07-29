@@ -388,6 +388,7 @@ describe("Scenario plan preview", () => {
   it.each([
     ["unauthorized", "not authorized"],
     ["session-expired", "session expired"],
+    ["server-shutting-down", "API is shutting down"],
     ["compiler-refused", "planner refused"],
     ["response-too-large", "safe preview limit"],
     ["unavailable", "preview is unavailable"],

@@ -38,10 +38,14 @@ describe("Purview audit-boundary rehearsal verification typed client", () => {
     [401, "unauthorized"],
     [403, "forbidden"],
     [413, "request-too-large"],
+    [503, "server-shutting-down"],
     [500, "safe-failure"],
   ] as const)("maps HTTP %s to %s", async (status, category) => {
+    const body = status === 503
+      ? { error: "server_shutting_down" }
+      : { detail: "arbitrary" };
     await expect(
-      clientReturning(jsonResponse({ detail: "arbitrary" }, status))
+      clientReturning(jsonResponse(body, status))
         .verifyPurviewAuditBoundaryRehearsalOutput(
           "signed-token",
           fixture(),
