@@ -26,11 +26,16 @@ bounded sections:
   custodian/disposition; and
 - USD lane maximum plus a conservative duration assumption.
 
-All arrays are bounded and identifiers are stable lowercase values. Mutations
-require markers. References must resolve to declared actors, operations,
+All arrays are bounded and identifiers are stable lowercase values. Every
+mutation in one manifest uses the same lifecycle marker; labels never imply
+shared ownership. References must resolve to declared actors, operations,
 resources, or artifacts. Every cleanup operation is declared by lifecycle and
 owned by the lifecycle cleanup actor. Every retained evidence artifact has one
 inventory entry; `cleanup-later` also names its exact cleanup operation.
+When any resource is billable, the manifest also declares exactly one
+marker-bound expiry-schedule resource. Its setup and cleanup operations are
+the supported `expiry.schedule` and `expiry.remove` capabilities, and its
+expiry equals the lifecycle expiry.
 
 The validator rejects:
 
@@ -44,7 +49,8 @@ The validator rejects:
 - missing expiry, cleanup, cost, owners, markers, permission revocation, or
   retained-artifact disposition; and
 - mismatched creation/cleanup markers or non-canonical proof references; and
-- billable resources outside the declared lifecycle or in a zero-cost lane.
+- billable resources outside the declared lifecycle, without a marker-bound
+  expiry schedule, or in a zero-cost lane.
 
 ## Representative fixtures
 
@@ -64,6 +70,15 @@ resource group, marker policies/groups, Intune and Entra device records,
 temporary roles, expiry job, and sensitive run artifacts absent. No learner
 session occurred, so its learner completion is `not-run` and learner visibility
 is `not-proven`. Reduced evidence remains with the AP2 orchestrator.
+
+This active manifest is also the canonical personal-AVD infrastructure
+contract because that host is one explicit resource in the three-VM topology.
+The earlier standalone personal-AVD and Bastion experiments remain historical
+capability records. They are not backfilled as executable manifests: doing so
+would turn old protected observations into an invented current plan. Teams,
+private-document, and email manifests use the same lifecycle sections with
+zero-cost, workload-specific capabilities rather than placeholder
+infrastructure.
 
 The controlled Teams missed-call fixture is also migrated to schema version 2.
 Its native Teams semantic claim remains distinct from the Outlook fixture.

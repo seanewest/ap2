@@ -246,18 +246,28 @@ export function compileScenarioExecutionPlan(
   }
   push(metaStep("preflight", "budget.validate", "budget-ceiling"));
 
-  for (const operation of manifest.operations) {
-    if (operation.phase !== "setup" && operation.phase !== "evidence") {
-      continue;
-    }
+  const producerOperations = manifest.operations
+    .filter((operation) =>
+      operation.phase === "setup" || operation.phase === "evidence"
+    )
+    .map((operation, index) => ({
+      operation,
+      index,
+      preSeededReference: operation.effect === "mutation" &&
+        (
+          allProducerEvidencePreSeeded ||
+          preSeededSourceOperationKeys.has(operation.key)
+        ),
+    }))
+    .sort((left, right) =>
+      operationPriority(left.operation, left.preSeededReference) -
+        operationPriority(right.operation, right.preSeededReference) ||
+      left.index - right.index
+    );
+  for (const { operation, preSeededReference } of producerOperations) {
     if (cleanupObservationOperationKeys.has(operation.key)) {
       continue;
     }
-    const preSeededReference = operation.effect === "mutation" &&
-      (
-        allProducerEvidencePreSeeded ||
-        preSeededSourceOperationKeys.has(operation.key)
-      );
     push(operationStep(
       "producer-operation",
       operation,
@@ -423,6 +433,17 @@ export function compileScenarioExecutionPlan(
       .update(canonicalJson(unsigned))
       .digest("hex"),
   };
+}
+
+function operationPriority(
+  operation: ScenarioOperation,
+  preSeededReference: boolean,
+): number {
+  return !preSeededReference &&
+      operation.phase === "setup" &&
+      operation.capability === "expiry.schedule"
+    ? 0
+    : 1;
 }
 
 export function parseScenarioPlanningRequest(

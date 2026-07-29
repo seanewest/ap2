@@ -25,6 +25,15 @@ identifiers, credentials, tokens, certificates, private paths, and session
 data are rejected rather than normalized. Distinct manifest actors require
 distinct aliases; roles assigned to the same actor require the same alias.
 
+The compiler freezes marker ownership, lifecycle expiry, cleanup requirements,
+elapsed-time window, and conservative USD ceiling before it emits any
+operation. For a billable scenario it places the marker-bound
+`expiry.schedule` producer operation before every other executable setup or
+evidence operation, regardless of authoring order. Historical pre-seeded
+references retain their canonical order because they cannot submit billable
+work. This is a contract ordering rule, not proof that a timer or resource
+exists.
+
 The ordered output covers:
 
 1. actor, prerequisite, expiry, and budget preflight;
@@ -48,6 +57,15 @@ human gate. When cleanup itself is already observed, its mutation steps are
 also non-executable references. Cleanup-state observations are ordered after
 every cleanup step. The SHA-256 plan digest is computed from canonical
 sanitized output with stable key and step ordering.
+
+The manifest, plan, and receipt already form the reusable lifecycle envelope:
+optional scenario capabilities supply infrastructure setup, producer staging,
+learner activity, response, and cleanup without weakening their own
+operation-specific rules. A scenario may omit infrastructure or response, but
+it may not omit bounded expiry, cleanup, cost, or terminal proof. Readiness and
+human-only gates remain distinct steps. In particular, an infrastructure-ready
+AVD artifact with `not-proven` learner visibility cannot become a learner
+session merely because deployment and cleanup completed.
 
 The compiler fails with one categorical error for invalid actor binding, role
 conflation, undeclared self-triggering, raw identifiers, invalid expiry,

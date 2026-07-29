@@ -398,6 +398,81 @@ describe("generalized scenario manifest contract", () => {
     );
   });
 
+  it("rejects different lifecycle markers across otherwise unrelated mutations", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: [
+          {
+            key: "prepare-second-lifecycle",
+            phase: "setup",
+            capability: "sensitive-artifacts.prepare",
+            effect: "mutation",
+            ownerActorId: "producer",
+            marker: "different-lifecycle",
+            summary: "Attempt to introduce a second lifecycle marker.",
+          },
+          ...separatedScenario.operations,
+        ],
+      })
+    ).toThrowError(
+      "all mutating operations must share one lifecycle marker",
+    );
+  });
+
+  it("rejects billable setup without one marker-bound expiry schedule", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...separatedScenario,
+        operations: [
+          {
+            key: "create-billable",
+            phase: "setup",
+            capability: "azure.three-vm.deploy",
+            effect: "mutation",
+            ownerActorId: "producer",
+            marker,
+            summary: "Create one billable resource.",
+          },
+          ...separatedScenario.operations,
+        ],
+        resources: [
+          {
+            id: "billable-resource",
+            kind: "avd-personal-host",
+            summary: "One billable host.",
+            ownerActorId: "producer",
+            createOperationKey: "create-billable",
+            cleanupOperationKey: "clean-evidence",
+            billable: true,
+            expiresAt: separatedScenario.lifecycle.expiresAt,
+          },
+        ],
+        cost: {
+          ...separatedScenario.cost,
+          laneMaximum: 1,
+        },
+      })
+    ).toThrowError(
+      "billable resources require one marker-bound expiry schedule",
+    );
+  });
+
+  it("binds the expiry schedule to the lifecycle expiry", () => {
+    expect(() =>
+      parseScenarioManifest({
+        ...AVD_THREE_VM_SCENARIO,
+        resources: AVD_THREE_VM_SCENARIO.resources.map((resource) =>
+          resource.kind === "expiry-schedule"
+            ? { ...resource, expiresAt: "2026-07-29T09:00:00Z" }
+            : resource
+        ),
+      })
+    ).toThrowError(
+      "billable expiry schedule must bind setup, cleanup, and lifecycle expiry",
+    );
+  });
+
   it("rejects a resource whose cleanup marker differs from creation", () => {
     expect(() =>
       parseScenarioManifest({
