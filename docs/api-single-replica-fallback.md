@@ -1,9 +1,11 @@
 # API single-replica fallback
 
-AP2 has no approved shared conditional-write operation journal. Until one is
-selected and implemented, the main API must run with both minimum and maximum
-replicas fixed at one. This is a fail-closed fallback, not cross-replica
-serialization.
+AP2 has no approved, configured, and live-proven shared conditional-write
+operation journal. Although the repository now includes the
+[Azure Table adapter](shared-operation-journal.md), the main API must run with
+both minimum and maximum replicas fixed at one until a later lane establishes
+the exact table, managed-identity role, network path, and readiness proof. This
+is a fail-closed fallback, not cross-replica serialization.
 
 PR #144 froze the required future journal state machine. It did not add a
 store, a lease implementation, a journal-ready switch, or any protection
@@ -35,6 +37,6 @@ acceptable only when it consumes the validated one-to-one plan and the later
 authoritative readiness read observes that exact scale.
 
 Do not replace this invariant with an environment flag. Enabling multiple
-replicas requires the explicit shared-store architecture decision, the
-conditional journal implementation, operation-specific reconciliation, and
-their independent review.
+replicas requires an approved live shared-store configuration, operation-
+specific reconciliation wiring, cloud readiness proof, and independent
+review. Emulator proof alone cannot satisfy that boundary.

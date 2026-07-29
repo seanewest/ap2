@@ -1,11 +1,14 @@
 # Durable operation journal decision
 
-Status: **architecture decision required**
+Status: **adapter implemented; live storage architecture remains deferred**
 
 The repository's
 [single-replica fallback](api-single-replica-fallback.md) remains mandatory
-while this decision is open. This document and PR #144 define a future state
-machine; neither provides cross-replica serialization.
+until an approved shared table, network path, and managed-identity data role
+are configured and proven. PR #144 defines the state machine. The
+[shared operation journal](shared-operation-journal.md) now implements its
+Azure Table conditional-write adapter and emulator contract, but does not
+provision or approve a live store.
 
 The main AP2 API cannot replace its process-local mutation boundaries without
 choosing and provisioning a shared durable store. Its source and configuration
@@ -151,24 +154,21 @@ journal proves only exclusive file creation for a one-replica canary; it is not
 the intended atomic cross-replica journal contract, and its Container Apps
 mount introduces storage-account-key custody. Neither is recommended.
 
-## Decision and executable next step
+## Remaining deployment decision
 
-Choose either:
+Azure Table Storage is selected and its production adapter is implemented. A
+later bounded deployment lane must designate an existing or authorize a new
+StorageV2 account/table, freeze its network posture and owner, assign the API
+managed identity table-scoped data access, choose the live retention period,
+and prove cloud readiness. It must then wire each operation-specific read-only
+reconciler before allowing more than one replica.
 
-- **Azure Table Storage (recommended):** designate an existing or authorize a
-  new StorageV2 account/table, its network posture and owner, table-scoped
-  managed-identity access, and a retention period; or
-- a named existing production shared store with equivalent atomic
-  create/compare-and-swap and retention guarantees.
-
-After that decision, implement one store interface plus the selected production
-adapter, make operation-specific reconciliation explicit, and wire the two
-existing consumers. The local service-path suite must run two independent API
-servers against one emulator/store and cover concurrent claims, restart,
-prepared lease expiry, executing lease expiry, terminal replay suppression,
-marker/actor/target mismatch, store outage, and failure between mutation and
-terminal recording. A serialization test must reject every forbidden sensitive
-field and arbitrary request/response bodies.
+The current emulator suite proves conditional claims across two independent
+processes plus a fresh process, prepared lease expiry, executing replay
+suppression, terminal and ambiguous tombstones, corruption refusal, exact
+retirement, and uncertain-write reconciliation. It does not prove Azure
+managed identity, RBAC, networking, availability, or the existing operations'
+reconciliation wiring.
 
 ## Platform references
 
