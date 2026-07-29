@@ -28,7 +28,7 @@ contain unsafe, stale, duplicate, unknown, or unsupported claims.
 | Scenario | Manifest / plan / receipt | Adapter | Rehearsal | Authenticated plan API/client | Authenticated receipt API/client | Authenticated rehearsal verification API/client | Operator read / preview | Operator verify |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `avd-three-vm-substrate` | implemented | implemented | implemented | implemented | implemented | implemented | implemented | implemented |
-| `help-desk-email-observation` | implemented | implemented | missing | implemented | implemented | missing | implemented | implemented |
+| `help-desk-email-observation` | implemented | implemented | implemented | implemented | implemented | missing | implemented | implemented |
 | `oauth-application-reconnaissance` | implemented | not applicable | missing | implemented | implemented | missing | implemented | implemented |
 | `private-document-evidence` | implemented | implemented | implemented | implemented | missing | missing | implemented | implemented |
 | `teams-missed-call-observation` | implemented | implemented | missing | implemented | implemented | missing | implemented | implemented |

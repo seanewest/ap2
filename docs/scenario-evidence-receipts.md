@@ -48,6 +48,14 @@ candidate acceptance is not external proof: the emitted rehearsal summary
 keeps staging, visibility, interpretation, audit/detection, response, cleanup,
 and retention `uninspected`.
 
+The
+[help-desk email contract rehearsal](help-desk-email-rehearsal.md) composes the
+canonical plan, a one-shot operation fake, the help-desk adapter, this
+verifier, and the shared rehearsal envelope. Its send, learner-visible,
+retained, and cleaned synthetic branches keep email, Inbox visibility,
+interpretation, response, cleanup, retention, audit/detection, Teams, and
+voicemail external truth `uninspected`.
+
 ## Receipt shape
 
 `verifyScenarioEvidenceReceipt` accepts only schema version 1. A receipt

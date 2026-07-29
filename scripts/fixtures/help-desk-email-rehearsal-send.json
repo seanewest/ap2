@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "label": "REHEARSAL_ONLY",
+  "scenarioId": "help-desk-email-observation",
+  "syntheticBranch": "send-accepted"
+}
