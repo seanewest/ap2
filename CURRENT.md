@@ -50,6 +50,14 @@ At each material checkpoint, the Captain checks and updates this docket against 
 
 ## Closed/do not reopen
 
+- The main API now refuses excess one-process work through fixed route-metadata
+  lanes before authentication or body parsing. Mutations are never queued or
+  retried; receive/header/keep-alive limits are explicit; and a bounded
+  production-container matrix covers health, authentication refusal, pure,
+  mutation, oversized, timeout, resource-growth, shutdown, and residue paths.
+  This is not client-rate or multi-replica protection: ingress controls and
+  `maxReplicas=1` remain deployment requirements. See
+  [API process-local backpressure](docs/api-abuse-backpressure.md).
 - The authoritative offline Purview rehearsal verifier is exposed through one
   pure operator-only API route and browser-safe typed client. The route registry
   enforces auth-before-body, fixed request/response bounds, and zero external

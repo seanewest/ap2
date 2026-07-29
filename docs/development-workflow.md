@@ -200,6 +200,14 @@ the operator browser's CBA interaction. Do not persist it during Pass 3: a
 persistent cache contains durable refresh-token credentials and needs
 encryption, locking, eviction, revocation handling, and cross-replica design.
 
+The API's process-local admission boundary derives its fail-fast concurrency
+lanes from the authoritative route side-effect metadata. It never queues or
+retries a bounded mutation, and it does not claim client-rate or multi-replica
+protection. Keep ingress connection/rate controls and `maxReplicas=1` as
+deployment requirements until a durable journal and explicit distributed
+admission architecture exist. See
+[API process-local backpressure](api-abuse-backpressure.md).
+
 ## Eventual consistency
 
 Treat documented `201`, `202`, and `204` responses as platform acceptance when
