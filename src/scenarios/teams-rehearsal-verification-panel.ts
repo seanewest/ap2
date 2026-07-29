@@ -1,9 +1,9 @@
 import { appendIdentity, createStatus } from "../ui/elements";
-import type {
+import {
+  TEAMS_MISSED_CALL_REHEARSAL_MAX_REQUEST_BYTES,
+  type TeamsMissedCallRehearsalVerificationRequest,
   VerifiedTeamsMissedCallRehearsalSummary,
-} from "../../scripts/verify-teams-missed-call-rehearsal-output";
-
-const MAX_REQUEST_BYTES = 32 * 1024;
+} from "../api/teams-missed-call-rehearsal-verification-contract";
 
 export type TeamsRehearsalPanelFailure =
   | "request-too-large"
@@ -13,13 +13,17 @@ export type TeamsRehearsalPanelFailure =
   | "unavailable"
   | "verification-refused";
 
-export interface TeamsRehearsalPanelClient<TInput extends object = object> {
+export interface TeamsRehearsalPanelClient<
+  TInput extends object = TeamsMissedCallRehearsalVerificationRequest,
+> {
   parse(value: unknown): TInput | undefined;
   verify(input: TInput): Promise<VerifiedTeamsMissedCallRehearsalSummary>;
   classifyError(error: unknown): TeamsRehearsalPanelFailure;
 }
 
-export interface TeamsRehearsalPanelOptions<TInput extends object = object> {
+export interface TeamsRehearsalPanelOptions<
+  TInput extends object = TeamsMissedCallRehearsalVerificationRequest,
+> {
   client: TeamsRehearsalPanelClient<TInput>;
 }
 
@@ -56,7 +60,7 @@ export function createTeamsRehearsalVerificationPanel<TInput extends object>(
   const input = document.createElement("textarea");
   input.name = "teamsRehearsalOutput";
   input.rows = 10;
-  input.maxLength = MAX_REQUEST_BYTES;
+  input.maxLength = TEAMS_MISSED_CALL_REHEARSAL_MAX_REQUEST_BYTES;
   input.required = true;
   input.autocomplete = "off";
   input.spellcheck = false;
@@ -131,7 +135,10 @@ function parseInput<TInput extends object>(
   parse: (value: unknown) => TInput | undefined,
 ): TInput | "branch" | "empty" | "invalid" | "label" | "too-large" {
   if (text.trim().length === 0) return "empty";
-  if (new TextEncoder().encode(text).byteLength > MAX_REQUEST_BYTES) {
+  if (
+    new TextEncoder().encode(text).byteLength >
+    TEAMS_MISSED_CALL_REHEARSAL_MAX_REQUEST_BYTES
+  ) {
     return "too-large";
   }
   let value: unknown;

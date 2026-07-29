@@ -68,3 +68,18 @@ branch, digests, claim count, and all-uninspected state.
 The route and client do not execute the rehearsal, fake, or call path; ingest
 telemetry; persist input; schedule work; contact Teams or Graph; or establish
 external proof.
+
+## Authenticated operator panel
+
+The authenticated SPA exposes the same bounded verifier as a manual-only
+operator panel. It validates one pasted sanitized PR #106 envelope locally
+before acquiring authorization, and sends exactly one request only when the
+operator selects **Verify Teams rehearsal**. Input changes clear any prior
+result and make an in-flight result stale.
+
+The panel renders only the fixed typed summary and categorical safe failures.
+It never renders or persists the submitted JSON, digests, fake journal fields,
+backend payloads, or arbitrary labels. The panel is not a call, execution,
+retry, polling, scheduling, or evidence-ingestion surface. Its copy states that
+contract consistency proves no call, native Teams evidence, learner
+visibility or interpretation, cleanup, identity, or external proof.
