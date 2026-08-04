@@ -30,9 +30,10 @@ The production factory accepts only:
 
 It constructs `ManagedIdentityCredential` and disables SDK retries. Connection
 strings, account keys, SAS values, HTTP endpoints, unknown fields, and
-unbounded retention are refused. A later deployment lane must separately
-establish the storage resource, table-scoped `Storage Table Data Contributor`
-assignment, network reachability, retention ownership, and cloud readiness.
+unbounded retention are refused. If an explicit future goal enables this
+adapter, that work would separately establish the storage resource,
+table-scoped `Storage Table Data Contributor` assignment, network reachability,
+retention ownership, and cloud readiness. None of that is current Pass 3 work.
 
 ## Conditional state transitions
 

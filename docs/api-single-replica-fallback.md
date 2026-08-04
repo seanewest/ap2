@@ -1,5 +1,11 @@
 # API single-replica fallback
 
+> **Current Pass 3 posture:** One warm API replica is intentional. Keeping
+> `minReplicas=1` avoids slow cold starts and improves development feedback.
+> Keeping `maxReplicas=1` also matches the API's current process-local mutation
+> and token-cache boundaries. This accepted development topology does not create
+> a current goal to provision shared storage or enable multiple replicas.
+
 AP2 has no approved, configured, and live-proven shared conditional-write
 operation journal. Although the repository now includes the
 [Azure Table adapter](shared-operation-journal.md), the main API must run with

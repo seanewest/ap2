@@ -43,16 +43,34 @@ machinery to eliminate every uncertainty.
 The AP2 tenant and explicitly selected subscriptions are dedicated sandboxes,
 but the sandbox contains two different classes of state.
 
-The tenant-resident AP2 control plane is the infrastructure required to develop
-and run the current architecture: application registrations and service
-principals, the development automation identity, the API and its managed
-identity, required roles and permissions, simulated users, licensing, and other
-selected baseline configuration. Preserve that control plane by default. It may
-be rebuildable, but deleting or casually resetting it would disable AP2 and is
-not ordinary scenario cleanup. Change or remove it only when the current goal
-explicitly concerns that infrastructure or replaces it deliberately.
+The AP2 control plane spans two tenants. The Product tenant owns the
+multitenant After Party app registration and API resource. The Student tenant
+contains its enterprise application plus the development automation identity,
+the API and managed identity, standing roles and permissions, simulated-user
+identities, licenses, authentication setup, and other selected baseline
+configuration required to develop and run AP2. Preserve that control plane by
+default. Deleting or casually resetting it would disable the current
+architecture and is not ordinary scenario cleanup.
 
-Capability and scenario runs create disposable experimental state around that
+A simulated user's identity, license, and authentication setup are baseline
+infrastructure. That user's mailbox, calendar, files, Teams activity,
+scenario-specific memberships, temporary permissions, and other staged workload
+state are disposable or resettable.
+
+Avoid permission churn. Standing development authority that AP2 already uses is
+part of the baseline and should not be repeatedly revoked, narrowed, and
+regranted between experiments. Remove a grant during routine cleanup only when
+it was explicitly introduced as temporary for that experiment. Change standing
+authority when the current question requires different actor semantics or when
+the permission choice changes the architecture in a meaningful way.
+
+Broad authority inside the sandbox does not relax architectural boundaries.
+Secrets, certificates, private keys, refresh tokens, and privileged credentials
+must not be embedded in the public SPA or returned to the browser. Keep them in
+the backend, external secret/configuration paths, or another appropriate
+non-public boundary.
+
+Capability and scenario runs create disposable experimental state around the
 control plane. Messages, meetings, files, calls, temporary permissions, marked
 Azure resources, security signals, and similar staged activity may be removed
 or left as acceptable historical residue according to the current experiment.

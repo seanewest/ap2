@@ -28,6 +28,21 @@ Use the identity whose behavior the experiment is meant to represent:
 
 Do not create additional identities merely to make a diagram more complete.
 
+### Keep development authority stable
+
+Pass 3 intentionally avoids permission churn. Reuse existing standing Dev-app,
+API-managed-identity, and simulated-user authority when it supports the question.
+Do not repeatedly revoke, narrow, and regrant permissions between experiments to
+simulate production hardening.
+
+A grant should normally be removed only when it was explicitly introduced as
+temporary for the current experiment, when actor attribution is itself under
+test, or when the permission choice changes the architecture materially.
+
+Stable broad development authority does not permit secrets in the SPA. Public
+browser code may contain public IDs but never client secrets, certificates,
+private keys, refresh tokens, or privileged backend credentials.
+
 ## 3. Run the smallest decisive test
 
 Start with a read that can disprove readiness cheaply. Then perform one live

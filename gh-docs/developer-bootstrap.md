@@ -51,6 +51,10 @@ building or deploying the SPA.
 
 ## 3. Tear down the application
 
+> **Control-plane operation, not routine cleanup:** the current Product-tenant
+> registration is required by AP2. Use this path only when an explicit goal is
+> replacing or retiring that control plane.
+>
 > **Destructive:** this deletes the exact-name application object from the
 > selected tenant. Microsoft Entra may retain a recoverable deleted item
 > according to the tenant's retention policy.

@@ -34,6 +34,12 @@ substance of the project. Fill them accurately and briefly.
 A worker's sense of progress must remain tied to the intent and stop condition,
 not to a checklist the coordinator invented.
 
+The authoritative goal card must survive chat, terminal, app-server, WSL, and
+host restarts. Store it in durable assignment state or in one named owner-only
+local artifact referenced by that assignment. `CURRENT.md` may summarize active
+goals, but conversational history and the worker's latest technical message are
+not authoritative copies.
+
 ## Assign durable peers, not disguised children
 
 A peer worker is one of the configured top-level threads with an exact runtime

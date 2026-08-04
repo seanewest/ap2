@@ -66,12 +66,22 @@ architecture.
 
 ## Baseline and disposable state
 
-The current Student tenant contains a retained AP2 control plane: application
-and service-principal identities, the development automation identity, the API
-and runtime managed identity, required authority, simulated users, licensing,
-and selected baseline configuration. These are operational infrastructure and
-must survive ordinary capability and scenario cleanup. They may later be
-managed by Microsoft365DSC or other baseline tooling.
+The retained AP2 control plane spans the Product and Student tenants. The Product
+tenant owns the multitenant app registration and API resource. The Student
+tenant owns the local service principal, development automation identity, API
+and managed identity, standing authority, simulated-user identities, licensing,
+authentication setup, and selected baseline configuration. These must survive
+ordinary capability and scenario cleanup.
+
+For simulated users, preserve identity and access setup but distinguish it from
+workload state. Mail, calendar entries, files, Teams activity, temporary group
+membership, and scenario-created permissions are disposable or resettable.
+
+Standing development permissions are baseline. Pass 3 should not repeatedly
+remove and restore them unless the permission itself is under investigation or
+the intended architecture changes. Explicitly temporary grants remain part of
+the scenario lifecycle. Broad authority never justifies placing secrets or
+privileged credentials in the SPA.
 
 Capability and scenario runs add disposable state around that control plane.
 Reset is likely to be staged and workload-specific because Microsoft 365 lacks

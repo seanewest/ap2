@@ -23,8 +23,9 @@ See:
 ## Developer bootstrap
 
 See the [Microsoft Entra developer bootstrap guide](gh-docs/developer-bootstrap.md)
-to create or tear down the minimal multi-tenant application registration from
-Azure Cloud Shell.
+to create or verify the minimal multi-tenant application registration from
+Azure Cloud Shell. Its teardown path is only for an explicit control-plane
+replacement or retirement goal, not routine sandbox cleanup.
 
 ## Develop
 

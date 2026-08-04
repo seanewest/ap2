@@ -1,5 +1,13 @@
 # Durable operation journal decision
 
+> **Current Pass 3 posture:** This document preserves a possible design if a
+> concrete future need requires more than one API replica or durable crash
+> recovery. The current warm single-replica API is accepted: `minReplicas=1`
+> improves development speed by avoiding cold starts, and `maxReplicas=1` keeps
+> existing process-local mutation boundaries coherent. Provisioning Azure Table
+> Storage or wiring this journal is not current work merely because the design
+> exists.
+
 Status: **adapter implemented; live storage architecture remains deferred**
 
 The repository's
@@ -154,14 +162,15 @@ journal proves only exclusive file creation for a one-replica canary; it is not
 the intended atomic cross-replica journal contract, and its Container Apps
 mount introduces storage-account-key custody. Neither is recommended.
 
-## Remaining deployment decision
+## Optional future deployment path
 
-Azure Table Storage is selected and its production adapter is implemented. A
-later bounded deployment lane must designate an existing or authorize a new
-StorageV2 account/table, freeze its network posture and owner, assign the API
+Azure Table Storage is the retained design choice and its production adapter is
+implemented. If a future explicit goal requires more than one replica or durable
+crash recovery, that work would designate an existing or authorize a new
+StorageV2 account/table, define its network posture and owner, assign the API
 managed identity table-scoped data access, choose the live retention period,
-and prove cloud readiness. It must then wire each operation-specific read-only
-reconciler before allowing more than one replica.
+prove cloud readiness, and wire each operation-specific read-only reconciler.
+Until then, the warm single-replica topology remains the accepted Pass 3 path.
 
 The current emulator suite proves conditional claims across two independent
 processes plus a fresh process, prepared lease expiry, executing replay

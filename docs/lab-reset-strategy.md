@@ -7,13 +7,20 @@ This repository does not yet provide general reset automation.
 
 ## Baseline model
 
-The sandbox has a retained control plane that ordinary reset must not remove:
-application registrations and service principals, the development automation
-identity, the API and its managed identity, required permissions, simulated
-users, licensing, and selected configuration needed to develop and run AP2.
-This infrastructure may be rebuildable, but it is operationally necessary in
-the current tenant-local architecture. Reset it only when a separate explicit
-goal is changing or replacing that architecture.
+The sandbox participates in a retained AP2 control plane that ordinary reset
+must not remove. The Product tenant owns the multitenant app/API registration;
+the Student tenant owns its enterprise application, development automation
+identity, API and managed identity, standing permissions, simulated-user
+identities, licenses, authentication setup, and selected configuration. Reset
+that infrastructure only when a separate explicit goal changes or replaces the
+architecture.
+
+Preserve simulated-user identity and access setup, but not every object those
+users own. Mailbox contents, calendar entries, files, Teams activity,
+scenario-specific memberships, and temporary permissions are ordinary workload
+state. Standing development permissions are retained baseline; do not revoke and
+regrant them during reset. Remove only grants explicitly created as temporary
+for the run being cleaned up.
 
 A capability or scenario run should retain only the additional state needed to
 understand and later reconcile its effects:

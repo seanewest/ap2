@@ -46,17 +46,28 @@ The fixed Student tenant currently used by AP2, and any future student-provided
 tenant used by the product, are dedicated sandboxes. They should not contain
 personal or production work.
 
-The current architecture places AP2's development and execution infrastructure
-inside the Student tenant. That tenant-resident control plane includes the
-application and service-principal identities, development automation identity,
-API and its managed identity, required permissions, simulated users, licensing,
-and selected configuration needed to operate AP2. Preserve it by default. It is
-infrastructure, not scenario residue, even though it lives inside the sandbox.
+The current AP2 control plane spans the Product and Student tenants. The Product
+tenant owns the multitenant After Party app registration and API resource. The
+Student tenant contains the enterprise application, development automation
+identity, API and managed identity, standing permissions, simulated-user
+identities, licensing, authentication setup, and selected configuration needed
+to operate AP2. Preserve both sides by default.
 
-A different product could centralize more of that control plane in a separate
-provider tenant, but that is a different architecture and not a current goal.
-Microsoft365DSC or similar tooling may eventually help describe and restore the
-retained tenant baseline.
+A different product could centralize more execution infrastructure in a
+provider tenant and leave a student's tenant lighter. That is a different
+architecture and not a current goal. Microsoft365DSC or similar tooling may
+eventually help describe and restore the retained Student-tenant baseline.
+
+Simulated-user identity objects, licenses, and authentication setup are retained
+infrastructure. Their mailbox, calendar, files, Teams activity, scenario-specific
+memberships, temporary grants, and other staged workload state are disposable.
+
+Pass 3 intentionally avoids permission churn. Existing broad development
+authority may remain when it supports exploration. Do not repeatedly revoke,
+narrow, and regrant standing permissions merely to approximate production least
+privilege. Temporary grants created specifically for one experiment remain
+cleanup candidates. Revisit standing authority when actor semantics or another
+architectural boundary materially changes.
 
 Scenario state—messages, meetings, files, calls, temporary permissions, marked
 resources, security signals, and other staged activity—is disposable. Azure can
@@ -89,8 +100,10 @@ repeated work reveals a stable need.
 
 Broad exploratory permissions are acceptable inside the dedicated sandbox when
 they reduce friction. Actor identity still matters when the experiment is meant
-to appear as a specific user, application, or device.
+to appear as a specific user, application, or device. Avoiding permission churn
+is a Pass 3 development priority, not a relaxation of architectural boundaries.
 
 Protect credentials, administrative recovery, systems outside the sandbox,
-public exposure, service-abuse limits, and spending. Do not confuse those real
+public exposure, service-abuse limits, and spending. Public clients must never
+contain backend secrets or privileged credentials. Do not confuse those real
 boundaries with preservation of disposable tenant state.

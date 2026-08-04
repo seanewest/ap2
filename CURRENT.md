@@ -22,10 +22,11 @@ guidance is simplified.
 ## Immediate decisions
 
 - Keep the existing AP2 repository and history rather than starting over.
-- Treat capability and scenario state as disposable, while preserving the
-  tenant-resident AP2 control plane: development and runtime identities, the API
-  and managed identity, required authority, simulated users, licensing, and
-  selected baseline configuration.
+- Treat capability and scenario state as disposable, while preserving the AP2
+  control plane across the Product and Student tenants. Preserve simulated-user
+  identities, licensing, and authentication setup but not their staged workload
+  state. Keep standing development permissions stable; clean up only explicitly
+  temporary grants unless an architectural change requires otherwise.
 - Prefer short capability experiments over generalized contracts and hardening.
 - Treat Microsoft propagation and piece-by-piece cleanup as expected realities.
 - Recreate the local coordinator and peer threads only after the revised
