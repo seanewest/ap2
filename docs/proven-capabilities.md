@@ -6,10 +6,11 @@ bounded direct canary against the Student tenant. Unit tests, deployment alone,
 and code that has not touched Microsoft are not counted as live proof.
 
 A capability rehearsal or environment-validation canary proves a platform
-contract. It is not automatically a learner lab. Source-backed capability
-manifests additionally preserve the evidence producer, workload actor,
-learner/observer, and optional responder needed for safe orchestration. Those
-internal roles do not by themselves create a learner story.
+contract. It is not automatically a scenario or lab. Some existing source-backed
+manifests preserve evidence-producer, workload-actor, learner/observer, and
+responder fields created during earlier Pass 3 architecture work. Those fields
+remain facts about that code; they are not requirements for future capability
+exploration.
 
 Actor shorthand:
 

@@ -1,5 +1,10 @@
 # Post-run scenario evidence receipts
 
+> **Status:** Experimental Pass 3 contract. It records how existing code limits
+> claims; it is not a requirement that every capability or scenario produce a
+> receipt. Extend it only for a concrete current use. See
+> [the current product direction](product-direction.md).
+
 A scenario evidence receipt is a sanitized, post-run statement of what was
 observed. It verifies that supplied claims are internally consistent with one
 validated scenario manifest and that no claim is stronger than its categorical

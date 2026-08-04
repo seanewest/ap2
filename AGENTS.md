@@ -1,169 +1,135 @@
 # AGENTS.md
 
-## Working principles
+## What AP2 is doing now
 
-### Testability
+AP2 is an exploratory project for learning what can be created, changed,
+observed, and reset across Microsoft 365, Azure, endpoints, SaaS integrations,
+applications, and related security systems.
 
-Prefer architecture that is easy and efficient to test.
+The eventual product may contain cybersecurity labs. That is not the current
+work unless Sean explicitly asks for lab design, teaching content, learner
+objectives, assessment, or pedagogy.
 
-Prefer end-to-end testing that uses a similar path as the product itself, when
-possible.
+Use these terms consistently:
 
-### Speed
+- A **capability** is one action or observation we can perform reliably, such as
+  creating a calendar event, changing a SharePoint file, placing a Teams call,
+  observing an audit record, or removing an artifact.
+- A **scenario** combines capabilities to create incident-like state. It is a
+  technical composition, not automatically a learning experience.
+- A **lab** is a later educational product built around a scenario. It includes
+  teaching, investigation, learner decisions, and completion criteria.
 
-For Captain-led work, use the five shared peer-worker threads through the
-detached assignment process in [captains-strategy.md](captains-strategy.md).
-Those durable peer threads are not personal `/root` child subagents. The
-Captain must not create child subagents for project work.
+Current work is mainly capability exploration and early scenario composition.
 
-Give peer workers durable goals rather than individual procedural steps. A
-peer worker should normally own planning, implementation, correction, review,
-verification, and closeout for one distinct outcome. It may use its own
-subagents to parallelize or independently review parts of that goal.
+## Preserve the original question
 
-Prefer fast feedback loops.
+Every task should have a plain-language question or outcome and a clear stopping
+point. Keep returning to that original intent while working.
 
-Try to avoid repeated operations that incur wait times, such as merging,
-GitHub operations, hosted deployments, or tenant operations.
+Do not turn a useful experiment into a framework, production subsystem,
+compliance exercise, documentation program, or generalized lab model unless the
+current task actually requires it.
 
-### Safety boundaries
+Code, tests, deployment, integration, documentation, cleanup, and hardening are
+possible means. They are not automatic parts of every goal.
 
-AP2 operates in dedicated lab environments. State created after a lab or
-experiment begins is disposable. Cleanup should leave the environment ready
-enough for another lab; it does not need to reproduce an exact prior state or
-erase normal platform history.
+Stop when the stated question is answered well enough to support the next
+product decision. Record unresolved facts honestly instead of creating more
+machinery to eliminate every uncertainty.
 
-Safety means protecting:
+## Work in a disposable sandbox
 
-- the correct tenant, subscription, account, and target environment;
-- credentials, certificates, tokens, and private evidence;
-- the administrative path needed to regain control;
-- people and systems outside the lab;
-- unintended public exposure;
-- service abuse limits;
-- assets that predate the lab or experiment;
-- the authorized spending boundary.
+The AP2 tenant and explicitly selected subscriptions are dedicated sandboxes.
+Their state is not valuable user or production data. Simulated users and useful
+baseline configuration may be retained because rebuilding them is inconvenient,
+not because their current state must be preserved exactly.
 
-Within those boundaries, agents should move quickly. Read-only failures, local
-tooling defects, clock changes, or changes between already approved transports
-do not require new human authorization. Marked and reversible changes inside
-the disposable lab normally do not require production-style ceremony.
+Protect the boundaries that actually matter:
 
-Do not automatically repeat an ambiguous non-idempotent mutation. Reconcile
-its outcome read-only first.
+- the exact tenant, subscription, account, and target environment;
+- credentials, certificates, tokens, and administrative recovery;
+- people and systems outside the sandbox;
+- unintended public exposure or service abuse;
+- spending limits.
 
-Use one focused independent review when an operation is broadly destructive,
-difficult to recover from, or changes a real safety boundary. Do not create
-review chains or re-review unchanged work.
+Inside that boundary, marked experimental state is disposable. Cleanup should
+make later experiments practical when useful; it does not need to restore an
+exact prior state or erase ordinary Microsoft history.
 
-### Efficient experimentation
+Do not automatically repeat an ambiguous non-idempotent mutation. Inspect its
+result first. This is a narrow operational rule, not a reason to add ceremony to
+every experiment.
 
-Design experiments marker- and cleanup-first so their mutations can be
-identified and reversed.
+## Prefer the shortest useful experiment
 
-Validate fields that control mutation safety rather than normalizing upstream
-presentation details.
+Start with the cheapest observation that could disprove the idea. Then run the
+smallest live proof that answers the real question.
 
-If repeated findings converge on one abstraction, simplify or remove it.
+Microsoft 365 state often propagates slowly. Cleanup and confirmation may also
+require delayed observations. Treat those waits as normal platform behavior:
+record the state, do other useful work, and return later. Do not build a general
+orchestration system merely because one experiment needs a wait.
 
-When feasible, run deterministic local tests, then a local canary through the
-real product path before hosted deployment. Avoid repeated CI or cloud cycles.
+Use the actor whose recorded behavior matters. A broad development identity is
+fine for platform discovery when user attribution is not the question.
 
-For features with a human-facing path, prefer operating the local product in a
-browser before pushing another revision or repeating a tenant mutation. The
-browser test should show whether the product actually behaves and communicates
-as intended.
+Add reusable product code only after an experiment reveals a repeated need or a
+real product path. Remove temporary experiment code when its useful result has
+been captured.
 
-Use incremental checks for image-only changes.
+## Keep documentation small and factual
 
-Start with the decisive query. Do not add evidence-sealing ceremony unless the
-result is consequential or genuinely ambiguous.
+Documentation should help a person recover the current mental model. It should
+not accumulate every caution, implementation detail, review observation, or
+historical exception as a standing rule.
 
-Reuse a verified authentication session or token cache within one controlled
-test batch when isolation does not require a fresh sign-in. Use a fresh browser
-context when authentication itself is under test. A local browser harness
-should shorten the feedback loop; stop improving it when the harness costs more
-time than the product risk it removes.
+Use the canonical documents for their distinct jobs:
 
-Backend simulated-user CBA and SPA operator sign-in are separate sessions.
-Prefer one in-memory MSAL cache per simulated user, silent acquisition before
-interactive CBA, and Graph `/me` for fixed-user verification. Treat Microsoft
-Graph access tokens as opaque. Do not log or persist tokens, browser state, or
-token caches during Pass 3.
+- `docs/product-direction.md` explains the project and current exploration stage.
+- `docs/product-model.md` defines capability, scenario, and lab vocabulary.
+- `docs/development-workflow.md` describes the short exploration loop.
+- `captains-strategy.md` describes the local coordinator role.
+- `CURRENT.md` contains only the current docket and immediate decisions.
+- `docs/proven-capabilities.md` records evidence and limitations from completed
+  work.
 
-See [the development workflow](docs/development-workflow.md) for the shared
-testing and actor-selection strategy.
+Feature documents may preserve technical facts that code and tests cannot carry.
+They do not become new project goals merely because they exist.
 
-### Peer-worker ownership
+When changing a rule, replace obsolete guidance rather than stacking another
+qualification on top. Avoid duplicating the same rule across documents.
 
-A peer worker owns a distinct outcome, not a single procedural step.
+## Coordinator, peers, and subagents
 
-The owning worker should continue through normal research, implementation,
-testing, local correction, internal review, live verification, and integration
-without returning to the Captain after every intermediate result.
+Sean's primary strategy conversation defines product intent and interprets
+whether the work is still useful. The local coordinator keeps approved work
+moving; it does not redefine the product direction.
 
-A peer worker may create and direct its own subagents when one goal contains
-parallel or specialized work. Those subagent findings return to the owning
-worker, not normally to the Captain.
+Configured peer workers are durable top-level threads with exact runtime thread
+IDs. A child subagent is not a peer worker, even if someone gives it the same
+friendly name. Only the configured mapping establishes peer identity.
 
-A worker should report to the Captain when:
+The local coordinator should use the configured peer pool for project work and
+should not create personal child agents as substitutes for peers. A peer worker
+may create subagents for parts of its own goal. Those children remain owned by
+that peer and must never be represented as independent peer workers.
 
-- its owned outcome is complete;
-- Sean must perform a genuinely human-only action or make a material decision;
-- the established safety or authority boundary must change;
-- its result materially changes another active goal; or
-- an external blocker prevents useful progress within the goal.
+A peer owns the original outcome, not a checklist derived from it. It may plan,
+research, implement, test, and correct ordinary problems without reporting each
+step. It should return when the outcome is answered, a real decision is needed,
+the established boundary must change, or progress is genuinely blocked.
 
-Ordinary local defects, test failures, read-only transport problems, and
-review findings the worker can resolve itself are not Captain checkpoints.
+Worker reports should restate the original question, give the conclusion in
+plain language, and name only the evidence or blocker that changes the next
+decision.
 
-### Simplicity
+## Simplicity
 
-Prefer solutions that keep the overall system simple.
+Prefer fewer concepts, fewer layers, fewer documents, and fewer moving parts.
+Do not preserve complexity merely because previous agents created it.
 
-Be cautious about adding new architecture.
-
-If you see leftover code or unnecessary architecture, refactor or remove it.
-
-Avoid overengineering.
-
-### Autonomy and human interaction
-
-Do not create unconventional workarounds or add new complexity simply to avoid
-asking the human for input.
-
-Ask for input when a decision meaningfully affects the mental model, product
-direction, safety boundary, or overall architecture.
-
-Agents should perform all testing and QA they can perform themselves, including
-operating the SPA in a browser. Involve Sean only when human judgment, a
-meaningful product or architecture decision, credentials or access only he
-has, deliberate authorization, or evaluation of the human experience is
-needed.
-
-When Sean must act, give him one clear action, the expected outcome, and the
-point at which he should stop. Do not turn human involvement into a sequence of
-routine administrative checks that agents could perform themselves.
-
-Agent QA does not replace intentionally requested human-experience testing.
-
-### Human comprehension
-
-When communicating with a human, write like a person, not an agent status
-report. Keep it simple and understandable.
-
-Prefer solutions that are easy to explain at a high level to a human.
-
-Keep worker-to-Captain reports concise. State the outcome, blockers, material
-changes, and only the decisive evidence or references. Prefer one short
-paragraph. Leave step-by-step logs, exhaustive checks, routine unchanged-state
-details, and full timing data in the worker thread or evidence files unless
-they explain an ambiguity, risk, or requested decision.
-
-### Languages
-
-Keep the number of implementation languages small. Prefer TypeScript for
-application code, automation, tooling, and tests.
-
-Use PowerShell, Bash, or another language when the platform or task genuinely
-calls for it.
+A local defect is usually something to fix and continue. A speculative edge
+case is usually something to record or ignore. Hardening belongs in the current
+goal only when failure would invalidate the experiment, cross a real boundary,
+or prevent the next useful step.

@@ -1,323 +1,143 @@
-# Pass 3 development workflow
+# Pass 3 exploration workflow
 
-This is the shared workflow for exploring Microsoft 365 and Azure capabilities
-without turning each experiment into production architecture.
+This workflow is for learning what AP2 can do without turning each experiment
+into production architecture or a learner-lab design exercise.
 
-## Choose the actor first
+## 1. State the question
 
-| Intended behavior | Actor |
-| --- | --- |
-| Activity should appear as Cory, Homer, or another simulated user | That user's delegated token through the shared c91 CBA client |
-| Backend or infrastructure operation is not meant to appear as a user | The API runtime managed identity |
-| Fast readiness, response-shape discovery, or bounded diagnostics | The Pass 3 Dev app |
-| Operator authorization and human product path | The SPA and AP2 API |
+Begin with one plain-language question and the observation that would answer it.
+Examples:
 
-The Dev app is deliberately broad and does not exist in the future student
-product. A successful Dev canary proves the Microsoft operation and response
-shape. It does not prove that the deployed API has the correct identity,
-permission, configuration, or route.
+- Can AP2 create a calendar invitation as Homer and later remove it?
+- Can a controlled Teams call create authentic history for Cory?
+- Can a SharePoint change be attributed to the intended application?
+- Can several proven capabilities be staged together without conflicting?
 
-When a scenario claims an independent detection or audit observation, the
-observer must authenticate as a different application identity from the
-workload actor. Authentication transport remains a separate field: two
-application-only sessions are not independent when they resolve to the same
-client. Environment-validation canaries may reuse a diagnostic identity only
-when they make no learner-scenario or independent-detector claim.
+Also state why the answer matters now. Do not begin by designing a general
+contract.
 
-For application-to-application scenarios, distinct client IDs alone are not
-enough. The reusable
-[distinct application identity contract](distinct-application-identity.md)
-binds exact application and service-principal identities, least role sets,
-fresh token claims and audience, tenant, marker window, evidence origin, and
-independent recovery ownership across the manifest, plan, readiness, and
-receipt. Unproven installation, cached tokens, attribution-defeating role
-overlap, or detector-generated evidence fails closed.
+## 2. Choose the actor that matters
 
-For Azure or another platform, apply the same principle: use the identity that
-matches the behavior being tested. A development identity can prove a platform
-contract, but it does not prove that the eventual product identity or learner
-path works.
+Use the identity whose behavior the experiment is meant to represent:
 
-## Separate scenario roles
+- a simulated user's delegated identity when Microsoft should record that user;
+- the API or infrastructure identity for backend actions;
+- the broad Pass 3 development identity for quick platform discovery when actor
+  attribution is not the question;
+- a distinct observer only when independent observation is part of the claim.
 
-Choosing the Microsoft workload actor is necessary but not sufficient for a
-learner scenario. Every source-backed staged scenario must explicitly assign:
+Do not create additional identities merely to make a diagram more complete.
 
-- **evidence producer/orchestrator** — the agent, app, instructor, simulated
-  attacker, or lab harness that stages the evidence;
-- **workload actor** — the Microsoft identity, service principal, or device
-  that performs the underlying operation;
-- **learner/observer** — the person expected to receive, inspect, and interpret
-  the evidence; and
-- **detector/observer** — required when the scenario claims an independent
-  audit or detection result, and distinct from the workload actor; and
-- **responder** — the optional actor authorized to remediate after
-  interpretation.
+## 3. Run the smallest decisive test
 
-The scenario manifest fails closed when the evidence producer and learner
-resolve to the same actor. A scenario may make them the same only by declaring
-an explicit `self-triggered` exercise with a non-empty rationale explaining why
-the learner action is intentionally the event under investigation.
-An `independent` detection claim additionally requires an explicit detector
-role and fails closed when that role resolves to either the workload actor or
-the learner. A controlled-human learner observation remains a learner-view
-claim, not an independent-detector claim.
+Start with a read that can disprove readiness cheaply. Then perform one live
+canary that answers the real question.
 
-Actor identity and authentication transport are separate fields. For example,
-Kobe is the workload actor while a licensed Teams client session is the
-transport. Changing from a browser to an app-only or delegated token does not
-silently change who Microsoft records as the actor.
+Capture enough identity, marker, time, target, and returned identifiers to find
+the result and avoid an accidental duplicate. Do not seal every response into a
+new schema when ordinary notes or existing code are enough.
 
-The existing fixed proof operations and bounded direct canaries remain
-backward-compatible capability rehearsals. They validate environment and
-operation contracts and are not implicitly learner scenarios. A rehearsal
-becomes a learner scenario only when it is deliberately migrated into the
-validated scenario registry and its learner-facing evidence plan is explicit.
-The [scenario manifest contract](scenario-manifest.md) is the executable
-authoring boundary for those migrated scenarios. It binds setup, evidence,
-learner interpretation, response, cleanup, retention, permissions, expiry, and
-cost; runtime validation must pass before the UI consumes a manifest.
-The [local scenario planner](scenario-planner.md) can compile that contract
-into a deterministic sanitized readiness plan. Planning remains local and does
-not prove or execute external activity.
-The [lifecycle cost envelope](lifecycle-cost-envelope.md) can bind a future
-billable plan to one supplied, time-bounded rate card. Its conservative result
-is a forecast-only ceiling check, never a live price quote or observed bill.
-The
-[executable generalized lifecycle contract](executable-scenario-manifest.md)
-then composes a dependency-complete manifest and canonical plan with the
-authoritative receipt verifier and that supplied-rate envelope. Its output is
-still contract-only and `not-executed`; it cannot promote readiness into a
-learner session or external proof.
-The
-[canonical scenario surface inventory](scenario-surface-inventory.md) shows
-which validated scenarios also have repository adapters, rehearsal
-composition, authenticated API/client support, and operator surfaces. It is a
-source-coverage view, not readiness or live proof.
-The
-[help-desk email receipt adapter](help-desk-email-receipt-adapter.md) is a
-post-run local bridge: provider acceptance proves only its operation result,
-while learner and cleanup truth require their separately owned observations.
-The
-[Teams missed-call receipt adapter](teams-missed-call-receipt-adapter.md)
-applies the same boundary to the human-assisted call path: originator
-completion is distinct from Cory-side native evidence, interpretation, and
-terminal cleanup.
-The
-[Teams missed-call contract rehearsal](teams-missed-call-rehearsal.md)
-composes that contract with deterministic synthetic staging and observations.
-Its output keeps every external claim uninspected; it is not a call or evidence
-that Teams, a learner, or cleanup reached any external state.
-The
-[offline Teams rehearsal verifier](teams-missed-call-rehearsal-verifier.md)
-checks a saved bounded output by independently recompiling and reconstructing
-the categorical adapter/receipt contract. A verified result proves contract
-consistency only and does not upgrade any external or learner claim.
-Its operator-only API/client preserves that same pure boundary: authorization
-precedes the bounded body read, and the response contains only the fixed safe
-summary or categorical refusal.
-The
-[Purview audit-boundary rehearsal](purview-audit-boundary-rehearsal.md)
-composes the receipt-facing Purview manifest with a synthetic deduplicated
-detector observation. Its verified receipt exercises categorical contract
-composition while its shared envelope keeps every audit, workload, learner,
-response, cleanup, retention, and impact claim externally uninspected.
-Its
-[authenticated verification API and typed client](purview-audit-boundary-rehearsal-verification-api.md)
-invoke only the authoritative offline verifier. Authorization precedes the
-bounded body read, and fixed safe responses cannot promote contract
-verification into external Purview, workload, learner, or cleanup proof.
-The
-[SharePoint trusted-version lifecycle](sharepoint-trusted-version-lifecycle.md)
-is the source-backed producer-side dependency for a future document-change
-lab. Its exact version bytes and active cleanup receipt do not imply Purview
-attribution, learner visibility, restoration, or lab completion.
+An ambiguous non-idempotent mutation should be inspected before another attempt.
+Read-only and idempotent failures can use proportionate retries or another
+available transport.
 
-## Work inside the lab boundary
+## 4. Observe what actually happened
 
-The tenant and explicitly selected subscriptions are dedicated lab
-environments. Post-construction lab state is disposable.
+Separate:
 
-Before acting, establish the correct:
+- what the platform accepted;
+- what later became visible;
+- what can reasonably be inferred;
+- what remains unknown.
 
-- tenant, subscription, account, or target environment;
-- workload or infrastructure actor;
-- intended external effect;
-- administrative recovery path;
-- spending boundary.
+Microsoft acceptance is sometimes the result being tested. Do not automatically
+turn every accepted operation into a long synchronous observation loop.
 
-Within that boundary, read-only retries, local tooling fixes, approved
-transport changes, and marked reversible experiments are ordinary work.
+Use the real product path when that path is itself part of the question. Use a
+direct development command when the question is the Microsoft capability rather
+than the current UI or deployment.
 
-Do not automatically repeat an ambiguous non-idempotent mutation. Reconcile it
-read-only first.
+## 5. Treat propagation as staged work
 
-Use one focused mutation-safety review when the action is broadly destructive,
-difficult to recover from, or changes a real boundary. Routine bounded canaries
-do not need a review chain.
+Creation, permission changes, audit records, endpoint enrollment, cleanup, and
+absence confirmation may converge slowly.
 
-## Capability loop
+Record the submitted action and the later observation needed. Continue other
+useful work or stop the active turn. Return at a sensible time rather than
+holding a tight loop.
 
-1. Run the smallest read-only query that can disprove readiness.
-2. Use one bounded direct canary to learn the real platform request, response,
-   normalization, propagation, and cleanup behavior.
-3. Freeze only the mutation-critical contract. Do not validate presentation
-   details that do not control safe follow-up or cleanup.
-4. Implement the fixed operation with deterministic tests, typechecking, a
-   production build, and the existing container fixture where relevant.
-5. When the capability has a human-facing path, operate the local product in a
-   browser before another hosted push or tenant mutation when that can reveal
-   product integration, authentication, or communication problems.
-6. Build the API image and Pages preview concurrently when they are independent.
-7. Invoke the hosted mutation inside the established authority, verify its
-   meaningful outcome, clean up, and merge the reviewed tree.
+A staged sequence may be:
 
-Avoid a second direct mutation merely because a response was normalized
-differently than expected. Reconcile the existing artifact read-only, improve
-the validator, and use the retained or marked artifact for cleanup.
+```text
+act → record accepted state → wait → observe → investigate or compose → clean up
+    → wait → confirm ready enough
+```
 
-A local browser harness exists to shorten the feedback loop. Time-box harness
-repair and stop improving it when the harness costs more time than the product
-risk it removes.
+Do not build a general background orchestration system until repeated scenarios
+show what state actually needs to be durable.
 
-## Worker ownership of the capability loop
+## 6. Clean up in proportion to the next need
 
-One peer worker should normally own a capability through the full loop rather
-than returning to the Captain after every numbered stage.
+The tenant is a dedicated sandbox. Cleanup should make the next experiment
+practical and prevent unintended continuing effects. It does not need to erase
+all history or restore an exact snapshot.
 
-The owning worker may use subagents for parallel research, implementation,
-testing, or internal review. It should correct ordinary local defects and
-continue under the same goal.
+Prefer broad cleanup boundaries when the platform provides them, such as an
+Azure resource group. Microsoft 365 cleanup may be workload-specific and
+piece-by-piece. Keep simulated users and useful baseline configuration unless a
+reset experiment is specifically testing their recreation.
 
-Return to the Captain only when:
+If cleanup is not needed to answer the current question, it may be recorded as a
+later operational dependency rather than silently expanding the goal.
 
-- the capability is complete;
-- a genuine human action or material decision is required;
-- the established safety boundary must change;
-- the result changes another active goal; or
-- an external blocker prevents useful progress.
+## 7. Decide what deserves to remain
 
-A platform propagation wait is an intermediate state inside the owning goal,
-not necessarily the end of the worker's assignment.
+After the result is known, choose the smallest useful artifact:
 
-## Authentication feedback loops
+- a note in `docs/proven-capabilities.md` for a live fact and its limitation;
+- temporary code that can be removed after preserving the result;
+- reusable code and tests when another scenario or product path needs it;
+- a focused technical document when the contract cannot be understood from code
+  and tests.
 
-The backend keeps one in-memory MSAL public-client application and cache per
-simulated-user provider. It attempts `acquireTokenSilent` for the fixed Student
-authority, account, and requested scopes before falling back to the existing
-Playwright CBA interaction when Microsoft requires interaction. The interactive
-request includes `offline_access`, Graph tokens remain opaque, and every token
-result is followed by exact fixed-user verification through Graph `/me`.
+Do not automatically add a manifest, planner, verifier, receipt adapter, hosted
+route, UI surface, deployment artifact, telemetry layer, or hardening pass.
+Those additions need a concrete current use.
 
-Within one controlled QA batch:
+## 8. Compose scenarios only when useful
 
-- reuse the warm API replica and its access-token cache;
-- reuse a verified agent-only browser profile or session when authentication
-  itself is not being tested;
-- use a fresh browser context for sign-in/sign-out tests, account-isolation
-  tests, or evidence that specifically requires fresh authentication;
-- keep every human and simulated-user certificate and token cache isolated;
-- never replace a delegated-user proof with the Dev app when the simulated
-  actor is part of the behavior.
+A scenario combines already useful capabilities to create incident-like state.
+Scenario exploration should answer technical questions about ordering, identity,
+evidence, coexistence, and reset.
 
-The cache does not survive a fresh container or revision and does not remove
-the operator browser's CBA interaction. Do not persist it during Pass 3: a
-persistent cache contains durable refresh-token credentials and needs
-encryption, locking, eviction, revocation handling, and cross-replica design.
+Do not introduce teaching objectives, learner-role rules, assessment, or a
+publishable-lab contract unless Sean explicitly changes the goal to lab design.
 
-The API's process-local admission boundary derives its fail-fast concurrency
-lanes from the authoritative route side-effect metadata. It never queues or
-retries a bounded mutation, and it does not claim client-rate or multi-replica
-protection. Keep ingress connection/rate controls and both `minReplicas=1` and
-`maxReplicas=1` as deployment requirements until the repository's
-[Azure Table journal adapter](shared-operation-journal.md) is backed by an
-approved live table, managed-identity role, network readiness, and explicit
-distributed admission architecture. The explicit topology-plan
-contract and authoritative readiness read enforce the
-[single-replica fallback](api-single-replica-fallback.md). See
-[API process-local backpressure](api-abuse-backpressure.md).
-The
-[offline Container Apps artifact compiler](api-container-app-deployment-artifact.md)
-is the sole declarative main-API artifact path. It consumes that exact
-topology plan and emits validated data only; it is not a deployment command or
-external readiness proof.
+## Worker ownership
 
-## Eventual consistency
+One peer worker can own a coherent exploration question through research, live
+proof, ordinary correction, and the minimum useful record. The worker may use
+subagents, but it remains responsible for the original question.
 
-Treat documented `201`, `202`, and `204` responses as platform acceptance when
-that is the contract. Do not turn every accepted operation into a synchronous
-recipient-observation loop.
+Return to the local coordinator when the question is answered, a real human or
+strategy decision is needed, a boundary must change, or an external dependency
+prevents useful progress.
 
-Tenant setup and platform propagation may take more than an hour. A lab may
-also include clearly identified manual steps. Neither case should be disguised
-as a short synchronous operation or treated as automatic failure.
+A test failure, local tooling problem, read timeout, or correctable review note
+is not automatically a new project phase.
 
-When a later mutation depends on convergence, use deliberate stages:
+## Review and hardening
 
-1. perform one mutation;
-2. continue other useful work or wait without holding a synchronous loop;
-3. later perform one exact observation;
-4. perform the dependent mutation only after that observation;
-5. later confirm cleanup.
+Use focused independent review only when an action could cross the sandbox
+boundary, cause a meaningful unintended external effect, lose administrative
+recovery, exceed spending, or make the claimed result untrustworthy.
 
-The owning peer worker should normally retain the goal across these stages. It
-does not need to report every stage to the Captain.
+Production reliability, least privilege, multi-replica coordination, generalized
+persistence, exhaustive validation, and defensive edge hardening are later work
+unless they directly block the current experiment.
 
-During Pass 3, workers can schedule those stages as separate actions within
-their owned goal. A future lab product may store readiness state in a durable
-lab run and use background checks to resume after long propagation. The SPA can
-display recorded status, manual instructions, or an explicit refresh; it does
-not need a tight polling loop. This repository does not yet provide that
-durable product orchestration.
+## Stop
 
-## Keep generated and private artifacts out of Git
-
-`npm test` checks the tracked Git index for generated output, caches, reports,
-local environment files, browser/session state, credentials and certificates,
-package/container residue, temporary files, and protected worker artifacts.
-The check classifies paths only; it never opens those artifacts or emits their
-contents. A forced-added artifact still fails even when an ignore rule normally
-hides it.
-
-Ignore rules remain a local convenience rather than a security boundary.
-Sanitized source and fixtures use ordinary source extensions; `.env.example`,
-the package lockfile, Dockerfiles, token-verifier source, and journal
-implementations remain valid tracked inputs.
-
-## Keep workflow authority separate from build steps
-
-`npm test` statically checks every tracked GitHub Actions workflow. Workflows
-must declare bounded triggers, explicit permissions, Linux-hosted runners,
-concurrency cancellation, safe checkout and artifact paths, and classified
-action references. Third-party actions require an immutable commit SHA;
-GitHub-owned actions may use a major version tag and remain visibly classified
-as mutable.
-
-Jobs that install dependencies or run repository scripts cannot hold write or
-OIDC authority. The Pages workflow therefore builds with read-only contents
-access, uploads only `dist`, and grants Pages/OIDC writes only to a separate
-shell-free deployment job. Manual deployments remain restricted to `main`.
-
-## Focused mutation-safety review
-
-Use a focused review when the operation is broadly destructive, difficult to
-recover from, or capable of crossing a real lab boundary.
-
-The review checks that:
-
-- the target environment, actor, fixed target, and permissions are correct;
-- an ambiguous response cannot cause an automatic duplicate mutation;
-- markers, retained IDs, or equivalent ownership evidence prevent cleanup of
-  the wrong object;
-- malformed, mismatched, or incomplete reconciliation stops before a dangerous
-  mutation;
-- partial success has an acceptable recovery or cleanup path;
-- credentials, tokens, private evidence, and raw sensitive responses do not
-  escape;
-- external effects, public exposure, administrative recovery, and spending
-  remain inside the established boundary;
-- unrelated product operations and authentication behavior remain unchanged.
-
-It is not a request to harden every defensive edge in controlled development
-tooling. Correctable local issues remain with the owning worker and do not
-begin another review cycle.
+Stop when the stated question is answered well enough for the next decision.
+Do not continue merely because adjacent work exists, a worker is idle, or the
+prototype could be made more complete.

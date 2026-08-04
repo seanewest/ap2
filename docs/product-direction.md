@@ -1,71 +1,89 @@
-# AP2 Product Direction and Pass 3 Charter
+# AP2 product direction and current exploration
 
-> This document provides context, not a backlog.
->
-> It does not authorize agents to implement future ideas. The current task from Sean or Captain always defines the actual scope. Do not build something merely because it appears in this document.
+## Long-term direction
 
-## Ultimate product direction
+The eventual product may provide cybersecurity labs in a Microsoft 365 and
+Azure tenant dedicated to training. A lab could stage realistic activity, let a
+student investigate it with real security tools, and support teaching or
+assessment around what happened.
 
-The eventual product is a cybersecurity learning platform.
+That long-term idea is a direction, not the current backlog.
 
-A student connects a Microsoft 365 and Azure tenant reserved for AP2
-cybersecurity labs. That tenant must never contain personal or production work.
-Each lab creates a controlled, realistic scenario inside it—possibly based on a
-real security event—and teaches the student how to detect and respond using the
-same tools they would use in practice.
+## Current stage
 
-The learning experience may eventually include:
+AP2 is still mapping what is technically possible and useful. The immediate
+work is to learn which actions and observations can be performed reliably,
+which identities and transports they require, what Microsoft records, how long
+state takes to appear, and how practical reset is.
 
-1. Creating controlled activity inside the student's tenant.
-2. Letting the student investigate that activity with real Microsoft tools.
-3. Providing video or other educational material explaining detection and response.
+Examples include:
 
-Before building the educational content, we need to understand how to build the underlying tenant automator or simulator.
+- creating, changing, observing, and removing Microsoft 365 content;
+- producing user, application, identity, endpoint, and infrastructure activity;
+- observing security, audit, and administrative evidence;
+- composing several actions into incident-like tenant state;
+- exploring endpoints, SaaS connections, Azure resources, applications,
+  Kubernetes, attack paths, and other surfaces that have barely been tested.
 
-Lab construction is the content boundary. AP2 may modify or delete any tenant
-content created after construction begins. This dedicated-tenant contract
-changes the cleanup risk: later lab content does not need the preservation
-guarantees required in a personal or production tenant. It does not authorize
-AP2 to act in another tenant or to treat pre-construction content as disposable.
+There is far more platform exploration to do before AP2 needs a general model
+for teaching, learner roles, lesson flow, assessment, or publishable labs.
+Those topics should be worked on only when Sean explicitly asks for them.
 
-## The simulator we are exploring
+## Capability, scenario, and lab
 
-The simulator may eventually need to perform actions such as:
+A capability is one repeatable action or observation. A scenario is a technical
+composition of capabilities that creates a useful incident-like state. A lab is
+a later educational experience built around a scenario.
 
-- Creating or configuring Azure resources.
-- Creating controlled Microsoft 365 user activity.
-- Simulating ordinary user behavior.
-- Changing selected security settings.
-- Producing events that security tools can detect.
-- Verifying or restoring tenant state after an experiment.
+Current work is mostly capabilities and early scenario composition. A scenario
+can be valuable even when no learner workflow has been designed.
 
-We do not yet know the complete list of safe or practical operations.
+See [the product vocabulary](product-model.md) for the fuller distinction.
 
-An important part of the exploration is learning Microsoft's boundaries. Some activity may be unsafe, unrealistic, prohibited, or likely to trigger abuse protections. For example, repeatedly causing failed sign-ins or attempting to simulate denial-of-service activity would not be appropriate.
+## Dedicated sandbox model
 
-We should begin with small, controlled actions and learn from real results.
+The fixed Student tenant currently used by AP2, and any future student-provided
+tenant used by the product, are dedicated sandboxes. They should not contain
+personal or production work.
 
-## What Pass 3 is for
+A practical baseline may retain simulated users, licenses, applications, and
+configuration because recreating them is slow. That baseline is operational
+convenience, not valuable data that must be preserved exactly. Microsoft365DSC
+or similar tooling may eventually help restore selected baseline configuration.
 
-This repository is the third exploratory pass. It is intentionally disposable.
+Scenario state—messages, meetings, files, calls, permissions, resources,
+security signals, and other staged activity—is disposable. Azure can often be
+reset through resource-group deletion. Microsoft 365 usually requires
+workload-specific cleanup, and both creation and cleanup may take time to
+propagate. Historical audit, retention, recycle-bin, and deleted-object residue
+may remain.
+
+A useful reset returns the sandbox to a state where another experiment can run.
+It does not need to prove that Microsoft restored an exact previous snapshot.
+
+## Pass 3
+
+This repository is the third exploratory pass of After Party despite the `ap2`
+name. Earlier passes were discarded and restarted. This pass should preserve
+useful code and evidence while remaining willing to remove mistaken
+architecture and rewrite accumulated guidance.
 
 Pass 3 has two purposes:
 
-1. Explore what Microsoft 365 and Azure activity can be automated or simulated, how it works, and what limitations we encounter.
-2. Improve Sean's workflow for directing and collaborating with LLM agents.
+1. learn the available technical medium across Microsoft and connected security
+   systems;
+2. improve the way Sean collaborates with agents while doing that exploration.
 
-The implementation may eventually be thrown away and rebuilt in another pass. That is expected, not a failure.
+Optimize for learning and feedback speed. Prefer one decisive live experiment
+over a generalized framework. Add durable product architecture only after
+repeated work reveals a stable need.
 
-Pass 3 should optimize for architectural learning and feedback speed. Prove one capability end to end, defer hardening and general frameworks until repeated need makes them useful, and use per-run identifiers for created artifacts.
+## Real boundaries
 
-During Pass 3, the rehearsal API may be kept warm as needed because development speed and exploration take priority over minimizing hosting cost. Later passes should revisit student-borne hosting cost, scale-to-zero behavior, and SPA timeout and user messaging when the API is cold. Do not build cold-start or cost-control machinery solely for those concerns in Pass 3.
+Broad exploratory permissions are acceptable inside the dedicated sandbox when
+they reduce friction. Actor identity still matters when the experiment is meant
+to appear as a specific user, application, or device.
 
-## Pass 3 identity and permission posture
-
-The Dev app is a development and test identity for Pass 3. It will never be installed, consented, or present in a real student's tenant. It may directly query or manipulate Microsoft services for development and diagnostics.
-
-During this exploratory pass, the human operator, backend/API automation identity, Dev app, and shared simulated-user client should receive broad permissions appropriate to exploration so work is not repeatedly blocked by least-privilege decisions. Production hardening and least-privilege review are deferred to a later pass.
-
-Broad permissions do not erase actor boundaries. The operator uses the SPA/API, backend administrative operations use the API/backend identity, and activity intended to appear as a simulated user uses that user's delegated identity.
-
-Pass 3 should minimize app identities and registrations. Reuse one identity where the actor and authentication model are the same, and create another only for a genuinely distinct actor or authentication flow. The current shared simulated-user client is an Entra OAuth client used to acquire delegated tokens for simulated users; it is not a process, worker, or long-running job, and it is shared rather than created per user.
+Protect credentials, administrative recovery, systems outside the sandbox,
+public exposure, service-abuse limits, and spending. Do not confuse those real
+boundaries with preservation of disposable tenant state.
