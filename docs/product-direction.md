@@ -46,14 +46,21 @@ The fixed Student tenant currently used by AP2, and any future student-provided
 tenant used by the product, are dedicated sandboxes. They should not contain
 personal or production work.
 
-A practical baseline may retain simulated users, licenses, applications, and
-configuration because recreating them is slow. That baseline is operational
-convenience, not valuable data that must be preserved exactly. Microsoft365DSC
-or similar tooling may eventually help restore selected baseline configuration.
+The current architecture places AP2's development and execution infrastructure
+inside the Student tenant. That tenant-resident control plane includes the
+application and service-principal identities, development automation identity,
+API and its managed identity, required permissions, simulated users, licensing,
+and selected configuration needed to operate AP2. Preserve it by default. It is
+infrastructure, not scenario residue, even though it lives inside the sandbox.
 
-Scenario state—messages, meetings, files, calls, permissions, resources,
-security signals, and other staged activity—is disposable. Azure can often be
-reset through resource-group deletion. Microsoft 365 usually requires
+A different product could centralize more of that control plane in a separate
+provider tenant, but that is a different architecture and not a current goal.
+Microsoft365DSC or similar tooling may eventually help describe and restore the
+retained tenant baseline.
+
+Scenario state—messages, meetings, files, calls, temporary permissions, marked
+resources, security signals, and other staged activity—is disposable. Azure can
+often be reset through resource-group deletion. Microsoft 365 usually requires
 workload-specific cleanup, and both creation and cleanup may take time to
 propagate. Historical audit, retention, recycle-bin, and deleted-object residue
 may remain.

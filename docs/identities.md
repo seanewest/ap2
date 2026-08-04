@@ -1,5 +1,10 @@
 # Identities
 
+The identities and API shown below form the tenant-resident AP2 control plane for
+the current architecture. They are inside the dedicated Student sandbox but are
+not ordinary disposable scenario state. Preserve them during routine capability
+and scenario cleanup unless an explicit infrastructure goal replaces them.
+
 ## Identity diagram
 
 ```text

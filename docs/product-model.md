@@ -66,14 +66,18 @@ architecture.
 
 ## Baseline and disposable state
 
-A sandbox can keep a practical baseline such as simulated users, licensing,
-applications, and selected configuration. The baseline may later be managed by
-Microsoft365DSC or other reset tooling.
+The current Student tenant contains a retained AP2 control plane: application
+and service-principal identities, the development automation identity, the API
+and runtime managed identity, required authority, simulated users, licensing,
+and selected baseline configuration. These are operational infrastructure and
+must survive ordinary capability and scenario cleanup. They may later be
+managed by Microsoft365DSC or other baseline tooling.
 
-Capability and scenario runs add disposable state. Reset is likely to be staged
-and workload-specific because Microsoft 365 lacks an Azure-style universal
-resource container. Propagation delay, retention, audit history, recoverable
-deletion, and partial cleanup are expected platform properties.
+Capability and scenario runs add disposable state around that control plane.
+Reset is likely to be staged and workload-specific because Microsoft 365 lacks
+an Azure-style universal resource container. Propagation delay, retention,
+audit history, recoverable deletion, and partial cleanup are expected platform
+properties.
 
 The useful question is whether the sandbox is ready enough for the next run,
 not whether every historical trace disappeared.

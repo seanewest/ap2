@@ -40,10 +40,22 @@ machinery to eliminate every uncertainty.
 
 ## Work in a disposable sandbox
 
-The AP2 tenant and explicitly selected subscriptions are dedicated sandboxes.
-Their state is not valuable user or production data. Simulated users and useful
-baseline configuration may be retained because rebuilding them is inconvenient,
-not because their current state must be preserved exactly.
+The AP2 tenant and explicitly selected subscriptions are dedicated sandboxes,
+but the sandbox contains two different classes of state.
+
+The tenant-resident AP2 control plane is the infrastructure required to develop
+and run the current architecture: application registrations and service
+principals, the development automation identity, the API and its managed
+identity, required roles and permissions, simulated users, licensing, and other
+selected baseline configuration. Preserve that control plane by default. It may
+be rebuildable, but deleting or casually resetting it would disable AP2 and is
+not ordinary scenario cleanup. Change or remove it only when the current goal
+explicitly concerns that infrastructure or replaces it deliberately.
+
+Capability and scenario runs create disposable experimental state around that
+control plane. Messages, meetings, files, calls, temporary permissions, marked
+Azure resources, security signals, and similar staged activity may be removed
+or left as acceptable historical residue according to the current experiment.
 
 Protect the boundaries that actually matter:
 

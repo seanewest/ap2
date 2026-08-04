@@ -7,13 +7,16 @@ This repository does not yet provide general reset automation.
 
 ## Baseline model
 
-A practical baseline may retain simulated users, licenses, applications, and
-selected configuration because recreating them is slow. Those objects are not
-valuable production data and do not require exact preservation unless a
-specific experiment says otherwise.
+The sandbox has a retained control plane that ordinary reset must not remove:
+application registrations and service principals, the development automation
+identity, the API and its managed identity, required permissions, simulated
+users, licensing, and selected configuration needed to develop and run AP2.
+This infrastructure may be rebuildable, but it is operationally necessary in
+the current tenant-local architecture. Reset it only when a separate explicit
+goal is changing or replacing that architecture.
 
-A capability or scenario run should retain only the state needed to understand
-and later reconcile its effects:
+A capability or scenario run should retain only the additional state needed to
+understand and later reconcile its effects:
 
 - a run marker and approximate start time;
 - the target tenant, subscription, and actors;
