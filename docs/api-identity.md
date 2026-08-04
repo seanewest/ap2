@@ -146,12 +146,15 @@ raw Graph responses.
 One process-local boundary serializes share and cleanup across operator and
 Dev-app callers. Concurrent requests receive
 `proof_operation_busy`. This is rehearsal-only coordination: it has no durable
-lock, database, queue, or cross-replica protection. The live proof therefore
-requires Container Apps `minReplicas=1` and `maxReplicas=1`. Replacing this
-boundary is blocked on
-the shared-store choice recorded in the
-[durable operation journal decision](durable-operation-journal-decision.md);
-do not substitute container-local or filesystem state.
+lock, database, queue, or cross-replica protection. The accepted Pass 3 topology
+therefore keeps one warm replica with `minReplicas=1` and `maxReplicas=1`, which
+also avoids slow cold starts during development.
+
+If a future explicit goal requires multiple replicas or durable crash recovery,
+use the design recorded in the
+[durable operation journal decision](durable-operation-journal-decision.md).
+The existence of that design is not a current integration obligation; do not
+substitute container-local or filesystem state for a real shared store.
 
 ## One calendar rehearsal
 
@@ -231,6 +234,11 @@ The shared public client must already have delegated
 Certificates and tokens remain outside repository and response output.
 
 ## Identity setup and rollback
+
+> **Control-plane operation:** Setup changes the retained Product/Student AP2
+> identity boundary. Rollback is for a failed setup or an explicit replacement
+> or retirement goal. It is not routine capability, scenario, permission, or
+> sandbox cleanup.
 
 Use separate `AZURE_CONFIG_DIR` directories for Product and Student. The setup
 tool refuses the normal `~/.azure` directory, asserts both the selected account

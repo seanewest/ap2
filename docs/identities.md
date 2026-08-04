@@ -1,5 +1,19 @@
 # Identities
 
+The identities and API shown below form the AP2 control plane for the current
+architecture. It spans the Product tenant's multitenant app/API registration and
+the Student tenant's enterprise application, development and runtime identities,
+permissions, simulated-user identities, licensing, and authentication setup.
+Preserve both sides during routine capability and scenario cleanup unless an
+explicit infrastructure goal changes or replaces them.
+
+A simulated-user identity is baseline infrastructure; that user's mailbox,
+calendar, files, Teams activity, scenario-specific memberships, and temporary
+permissions are not. Existing broad development permissions are also baseline
+for Pass 3 and should not be churned between experiments. A grant is ordinary
+cleanup only when it was explicitly introduced as temporary for the current
+experiment.
+
 ## Identity diagram
 
 ```text
@@ -36,6 +50,14 @@ Student tenant
 │       │   in a fresh headless browser context
 │       └── keeps delegated tokens only in isolated process-memory caches
 ```
+
+## Architectural credential boundary
+
+The SPA is a public client. It may contain public identifiers and request
+delegated access, but it must never contain client secrets, certificates, private
+keys, refresh tokens, or backend credentials. Development certificates and
+privileged tokens remain outside the repository and browser and are used only by
+the appropriate backend or local development process.
 
 ## Backend identities
 

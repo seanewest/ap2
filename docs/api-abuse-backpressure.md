@@ -1,5 +1,9 @@
 # API process-local backpressure
 
+> **Current Pass 3 posture:** This document records an existing one-process
+> boundary. It does not create a current goal to add ingress infrastructure,
+> rate limiting, distributed coordination, or production hardening.
+
 The production API now has a small fail-fast admission boundary derived from
 the authoritative route registry. It exists to keep one Node process from
 accepting unbounded simultaneous authentication, request-body, verifier, or
@@ -71,21 +75,18 @@ Focused server tests additionally abort a client after a fake mutation starts
 and prove that the same route remains refused until the original operation
 settles.
 
-## Required platform boundary
+## Current deployment boundary
 
 The repository has no main-API ingress or Container Apps infrastructure
-definition, so it cannot truthfully enforce client rate, connection count,
-aggregate replicas, or upstream queueing. Deployment must keep
-`minReplicas=1` and `maxReplicas=1` while mutation ownership and token caches
-remain process-local. The repository's
-[single-replica fallback](api-single-replica-fallback.md) rejects explicit
-topology-plan or read-only readiness drift.
-Ingress must independently bound connection creation, header/body bytes,
-request rate, and aggregate concurrent requests before traffic reaches the
-container. Any upstream overload response must be fixed and must not
-automatically retry bounded-mutation methods.
+definition, so it does not claim client-rate, connection-count, aggregate-load,
+or upstream-queueing protection. The accepted Pass 3 topology keeps one warm
+replica with `minReplicas=1` and `maxReplicas=1` while mutation ownership and
+token caches remain process-local. The repository's
+[single-replica fallback](api-single-replica-fallback.md) checks that topology.
 
-A future multi-replica deployment needs the durable operation journal already
-identified by the architecture decision plus an ingress-level rate and
-concurrency policy. Increasing these process-local counters is not a
-replacement for either boundary.
+No new ingress hardening is required merely to continue capability exploration.
+If a future explicit goal broadens exposure, load, or replica count, that goal
+should define the needed ingress connection, byte, request-rate, concurrency,
+and overload behavior. A multi-replica goal would also need the retained durable
+journal design. Increasing the one-process counters is not a substitute for
+those future boundaries.

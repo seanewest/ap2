@@ -1,5 +1,10 @@
 # Executable generalized scenario manifest
 
+> **Status:** Experimental Pass 3 architecture already present in the
+> repository. Preserve or use it when a current technical question benefits from
+> it; do not treat its generalization as the default direction for new
+> capabilities. See [the current product direction](product-direction.md).
+
 `compileExecutableScenarioManifest` is a pure, local composition boundary for
 an already-authored scenario lifecycle. It does not execute a scenario. It
 accepts the exact manifest and canonical plan already bound by the lifecycle

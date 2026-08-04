@@ -1,23 +1,37 @@
-# Lab reset strategy
+# Sandbox reset strategy
 
-The eventual student uses a tenant dedicated to AP2 cybersecurity labs, as
-defined in the [product direction](product-direction.md). Reset aims to leave
-that tenant ready enough for another lab, not to restore a personal or
-production tenant exactly. Automated and manual cleanup are both acceptable.
-This repository does not yet provide complete reset automation.
+The AP2 tenant is a dedicated sandbox. Reset aims to leave it ready enough for
+another capability or scenario run, not to restore an exact snapshot or erase
+ordinary Microsoft history. Automated and manual cleanup are both acceptable.
+This repository does not yet provide general reset automation.
 
 ## Baseline model
 
-Each lab run should retain:
+The sandbox participates in a retained AP2 control plane that ordinary reset
+must not remove. The Product tenant owns the multitenant app/API registration;
+the Student tenant owns its enterprise application, development automation
+identity, API and managed identity, standing permissions, simulated-user
+identities, licenses, authentication setup, and selected configuration. Reset
+that infrastructure only when a separate explicit goal changes or replaces the
+architecture.
 
-- a unique lab run ID and construction start time;
-- the target tenant and simulated users;
-- original values for pre-construction settings that must survive;
-- created artifact IDs, stable markers, and parent-child relationships;
-- accepted operations whose final visibility has not yet been observed;
-- cleanup progress, known residue, conflicts, and manual steps.
+Preserve simulated-user identity and access setup, but not every object those
+users own. Mailbox contents, calendar entries, files, Teams activity,
+scenario-specific memberships, and temporary permissions are ordinary workload
+state. Standing development permissions are retained baseline; do not revoke and
+regrant them during reset. Remove only grants explicitly created as temporary
+for the run being cleaned up.
 
-When cleanup is automated, it should run in reverse dependency order:
+A capability or scenario run should retain only the additional state needed to
+understand and later reconcile its effects:
+
+- a run marker and approximate start time;
+- the target tenant, subscription, and actors;
+- created or changed artifact IDs and useful relationships;
+- accepted operations whose later visibility is still unknown;
+- cleanup progress, known residue, and any manual step still needed.
+
+When cleanup is automated, reverse dependency order is often useful:
 
 1. stop pending jobs;
 2. remove shares, memberships, permissions, and relationships;
@@ -28,12 +42,12 @@ When cleanup is automated, it should run in reverse dependency order:
 
 Audit logs, recoverable deletion, mail retention, recycle-bin history, and
 known remnants may remain. Record incomplete cleanup and use manual steps when
-useful; the dedicated lab tenant makes imperfect cleanup acceptable. Reset
+useful; the dedicated sandbox makes imperfect cleanup acceptable. Reset
 must not claim that Microsoft erased history or restored an exact prior state.
 
 ## Broad cleanup
 
-Azure labs should prefer a dedicated resource group with the lab run ID in
+Azure experiments should prefer a dedicated resource group with the run marker in
 tags. Deleting the resource group is the broadest and simplest cleanup
 boundary.
 
@@ -66,7 +80,7 @@ The tool should:
 8. confirm active absence read-only without polling or permanent purge.
 
 Deleting an organizer event can generate attendee cancellation behavior. The
-dedicated-tenant contract permits future cleanup to delete post-construction
+dedicated-tenant contract permits cleanup to delete marked sandbox
 calendar content, but the current preview only records organizer/attendee
 distinctions and refuses every mutation. Its schema-v2 contract has no apply
 scope: `classifiedAction` is diagnostic only, every otherwise actionable item
@@ -84,7 +98,7 @@ zero eligible and zero indeterminate events.
 The fixture is therefore confirmed absent, and the canary showed that
 `If-Match` cannot be used for selective drift protection on this route. Under
 the dedicated-tenant contract, that result does not forbid a future reset from
-deleting post-construction calendar content. This repository still retains no
+deleting marked sandbox calendar content. This repository still retains no
 executable calendar mutation or apply path: organizer cancellation,
 attendee-copy deletion, appointment deletion, and broad calendar apply remain
 unsupported. Any future automation must be implemented and reviewed

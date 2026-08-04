@@ -23,8 +23,10 @@ Before shutdown, one
 [process-local backpressure boundary](api-abuse-backpressure.md) admits
 bounded work by the route registry's side-effect class. A full lane refuses
 immediately without authenticating, reading JSON, queueing, or retrying. This
-single-process boundary does not replace ingress rate/connection controls,
-`maxReplicas=1`, or a durable cross-replica mutation journal.
+boundary operates inside the accepted warm one-replica Pass 3 topology; it does
+not claim ingress-wide or multi-replica protection. Ingress hardening or a
+durable cross-replica journal belongs only to a future explicit goal that
+broadens exposure, load, or replica count.
 
 `npm run test:api-lifecycle-container` builds and exercises the real production
 image. It proves:

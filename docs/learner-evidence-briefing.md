@@ -1,5 +1,10 @@
 # Learner evidence briefing
 
+> **Status:** Historical Pass 3 prototype. This document records an existing
+> learner-facing projection that may remain in the codebase. It is not a current
+> instruction to expand learner architecture or design labs. See
+> [the current product direction](product-direction.md).
+
 The learner evidence briefing is a bounded, read-only projection of one
 accepted canonical plan and one verified sanitized receipt. It currently
 supports only the proven `help-desk-email-observation` contract.

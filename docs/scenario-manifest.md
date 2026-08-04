@@ -1,13 +1,14 @@
 # Capability orchestration manifest
 
-The schema-v2 scenario manifest is the runtime-validated orchestration
-boundary for one reusable capability building block. It is not a complete
-learner lab. It is a plan and evidence contract,
-not proof that setup ran. Microsoft API acceptance, resource readiness, and a
-planned learner task cannot be presented as learner evidence. The separate
-[learner-lab product model](product-model.md) requires a coherent story and a
-connected evidence chain across at least two building blocks before anything
-is published as a lab.
+The schema-v2 scenario manifest is an experimental runtime contract created
+during Pass 3. It can describe one capability composition and preserve the
+meaning of its planned operations and evidence. Its presence does not require
+new capabilities to use this architecture, and it is not the current project's
+universal scenario or lab model.
+
+A compiled plan is not proof that setup ran. Microsoft API acceptance,
+resource readiness, and later observation remain separate facts. See
+[capability, scenario, and lab vocabulary](product-model.md).
 
 `parseScenarioManifest` accepts only schema version 2 and validates these
 bounded sections:

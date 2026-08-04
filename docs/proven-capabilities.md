@@ -6,10 +6,11 @@ bounded direct canary against the Student tenant. Unit tests, deployment alone,
 and code that has not touched Microsoft are not counted as live proof.
 
 A capability rehearsal or environment-validation canary proves a platform
-contract. It is not automatically a learner lab. Source-backed capability
-manifests additionally preserve the evidence producer, workload actor,
-learner/observer, and optional responder needed for safe orchestration. Those
-internal roles do not by themselves create a learner story.
+contract. It is not automatically a scenario or lab. Some existing source-backed
+manifests preserve evidence-producer, workload-actor, learner/observer, and
+responder fields created during earlier Pass 3 architecture work. Those fields
+remain facts about that code; they are not requirements for future capability
+exploration.
 
 Actor shorthand:
 
@@ -151,9 +152,10 @@ and learner remain uninspected, and it does not add restoration or a Lab.
   creation, or spend after the wizard appeared in a shared physical Windows
   session. WCD, its exact project directory, package/project files, marker
   resources/devices, package identity, and tenant mutation were reconciled
-  absent. A future pass must author the package in a separately authorized
-  isolated interactive Windows client, then use the
-  [fail-closed headless execution contract](shared-device-provisioning-package.md).
+  absent. If a future endpoint question needs this path, the package would need
+  to be authored in an isolated interactive Windows client before using the
+  retained [headless execution contract](shared-device-provisioning-package.md).
+  This is a limitation, not an active backlog item.
 - The dedicated Teams Call Canary's first authorized audio-only create attempt
   retained only a `4xx` class. A separately authorized unanswered
   follow-up then made exactly one create attempt with the corrected diagnostic
@@ -235,12 +237,11 @@ and learner remain uninspected, and it does not add restoration or a Lab.
   contract declares no apply scope, and its classified actions are diagnostic
   metadata with no planned or executable action.
 - Mutations are deliberately not retried. Some hosted operations use fixed
-  markers, IDs, eTags, browser state, and a process-local busy boundary, but
-  the main API has no durable queue, database, cross-replica lock, or
-  exactly-once guarantee across callers, replicas, or restarts. The repository
-  has derived the two production consumers and the required claim/recovery
-  contract, but implementation is blocked on a production shared-store choice;
-  see the
+  markers, IDs, eTags, browser state, and a process-local busy boundary. The
+  accepted Pass 3 API keeps one warm replica, which avoids cold starts and keeps
+  those process-local boundaries coherent. It does not claim exactly-once
+  behavior across multiple replicas or restarts. A shared-journal design is
+  retained for a future explicit multi-replica or crash-recovery need; see the
   [durable operation journal decision](durable-operation-journal-decision.md).
 - Simulated-user MSAL caches exist only in API process memory. The first
   request after a restart may launch an isolated headless CBA browser; later

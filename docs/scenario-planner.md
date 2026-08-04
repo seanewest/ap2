@@ -1,5 +1,10 @@
 # Local scenario execution-plan compiler
 
+> **Status:** Experimental Pass 3 tooling. A planner is optional machinery, not
+> a prerequisite for capability exploration or scenario composition. Extend it
+> only when a current experiment needs it. See
+> [the current product direction](product-direction.md).
+
 The scenario planner turns one canonical runtime-validated scenario manifest
 into a deterministic, sanitized readiness plan. It is a pure local compiler:
 it does not execute setup, evidence, learner, response, cleanup, tenant, cloud,

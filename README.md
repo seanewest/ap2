@@ -1,30 +1,31 @@
 # AP2
 
-AP2 is a TypeScript SPA and API used to explore bounded Microsoft 365 and Azure
-lab operations. Operators sign in through the multitenant `After Party
-Exploratory` application, then explicitly trigger fixed rehearsal actions.
+AP2 is an exploratory TypeScript SPA, API, and collection of automation used to
+learn what can be created, changed, observed, composed, and reset across
+Microsoft 365, Azure, endpoints, and related security systems.
 
-The product distinguishes reusable
-[capability building blocks from complete learner labs](docs/product-model.md).
-No complete labs are currently published.
+The current work is capability exploration and early technical scenario
+composition. It is not a general learner-lab authoring effort. See
+[capability, scenario, and lab vocabulary](docs/product-model.md).
 
 ## Architecture
 
 See:
 
-- [Product direction and Pass 3 charter](docs/product-direction.md)
-- [Capabilities and learner labs](docs/product-model.md)
+- [Product direction and current exploration](docs/product-direction.md)
+- [Capability, scenario, and lab vocabulary](docs/product-model.md)
 - [Identities](docs/identities.md)
 - [Proven capabilities](docs/proven-capabilities.md)
-- [Pass 3 development workflow](docs/development-workflow.md)
+- [Pass 3 exploration workflow](docs/development-workflow.md)
 - [Private document evidence contract](docs/private-document-evidence.md)
 - [Lab reset strategy](docs/lab-reset-strategy.md)
 
 ## Developer bootstrap
 
 See the [Microsoft Entra developer bootstrap guide](gh-docs/developer-bootstrap.md)
-to create or tear down the minimal multi-tenant application registration from
-Azure Cloud Shell.
+to create or verify the minimal multi-tenant application registration from
+Azure Cloud Shell. Its teardown path is only for an explicit control-plane
+replacement or retirement goal, not routine sandbox cleanup.
 
 ## Develop
 
