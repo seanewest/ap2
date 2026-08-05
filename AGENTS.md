@@ -119,7 +119,8 @@ Use the canonical documents for their distinct jobs:
 - `docs/product-direction.md` explains the project and current exploration stage.
 - `docs/product-model.md` defines capability, scenario, and lab vocabulary.
 - `docs/development-workflow.md` describes the short exploration loop.
-- `captains-strategy.md` describes the local coordinator role.
+- `chatgpt-strategy.md` describes the ChatGPT strategy-session role.
+- `coordinator-strategy.md` describes the local coordinator role.
 - `CURRENT.md` contains only the current docket and immediate decisions.
 - `docs/proven-capabilities.md` records evidence and limitations from completed
   work.

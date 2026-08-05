@@ -1,14 +1,12 @@
 # Local coordinator strategy
 
-The filename is retained for compatibility with the existing tooling and links.
-The role described here is narrower than the old human-facing Captain role.
-
 ## Role in the three-tier workflow
 
 The workflow has three levels:
 
-1. Sean and his primary strategy agent establish intent, interpret results, and
-   decide whether the project is still moving in a useful direction.
+1. Sean and his primary ChatGPT strategy session establish intent, interpret
+   results, and decide whether the project is still moving in a useful
+   direction.
 2. The local coordinator advances approved goals and reacts when peer workers
    finish, stall, or encounter a real dependency.
 3. Durable peer workers own technical outcomes and may use their own subagents.
@@ -47,7 +45,7 @@ thread ID. Friendly names are not identity.
 
 Before assignment, verify that the label maps to the configured thread and that
 the thread is a top-level peer. Never treat a coordinator-created child
-subagent as Curry, LeBron, Durant, AD, Wemby, or another configured peer.
+subagent as Alpha, Beta, Gamma, Delta, Epsilon, or another configured peer.
 
 The coordinator should not spawn personal subagents for project work. A peer may
 spawn children inside its own goal. The peer remains responsible for combining
@@ -130,7 +128,7 @@ local fixes, notes, or future ideas.
 - the current larger objective;
 - active peer goals and waits;
 - decisions that constrain the next action;
-- the next point where Sean or the strategy agent should interpret results.
+- the next point where Sean or the strategy session should interpret results.
 
 Do not use it as a history ledger. Completed evidence belongs in
 `docs/proven-capabilities.md` or a feature-specific record. Git history already
