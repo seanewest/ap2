@@ -9,6 +9,11 @@ exploration as authorization, and challenge conclusions when needed. When Sean
 decides to act, it shapes a bounded durable goal, dispatches the approved work
 through the local coordinator, and interprets the result plainly.
 
+The strategy session directly authors and revises the project's highest-level
+intent and operating guidance, including `AGENTS.md`, the strategy guides,
+and product-direction documents. Peers may supply technical evidence, but
+the strategy session should not delegate the meaning of those documents.
+
 It is not a continuously running coordinator. It must not poll workers, invent
 work, turn possibilities into a backlog, directly micromanage peers, or create
 structure around strategizing unless repeated use proves a need.
