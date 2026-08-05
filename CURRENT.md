@@ -6,8 +6,8 @@ rules belong in `AGENTS.md` and focused architecture documents.
 
 ## Current objective
 
-Wait for Sean and his primary strategy conversation to shape the first useful
-post-migration capability goal. The local coordinator must not choose that goal.
+Review the captured Pass 3 Student-tenant reconstruction specification. It
+records desired state only; replacement-tenant implementation remains separate.
 
 ## Current state
 
@@ -22,22 +22,15 @@ post-migration capability goal. The local coordinator must not choose that goal.
 - A harmless migration canary proved one exact goal-card assignment, peer final,
   automatic coordinator delivery, coordinator interpretation, and durable
   recovery while proactive liveness was off.
-- No AP2 product implementation goal is active.
+- Peer Gamma captured the authorized Student-tenant reconstruction specification;
+  it awaits independent review and replacement-tenant implementation.
 
 ## Operating state
 
-The coordinator is idle and should react only to explicit peer events or goals
-that Sean and the primary strategy conversation have already shaped. It must not
-turn unexplored areas, historical findings, or optional hardening into a docket.
-
-The five peers are idle. Each peer should receive one durable goal with a clear
-intent, reason, stop condition, and only the constraints that materially affect
-that goal. A peer may use child subagents, but those children are not configured
-peers.
+The coordinator remains reactive and the peers are idle. This capture made no
+Microsoft 365 or Azure changes and authorizes no replacement-tenant bootstrap.
 
 ## Next interpretation point
 
-Sean and the primary strategy conversation decide what capability question, if
-any, should become the first real peer goal. That decision should begin from the
-current product direction and a concrete learning need, not from the historical
-team's unfinished assignments or adjacent possibilities.
+Sean and the primary strategy conversation decide whether the reviewed capture
+is ready for a separately authorized replacement-tenant implementation.

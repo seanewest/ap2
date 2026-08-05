@@ -1,0 +1,637 @@
+{
+  "schemaVersion": 1,
+  "kind": "ap2-pass3-student-control-plane",
+  "status": "reconstruction-intent-only",
+  "bindingClasses": [
+    "stable",
+    "human-supplied",
+    "generated",
+    "discovered",
+    "intentionally-excluded-historical"
+  ],
+  "freshEnvironment": {
+    "tenant": {
+      "bindingClass": "human-supplied",
+      "description": "A new Microsoft 365 trial tenant supplied by Sean; its tenant ID and initial domain are discovered after creation."
+    },
+    "initialAdministrator": {
+      "bindingClass": "human-supplied",
+      "description": "The enabled initial tenant administrator account supplied during trial creation."
+    },
+    "azureSubscription": {
+      "bindingClass": "human-supplied",
+      "offer": "Azure pay-as-you-go",
+      "tenantRelationship": "created separately and associated with the fresh Student tenant",
+      "subscriptionId": "discover"
+    },
+    "defaultLocation": {
+      "bindingClass": "stable",
+      "value": "eastus",
+      "validation": "confirm required providers, quota, SKUs, and image versions before each deployment"
+    }
+  },
+  "stablePublicResources": {
+    "microsoftGraph": {
+      "bindingClass": "stable",
+      "applicationId": "00000003-0000-0000-c000-000000000000"
+    },
+    "exchangeOnline": {
+      "bindingClass": "stable",
+      "applicationId": "00000002-0000-0ff1-ce00-000000000000"
+    },
+    "windowsDefenderAtp": {
+      "bindingClass": "stable",
+      "applicationId": "fc780465-2017-40d4-a0c5-307022471b92"
+    },
+    "afterPartyProduct": {
+      "bindingClass": "stable",
+      "ownership": "Product tenant",
+      "applicationId": "c91c7af4-b1b8-4730-a240-4a1c6137ab15",
+      "identifierUri": "api://c91c7af4-b1b8-4730-a240-4a1c6137ab15",
+      "signInAudience": "AzureADMultipleOrgs",
+      "studentInstallation": "discover enterprise application by applicationId; do not bind by display name",
+      "publicClientRedirectUris": [
+        "http://localhost/ap2-simulated-user-callback"
+      ],
+      "spaRedirectUris": [
+        "https://seanewest.github.io/ap2/",
+        "http://localhost:5173/"
+      ],
+      "api": {
+        "accessTokenVersion": 2,
+        "delegatedScope": {
+          "bindingClass": "stable",
+          "id": "59c976f0-118f-436f-8938-e0f2f0f1c84b",
+          "value": "access_as_user",
+          "consentType": "AllPrincipals"
+        },
+        "applicationRole": {
+          "bindingClass": "stable",
+          "id": "b6e481bc-9bf3-4faf-8b11-5d3e80ba1724",
+          "value": "access_as_application",
+          "allowedMemberTypes": [
+            "Application"
+          ]
+        },
+        "requiredAccessTokenClaim": {
+          "bindingClass": "stable",
+          "name": "idtyp",
+          "essential": true
+        }
+      }
+    }
+  },
+  "licenses": [
+    {
+      "bindingClass": "stable",
+      "productName": "Microsoft 365 Business Premium",
+      "skuPartNumber": "SPB",
+      "skuId": "discover",
+      "roleIntent": "Exchange, OneDrive, SharePoint, Teams, Intune, Entra, Office, and related base workload readiness"
+    },
+    {
+      "bindingClass": "stable",
+      "productName": "Microsoft Defender and Purview Suites for Microsoft 365 Business Premium",
+      "skuPartNumber": "DEFENDER_AND_PURVIEW_SUITES_FOR_BUSINESS_PREMIUM_NEW",
+      "skuId": "discover",
+      "roleIntent": "Defender, advanced audit, Purview, and Entra ID P2 exploration surfaces"
+    }
+  ],
+  "roleRoster": [
+    {
+      "alias": "human-admin-operator",
+      "bindingClass": "human-supplied",
+      "kind": "user",
+      "userPrincipalName": "supply initial administrator UPN",
+      "purpose": "human administration, recovery, licensing, consent, and interactive operator path",
+      "usageLocation": "US",
+      "licenseSkuPartNumbers": [
+        "SPB",
+        "DEFENDER_AND_PURVIEW_SUITES_FOR_BUSINESS_PREMIUM_NEW"
+      ],
+      "directoryRoles": [
+        {
+          "bindingClass": "stable",
+          "name": "Global Administrator",
+          "templateId": "62e90394-69f5-4237-9190-012177145e10",
+          "scope": "/"
+        }
+      ],
+      "azureRoles": [
+        {
+          "bindingClass": "stable",
+          "name": "Owner",
+          "roleDefinitionId": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
+          "scope": "fresh subscription"
+        },
+        {
+          "bindingClass": "stable",
+          "name": "Security Admin",
+          "roleDefinitionId": "fb1c8493-542b-48eb-b624-b4c8fea62acd",
+          "scope": "fresh tenant-root management group; discover support and scope ID"
+        }
+      ],
+      "cba": "not configured; distinct human path"
+    },
+    {
+      "alias": "cba-spa-operator",
+      "bindingClass": "generated",
+      "kind": "user",
+      "displayName": "After Party Development Operator",
+      "userPrincipalName": "after-party-operator@{studentInitialDomain}",
+      "purpose": "dedicated hosted/local SPA browser-test operator; not the human administrator",
+      "usageLocation": "US",
+      "licenseSkuPartNumbers": [
+        "SPB",
+        "DEFENDER_AND_PURVIEW_SUITES_FOR_BUSINESS_PREMIUM_NEW"
+      ],
+      "directoryRoles": [
+        {
+          "bindingClass": "stable",
+          "name": "Global Administrator",
+          "templateId": "62e90394-69f5-4237-9190-012177145e10",
+          "scope": "/"
+        }
+      ],
+      "azureRoles": [
+        {
+          "bindingClass": "stable",
+          "name": "Owner",
+          "roleDefinitionId": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
+          "scope": "fresh subscription"
+        }
+      ],
+      "cbaGroup": "After Party Development Operator CBA"
+    },
+    {
+      "alias": "cory",
+      "bindingClass": "generated",
+      "kind": "simulated-user",
+      "displayName": "Cory West",
+      "userPrincipalName": "cory@{studentInitialDomain}",
+      "purpose": "calendar, contacts, mailbox settings, drafts, To Do, inbox-rule, Teams, and learner mailbox actor",
+      "usageLocation": "US",
+      "licenseSkuPartNumbers": [
+        "SPB",
+        "DEFENDER_AND_PURVIEW_SUITES_FOR_BUSINESS_PREMIUM_NEW"
+      ],
+      "directoryRoles": [],
+      "cbaGroup": "AP2 Simulated User CBA"
+    },
+    {
+      "alias": "homer",
+      "bindingClass": "generated",
+      "kind": "simulated-user",
+      "displayName": "Homer Simpson",
+      "userPrincipalName": "homer.simpson@{studentInitialDomain}",
+      "purpose": "delegated mail and OneDrive producer",
+      "usageLocation": "US",
+      "licenseSkuPartNumbers": [
+        "SPB",
+        "DEFENDER_AND_PURVIEW_SUITES_FOR_BUSINESS_PREMIUM_NEW"
+      ],
+      "directoryRoles": [],
+      "cbaGroup": "AP2 Simulated User CBA"
+    },
+    {
+      "alias": "kobe",
+      "bindingClass": "generated",
+      "kind": "simulated-user",
+      "displayName": "Kobe West",
+      "userPrincipalName": "kobe@{studentInitialDomain}",
+      "purpose": "delegated help-desk mail and controlled Teams caller",
+      "usageLocation": "US",
+      "licenseSkuPartNumbers": [
+        "SPB",
+        "DEFENDER_AND_PURVIEW_SUITES_FOR_BUSINESS_PREMIUM_NEW"
+      ],
+      "directoryRoles": [],
+      "cbaGroup": "AP2 Simulated User CBA"
+    },
+    {
+      "alias": "marge",
+      "bindingClass": "generated",
+      "kind": "simulated-user",
+      "displayName": "Marge Simpson",
+      "userPrincipalName": "marge.simpson@{studentInitialDomain}",
+      "purpose": "delegated recipient and learner/observer identity",
+      "usageLocation": "US",
+      "licenseSkuPartNumbers": [
+        "SPB",
+        "DEFENDER_AND_PURVIEW_SUITES_FOR_BUSINESS_PREMIUM_NEW"
+      ],
+      "directoryRoles": [],
+      "cbaGroup": "AP2 Simulated User CBA"
+    },
+    {
+      "alias": "dev-automation",
+      "bindingClass": "generated",
+      "kind": "application-and-service-principal",
+      "displayName": "After Party Development Admin",
+      "purpose": "agents, TypeScript scripts, az, app-only API calls, deployment, diagnostics, and retained Purview detection",
+      "applicationId": "generate",
+      "objectIds": "discover",
+      "credential": "generate one externally protected application certificate; never commit private material",
+      "directoryRoles": [
+        {
+          "bindingClass": "stable",
+          "name": "Exchange Administrator",
+          "templateId": "29232cdf-9323-42fd-ade2-1d097af3e4de",
+          "scope": "/"
+        },
+        {
+          "bindingClass": "stable",
+          "name": "Security Reader",
+          "templateId": "5d6b6bb7-de71-4623-b4af-96380a352509",
+          "scope": "/"
+        },
+        {
+          "bindingClass": "stable",
+          "name": "Teams Administrator",
+          "templateId": "69091246-20e8-4a56-aa4d-066075b2a7a8",
+          "scope": "/"
+        }
+      ],
+      "azureRoles": [
+        {
+          "bindingClass": "stable",
+          "name": "Owner",
+          "roleDefinitionId": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635",
+          "scope": "fresh subscription"
+        }
+      ]
+    },
+    {
+      "alias": "product-enterprise-application",
+      "bindingClass": "discovered",
+      "kind": "service-principal",
+      "applicationId": "c91c7af4-b1b8-4730-a240-4a1c6137ab15",
+      "purpose": "Student installation of the Product-owned multitenant SPA and API resource",
+      "objectId": "discover",
+      "displayName": "do not bind; live and older documents disagree"
+    },
+    {
+      "alias": "student-api",
+      "bindingClass": "stable",
+      "kind": "containerized-application",
+      "displayName": "ca-ap2-api",
+      "purpose": "Student-hosted After Party API accepting Product delegated and Dev app-only tokens"
+    },
+    {
+      "alias": "api-runtime-managed-identity",
+      "bindingClass": "generated",
+      "kind": "system-assigned-managed-identity",
+      "parent": "ca-ap2-api",
+      "purpose": "runtime Microsoft Graph and Azure actor",
+      "principalId": "discover"
+    }
+  ],
+  "groups": [
+    {
+      "bindingClass": "stable",
+      "displayName": "After Party Development Operator CBA",
+      "type": "static-security",
+      "mailEnabled": false,
+      "members": [
+        "cba-spa-operator"
+      ]
+    },
+    {
+      "bindingClass": "stable",
+      "displayName": "AP2 Simulated User CBA",
+      "type": "static-security",
+      "mailEnabled": false,
+      "members": [
+        "cory",
+        "homer",
+        "kobe",
+        "marge"
+      ]
+    }
+  ],
+  "certificateBasedAuthentication": {
+    "bindingClass": "stable",
+    "method": "X509Certificate",
+    "state": "enabled",
+    "includeGroups": [
+      "After Party Development Operator CBA",
+      "AP2 Simulated User CBA"
+    ],
+    "excludeTargets": [],
+    "registrationRequired": false,
+    "authenticationModeConfiguration": {
+      "defaultMode": "x509CertificateMultiFactor",
+      "defaultRequiredAffinityLevel": "high",
+      "rules": []
+    },
+    "userBinding": {
+      "priority": 1,
+      "x509CertificateField": "SubjectKeyIdentifier",
+      "userProperty": "certificateUserIds",
+      "trustAffinityLevel": "high",
+      "storedValueShape": "X509:<SKI>{generated uppercase hex}"
+    },
+    "issuerHints": "disabled",
+    "crlValidation": "disabled",
+    "trusts": [
+      {
+        "bindingClass": "generated",
+        "purpose": "dedicated SPA operator CBA",
+        "rootSubjectAndIssuer": "CN=After Party Development Operator CA",
+        "leafSubject": "CN=After Party Development Operator",
+        "leafSan": "email:after-party-operator@{studentInitialDomain}"
+      },
+      {
+        "bindingClass": "generated",
+        "purpose": "supported simulated-user CBA",
+        "rootSubjectAndIssuer": "CN=After Party Lisa CBA Proof CA",
+        "leafSubject": "CN={displayName}",
+        "leafSan": "email:{userPrincipalName}"
+      }
+    ],
+    "certificateProfile": {
+      "root": "CA true, path length 0, keyCertSign and cRLSign, generated SKI",
+      "leaf": "CA false, digitalSignature and keyEncipherment, TLS Web Client Authentication EKU, generated SKI and AKI",
+      "mapping": "one unique generated leaf SKI per CBA identity"
+    },
+    "protectedReferenceContract": {
+      "bindingClass": "generated",
+      "storage": "outside Git; directories mode 0700 and private files mode 0600",
+      "rootArtifacts": [
+        "public root certificate",
+        "encrypted root private key",
+        "root-key passphrase reference"
+      ],
+      "perIdentityArtifacts": [
+        "encrypted private key",
+        "private-key passphrase reference",
+        "public leaf certificate",
+        "PFX",
+        "PFX passphrase reference",
+        "sanitized record containing alias, UPN, generated paths, validity, SKI mapping, and applied timestamp"
+      ],
+      "validation": [
+        "certificate chain and key match",
+        "validity window",
+        "unique SKI mappings",
+        "exact group membership and CBA policy",
+        "fresh nonpersistent CBA sign-in and /me identity check for every CBA identity"
+      ]
+    }
+  },
+  "consentAndPermissionManifests": {
+    "productEnterpriseApplicationDelegatedMicrosoftGraphScopes": [
+      { "bindingClass": "stable", "id": "88e58d74-d3df-44f3-ad47-e89edf4472e4", "value": "AppCatalog.Read.All" },
+      { "bindingClass": "stable", "id": "1ec239c2-d7c9-4623-a91a-a9775856bb36", "value": "Calendars.ReadWrite" },
+      { "bindingClass": "stable", "id": "9ff7295e-131b-4d94-90e1-69fde507ac11", "value": "Chat.ReadWrite" },
+      { "bindingClass": "stable", "id": "d56682ec-c09e-4743-aaf4-1a3aac4caa21", "value": "Contacts.ReadWrite" },
+      { "bindingClass": "stable", "id": "10465720-29dd-4523-a11a-6a75c743c9d9", "value": "Files.Read" },
+      { "bindingClass": "stable", "id": "5c28f0bf-8a70-41f1-8ab2-9032436ddb65", "value": "Files.ReadWrite" },
+      { "bindingClass": "stable", "id": "024d486e-b451-40bb-833d-3e66d98c5c73", "value": "Mail.ReadWrite" },
+      { "bindingClass": "stable", "id": "e383f46e-2787-4529-855e-0e479a3ffac0", "value": "Mail.Send" },
+      { "bindingClass": "stable", "id": "818c620a-27a9-40bd-a6a5-d96f7d610b4b", "value": "MailboxSettings.ReadWrite" },
+      { "bindingClass": "stable", "id": "a8ead177-1889-4546-9387-f25e658e2a79", "value": "Policy.ReadWrite.MobilityManagement" },
+      { "bindingClass": "stable", "id": "2219042f-cab5-40cc-b0d2-16b1540b4c5f", "value": "Tasks.ReadWrite" },
+      { "bindingClass": "stable", "id": "c395395c-ff9a-4dba-bc1f-8372ba9dca84", "value": "TeamsAppInstallation.ReadForUser" },
+      { "bindingClass": "stable", "id": "e1fe6dd8-ba31-4d61-89e7-88639da4683d", "value": "User.Read" },
+      { "bindingClass": "stable", "id": "7427e0e9-2fba-42fe-b0c0-848c9e6a8182", "value": "offline_access" },
+      { "bindingClass": "stable", "id": "37f7f235-527c-4136-accd-4a02d197296e", "value": "openid" },
+      { "bindingClass": "stable", "id": "14dad69e-099b-42c9-810b-d002981feec1", "value": "profile" }
+    ],
+    "productEnterpriseApplicationCustomConsent": [
+      { "bindingClass": "stable", "id": "59c976f0-118f-436f-8938-e0f2f0f1c84b", "value": "access_as_user", "consentType": "AllPrincipals" }
+    ],
+    "devAutomationApplicationPermissions": [
+      { "resource": "After Party Product API", "bindingClass": "stable", "id": "b6e481bc-9bf3-4faf-8b11-5d3e80ba1724", "value": "access_as_application" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "dc149144-f292-421e-b185-5953f2e98d7f", "value": "AppCatalog.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "06b708a9-e830-4db3-a914-8e69da51d44f", "value": "AppRoleAssignment.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "1bfefb4e-e0b5-418b-a88f-73c46d2cc8e9", "value": "Application.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "b0afded3-3588-46d8-8b3d-9842eff778da", "value": "AuditLog.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "5e1e9171-754d-478c-812c-f1755a9a4c2d", "value": "AuditLogsQuery.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "ef54d2bf-783f-4e0f-bca1-3210c0444d99", "value": "Calendars.ReadWrite" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "6a118a39-1227-45d4-af0c-ea7b40d210bc", "value": "Channel.Delete.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "35930dcf-aceb-4bd1-b99a-8ffed403c974", "value": "ChannelMember.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "243cded2-bd16-4fd6-a953-ff8177894c3d", "value": "ChannelSettings.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "6918b873-d17a-4dc1-b314-35f528134491", "value": "Contacts.ReadWrite" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "8e8e4742-1d95-4f68-9d56-6ee75648c72a", "value": "DelegatedPermissionGrant.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "7438b122-aefc-4978-80ed-43db9fcc7715", "value": "Device.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "dc377aa6-52d8-4e23-b271-2a7ae04cedf3", "value": "DeviceManagementConfiguration.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "2f51be20-0bb4-4fed-bf7b-db946066c75e", "value": "DeviceManagementManagedDevices.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "06a5fe6d-c49d-46a7-b082-56b1b14103c7", "value": "DeviceManagementServiceConfig.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "5ac13192-7ace-4fcf-b828-1a26f28068ee", "value": "DeviceManagementServiceConfig.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "19dbc75e-c2e2-444c-a770-ec69d8559fc7", "value": "Directory.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "89b20d8a-76e2-4057-867b-9961f800b9a4", "value": "ExchangeMessageTrace.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "75359482-378d-4052-8f01-80520e7db3cd", "value": "Files.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "62a82d76-70ea-41e2-9197-370581804d09", "value": "Group.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "e2a3a72e-5f79-4c64-b1b1-878b674786c9", "value": "Mail.ReadWrite" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "b633e1c5-b582-4048-a93e-9f11b44c7e96", "value": "Mail.Send" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "6931bccd-447a-43d1-b442-00a195474933", "value": "MailboxSettings.ReadWrite" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "498476ce-e0fe-48b0-b801-37ba7e2685c6", "value": "Organization.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "292d869f-3427-49a8-9dab-8c70152b74e9", "value": "Organization.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "246dd0d5-5bd0-4def-940b-0421030a5b68", "value": "Policy.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "29c18626-4985-4dcd-85c0-193eef327366", "value": "Policy.ReadWrite.AuthenticationMethod" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "01c0a623-fc9b-48e9-b794-0756f8e8f067", "value": "Policy.ReadWrite.ConditionalAccess" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "230c1aed-a721-4c5d-9cb4-a90514e508ef", "value": "Reports.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "9e3f62cf-ca93-4989-b6ce-bf83c28f9fe8", "value": "RoleManagement.ReadWrite.Directory" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "472e4a4d-bb4a-4026-98d1-0b0d74cb74a5", "value": "SecurityAlert.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "ed4fca05-be46-441f-9803-1873825f8fdb", "value": "SecurityAlert.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "d903a879-88e0-4c09-b0c9-82f6a1333f84", "value": "SecurityEvents.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "45cc0394-e837-488b-a098-1918f48d186c", "value": "SecurityIncident.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "34bf0e97-1971-4929-b999-9e2442d941d7", "value": "SecurityIncident.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "83d4163d-a2d8-4d3b-9695-4ae3ca98f888", "value": "SharePointTenantSettings.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "9492366f-7969-46a4-8d15-ed1a20078fff", "value": "Sites.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "bdd80a03-d9bc-451d-b7c4-ce7c63fe3c8f", "value": "TeamSettings.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "74ef0291-ca83-4d02-8c7e-d2391e6a444f", "value": "TeamsAppInstallation.ReadWriteForUser.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "dd98c7f5-2d42-42d3-a0e4-633161547251", "value": "ThreatHunting.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "c529cfca-c91b-489c-af2b-d92990b66ce6", "value": "User.ManageIdentities.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "df021288-bdef-4463-88db-98f22de89214", "value": "User.Read.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "741f803b-c850-494e-b5df-cde7c675a1ca", "value": "User.ReadWrite.All" },
+      { "resource": "Microsoft Graph", "bindingClass": "stable", "id": "38d9df27-64da-44fd-b7c5-a6fbac20248f", "value": "UserAuthenticationMethod.Read.All" },
+      { "resource": "Office 365 Exchange Online", "bindingClass": "stable", "id": "dc50a0fb-09a3-484d-be87-e023b12c6440", "value": "Exchange.ManageAsApp" },
+      { "resource": "WindowsDefenderATP", "bindingClass": "stable", "id": "71fe6b80-7034-4028-9ed8-0f316df9c3ff", "value": "Alert.Read.All" },
+      { "resource": "WindowsDefenderATP", "bindingClass": "stable", "id": "ea8291d3-4b9a-44b5-bc3a-6cea3026dc79", "value": "Machine.Read.All" }
+    ],
+    "apiRuntimeManagedIdentityMicrosoftGraphApplicationPermissions": [
+      { "bindingClass": "stable", "id": "b0afded3-3588-46d8-8b3d-9842eff778da", "value": "AuditLog.Read.All" },
+      { "bindingClass": "stable", "id": "ef54d2bf-783f-4e0f-bca1-3210c0444d99", "value": "Calendars.ReadWrite" },
+      { "bindingClass": "stable", "id": "6918b873-d17a-4dc1-b314-35f528134491", "value": "Contacts.ReadWrite" },
+      { "bindingClass": "stable", "id": "19dbc75e-c2e2-444c-a770-ec69d8559fc7", "value": "Directory.ReadWrite.All" },
+      { "bindingClass": "stable", "id": "89b20d8a-76e2-4057-867b-9961f800b9a4", "value": "ExchangeMessageTrace.Read.All" },
+      { "bindingClass": "stable", "id": "75359482-378d-4052-8f01-80520e7db3cd", "value": "Files.ReadWrite.All" },
+      { "bindingClass": "stable", "id": "62a82d76-70ea-41e2-9197-370581804d09", "value": "Group.ReadWrite.All" },
+      { "bindingClass": "stable", "id": "e2a3a72e-5f79-4c64-b1b1-878b674786c9", "value": "Mail.ReadWrite" },
+      { "bindingClass": "stable", "id": "b633e1c5-b582-4048-a93e-9f11b44c7e96", "value": "Mail.Send" },
+      { "bindingClass": "stable", "id": "6931bccd-447a-43d1-b442-00a195474933", "value": "MailboxSettings.ReadWrite" },
+      { "bindingClass": "stable", "id": "230c1aed-a721-4c5d-9cb4-a90514e508ef", "value": "Reports.Read.All" },
+      { "bindingClass": "stable", "id": "ed4fca05-be46-441f-9803-1873825f8fdb", "value": "SecurityAlert.ReadWrite.All" },
+      { "bindingClass": "stable", "id": "d903a879-88e0-4c09-b0c9-82f6a1333f84", "value": "SecurityEvents.ReadWrite.All" },
+      { "bindingClass": "stable", "id": "34bf0e97-1971-4929-b999-9e2442d941d7", "value": "SecurityIncident.ReadWrite.All" },
+      { "bindingClass": "stable", "id": "9492366f-7969-46a4-8d15-ed1a20078fff", "value": "Sites.ReadWrite.All" },
+      { "bindingClass": "stable", "id": "741f803b-c850-494e-b5df-cde7c675a1ca", "value": "User.ReadWrite.All" }
+    ],
+    "exchangeRoleContract": {
+      "bindingClass": "stable",
+      "devAutomation": [
+        "Exchange.ManageAsApp application role",
+        "Exchange Administrator tenant-wide directory role"
+      ],
+      "separateExchangeRbacRoleGroup": "none observed or required by current repository authority"
+    },
+    "detectorIdentity": {
+      "bindingClass": "stable",
+      "alias": "dev-automation",
+      "purpose": "retained broad Purview Audit Search and security diagnostic detector",
+      "separateDetector": "none"
+    }
+  },
+  "studentAzure": {
+    "resourceProviders": [
+      { "bindingClass": "stable", "namespace": "Microsoft.App" },
+      { "bindingClass": "stable", "namespace": "Microsoft.Compute" },
+      { "bindingClass": "stable", "namespace": "Microsoft.ContainerRegistry" },
+      { "bindingClass": "stable", "namespace": "Microsoft.DesktopVirtualization" },
+      { "bindingClass": "stable", "namespace": "Microsoft.Network" }
+    ],
+    "runtime": {
+      "resourceGroup": { "bindingClass": "stable", "name": "rg-ap2-rehearsal", "location": "eastus" },
+      "containerRegistry": {
+        "bindingClass": "generated",
+        "name": "generate globally unique name",
+        "sku": "Basic",
+        "adminUserEnabled": false,
+        "repository": "ap2-api",
+        "imageReference": "publish and discover immutable sha256 digest"
+      },
+      "containerAppsEnvironment": {
+        "bindingClass": "stable",
+        "name": "cae-ap2-rehearsal",
+        "network": "public; no VNet",
+        "zoneRedundant": false,
+        "logAnalytics": "not configured"
+      },
+      "apiContainerApp": {
+        "bindingClass": "stable",
+        "name": "ca-ap2-api",
+        "identity": "system-assigned",
+        "ingress": { "external": true, "allowInsecure": false, "targetPort": 3000 },
+        "revisionMode": "Single",
+        "scale": { "minReplicas": 1, "maxReplicas": 1 },
+        "resources": { "cpu": 0.5, "memory": "1Gi" },
+        "image": "generated registry/ap2-api@sha256:{discoveredDigest}",
+        "configurationReferences": [
+          "AUTH_ISSUER",
+          "AUTH_AUDIENCE",
+          "AUTH_JWKS_URL",
+          "CORS_ALLOWED_ORIGIN",
+          "AUTH_DELEGATED_USER_OBJECT_IDS",
+          "AUTH_AUTOMATION_CLIENT_ID",
+          "SIMULATED_USER_CLIENT_ID",
+          "CORY_CBA_OBJECT_ID"
+        ],
+        "secretReferences": [
+          "HOMER_CBA_PFX_PATH",
+          "HOMER_CBA_PFX_PASSPHRASE",
+          "CORY_CBA_PFX_PATH",
+          "CORY_CBA_PFX_PASSPHRASE",
+          "KOBE_CBA_PFX_PATH",
+          "KOBE_CBA_PFX_PASSPHRASE"
+        ],
+        "secretTransport": "regenerate externally; mount PFX bytes and pass references without literal values",
+        "healthPath": "/health"
+      },
+      "genericContainerAppsJob": {
+        "evidenceStatus": "unresolved-discrepancy",
+        "requestedCoverage": "generic job",
+        "observation": "No live Container Apps Job, repository contract, or repository-history definition was found.",
+        "desiredBinding": "not asserted; do not invent trigger, image, identity, configuration, or name during reconstruction"
+      },
+      "operationLockAndTokenState": {
+        "bindingClass": "stable",
+        "operationLocks": "process-local",
+        "simulatedUserTokenCaches": "per-user process-memory only",
+        "replicaConstraint": "one warm replica",
+        "sharedAzureStore": "none",
+        "azureTableAdapter": "code-only and intentionally not provisioned or wired"
+      },
+      "managedIdentityAzureRoles": [
+        { "bindingClass": "stable", "name": "Owner", "roleDefinitionId": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635", "scope": "fresh subscription" },
+        { "bindingClass": "stable", "name": "Reader", "roleDefinitionId": "acdd72a7-3385-48ef-bd42-f606fba81ae7", "scope": "rg-ap2-rehearsal" },
+        { "bindingClass": "stable", "name": "AcrPull", "roleDefinitionId": "7f951dda-4ed3-4680-a7ca-43fe172d538d", "scope": "generated AP2 container registry" }
+      ]
+    },
+    "supportedRehearsal": {
+      "bindingClass": "generated",
+      "name": "private three-VM AVD substrate",
+      "lifecycle": "create in a fresh marker-bound resource group and remove after rehearsal; no old Azure resource is migrated",
+      "topology": [
+        "one VNet with two private subnets, NSGs, Standard NAT Gateway, and static public IP",
+        "one personal direct-assigned AVD host pool, desktop application group, and workspace",
+        "one private Trusted Launch Windows 11 Enterprise 24H2 AVD VM with system identity, Entra join, Intune enrollment, and session-host extension",
+        "two private Trusted Launch Ubuntu 24.04 auxiliary VMs",
+        "fixed private NICs and no VM public IPs"
+      ],
+      "skuIntent": {
+        "windows": "Standard_D2s_v3",
+        "linux": "Standard_F1als_v7",
+        "validation": "discover current exact image versions, regional availability, and quota before each run"
+      },
+      "learnerAzureRoles": [
+        { "bindingClass": "stable", "name": "Desktop Virtualization User", "roleDefinitionId": "1d18fff3-a72a-46b5-b4a9-0b38a3cd7e63", "scope": "generated desktop application group" },
+        { "bindingClass": "stable", "name": "Virtual Machine User Login", "roleDefinitionId": "1c0163c0-47e6-4577-8991-ea5c82e286e4", "scope": "generated Windows VM" }
+      ],
+      "temporaryGraphRoles": [
+        "DeviceManagementConfiguration.ReadWrite.All",
+        "DeviceManagementManagedDevices.ReadWrite.All"
+      ],
+      "protectedGeneratedInputs": [
+        "local administrator password",
+        "SSH private key",
+        "host-pool registration token",
+        "run marker and expiry",
+        "protected run journal and cleanup timer state"
+      ]
+    }
+  },
+  "contentFreeReadinessChecks": [
+    "fresh tenant, domain, initial administrator, recovery path, and pay-as-you-go subscription are the intended targets",
+    "both SKU part numbers are enabled and assigned by retained role; discover SKU IDs",
+    "mailboxSettings is reachable for each retained licensed user without reading messages",
+    "OneDrive business root is reachable for each simulated user without listing files",
+    "SharePoint root and intended site/drive surfaces are reachable without listing content",
+    "Teams license service plan, catalog/client sign-in, and supported user surface are ready without reading chats or meetings",
+    "Defender secure-score or security API surface is reachable without alerts or content export",
+    "Purview Audit Search and unified-audit surface is reachable without exporting audit records",
+    "CBA policy, roots, mappings, and exact group membership match this manifest",
+    "all app-role, delegated-consent, directory-role, Exchange-role, and Azure-role sets match exactly by stable name/ID and fresh principal/scope binding"
+  ],
+  "endToEndValidation": [
+    "Dev certificate authentication obtains fresh Graph and ARM tokens in the new tenant without printing or persisting tokens",
+    "agents, TypeScript scripts, az, app-only diagnostics, and the Dev-to-API access_as_application path succeed",
+    "the Product client reaches the hosted SPA doorway and obtains only expected delegated consent",
+    "the dedicated SPA operator completes fresh nonpersistent CBA, /me, API whoami, and sign-out",
+    "Cory, Homer, Kobe, and Marge each complete fresh isolated delegated CBA /me validation",
+    "the Student API validates issuer, audience, signature, caller identity, access_as_user, access_as_application, and idtyp",
+    "the runtime managed identity reaches ARM, ACR, Graph, and representative licensed surfaces with its exact broad roles",
+    "content-free Exchange, OneDrive, SharePoint, Teams, Defender, Purview, Intune, and directory readiness checks pass",
+    "a dry, content-free AVD planning/readiness pass resolves providers, quota, image versions, ephemeral identities, roles, and protected inputs without deployment"
+  ],
+  "discrepancies": [
+    "Live Product enterprise-application display name and older documentation disagree; bind only by stable Product client ID.",
+    "The protected July broad-permission snapshot is stale: live Dev authority expanded to 48 app-role assignments and three directory roles; this manifest uses the live read-only inventory.",
+    "The simulated-user root's observed issuer convention retains the historical name 'After Party Lisa CBA Proof CA'; reconstruction regenerates the chain with that convention but does not reconstruct the Lisa user or historical group.",
+    "The offline deployment-artifact contract describes four Key Vault references, probes, and termination grace, while the proven live API uses Container App configuration plus certificate secret volumes and has no probes; the runtime section records the proven live shape.",
+    "No generic Container Apps Job exists in live state, active code, or repository history, so no desired job binding is asserted.",
+    "No live shared operation, lock, or token-state store backs the main API; process-local state plus one replica is the accepted Pass 3 baseline."
+  ],
+  "exclusions": [
+    { "bindingClass": "intentionally-excluded-historical", "value": "all old tenant, subscription, object, service-principal, managed-identity, SKU, user, group, drive, resource, and role-assignment instance IDs" },
+    { "bindingClass": "intentionally-excluded-historical", "value": "old tokens, cookies, browser state, secrets, passwords, passphrases, private keys, PFX files, certificate bytes, fingerprints, SKIs, and old certificate chains" },
+    { "bindingClass": "intentionally-excluded-historical", "value": "the current 18-user license pattern and all users other than the six retained role-bearing users" },
+    { "bindingClass": "intentionally-excluded-historical", "value": "unreferenced business, department, all-company, all-employee, old simulator, and historical CBA groups" },
+    { "bindingClass": "intentionally-excluded-historical", "value": "old local apps and temporary or attempted detector identities; Dev itself is the sole retained detector" },
+    { "bindingClass": "intentionally-excluded-historical", "value": "calling-canary Azure Bot, calling Container App/image, Teams app installation, Calls.Initiate.All grant, Azure Files journal, lock blob, storage roles, certificates, and after-test resource group" },
+    { "bindingClass": "intentionally-excluded-historical", "value": "NetworkWatcherRG, empty/historical resource groups, old ACR names/digests/revisions, and all old Azure subscription resources" },
+    { "bindingClass": "intentionally-excluded-historical", "value": "scenario content, mail, files, chats, meetings, alerts, temporary grants, scenario memberships, audit history, deleted objects, recycle-bin state, and historical residue" },
+    { "bindingClass": "intentionally-excluded-historical", "value": "provisioned Azure Table operation journal, durable token cache, multi-replica runtime, least-privilege redesign, bootstrap executor, migration tooling, and teardown framework" }
+  ]
+}
