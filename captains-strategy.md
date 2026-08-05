@@ -100,8 +100,10 @@ commands, reviews, or rewrites are no longer producing new evidence toward the
 stop condition. Inspect its recent outcome and interrupt or redirect only when
 that pattern is clear.
 
-The liveness mechanism should detect lack of forward movement and surface it.
-It should not manufacture new work or repeatedly awaken an idle completed team.
+The liveness mechanism should surface unresolved durable assignment or report
+state. An optional elapsed-time audit may provide visibility into a long-running
+peer, but it must not decide that a quiet worker is stuck. Liveness must not
+manufacture new work or repeatedly awaken an idle completed team.
 
 ## Resist ceremony and hardening drift
 
@@ -141,14 +143,18 @@ Update the docket at meaningful transitions, not after every technical step.
 Worker reports should be short and decision-ready:
 
 ```text
-QUESTION: The original question or outcome.
+PEER: Copy the exact configured peer label.
+QUESTION: Copy the durable goal card's INTENT exactly.
 ANSWER: The plain-language result.
 NEXT: Stop, the direct next dependency, or the one decision needed.
 EVIDENCE: Only the decisive PR, commit, artifact, or observation.
 ```
 
 The coordinator should not merely relay reports. It should compare the answer
-to the goal card and say whether the original question was answered.
+to the goal card and say whether the original question was answered. `PEER` and
+`QUESTION` are identity fields: the peer copies its configured label and the
+exact `INTENT`; interpretation belongs in `ANSWER`, not in a paraphrased
+`QUESTION`.
 
 When reporting to Sean's strategy conversation, lead with meaning. Separate
 what is directly observed, what is inferred, and what remains unknown. Leave
