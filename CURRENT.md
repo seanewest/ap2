@@ -37,7 +37,7 @@ it explicitly.
 Do not replace the historical thread mapping while reusing its durable state.
 The old state contains historical assignments tied to old thread IDs.
 
-The migration is complete only when all of these are true:
+The core migration is complete when all of these are true:
 
 1. Install an agent-tools release that keeps durable assignment and report
    delivery available independently of proactive liveness.
@@ -47,12 +47,14 @@ The migration is complete only when all of these are true:
 3. Create a fresh local coordinator and fresh durable peer threads from current
    AP2 guidance.
 4. Configure the exact coordinator and peer thread-ID mapping for the new epoch.
-5. Keep proactive liveness disabled initially while assignment, report staging,
-   and read-only status remain available.
+5. Keep proactive liveness disabled while assignment, report staging, and
+   read-only status remain available.
 6. Prove one harmless goal-card assignment, exact peer report, coordinator
    delivery, and read-only recovery round trip.
-7. Enable proactive liveness later only when Sean deliberately wants the
-   fallback continuity check.
+
+Proactive liveness is optional after migration. Enable it later only when Sean
+deliberately wants the fallback continuity check; leaving it disabled does not
+make the migration incomplete.
 
 Until that sequence is complete, use the historical team only for read-only
 inspection. Do not assign it new AP2 goals.
