@@ -487,8 +487,10 @@
   "studentAzure": {
     "resourceProviders": [
       { "bindingClass": "stable", "namespace": "Microsoft.App" },
+      { "bindingClass": "stable", "namespace": "Microsoft.Compute" },
       { "bindingClass": "stable", "namespace": "Microsoft.ContainerRegistry" },
-      { "bindingClass": "stable", "namespace": "Microsoft.DesktopVirtualization" }
+      { "bindingClass": "stable", "namespace": "Microsoft.DesktopVirtualization" },
+      { "bindingClass": "stable", "namespace": "Microsoft.Network" }
     ],
     "runtime": {
       "resourceGroup": { "bindingClass": "stable", "name": "rg-ap2-rehearsal", "location": "eastus" },
