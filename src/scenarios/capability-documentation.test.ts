@@ -41,22 +41,12 @@ describe("canonical capability documentation", () => {
     }
   });
 
-  it("keeps completed AVD learner proof out of the future-work docket", () => {
-    const future = section(
-      current,
-      "## Future endpoint automation",
-      "## API durability decision",
-    );
-    const closed = section(current, "## Closed/do not reopen", "");
-
-    expect(future).not.toContain("AVD personal prototype");
-    expect(closed).toContain(
-      "The AVD personal-host learner lane is live-proven and closed.",
-    );
-    expect(closed).toContain(
-      "canonical private three-VM substrate",
-    );
-    expect(closed).toContain("did not include a learner session");
+  it("keeps future backlog and completed history out of the current docket", () => {
+    expect(current).not.toContain("## Future endpoint automation");
+    expect(current).not.toContain("## Closed/do not reopen");
+    expect(current).not.toContain("AVD personal-host learner lane");
+    expect(current).toContain("docs/proven-capabilities.md");
+    expect(current).toContain("No AP2 product implementation goal is active.");
   });
 });
 
