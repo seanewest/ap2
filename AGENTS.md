@@ -150,9 +150,19 @@ research, implement, test, and correct ordinary problems without reporting each
 step. It should return when the outcome is answered, a real decision is needed,
 the established boundary must change, or progress is genuinely blocked.
 
-Worker reports should restate the original question, give the conclusion in
-plain language, and name only the evidence or blocker that changes the next
-decision.
+Worker reports must use the configured peer label and remain mechanically tied
+to the durable goal:
+
+```text
+PEER: Copy the exact configured peer label.
+QUESTION: Copy the goal card's INTENT exactly.
+ANSWER: Give the plain-language result.
+NEXT: Say Stop, the direct remaining dependency, or the one decision needed.
+EVIDENCE: Name only the decisive reference or observation.
+```
+
+Do not paraphrase `INTENT` in `QUESTION`; exact copying lets the durable report
+path detect accidental goal substitution.
 
 ## Simplicity
 
