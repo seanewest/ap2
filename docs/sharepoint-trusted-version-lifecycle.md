@@ -35,25 +35,20 @@ delete. The changed-version write is conditional on the retained trusted-v1
 eTag. The frozen expiry is checked again immediately before every producer
 mutation; expiry never blocks cleanup.
 
-## Receipt and claim boundary
+## Response and evidence boundary
 
-The response contains a sanitized lifecycle result, its canonical scenario
-receipt, and the authoritative receipt-verifier summary. It contains digests
-and safe actor aliases, never the marker, tenant, drive, folder, item, version,
-path, token, or Graph payload identifiers.
+The response is the sanitized lifecycle result. It contains safe actor aliases,
+the action window and expiry, digests of the marker and file identity, ordered
+version sizes and digests, a categorical journal, and terminal cleanup state.
+It never contains the marker, tenant, drive, folder, item, version, path, token,
+or Graph payload identifiers.
 
-The receipt carries one evidence-binding digest over the safe marker and file
-identity digests, actor aliases, action window, expiry, ordered version
-identity/content/timestamp rows, journal digest, and terminal cleanup state.
-Changing any run binding changes the canonical receipt without exposing the
-underlying identifiers.
-
-The receipt proves only producer-side platform operations, exact trusted and
-changed bytes, ordered version history, marker-owned active cleanup, and
-expiry closure. Future detector observation, learner visibility,
-interpretation, and response remain `uninspected`. SharePoint recycle-bin and
-ordinary audit history are honestly classified as service-managed platform
-history rather than active run artifacts.
+A completed result proves only the producer-side platform operations, exact
+trusted and changed bytes, ordered version history, marker-owned active
+cleanup, and expiry closure. It does not prove an independent detector,
+human visibility, interpretation, response, or restoration. SharePoint
+recycle-bin and ordinary audit history remain service-managed platform history,
+not active run artifacts.
 
 The process-local reservation is sufficient only for the enforced
 single-replica synchronous route. A protected canary journal remains outside
@@ -69,8 +64,8 @@ both active paths absent. The defect was the runtime's use of the folder's
 creation-time eTag after child mutations; the lifecycle now rereads and
 matches the folder before deletion.
 
-Because the refused response did not return its version receipt, this canary
+Because the refused response did not return a completed lifecycle result, this canary
 does not establish the trusted-v1 bytes, changed-v2 bytes, or ordered-history
 claim even though cleanup is terminal. It was not replayed. Recycle-bin and
-audit records remain ordinary platform history, and detector, learner,
-restoration, and Lab claims remain unproven.
+audit records remain ordinary platform history, and detector, human-observation,
+restoration, and lab claims remain unproven.

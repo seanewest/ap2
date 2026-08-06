@@ -28,7 +28,6 @@ const INPUT_DIRECTORIES = [
   "api",
   "scripts",
   "src/api",
-  "src/scenarios",
   "src/ui",
 ] as const;
 const UNSAFE_INPUT_SEGMENTS = new Set([
@@ -295,7 +294,6 @@ function validateContainerContract(
       "COPY api ./api",
       "COPY scripts ./scripts",
       "COPY src/api ./src/api",
-      "COPY src/scenarios ./src/scenarios",
       "COPY src/ui ./src/ui",
     ]) ||
     JSON.stringify(buildRuns) !== JSON.stringify([

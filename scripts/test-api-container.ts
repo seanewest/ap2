@@ -131,7 +131,7 @@ async function main(): Promise<void> {
       unknownUserToken,
       403,
     );
-    await expectRequestStatus(`${baseUrl}/api/scenario-plan`, {
+    await expectRequestStatus(`${baseUrl}/api/sharepoint-trusted-version-lifecycle`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${delegatedProductToken}`,
@@ -139,7 +139,7 @@ async function main(): Promise<void> {
       },
       body: UNSAFE_SENTINEL,
     }, 415);
-    await expectRequestStatus(`${baseUrl}/api/scenario-plan`, {
+    await expectRequestStatus(`${baseUrl}/api/sharepoint-trusted-version-lifecycle`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${delegatedProductToken}`,
@@ -147,14 +147,14 @@ async function main(): Promise<void> {
       },
       body: `{${UNSAFE_SENTINEL}`,
     }, 400);
-    await expectRequestStatus(`${baseUrl}/api/scenario-plan`, {
+    await expectRequestStatus(`${baseUrl}/api/sharepoint-trusted-version-lifecycle`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${delegatedProductToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        value: `${UNSAFE_SENTINEL}${"x".repeat(8_192)}`,
+        value: `${UNSAFE_SENTINEL}${"x".repeat(512)}`,
       }),
     }, 413);
     await expectRequestStatus(`${baseUrl}/api/simulated-email`, {
@@ -504,10 +504,10 @@ function verifyStructuredLogs(
   expectSignature(requests, "whoami", "pure", 200, 3);
   expectSignature(requests, "whoami", "pure", 401, 1);
   expectSignature(requests, "whoami", "pure", 403, 2);
-  expectSignature(requests, "scenario-plan-compile", "pure", 415, 1);
-  expectSignature(requests, "scenario-plan-compile", "pure", 400, 1);
-  expectSignature(requests, "scenario-plan-compile", "pure", 413, 1);
-  expectSignature(requests, "scenario-plan-compile", "pure", 499, 1);
+  expectSignature(requests, "sharepoint-trusted-version-lifecycle", "bounded-mutation", 415, 1);
+  expectSignature(requests, "sharepoint-trusted-version-lifecycle", "bounded-mutation", 400, 1);
+  expectSignature(requests, "sharepoint-trusted-version-lifecycle", "bounded-mutation", 413, 1);
+  expectSignature(requests, "sharepoint-trusted-version-lifecycle", "bounded-mutation", 499, 1);
   expectSignature(requests, "simulated-email-send", "bounded-mutation", 403, 1);
   if (!requests.some(({ routeOwner, status }) => routeOwner === "health" && status === 200)) {
     throw new Error("Health request telemetry was not emitted");
@@ -565,7 +565,7 @@ async function incompleteJsonRequest(
     socket.once("error", reject);
   });
   socket.write([
-    "POST /api/scenario-plan HTTP/1.1",
+    "POST /api/sharepoint-trusted-version-lifecycle HTTP/1.1",
     `Host: 127.0.0.1:${port}`,
     `Authorization: Bearer ${token}`,
     "Content-Type: application/json",

@@ -1,5 +1,3 @@
-import { findScenarioRoleConflation } from "../scenarios/scenario-manifest.ts";
-
 const RESULT_STATUSES = [
   "officially-supported",
   "live-proven",
@@ -115,13 +113,12 @@ export function parsePurviewAuditCapabilityResult(
     learner: text(result.learner, "learner"),
     officialContract: parseOfficialContract(result.officialContract),
   };
-  const conflation = findScenarioRoleConflation({
-    evidenceProducer: base.evidenceProducer,
-    workloadActor: base.workloadActor,
-    learner: base.learner,
-    detector: base.detector,
-  });
-  if (conflation !== undefined) {
+  if (new Set([
+    base.evidenceProducer,
+    base.workloadActor,
+    base.learner,
+    base.detector,
+  ]).size !== 4) {
     throw new PurviewAuditResultError(
       "scenario actor roles contain a forbidden overlap.",
     );

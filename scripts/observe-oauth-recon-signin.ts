@@ -6,10 +6,13 @@ import {
   STUDENT_TENANT_ID,
 } from "../api/identity.ts";
 import {
+  OAUTH_RECON_DETECTOR_ACTOR,
+  OAUTH_RECON_MARKER,
+  OAUTH_RECON_PRODUCER_ACTOR,
+  OAUTH_RECON_SCENARIO_ID,
   verifyDistinctApplicationIdentityReadiness,
   type ReadyApplicationIdentityBinding,
-} from "../src/scenarios/application-identity-readiness.ts";
-import { OAUTH_APPLICATION_RECON_SCENARIO } from "../src/scenarios/oauth-application-recon.ts";
+} from "../src/validation/oauth-recon-identity-readiness.ts";
 
 const GRAPH_SCOPE = "https://graph.microsoft.com/.default";
 const SIGN_INS_URL =
@@ -78,12 +81,11 @@ export async function observeOauthReconSignin(
   requireDistinctObserver(observerClientId);
   if (
     identityBinding.status !== "ready" ||
-    identityBinding.scenarioId !==
-      OAUTH_APPLICATION_RECON_SCENARIO.id ||
+    identityBinding.scenarioId !== OAUTH_RECON_SCENARIO_ID ||
     identityBinding.roles.producer !==
-      OAUTH_APPLICATION_RECON_SCENARIO.roles.workloadActor ||
+      OAUTH_RECON_PRODUCER_ACTOR ||
     identityBinding.roles.detector !==
-      OAUTH_APPLICATION_RECON_SCENARIO.roles.detector ||
+      OAUTH_RECON_DETECTOR_ACTOR ||
     identityBinding.runtimeBinding.producer.applicationId !==
       DEVELOPMENT_AUTOMATION_CLIENT_ID ||
     identityBinding.runtimeBinding.producer.servicePrincipalId !==
@@ -98,10 +100,7 @@ export async function observeOauthReconSignin(
       DEVELOPMENT_AUTOMATION_SERVICE_PRINCIPAL_ID ||
     identityBinding.runtimeBinding.evidence.observerApplicationId !==
       observerClientId.toLowerCase() ||
-    identityBinding.runtimeBinding.evidence.marker !==
-      OAUTH_APPLICATION_RECON_SCENARIO.operations.find(
-        ({ key }) => key === "close-evidence-window",
-      )?.marker ||
+    identityBinding.runtimeBinding.evidence.marker !== OAUTH_RECON_MARKER ||
     identityBinding.runtimeBinding.evidence.windowStart !== window.start ||
     identityBinding.runtimeBinding.evidence.windowEnd !== window.end
   ) {
@@ -313,10 +312,7 @@ async function main(): Promise<void> {
   const window = argumentsFrom(process.argv.slice(2));
   const observerClientId = process.env.AP2_OBSERVER_CLIENT_ID ?? "";
   requireDistinctObserver(observerClientId);
-  const planDigest = process.env.AP2_SCENARIO_PLAN_DIGEST_SHA256 ?? "";
   const identityBinding = verifyDistinctApplicationIdentityReadiness(
-    OAUTH_APPLICATION_RECON_SCENARIO,
-    planDigest,
     secureJson(process.env.AP2_APPLICATION_IDENTITY_READINESS_PATH),
   );
   if (identityBinding.status !== "ready") {

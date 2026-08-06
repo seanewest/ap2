@@ -231,7 +231,7 @@ async function main(): Promise<void> {
     forcedSocket.removeAllListeners("error");
     forcedSocket.on("error", () => undefined);
     forcedSocket.write([
-      "POST /api/scenario-plan HTTP/1.1",
+      "POST /api/sharepoint-trusted-version-lifecycle HTTP/1.1",
       `Host: 127.0.0.1:${forcedPort}`,
       `Authorization: Bearer ${token}`,
       "Content-Type: application/json",

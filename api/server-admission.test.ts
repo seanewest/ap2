@@ -42,18 +42,14 @@ describe("API process-local admission", () => {
     const gate = deferred();
     const telemetryMessages: string[] = [];
     let correlationSequence = 0;
-    const compile = vi.fn(async () => {
+    const snapshot = vi.fn(async () => {
       await gate.promise;
-      return { status: "compiled" };
+      return { schemaVersion: 1, order: "newest", events: [] };
     });
     const verify = vi.fn(async () => claims);
     const baseUrl = await start({
       tokenVerifier: { verify },
-      scenarioPlanService: {
-        compile: compile as unknown as NonNullable<
-          ApiDependencies["scenarioPlanService"]
-        >["compile"],
-      },
+      operationTelemetryReader: { snapshot } as never,
       allowedOrigin: "https://allowed.example.test",
       requestTelemetry: new StructuredConsoleApiRequestTelemetry({
         write: (message) => telemetryMessages.push(message),
@@ -63,29 +59,23 @@ describe("API process-local admission", () => {
     });
     const accepted = Array.from(
       { length: API_PROCESS_ADMISSION_LIMITS.purePerRoute },
-      () => fetch(`${baseUrl}/api/scenario-plan`, {
-        method: "POST",
+      () => fetch(`${baseUrl}/api/operation-events`, {
         headers: {
           Authorization: "Bearer fixture",
-          "Content-Type": "application/json",
           Origin: "https://allowed.example.test",
         },
-        body: "{}",
       }),
     );
     await until(() =>
-      compile.mock.calls.length ===
+      snapshot.mock.calls.length ===
         API_PROCESS_ADMISSION_LIMITS.purePerRoute
     );
 
-    const refused = await fetch(`${baseUrl}/api/scenario-plan`, {
-      method: "POST",
+    const refused = await fetch(`${baseUrl}/api/operation-events`, {
       headers: {
         Authorization: "Bearer fixture",
-        "Content-Type": "application/json",
         Origin: "https://allowed.example.test",
       },
-      body: "not-json",
     });
     expect(refused.status).toBe(503);
     await expect(refused.json()).resolves.toEqual({

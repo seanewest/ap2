@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { compileScenarioExecutionPlan } from "./scenario-plan.ts";
-import { OAUTH_APPLICATION_RECON_SCENARIO } from "./oauth-application-recon.ts";
 import {
   summarizeDistinctApplicationIdentityReadiness,
   verifyDistinctApplicationIdentityReadiness,
   type DistinctApplicationIdentityReadinessInput,
-} from "./application-identity-readiness.ts";
+} from "./oauth-recon-identity-readiness.ts";
 
 const TENANT = "11111111-1111-4111-8111-111111111111";
 const PRODUCER_APP = "22222222-2222-4222-8222-222222222222";
@@ -14,21 +12,6 @@ const DETECTOR_APP = "44444444-4444-4444-8444-444444444444";
 const DETECTOR_SP = "55555555-5555-4555-8555-555555555555";
 const RECOVERY = "66666666-6666-4666-8666-666666666666";
 const GRAPH = "00000003-0000-0000-c000-000000000000";
-
-const PLAN = compileScenarioExecutionPlan({
-  scenarioId: "oauth-application-reconnaissance",
-  actorAliases: {
-    evidenceProducer: "harness",
-    workloadActor: "producer",
-    learner: "learner",
-    detector: "detector",
-    cleanupOwner: "harness",
-  },
-  now: "2026-07-29T12:00:00.000Z",
-  expiresAt: "2026-07-29T13:00:00.000Z",
-  maximumBudgetUsd: 0,
-  selectedResponseId: "report-recon-interpretation",
-});
 
 function assignment(applicationRoleId: string) {
   return {
@@ -42,7 +25,6 @@ function input(): DistinctApplicationIdentityReadinessInput {
   return {
     schemaVersion: 1,
     scenarioId: "oauth-application-reconnaissance",
-    planDigestSha256: PLAN.digestSha256,
     producer: {
       actorId: "recon-workload-app",
       applicationId: PRODUCER_APP,
@@ -102,15 +84,11 @@ function input(): DistinctApplicationIdentityReadinessInput {
 }
 
 describe("distinct application identity readiness", () => {
-  it("binds manifest, plan, exact identities, permissions, tokens, evidence, and recovery", () => {
-    const result = verifyDistinctApplicationIdentityReadiness(
-      OAUTH_APPLICATION_RECON_SCENARIO,
-      PLAN.digestSha256,
-      input(),
+  it("binds exact identities, permissions, tokens, evidence, and recovery", () => {
+    const result = verifyDistinctApplicationIdentityReadiness(input(),
     );
     expect(result).toMatchObject({
       status: "ready",
-      planDigestSha256: PLAN.digestSha256,
       identity: {
         applications: "distinct",
         servicePrincipals: "distinct",
@@ -218,65 +196,24 @@ describe("distinct application identity readiness", () => {
   ])("fails closed for %s", (_label, mutate, blocker) => {
     const value = input();
     mutate(value);
-    const result = verifyDistinctApplicationIdentityReadiness(
-      OAUTH_APPLICATION_RECON_SCENARIO,
-      PLAN.digestSha256,
-      value,
-    );
+    const result = verifyDistinctApplicationIdentityReadiness(value);
     expect(result.status).toBe("blocked");
     expect(result.status === "blocked" && result.blockers).toContain(blocker);
   });
 
-  it("fails closed on plan drift, unknown fields, and malformed exact identities", () => {
+  it("fails closed on scenario drift, unknown fields, and malformed exact identities", () => {
     const drifted = input();
-    drifted.planDigestSha256 = "f".repeat(64);
-    expect(
-      verifyDistinctApplicationIdentityReadiness(
-        OAUTH_APPLICATION_RECON_SCENARIO,
-        PLAN.digestSha256,
-        drifted,
-      ),
-    ).toMatchObject({ status: "blocked", blockers: ["plan-mismatch"] });
+    drifted.scenarioId = "another-scenario";
+    expect(verifyDistinctApplicationIdentityReadiness(drifted))
+      .toMatchObject({ status: "blocked", blockers: ["invalid-input"] });
 
     const extra = { ...input(), arbitrary: "not accepted" };
-    expect(
-      verifyDistinctApplicationIdentityReadiness(
-        OAUTH_APPLICATION_RECON_SCENARIO,
-        PLAN.digestSha256,
-        extra,
-      ),
-    ).toMatchObject({ status: "blocked", blockers: ["invalid-input"] });
+    expect(verifyDistinctApplicationIdentityReadiness(extra))
+      .toMatchObject({ status: "blocked", blockers: ["invalid-input"] });
 
     const malformed = input();
     malformed.producer.applicationId = "not-an-id";
-    expect(
-      verifyDistinctApplicationIdentityReadiness(
-        OAUTH_APPLICATION_RECON_SCENARIO,
-        PLAN.digestSha256,
-        malformed,
-      ),
-    ).toMatchObject({ status: "blocked", blockers: ["invalid-input"] });
-  });
-
-  it("makes the canonical plan declare the exact runtime binding contract", () => {
-    expect(PLAN.applicationIdentityBoundary).toEqual({
-      producerActorId: "recon-workload-app",
-      detectorActorId: "audit-observer-app",
-      recoveryOwnerActorId: "recon-recovery-administrator",
-      directoryBinding: "same-directory",
-      authenticationAudience: "https://graph.microsoft.com",
-      producerApplicationRoleIds: [
-        "01d4889c-1287-42c6-ac1f-5d1e02578ef6",
-        "810c84a8-4a9e-49e6-bf7d-12d183f40d01",
-        "98830695-27a2-44f7-8c18-0c3ebc9698f6",
-      ],
-      detectorApplicationRoleIds: [
-        "b0afded3-3588-46d8-8b3d-9842eff778da",
-      ],
-      markerOperationKey: "close-evidence-window",
-      observationOperationKey: "observe-bounded-sign-in",
-      maximumObservationWindowMinutes: 15,
-      runtimeExactIdentityBinding: "required",
-    });
+    expect(verifyDistinctApplicationIdentityReadiness(malformed))
+      .toMatchObject({ status: "blocked", blockers: ["invalid-input"] });
   });
 });

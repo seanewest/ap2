@@ -42,7 +42,7 @@ describe("API server contract dispatch", () => {
       status: 404,
     });
     await expect(
-      fetch(`${baseUrl}/api/scenario-plan`, { method: "DELETE" }),
+      fetch(`${baseUrl}/api/sharepoint-trusted-version-lifecycle`, { method: "DELETE" }),
     ).resolves.toMatchObject({ status: 404 });
   });
 

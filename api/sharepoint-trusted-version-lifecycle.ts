@@ -42,13 +42,8 @@ export interface SharePointTrustedVersionLifecycleResult {
   schemaVersion: 1;
   kind: "sharepoint-trusted-version-lifecycle-result";
   status: "completed-cleaned";
-  scenarioId: "sharepoint-trusted-version-lifecycle";
   producer: "sharepoint-producer-app";
   cleanupOwner: "trusted-version-cleanup-owner";
-  learnerVisibility: "uninspected";
-  detectorObservation: "uninspected";
-  learnerInterpretation: "uninspected";
-  response: "uninspected";
   markerDigestSha256: string;
   fileIdentityDigestSha256: string;
   startedAt: string;
@@ -275,13 +270,8 @@ export class GraphSharePointTrustedVersionLifecycle
         schemaVersion: 1,
         kind: "sharepoint-trusted-version-lifecycle-result",
         status: "completed-cleaned",
-        scenarioId: "sharepoint-trusted-version-lifecycle",
         producer: "sharepoint-producer-app",
         cleanupOwner: "trusted-version-cleanup-owner",
-        learnerVisibility: "uninspected",
-        detectorObservation: "uninspected",
-        learnerInterpretation: "uninspected",
-        response: "uninspected",
         markerDigestSha256,
         fileIdentityDigestSha256: identityDigest,
         startedAt,

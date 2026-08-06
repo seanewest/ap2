@@ -7,9 +7,9 @@ const tokenVerifier = {
     throw new Error("Shutdown must precede authentication");
   }),
 };
-const scenarioPlanService = {
-  compile: vi.fn(() => {
-    throw new Error("Shutdown must precede body parsing and compilation");
+const sharePointTrustedVersionLifecycleOperation = {
+  run: vi.fn(() => {
+    throw new Error("Shutdown must precede body parsing and dispatch");
   }),
 };
 const simulatedEmailOperation = {
@@ -32,7 +32,7 @@ const server = createApiServer({
       latestReadyRevision: "fixture",
     })),
   },
-  scenarioPlanService,
+  sharePointTrustedVersionLifecycleOperation,
   simulatedEmailOperation,
   isShuttingDown: () => true,
 });
@@ -55,7 +55,7 @@ afterAll(async () => {
 describe("API draining admission boundary", () => {
   it.each([
     ["GET", "/health", undefined],
-    ["POST", "/api/scenario-plan", "not-json"],
+    ["POST", "/api/sharepoint-trusted-version-lifecycle", "not-json"],
     ["POST", "/api/simulated-email", undefined],
   ])("refuses %s %s before authentication, body parsing, or dispatch", async (
     method,
@@ -76,7 +76,7 @@ describe("API draining admission boundary", () => {
 
   it("does not reach protected services while draining", () => {
     expect(tokenVerifier.verify).not.toHaveBeenCalled();
-    expect(scenarioPlanService.compile).not.toHaveBeenCalled();
+    expect(sharePointTrustedVersionLifecycleOperation.run).not.toHaveBeenCalled();
     expect(simulatedEmailOperation.send).not.toHaveBeenCalled();
   });
 });

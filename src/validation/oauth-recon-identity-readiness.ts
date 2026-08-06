@@ -1,13 +1,49 @@
 import { createHash } from "node:crypto";
-import type {
-  ScenarioApplicationIdentityBoundary,
-  ScenarioManifest,
-} from "./scenario-manifest.ts";
 
 const GRAPH_APPLICATION_ID = "00000003-0000-0000-c000-000000000000";
+export const OAUTH_RECON_SCENARIO_ID =
+  "oauth-application-reconnaissance";
+export const OAUTH_RECON_PRODUCER_ACTOR = "recon-workload-app";
+export const OAUTH_RECON_DETECTOR_ACTOR = "audit-observer-app";
+export const OAUTH_RECON_RECOVERY_ACTOR =
+  "recon-recovery-administrator";
+export const OAUTH_RECON_MARKER = "ap2-application-recon-window";
+
+interface ApplicationIdentityBoundary {
+  producerActorId: string;
+  detectorActorId: string;
+  recoveryOwnerActorId: string;
+  tokenAudience: string;
+  producerPermissions: readonly Readonly<{
+    resourceApplicationId: string;
+    applicationRoleId: string;
+  }>[];
+  detectorPermissions: readonly Readonly<{
+    resourceApplicationId: string;
+    applicationRoleId: string;
+  }>[];
+  marker: string;
+  maximumObservationWindowMinutes: number;
+}
+
+const OAUTH_RECON_IDENTITY_BOUNDARY: ApplicationIdentityBoundary = {
+  producerActorId: OAUTH_RECON_PRODUCER_ACTOR,
+  detectorActorId: OAUTH_RECON_DETECTOR_ACTOR,
+  recoveryOwnerActorId: OAUTH_RECON_RECOVERY_ACTOR,
+  tokenAudience: "https://graph.microsoft.com",
+  producerPermissions: [
+    { resourceApplicationId: GRAPH_APPLICATION_ID, applicationRoleId: "98830695-27a2-44f7-8c18-0c3ebc9698f6" },
+    { resourceApplicationId: GRAPH_APPLICATION_ID, applicationRoleId: "810c84a8-4a9e-49e6-bf7d-12d183f40d01" },
+    { resourceApplicationId: GRAPH_APPLICATION_ID, applicationRoleId: "01d4889c-1287-42c6-ac1f-5d1e02578ef6" },
+  ],
+  detectorPermissions: [
+    { resourceApplicationId: GRAPH_APPLICATION_ID, applicationRoleId: "b0afded3-3588-46d8-8b3d-9842eff778da" },
+  ],
+  marker: OAUTH_RECON_MARKER,
+  maximumObservationWindowMinutes: 15,
+};
 const BLOCKER_ORDER = [
   "invalid-input",
-  "plan-mismatch",
   "identity-conflation",
   "tenant-mismatch",
   "installation-unproven",
@@ -27,7 +63,6 @@ const BLOCKER_ORDER = [
 const INPUT_KEYS = [
   "schemaVersion",
   "scenarioId",
-  "planDigestSha256",
   "producer",
   "detector",
   "recovery",
@@ -104,7 +139,6 @@ export interface ApplicationIdentityBinding {
 export interface DistinctApplicationIdentityReadinessInput {
   schemaVersion: 1;
   scenarioId: string;
-  planDigestSha256: string;
   producer: ApplicationIdentityBinding;
   detector: ApplicationIdentityBinding;
   recovery: {
@@ -141,7 +175,6 @@ export interface BlockedApplicationIdentityReadiness extends ReadinessBase {
 export interface ReadyApplicationIdentityBinding extends ReadinessBase {
   status: "ready";
   bindingDigestSha256: string;
-  planDigestSha256: string;
   roles: {
     producer: string;
     detector: string;
@@ -206,30 +239,24 @@ export type SafeApplicationIdentityReadinessSummary =
   Omit<ReadyApplicationIdentityBinding, "runtimeBinding">;
 
 export function verifyDistinctApplicationIdentityReadiness(
-  manifest: ScenarioManifest,
-  expectedPlanDigestSha256: string,
   value: unknown,
 ): DistinctApplicationIdentityReadiness {
   const base: ReadinessBase = {
     schemaVersion: 1,
     contract: "distinct-application-identity/v1",
-    scenarioId: manifest.id,
+    scenarioId: OAUTH_RECON_SCENARIO_ID,
     proof: "readiness-and-correlation-contract-only",
   };
-  const boundary = manifest.applicationIdentityBoundary;
-  if (boundary === undefined || !isRecord(value)) {
+  const boundary = OAUTH_RECON_IDENTITY_BOUNDARY;
+  if (!isRecord(value)) {
     return blocked(base, ["invalid-input"]);
   }
   const blockers = new Set<ApplicationIdentityReadinessBlocker>();
   if (!exactKeys(value, INPUT_KEYS) || value.schemaVersion !== 1) {
     blockers.add("invalid-input");
   }
-  if (
-    value.scenarioId !== manifest.id ||
-    !sha256(value.planDigestSha256) ||
-    value.planDigestSha256 !== expectedPlanDigestSha256
-  ) {
-    blockers.add("plan-mismatch");
+  if (value.scenarioId !== OAUTH_RECON_SCENARIO_ID) {
+    blockers.add("invalid-input");
   }
   const producer = parseIdentity(value.producer, blockers);
   const detector = parseIdentity(value.detector, blockers);
@@ -249,13 +276,12 @@ export function verifyDistinctApplicationIdentityReadiness(
   validateToken(producer, boundary, blockers);
   validateToken(detector, boundary, blockers);
   validateRecovery(producer, detector, recovery, boundary, blockers);
-  validateEvidence(producer, detector, evidence, manifest, boundary, blockers);
+  validateEvidence(producer, detector, evidence, boundary, blockers);
 
   if (blockers.size > 0) return blocked(base, blockers);
   const bindingDigestSha256 = createHash("sha256")
     .update(canonicalJson({
-      scenarioId: manifest.id,
-      planDigestSha256: expectedPlanDigestSha256,
+      scenarioId: OAUTH_RECON_SCENARIO_ID,
       producer,
       detector,
       recovery,
@@ -266,7 +292,6 @@ export function verifyDistinctApplicationIdentityReadiness(
     ...base,
     status: "ready",
     bindingDigestSha256,
-    planDigestSha256: expectedPlanDigestSha256,
     roles: {
       producer: boundary.producerActorId,
       detector: boundary.detectorActorId,
@@ -329,7 +354,7 @@ export function summarizeDistinctApplicationIdentityReadiness(
 function validateIdentities(
   producer: ApplicationIdentityBinding,
   detector: ApplicationIdentityBinding,
-  boundary: ScenarioApplicationIdentityBoundary,
+  boundary: ApplicationIdentityBoundary,
   blockers: Set<ApplicationIdentityReadinessBlocker>,
 ): void {
   if (
@@ -362,7 +387,7 @@ function validateIdentities(
 function validatePermissions(
   producer: ApplicationIdentityBinding,
   detector: ApplicationIdentityBinding,
-  boundary: ScenarioApplicationIdentityBoundary,
+  boundary: ApplicationIdentityBoundary,
   blockers: Set<ApplicationIdentityReadinessBlocker>,
 ): void {
   const expectedProducer = permissionKeys(boundary.producerPermissions);
@@ -385,7 +410,7 @@ function validatePermissions(
 
 function validateToken(
   identity: ApplicationIdentityBinding,
-  boundary: ScenarioApplicationIdentityBoundary,
+  boundary: ApplicationIdentityBoundary,
   blockers: Set<ApplicationIdentityReadinessBlocker>,
 ): void {
   if (
@@ -410,7 +435,7 @@ function validateRecovery(
   producer: ApplicationIdentityBinding,
   detector: ApplicationIdentityBinding,
   recovery: DistinctApplicationIdentityReadinessInput["recovery"],
-  boundary: ScenarioApplicationIdentityBoundary,
+  boundary: ApplicationIdentityBoundary,
   blockers: Set<ApplicationIdentityReadinessBlocker>,
 ): void {
   if (
@@ -431,8 +456,7 @@ function validateEvidence(
   producer: ApplicationIdentityBinding,
   detector: ApplicationIdentityBinding,
   evidence: DistinctApplicationIdentityReadinessInput["evidence"],
-  manifest: ScenarioManifest,
-  boundary: ScenarioApplicationIdentityBoundary,
+  boundary: ApplicationIdentityBoundary,
   blockers: Set<ApplicationIdentityReadinessBlocker>,
 ): void {
   if (
@@ -455,12 +479,9 @@ function validateEvidence(
   }
   const start = Date.parse(evidence.windowStart);
   const end = Date.parse(evidence.windowEnd);
-  const expectedMarker = manifest.operations.find(
-    ({ key }) => key === boundary.markerOperationKey,
-  )?.marker;
   if (
     !safeMarker(evidence.marker) ||
-    evidence.marker !== expectedMarker ||
+    evidence.marker !== boundary.marker ||
     !Number.isFinite(start) ||
     !Number.isFinite(end) ||
     end <= start ||
@@ -468,7 +489,7 @@ function validateEvidence(
       boundary.maximumObservationWindowMinutes * 60_000
   ) {
     blockers.add(
-      !safeMarker(evidence.marker) || evidence.marker !== expectedMarker
+      !safeMarker(evidence.marker) || evidence.marker !== boundary.marker
         ? "marker-mismatch"
         : "invalid-window",
     );
@@ -609,7 +630,7 @@ function parseEvidence(
 }
 
 function permissionKeys(
-  permissions: ScenarioApplicationIdentityBoundary[
+  permissions: ApplicationIdentityBoundary[
     "producerPermissions"
   ],
 ): string[] {
@@ -678,10 +699,6 @@ function uuid(value: unknown): value is string {
   return typeof value === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       .test(value);
-}
-
-function sha256(value: unknown): value is string {
-  return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 }
 
 function utc(value: unknown): value is string {

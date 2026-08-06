@@ -5,12 +5,9 @@ listed only when it was exercised through the hosted product path or by a
 bounded direct canary against the Student tenant. Unit tests, deployment alone,
 and code that has not touched Microsoft are not counted as live proof.
 
-A capability rehearsal or environment-validation canary proves a platform
-contract. It is not automatically a scenario or lab. Some existing source-backed
-manifests preserve evidence-producer, workload-actor, learner/observer, and
-responder fields created during earlier Pass 3 architecture work. Those fields
-remain facts about that code; they are not requirements for future capability
-exploration.
+A bounded canary proves only the action or observation it exercised. It is not
+automatically a scenario or lab, and future capability work does not require a
+generalized manifest or learner contract.
 
 Actor shorthand:
 
@@ -71,48 +68,25 @@ not mean the operation has been added to the SPA/API product path.
 | Temporary To Do list | Created and deleted one temporary list without tasks or sharing. | c91 delegated — Cory | Exact list absent |
 | Temporary To Do list/task lifecycle | Created a temporary list and task, completed the task, then deleted both. No sharing or mail route was used. | c91 delegated — Cory | Exact task and list absent |
 | Calendar event conditional-delete check | Graph accepted one event `DELETE` carrying a genuinely stale event ETag with HTTP `204`, proving that `If-Match` was ignored on the tested route. | Dev diagnostic app | Read-only follow-up found the exact event absent, marker count zero, and preview eligible `0` / indeterminate `0` |
+| Application-owned draft observation | The Dev diagnostic app placed one marker-bound draft in Cory's mailbox without Cory signing in. The draft had no recipient, attachment, link, or send-family action. A separate aggregate Drafts inventory found exactly one recipient-free, attachment-free, low-importance AP2-marked draft. | Dev diagnostic app for creation; separate bounded inventory for observation | This adds app-only actor semantics to the draft capability; it does not prove delivery or message influence. The draft remains privately identifiable for deferred cleanup. |
 
 The contact and disabled-rule operations were also exercised through the
 production-shaped local SPA, rootless API container, operator CBA, and Cory
 CBA before their hosted proofs. Those runs corroborate the same product paths;
 they are not additional tenant capabilities.
 
-## Source-backed capability building blocks
+## Proven scenarios
 
-The validated source-backed registry contains exactly the capability building
-blocks listed below. This table is checked against the canonical manifest
-registry rather than maintained as a separate list. Each entry is an atomic
-ingredient, not a learner lab. Cards perform no tenant operation merely by
-rendering. The learner-evidence column describes the capability contract and
-its current boundary; it does not claim that a learner completed a lab:
+These five capability compositions were performed against Microsoft. They are
+factual evidence, not entries in a registry or templates for future work.
 
-| Capability building block | Evidence producer / orchestrator | Workload actor | Learner / observer | Responder | Learner receives |
-| --- | --- | --- | --- | --- | --- |
-| Controlled Teams missed-call observation | AP2 instructor, who owns the one-attempt staging boundary | Kobe lab user through a separate licensed Teams client session | Learner using Cory's lab Teams view | None; observation only | One `Missed incoming` call entry and one matching Teams activity item to correlate without returning the call |
-| Application reconnaissance and audit observation | AP2 reconnaissance lab harness, which owns the bounded window | Dev diagnostic app through an application-only Graph session | Security learner receiving sanitized output | None; observation only | Counts and reachability for four fixed reads plus a successful service-principal sign-in summary collected through a distinct audit observer application |
-| Kobe help-desk email for Cory | AP2 orchestrator with one private one-shot journal | Kobe through exact delegated `Mail.Send` | Learner using Cory's Inbox | Learner reports an interpretation only | One fixed platform-native Outlook email; no Teams or voicemail semantics |
-| Private three-VM AVD lab substrate | Dev application owns infrastructure, endpoint lifecycle, and cleanup | Windows 11 endpoint for the Entra/Intune/Defender lifecycle | Fixed learner is assigned but did not start a session | Dev application owns cleanup | Protected control-plane evidence for one AVD host, two Ubuntu nodes, shared NAT, and endpoint posture; learner visibility and task completion are not proven |
-| Private document evidence staging | AP2 orchestrator owns the one-shot journal and claim boundary | Distinct fictional producer through delegated Files access | Distinct fictional learner through a bounded delegated read | None; cleanup is producer-owned | Producer-side platform acceptance of one private text artifact and direct learner-only read grant; learner visibility and interpretation remain unproven |
-
-The remaining entries below are historical evidence narratives, not migrated
-source manifests. Their attacker/defender wording must not be read as silently
-assigning the learner to either proof role.
-
-The receipt-only
-[SharePoint trusted-version staging dependency](sharepoint-trusted-version-lifecycle.md)
-is also source-backed but intentionally absent from the SPA scenario registry:
-the existing API identity writes one trusted and one harmless changed version,
-binds their ordered exact bytes, and proves active cleanup. Its future detector
-and learner remain uninspected, and it does not add restoration or a Lab.
-
-| Scenario | Attacker-side unit | Defender-side observation | Boundary still visible |
+| Scenario | Staged activity | Observation and cleanup | Boundary still visible |
 | --- | --- | --- | --- |
-| OAuth application mail staging | The Dev diagnostic app placed one marker-bound draft in Cory's mailbox without Cory signing in. The draft has no recipient, attachment, link, or send-family action. | A separate aggregate Drafts inventory found exactly one true, recipient-free, attachment-free, low-importance AP2-marked draft. | This adds app-only actor semantics to the already-proven draft capability; it does not prove delivery or message influence. The draft remains privately identifiable for deferred cleanup. |
 | Inbox-rule persistence and effect | The Dev diagnostic app created one enabled Cory Inbox rule limited to an exact AP2 subject marker, mark-read, and stop-processing actions. A later single, non-retried app-only send delivered that harmless marker message from Homer to Cory. | After one bounded wait, one unpaged Inbox read found exactly one matching message already marked read with no attachment. A separate inventory had confirmed the rule shape and tenant-wide mailbox-settings reach. | This proves the mark-read effect, not runtime stop-processing. A later exact-rule deletion returned `204`, but two separately authorized exact-ID confirmation reads returned `500`; rule absence is therefore unconfirmed, and no second message was sent. |
-| Dormant OAuth application persistence and remediation | The Dev diagnostic app registered one single-tenant application with one short-lived password credential, then discarded the generated secret without storing or using it. The application had no service principal, permissions, roles, scopes, keys, or redirect URI. | A tenant-wide aggregate inventory found exactly one full dormant-configuration match. Defender remediation later deleted that exact inert application; after natural propagation, its exact lookup returned `404` and the bounded aggregate inventory contained zero dormant matches. | The application never obtained workload access. Immediate and naturally delayed directory-audit reads did not produce an exact actor-and-target correlation, so audit visibility remains unproven. |
-| SharePoint content tampering and recovery | The Dev diagnostic app created one uniquely named, unshared harmless file and overwrote it once with different harmless content. One capped, unpaged version read returned exactly the expected original and overwritten versions. | Defender recovery restored the unambiguous original version and proved the exact original bytes before conditionally deleting the file. Exact ID and path reads then returned `404`. A later distinct fixed detector reached Microsoft Graph v1 Purview Audit Search app-only without changing authority. | Overwrite and version restoration were unconditional, so this proves only the fresh, canary-owned file contract. Both retained audit searches later reached `succeeded`; their capped pages contained the same two records with the exact frozen producer application, allowed operations, marker target, target type, event window, and correlation. Correcting only the supported Graph record-type casing makes operation-level producer attribution `live-proven`. This does not prove content collection or every workload operation. The product minimum is `AuditLogsQuery-SharePoint.Read.All`; the retained diagnostic detector currently has a broader audit role. The [learner-lab readiness audit](sharepoint-document-change-lab-readiness.md) explains why these historical conclusions do not yet form one publishable lab. See also the [Purview operation-audit contract](purview-audit-contract.md). |
+| Dormant OAuth application remediation | The Dev diagnostic app registered one single-tenant application with one short-lived password credential, then discarded the generated secret without storing or using it. The application had no service principal, permissions, roles, scopes, keys, or redirect URI. | A tenant-wide aggregate inventory found exactly one full dormant-configuration match. Defender remediation later deleted that exact inert application; after natural propagation, its exact lookup returned `404` and the bounded aggregate inventory contained zero dormant matches. | The application never obtained workload access. Immediate and naturally delayed directory-audit reads did not produce an exact actor-and-target correlation, so audit visibility remains unproven. |
+| SharePoint document tampering and recovery | The Dev diagnostic app created one uniquely named, unshared harmless file and overwrote it once with different harmless content. One capped, unpaged version read returned exactly the expected original and overwritten versions. | Defender recovery restored the unambiguous original version and proved the exact original bytes before conditionally deleting the file. Exact ID and path reads then returned `404`. A later distinct fixed detector reached Microsoft Graph v1 Purview Audit Search app-only without changing authority. | Overwrite and version restoration were unconditional, so this proves only the fresh, canary-owned file contract. Both retained audit searches later reached `succeeded`; their capped pages contained the same two records with the exact frozen producer application, allowed operations, marker target, target type, event window, and correlation. Correcting only the supported Graph record-type casing makes operation-level producer attribution `live-proven`. This does not prove content collection or every workload operation. The product minimum is `AuditLogsQuery-SharePoint.Read.All`; the retained diagnostic detector currently has a broader audit role. See also the [Purview operation-audit contract](purview-audit-contract.md). |
 | Defender email-attachment prevention | One internal Homer-to-Cory message carried Microsoft's standard EICAR test attachment and was submitted exactly once. | Within five minutes, message trace and Defender hunting correlated one quarantined message and attachment with malware, blocked, quarantine, and antimalware-engine evidence; Cory's Inbox contained no matching message. | No exact alert or incident appeared. The learner evidence is in Threat Explorer or the email entity, message trace, hunting, and Quarantine. The attachment must not be released, previewed, downloaded, or opened; quarantine and audit residue can remain. |
-| Teams group-chat membership and message staging | Homer created one marked group chat with Cory and Kobe, later added Marge with a frozen history cutoff, and posted one harmless plaintext insider-style lab message. | Exact retained-identity reads proved the marked topic, Homer/Cory/Kobe/Marge roster, Marge's cutoff, and the sole Homer-authored message. Cory then identified and removed only the unexpected participant through the learner UI. One exact post-action membership read proved Cory, Homer, and Kobe retained and Marge absent; protected learner evidence showed the original warning message still visible. | The native member-add system-event predicate did not match, and Purview audit correlation remains unproven. The marked chat, its three intended members, warning message, membership history, and audit history remain for the separately authorized broader cleanup pass. |
+| Teams group-chat membership remediation | Homer created one marked group chat with Cory and Kobe, later added Marge with a frozen history cutoff, and posted one harmless plaintext insider-style lab message. | Exact retained-identity reads proved the marked topic, Homer/Cory/Kobe/Marge roster, Marge's cutoff, and the sole Homer-authored message. Cory then identified and removed only the unexpected participant through the learner UI. One exact post-action membership read proved Cory, Homer, and Kobe retained and Marge absent; protected learner evidence showed the original warning message still visible. | The native member-add system-event predicate did not match, and Purview audit correlation remains unproven. The marked chat, its three intended members, warning message, membership history, and audit history remain for the separately authorized broader cleanup pass. |
 
 ## Identity and infrastructure proofs
 

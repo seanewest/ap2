@@ -8,45 +8,7 @@ import {
   type ApiRouteContract,
   type ApiRouteContractFailure,
 } from "./api-route-contract.ts";
-import {
-  SCENARIO_PLAN_MAX_REQUEST_BYTES,
-  SCENARIO_PLAN_MAX_RESPONSE_BYTES,
-} from "../../api/scenario-plan.ts";
-import {
-  SCENARIO_RECEIPT_MAX_REQUEST_BYTES,
-  SCENARIO_RECEIPT_MAX_RESPONSE_BYTES,
-} from "../../api/scenario-evidence-verification.ts";
 import { OPERATION_TELEMETRY_MAX_RESPONSE_BYTES } from "../../api/operation-telemetry-collector.ts";
-import {
-  REHEARSAL_OUTPUT_MAX_REQUEST_BYTES,
-  REHEARSAL_OUTPUT_MAX_RESPONSE_BYTES,
-} from "./rehearsal-output-verification-contract.ts";
-import {
-  PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
-  PRIVATE_DOCUMENT_REHEARSAL_MAX_RESPONSE_BYTES,
-} from "./private-document-rehearsal-verification-contract.ts";
-import {
-  BATCH_FEASIBILITY_MAX_REQUEST_BYTES,
-  BATCH_FEASIBILITY_MAX_RESPONSE_BYTES,
-} from "./multi-scenario-feasibility-contract.ts";
-import {
-  HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
-  HELP_DESK_EMAIL_REHEARSAL_MAX_RESPONSE_BYTES,
-} from "./help-desk-email-rehearsal-verification-contract.ts";
-import {
-  OAUTH_APPLICATION_RECON_REHEARSAL_MAX_REQUEST_BYTES,
-  OAUTH_APPLICATION_RECON_REHEARSAL_MAX_RESPONSE_BYTES,
-} from "./oauth-application-recon-rehearsal-verification-contract.ts";
-
-const EXPECTED_PURE_OWNERS = [
-  "scenario-plan-compile",
-  "scenario-receipt-verify",
-  "avd-rehearsal-verify",
-  "private-document-rehearsal-verify",
-  "help-desk-email-rehearsal-verify",
-  "oauth-application-recon-rehearsal-verify",
-  "batch-feasibility-calculate",
-] as const;
 
 describe("authoritative API route contracts", () => {
   it("covers every fixed owner and method/path exactly once", () => {
@@ -68,59 +30,10 @@ describe("authoritative API route contracts", () => {
     }
   });
 
-  it("classifies every planning and verification route as pure", () => {
-    expect(
-      EXPECTED_PURE_OWNERS.map((ownerKey) => apiRouteContract(ownerKey)),
-    ).toEqual(
-      expect.arrayContaining(
-        EXPECTED_PURE_OWNERS.map((ownerKey) =>
-          expect.objectContaining({
-            ownerKey,
-            authorization: "operator",
-            authBeforeBody: true,
-            sideEffect: "pure",
-            externalCall: false,
-            persistence: false,
-            retry: false,
-            scheduling: false,
-          })
-        ),
-      ),
-    );
-  });
-
-  it("binds server and client byte limits to the existing safe contracts", () => {
+  it("binds the operation-event response limit to its collector", () => {
     expect(bounds("operation-events")).toEqual([
       0,
       OPERATION_TELEMETRY_MAX_RESPONSE_BYTES,
-    ]);
-    expect(bounds("scenario-plan-compile")).toEqual([
-      SCENARIO_PLAN_MAX_REQUEST_BYTES,
-      SCENARIO_PLAN_MAX_RESPONSE_BYTES,
-    ]);
-    expect(bounds("scenario-receipt-verify")).toEqual([
-      SCENARIO_RECEIPT_MAX_REQUEST_BYTES,
-      SCENARIO_RECEIPT_MAX_RESPONSE_BYTES,
-    ]);
-    expect(bounds("avd-rehearsal-verify")).toEqual([
-      REHEARSAL_OUTPUT_MAX_REQUEST_BYTES,
-      REHEARSAL_OUTPUT_MAX_RESPONSE_BYTES,
-    ]);
-    expect(bounds("private-document-rehearsal-verify")).toEqual([
-      PRIVATE_DOCUMENT_REHEARSAL_MAX_REQUEST_BYTES,
-      PRIVATE_DOCUMENT_REHEARSAL_MAX_RESPONSE_BYTES,
-    ]);
-    expect(bounds("help-desk-email-rehearsal-verify")).toEqual([
-      HELP_DESK_EMAIL_REHEARSAL_MAX_REQUEST_BYTES,
-      HELP_DESK_EMAIL_REHEARSAL_MAX_RESPONSE_BYTES,
-    ]);
-    expect(bounds("oauth-application-recon-rehearsal-verify")).toEqual([
-      OAUTH_APPLICATION_RECON_REHEARSAL_MAX_REQUEST_BYTES,
-      OAUTH_APPLICATION_RECON_REHEARSAL_MAX_RESPONSE_BYTES,
-    ]);
-    expect(bounds("batch-feasibility-calculate")).toEqual([
-      BATCH_FEASIBILITY_MAX_REQUEST_BYTES,
-      BATCH_FEASIBILITY_MAX_RESPONSE_BYTES,
     ]);
   });
 
