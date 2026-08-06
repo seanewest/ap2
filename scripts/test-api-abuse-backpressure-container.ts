@@ -113,26 +113,21 @@ async function main(): Promise<void> {
     );
     const oversized = await burst(
       OVERSIZED_BURST,
-      () => fetch(`${baseUrl}/api/scenario-plan`, {
+      () => fetch(`${baseUrl}/api/sharepoint-trusted-version-lifecycle`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: "x".repeat(8_193),
+        body: "x".repeat(513),
       }),
       413,
       "request_too_large",
     );
 
-    const held = await Promise.all(
-      Array.from(
-        { length: API_PROCESS_ADMISSION_LIMITS.purePerRoute },
-        () => openPartialJson(apiPort, token),
-      ),
-    );
+    const held = [await openPartialJson(apiPort, token)];
     await delay(250);
-    const pureRefusal = await timedFetch(`${baseUrl}/api/scenario-plan`, {
+    const bodyRefusal = await timedFetch(`${baseUrl}/api/sharepoint-trusted-version-lifecycle`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -141,14 +136,14 @@ async function main(): Promise<void> {
       body: "{}",
     });
     await assertResponse(
-      pureRefusal.response,
+      bodyRefusal.response,
       503,
       "process_capacity_exceeded",
     );
     const peak = processSample(container);
     held.forEach((socket) => socket.destroy());
     await delay(250);
-    const released = await timedFetch(`${baseUrl}/api/scenario-plan`, {
+    const released = await timedFetch(`${baseUrl}/api/sharepoint-trusted-version-lifecycle`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -158,7 +153,7 @@ async function main(): Promise<void> {
     });
     if (released.response.status !== 400) {
       throw new Error(
-        `Released pure capacity returned ${released.response.status}`,
+        `Released JSON-mutation capacity returned ${released.response.status}`,
       );
     }
 
@@ -242,12 +237,12 @@ async function main(): Promise<void> {
           queued: 0,
           retried: 0,
         },
-        pure: {
-          held: API_PROCESS_ADMISSION_LIMITS.purePerRoute,
+        jsonMutationBody: {
+          held: 1,
           refused: 1,
           refusalStatus: 503,
           released: true,
-          refusalLatencyMs: pureRefusal.elapsedMs,
+          refusalLatencyMs: bodyRefusal.elapsedMs,
         },
         oversized: {
           requests: OVERSIZED_BURST,
@@ -423,7 +418,7 @@ async function openPartialJson(apiPort: number, token: string): Promise<Socket> 
     socket.once("error", reject);
   });
   socket.write([
-    "POST /api/scenario-plan HTTP/1.1",
+    "POST /api/sharepoint-trusted-version-lifecycle HTTP/1.1",
     `Host: 127.0.0.1:${apiPort}`,
     `Authorization: Bearer ${token}`,
     "Content-Type: application/json",

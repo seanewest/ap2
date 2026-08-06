@@ -6,7 +6,6 @@ RUN npm ci
 COPY api ./api
 COPY scripts ./scripts
 COPY src/api ./src/api
-COPY src/scenarios ./src/scenarios
 COPY src/ui ./src/ui
 RUN npm run build:api && rm -f dist-api/*.map
 RUN npm prune --omit=dev

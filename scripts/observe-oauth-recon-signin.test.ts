@@ -9,10 +9,8 @@ import {
 import {
   verifyDistinctApplicationIdentityReadiness,
   type ReadyApplicationIdentityBinding,
-} from "../src/scenarios/application-identity-readiness.js";
+} from "../src/validation/oauth-recon-identity-readiness.js";
 import { STUDENT_TENANT_ID } from "../api/identity.js";
-import { compileScenarioExecutionPlan } from "../src/scenarios/scenario-plan.js";
-import { OAUTH_APPLICATION_RECON_SCENARIO } from "../src/scenarios/oauth-application-recon.js";
 
 const START = "2026-07-26T12:00:00.000Z";
 const END = "2026-07-26T12:15:00.000Z";
@@ -22,32 +20,14 @@ const OBSERVER_CLIENT_ID = "10b5f83c-f694-4d33-a5b8-0c93af872e02";
 const OBSERVER_SERVICE_PRINCIPAL_ID =
   "55555555-5555-4555-8555-555555555555";
 const GRAPH_RESOURCE_ID = "00000003-0000-0000-c000-000000000000";
-const PLAN = compileScenarioExecutionPlan({
-  scenarioId: "oauth-application-reconnaissance",
-  actorAliases: {
-    evidenceProducer: "harness",
-    workloadActor: "producer",
-    learner: "learner",
-    detector: "detector",
-    cleanupOwner: "harness",
-  },
-  now: START,
-  expiresAt: "2026-07-26T13:00:00.000Z",
-  maximumBudgetUsd: 0,
-  selectedResponseId: "report-recon-interpretation",
-});
 const role = (applicationRoleId: string) => ({
   resourceApplicationId: GRAPH_RESOURCE_ID,
   applicationRoleId,
   assignment: "present-exact" as const,
 });
-const verifiedBinding = verifyDistinctApplicationIdentityReadiness(
-  OAUTH_APPLICATION_RECON_SCENARIO,
-  PLAN.digestSha256,
-  {
+const verifiedBinding = verifyDistinctApplicationIdentityReadiness({
     schemaVersion: 1,
-    scenarioId: OAUTH_APPLICATION_RECON_SCENARIO.id,
-    planDigestSha256: PLAN.digestSha256,
+    scenarioId: "oauth-application-reconnaissance",
     producer: {
       actorId: "recon-workload-app",
       applicationId: CLIENT_ID,

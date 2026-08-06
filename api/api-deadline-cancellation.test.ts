@@ -15,7 +15,6 @@ import {
   API_REQUEST_RECEIVE_TIMEOUT_MS,
   createApiServer,
 } from "./server.ts";
-import type { ScenarioPlanService } from "./scenario-plan.ts";
 
 const servers: ReturnType<typeof createApiServer>[] = [];
 
@@ -40,23 +39,23 @@ describe("API deadline and client-cancellation boundary", () => {
   it("closes a held authenticated pure request without cancelling its work", async () => {
     const pure = deferred<unknown>();
     const started = deferred<void>();
-    const compile = vi.fn(() => {
+    const snapshot = vi.fn(() => {
       started.resolve();
       return pure.promise;
     });
     const { server, messages } = auditServer({
-      scenarioPlanService: { compile } as unknown as ScenarioPlanService,
+      operationTelemetryReader: { snapshot } as never,
     });
     const base = await listen(server, 40);
-    const client = post(base, "/api/scenario-plan", "{}");
+    const client = apiRequest(base, "GET", "/api/operation-events");
     await started.promise;
 
     await expect(client).rejects.toThrow();
-    expect(compile).toHaveBeenCalledOnce();
+    expect(snapshot).toHaveBeenCalledOnce();
     await waitForTerminal(messages);
     expect(terminalEvents(messages)).toEqual([
       expect.objectContaining({
-        routeOwner: "scenario-plan-compile",
+        routeOwner: "operation-events",
         sideEffect: "pure",
         status: API_CONNECTION_CLOSED_STATUS,
         outcome: "connection-closed",
@@ -79,7 +78,7 @@ describe("API deadline and client-cancellation boundary", () => {
       simulatedEmailOperation: { send } as never,
     });
     const base = await listen(server, 40);
-    const client = post(base, "/api/simulated-email");
+    const client = apiRequest(base, "POST", "/api/simulated-email");
     await started.promise;
 
     await expect(client).rejects.toThrow();
@@ -114,7 +113,7 @@ describe("API deadline and client-cancellation boundary", () => {
       simulatedEmailOperation: { send: operation } as never,
     });
     const base = await listen(server, 500);
-    const client = post(base, "/api/simulated-email");
+    const client = apiRequest(base, "POST", "/api/simulated-email");
     await started.promise;
     client.destroy();
 
@@ -141,9 +140,9 @@ describe("API deadline and client-cancellation boundary", () => {
 
   it("terminates an incomplete request body under the receive boundary", async () => {
     const { server, messages } = auditServer({
-      scenarioPlanService: {
-        compile: vi.fn(() => {
-          throw new Error("Incomplete input must not compile");
+      sharePointTrustedVersionLifecycleOperation: {
+        run: vi.fn(() => {
+          throw new Error("Incomplete input must not dispatch");
         }),
       },
     });
@@ -160,7 +159,7 @@ describe("API deadline and client-cancellation boundary", () => {
       socket.once("error", reject);
     });
     socket.write([
-      "POST /api/scenario-plan HTTP/1.1",
+      "POST /api/sharepoint-trusted-version-lifecycle HTTP/1.1",
       `Host: ${base.host}:${base.port}`,
       "Authorization: Bearer fixture-token",
       "Content-Type: application/json",
@@ -182,7 +181,7 @@ describe("API deadline and client-cancellation boundary", () => {
     await waitForTerminal(messages);
     expect(terminalEvents(messages)).toEqual([
       expect.objectContaining({
-        routeOwner: "scenario-plan-compile",
+        routeOwner: "sharepoint-trusted-version-lifecycle",
         status: API_CONNECTION_CLOSED_STATUS,
         outcome: "connection-closed",
       }),
@@ -238,8 +237,9 @@ async function listen(
   };
 }
 
-function post(
+function apiRequest(
   base: { host: string; port: number; origin: string },
+  method: "GET" | "POST",
   path: string,
   body?: string,
 ): Promise<void> & {
@@ -252,7 +252,7 @@ function post(
       hostname: base.host,
       port: base.port,
       path,
-      method: "POST",
+      method,
       headers: {
         Authorization: "Bearer fixture-token",
         ...(body === undefined

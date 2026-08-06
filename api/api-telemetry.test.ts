@@ -35,9 +35,9 @@ const server = createApiServer({
       latestReadyRevision: "fixture",
     })),
   },
-  scenarioPlanService: {
-    compile: vi.fn(() => {
-      throw new Error("Invalid requests must not reach compilation");
+  sharePointTrustedVersionLifecycleOperation: {
+    run: vi.fn(() => {
+      throw new Error("Invalid requests must not reach dispatch");
     }),
   },
   allowedOrigin: "https://allowed.example.test",
@@ -90,20 +90,20 @@ describe("API request telemetry", () => {
     expect(authorized.headers.get("Access-Control-Expose-Headers")).toBe(
       API_SUPPORT_REFERENCE_HEADER,
     );
-    expect((await authorizedFetch("/api/scenario-plan", {
+    expect((await authorizedFetch("/api/sharepoint-trusted-version-lifecycle", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: unsafe,
     })).status).toBe(415);
-    expect((await authorizedFetch("/api/scenario-plan", {
+    expect((await authorizedFetch("/api/sharepoint-trusted-version-lifecycle", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: `{${unsafe}`,
     })).status).toBe(400);
-    expect((await authorizedFetch("/api/scenario-plan", {
+    expect((await authorizedFetch("/api/sharepoint-trusted-version-lifecycle", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ value: `${unsafe}${"x".repeat(8_192)}` }),
+      body: JSON.stringify({ value: `${unsafe}${"x".repeat(512)}` }),
     })).status).toBe(413);
     expect((await fetch(`${baseUrl}/api/simulated-email`, {
       method: "POST",
@@ -134,9 +134,9 @@ describe("API request telemetry", () => {
       ["health", "pure", 200, "completed"],
       ["whoami", "pure", 401, "refused"],
       ["whoami", "pure", 200, "completed"],
-      ["scenario-plan-compile", "pure", 415, "refused"],
-      ["scenario-plan-compile", "pure", 400, "refused"],
-      ["scenario-plan-compile", "pure", 413, "refused"],
+      ["sharepoint-trusted-version-lifecycle", "bounded-mutation", 415, "refused"],
+      ["sharepoint-trusted-version-lifecycle", "bounded-mutation", 400, "refused"],
+      ["sharepoint-trusted-version-lifecycle", "bounded-mutation", 413, "refused"],
       ["simulated-email-send", "bounded-mutation", 403, "refused"],
       ["whoami", "pure", 503, "shutdown-refused"],
     ]);

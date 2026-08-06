@@ -208,13 +208,8 @@ const trustedVersionResult = {
   schemaVersion: 1,
   kind: "sharepoint-trusted-version-lifecycle-result",
   status: "completed-cleaned",
-  scenarioId: "sharepoint-trusted-version-lifecycle",
   producer: "sharepoint-producer-app",
   cleanupOwner: "trusted-version-cleanup-owner",
-  learnerVisibility: "uninspected",
-  detectorObservation: "uninspected",
-  learnerInterpretation: "uninspected",
-  response: "uninspected",
   markerDigestSha256: "1".repeat(64),
   fileIdentityDigestSha256: "2".repeat(64),
   startedAt: "2026-07-29T12:00:00.000Z",
@@ -336,7 +331,7 @@ describe("local API", () => {
       await fetch(`${baseUrl}/health`),
       await fetch(`${baseUrl}/api/whoami`),
       await fetch(`${baseUrl}/not-found`),
-      await fetch(`${baseUrl}/api/scenario-plan`, {
+      await fetch(`${baseUrl}/api/sharepoint-trusted-version-lifecycle`, {
         method: "OPTIONS",
         headers: {
           Origin: "http://localhost:5173",
@@ -1137,15 +1132,10 @@ describe("local API", () => {
       body: expect.any(Object),
     });
     expect(body).toMatchObject({
-      lifecycle: {
-        status: "completed-cleaned",
-        learnerVisibility: "uninspected",
-        detectorObservation: "uninspected",
-      },
-      verification: {
-        kind: "verified-scenario-evidence-receipt",
-        scenarioId: "sharepoint-trusted-version-lifecycle",
-      },
+      status: "completed-cleaned",
+      kind: "sharepoint-trusted-version-lifecycle-result",
+      producer: "sharepoint-producer-app",
+      cleanupOwner: "trusted-version-cleanup-owner",
     });
     expect(JSON.stringify(body)).not.toMatch(
       /ap2-spv-abc123def456|@|\/home\/|token|driveId|file-id/i,

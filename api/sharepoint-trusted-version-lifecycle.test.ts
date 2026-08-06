@@ -6,17 +6,6 @@ import {
   TRUSTED_VERSION_TWO_CONTENT,
   TrustedVersionLifecycleError,
 } from "./sharepoint-trusted-version-lifecycle";
-import {
-  adaptTrustedVersionLifecycleToReceipt,
-  TrustedVersionReceiptAdapterError,
-} from "../src/scenarios/sharepoint-trusted-version-receipt-adapter";
-import {
-  verifyCanonicalScenarioEvidenceReceipt,
-} from "../src/scenarios/scenario-evidence-verification";
-import { SCENARIO_MANIFESTS } from "../src/scenarios/scenarios";
-import {
-  SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO,
-} from "../src/scenarios/sharepoint-trusted-version-lifecycle";
 
 const NOW = new Date("2026-07-29T12:00:00.000Z");
 const input = {
@@ -66,12 +55,6 @@ describe("SharePoint trusted-version lifecycle", () => {
     );
 
     const result = await operation.run(input);
-    const receipt = adaptTrustedVersionLifecycleToReceipt(result);
-    const verified = verifyCanonicalScenarioEvidenceReceipt(receipt);
-    const otherRun = structuredClone(result);
-    otherRun.markerDigestSha256 = "0".repeat(64);
-    const otherReceipt = adaptTrustedVersionLifecycleToReceipt(otherRun);
-
     expect(result.status).toBe("completed-cleaned");
     expect(result.versions.map(({ ordinal, size }) => ({ ordinal, size })))
       .toEqual([
@@ -84,14 +67,9 @@ describe("SharePoint trusted-version lifecycle", () => {
       recycleAndAuditHistory: "ordinary-platform-history-retained",
       expiry: "removed",
     });
-    expect(verified.missingCoverage).toContain("detector-independent");
-    expect(verified.missingCoverage).toContain(
-      "visibility-trusted-version-history",
-    );
-    expect(verified.evidenceBindingDigestSha256).toMatch(/^[0-9a-f]{64}$/);
-    expect(otherReceipt.scenario.evidenceBindingDigestSha256).not.toBe(
-      receipt.scenario.evidenceBindingDigestSha256,
-    );
+    expect(result.markerDigestSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.fileIdentityDigestSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.journalDigestSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(request).toHaveBeenCalledTimes(20);
     expect(
       request.mock.calls.filter(([, init]) => init?.method === "PUT"),
@@ -108,21 +86,6 @@ describe("SharePoint trusted-version lifecycle", () => {
       /driveId|folder-id|file-id|ap2-spv-abc123def456|@|\/home\/|token/i,
     );
 
-    const overclaim = structuredClone(result) as unknown as Record<
-      string,
-      unknown
-    >;
-    overclaim.learnerVisibility = "proven";
-    expect(() => adaptTrustedVersionLifecycleToReceipt(overclaim)).toThrowError(
-      expect.objectContaining<Partial<TrustedVersionReceiptAdapterError>>({
-        code: "overclaim",
-      }),
-    );
-    const tampered = structuredClone(result);
-    tampered.versions[0].contentDigestSha256 = "0".repeat(64);
-    expect(() => adaptTrustedVersionLifecycleToReceipt(tampered)).toThrowError(
-      expect.objectContaining({ code: "sequence" }),
-    );
   });
 
   it("reconciles an ambiguous version write without replaying it", async () => {
@@ -312,29 +275,6 @@ describe("SharePoint trusted-version lifecycle", () => {
     expect(
       request.mock.calls.filter(([, init]) => init?.method === "DELETE"),
     ).toHaveLength(1);
-  });
-
-  it("keeps the backend dependency out of the primary SPA scenario registry", () => {
-    expect(SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO.roles).toEqual({
-      evidenceProducer: "trusted-version-cleanup-owner",
-      workloadActor: "sharepoint-producer-app",
-      learner: "future-human-learner",
-      detector: "future-purview-detector",
-    });
-    expect(
-      new Set([
-        SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO.roles.workloadActor,
-        SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO.roles.learner,
-        SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO.roles.detector,
-        SHAREPOINT_TRUSTED_VERSION_LIFECYCLE_SCENARIO.lifecycle
-          .cleanupOwnerActorId,
-      ]).size,
-    ).toBe(4);
-    expect(
-      SCENARIO_MANIFESTS.some(
-        ({ id }) => id === "sharepoint-trusted-version-lifecycle",
-      ),
-    ).toBe(false);
   });
 
   it("rejects malformed markers and reused one-shot markers before Graph", async () => {

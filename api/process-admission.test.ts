@@ -27,7 +27,7 @@ describe("process-local API admission", () => {
   });
 
   it.each([
-    ["pure", "POST", "/api/scenario-plan", "purePerRoute"],
+    ["pure", "GET", "/api/operation-events", "purePerRoute"],
     ["read-only", "GET", "/api/rehearsal-status", "readOnlyExternalPerRoute"],
     ["mutation", "POST", "/api/calendar-meeting", "boundedMutationPerRoute"],
   ] as const)(
@@ -72,29 +72,36 @@ describe("process-local API admission", () => {
 
   it("caps aggregate operator work across otherwise available routes", () => {
     const admission = new ProcessLocalApiAdmission();
-    const contracts = [
-      findApiRouteContract("POST", "/api/scenario-plan"),
-      findApiRouteContract(
-        "POST",
-        "/api/scenario-evidence-verification",
-      ),
+    const pureContracts = [
       findApiRouteContract("GET", "/api/whoami"),
+      findApiRouteContract("GET", "/api/operation-events"),
     ];
-    expect(contracts.every(Boolean)).toBe(true);
-    const releases = contracts.flatMap((contract) =>
-      Array.from(
-        { length: API_PROCESS_ADMISSION_LIMITS.purePerRoute },
-        () => admission.tryAcquire(contract),
-      )
-    );
+    const status = findApiRouteContract("GET", "/api/rehearsal-status");
+    const mutations = [
+      findApiRouteContract("POST", "/api/simulated-email"),
+      findApiRouteContract("POST", "/api/help-desk-scenario"),
+      findApiRouteContract("POST", "/api/calendar-meeting"),
+      findApiRouteContract("POST", "/api/contact-proof"),
+    ];
+    expect([...pureContracts, status, ...mutations].every(Boolean)).toBe(true);
+    const releases = [
+      ...pureContracts.flatMap((contract) =>
+        Array.from(
+          { length: API_PROCESS_ADMISSION_LIMITS.purePerRoute },
+          () => admission.tryAcquire(contract),
+        )
+      ),
+      ...Array.from(
+        { length: API_PROCESS_ADMISSION_LIMITS.readOnlyExternalPerRoute },
+        () => admission.tryAcquire(status),
+      ),
+      ...mutations.map((contract) => admission.tryAcquire(contract)),
+    ];
     expect(releases).toHaveLength(API_PROCESS_ADMISSION_LIMITS.operatorTotal);
     expect(releases.every(Boolean)).toBe(true);
     expect(
       admission.tryAcquire(
-        findApiRouteContract(
-          "POST",
-          "/api/private-document-rehearsal-verification",
-        ),
+        findApiRouteContract("POST", "/api/inbox-rule-proof"),
       ),
     ).toBeUndefined();
 

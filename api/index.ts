@@ -35,31 +35,6 @@ import {
   GraphSharePointTrustedVersionLifecycle,
 } from "./sharepoint-trusted-version-lifecycle.js";
 import { createApiServer } from "./server.js";
-import { InMemoryScenarioPlanService } from "./scenario-plan.js";
-import {
-  InMemoryScenarioEvidenceVerificationService,
-} from "./scenario-evidence-verification.js";
-import {
-  InMemoryRehearsalOutputVerificationService,
-} from "./rehearsal-output-verification.js";
-import {
-  InMemoryMultiScenarioFeasibilityService,
-} from "./multi-scenario-feasibility.js";
-import {
-  InMemoryPrivateDocumentRehearsalVerificationService,
-} from "./private-document-rehearsal-verification.js";
-import {
-  InMemoryHelpDeskEmailRehearsalVerificationService,
-} from "./help-desk-email-rehearsal-verification.js";
-import {
-  InMemoryTeamsMissedCallRehearsalVerificationService,
-} from "./teams-missed-call-rehearsal-verification.js";
-import {
-  InMemoryOauthApplicationReconRehearsalVerificationService,
-} from "./oauth-application-recon-rehearsal-verification.js";
-import {
-  InMemoryPurviewAuditBoundaryRehearsalVerificationService,
-} from "./purview-audit-boundary-rehearsal-verification.js";
 import {
   DelegatedGraphOneDriveShareProof,
   GRAPH_FILES_READ_WRITE_SCOPE,
@@ -194,23 +169,6 @@ const server = createApiServer({
   draftProofOperation,
   todoTaskProofOperation,
   operationTelemetryReader: operationTelemetryCollector,
-  scenarioPlanService: new InMemoryScenarioPlanService(),
-  scenarioEvidenceVerificationService:
-    new InMemoryScenarioEvidenceVerificationService(),
-  rehearsalOutputVerificationService:
-    new InMemoryRehearsalOutputVerificationService(),
-  privateDocumentRehearsalVerificationService:
-    new InMemoryPrivateDocumentRehearsalVerificationService(),
-  helpDeskEmailRehearsalVerificationService:
-    new InMemoryHelpDeskEmailRehearsalVerificationService(),
-  teamsMissedCallRehearsalVerificationService:
-    new InMemoryTeamsMissedCallRehearsalVerificationService(),
-  oauthApplicationReconRehearsalVerificationService:
-    new InMemoryOauthApplicationReconRehearsalVerificationService(),
-  purviewAuditBoundaryRehearsalVerificationService:
-    new InMemoryPurviewAuditBoundaryRehearsalVerificationService(),
-  multiScenarioFeasibilityService:
-    new InMemoryMultiScenarioFeasibilityService(),
   sharePointFileProofOperation: new GraphSharePointFileProof(managedIdentity),
   sharePointTrustedVersionLifecycleOperation:
     new GraphSharePointTrustedVersionLifecycle(managedIdentity),

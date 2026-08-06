@@ -186,8 +186,3 @@ Graph returned `SharePointFileOperation` while the internal contract compared
 producer attribution is `live-proven`. Do not substitute the earlier
 service-principal sign-in proof or generalize these exact records into content
 collection, learner visibility, or every workload operation.
-
-The canonical post-run
-[scenario evidence receipt](scenario-evidence-receipts.md) preserves these as
-separate rows: surface reachability and detector separation are proven, while
-exact operation-level producer attribution is also proven.

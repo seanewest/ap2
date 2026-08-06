@@ -92,7 +92,7 @@ async function main(): Promise<void> {
         "X-Forwarded-Proto": "https",
       },
     });
-    matrix.preflight = await observe(`${base}/api/scenario-plan`, {
+    matrix.preflight = await observe(`${base}/api/sharepoint-trusted-version-lifecycle`, {
       method: "OPTIONS",
       headers: {
         Origin: ORIGIN,
@@ -100,7 +100,7 @@ async function main(): Promise<void> {
         "Access-Control-Request-Headers": "Authorization, Content-Type",
       },
     });
-    matrix.preflightRejected = await observe(`${base}/api/scenario-plan`, {
+    matrix.preflightRejected = await observe(`${base}/api/sharepoint-trusted-version-lifecycle`, {
       method: "OPTIONS",
       headers: {
         Origin: ORIGIN,
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
       },
     });
     matrix.originRejectedBeforeAuth = await observe(
-      `${base}/api/scenario-plan`,
+      `${base}/api/sharepoint-trusted-version-lifecycle`,
       {
         method: "POST",
         headers: {
@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     matrix.pureSuccess = await observe(`${base}/api/whoami`, {
       headers: { ...authorization, Origin: ORIGIN },
     });
-    matrix.validationRefusal = await observe(`${base}/api/scenario-plan`, {
+    matrix.validationRefusal = await observe(`${base}/api/sharepoint-trusted-version-lifecycle`, {
       method: "POST",
       headers: {
         ...authorization,
@@ -135,14 +135,14 @@ async function main(): Promise<void> {
       },
       body: "{}",
     });
-    matrix.sizeRefusal = await observe(`${base}/api/scenario-plan`, {
+    matrix.sizeRefusal = await observe(`${base}/api/sharepoint-trusted-version-lifecycle`, {
       method: "POST",
       headers: {
         ...authorization,
         Origin: ORIGIN,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ value: "x".repeat(70_000) }),
+      body: JSON.stringify({ value: "x".repeat(512) }),
     });
     matrix.mutationBoundary = await observe(`${base}/api/simulated-email`, {
       method: "POST",
