@@ -10,8 +10,6 @@ export const categoryProofDefinition = {
   storageName: "category-proof",
   runId: CATEGORY_PROOF_RUN_ID,
   label: "category",
-  notice:
-    "Real tenant activity: Cory creates one fixed harmless Outlook category, then explicitly removes it.",
   messages: {
     "not-started": "Outlook category: not started in this browser.",
     uncertain:

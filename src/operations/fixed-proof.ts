@@ -35,7 +35,6 @@ export interface FixedProofDefinition {
   storageName: string;
   runId: string;
   label: string;
-  notice: string;
   messages: Record<FixedProofStage, string>;
   activityTarget: string;
   details: readonly (readonly [label: string, value: string])[];
@@ -58,7 +57,6 @@ export function createFixedProofPanel(
 ): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "api-access";
-  panel.append(createStatus(definition.notice, "notice"));
   panel.append(
     createStatus(
       state.activity === "idle"

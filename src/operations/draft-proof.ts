@@ -11,8 +11,6 @@ export const draftProofDefinition = {
   storageName: "draft-proof",
   runId: DRAFT_PROOF_RUN_ID,
   label: "unsent draft",
-  notice:
-    "Real tenant activity: Cory creates one fixed harmless unsent Outlook draft, then explicitly removes it. This operation never sends mail.",
   messages: {
     "not-started": "Unsent draft: not started in this browser.",
     uncertain:

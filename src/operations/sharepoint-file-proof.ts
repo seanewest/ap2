@@ -9,8 +9,6 @@ export const sharePointFileProofDefinition = {
   storageName: "sharepoint-file-proof",
   runId: SHAREPOINT_FILE_PROOF_RUN_ID,
   label: "SharePoint file",
-  notice:
-    "Real tenant activity: the API managed identity creates one fixed harmless file in SharePoint root Documents, then explicitly removes it to the recycle bin.",
   messages: {
     "not-started": "SharePoint file: not started in this browser.",
     uncertain:
