@@ -22,6 +22,32 @@ Use these terms consistently:
 
 Current work is mainly capability exploration and early scenario composition.
 
+## The SPA is Sean's internal capability notebook
+
+The current SPA exists for Sean to see, understand, and personally run AP2
+capabilities. It is an interactive companion to `docs/proven-capabilities.md`,
+not the product, the beginning of a product interface, a learner interface, or
+a lab platform. Sean may show it informally to a friend, but that does not
+change its role.
+
+The SPA should make its explanatory content visible before sign-in. Signing in
+only enables controls that perform real actions. Its primary organization is:
+
+1. **Capabilities:** only the actions that have buttons in the SPA;
+2. **Other things AP2 has proven:** factual results without action buttons;
+3. **Proven scenarios:** plain descriptions of direct capability compositions.
+
+Use ordinary descriptions in the interface. Do not expose internal architecture
+terms such as lab, learner, capability building block, rehearsal, canary,
+workload, or manifest in the SPA. Internal source names may lag temporarily
+while obsolete machinery is removed, but they do not define the interface or
+future architecture.
+
+A new capability does not need a generalized scenario manifest, planner,
+evidence receipt, learner contract, lab catalog, or compatibility framework.
+Implement capabilities directly. Compose a scenario directly when there is a
+real scenario to create or investigate.
+
 ## Preserve the original question
 
 Every task should have a plain-language question or outcome and a clear stopping

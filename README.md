@@ -4,9 +4,12 @@ AP2 is an exploratory TypeScript SPA, API, and collection of automation used to
 learn what can be created, changed, observed, composed, and reset across
 Microsoft 365, Azure, endpoints, and related security systems.
 
-The current work is capability exploration and early technical scenario
-composition. It is not a general learner-lab authoring effort. See
-[capability, scenario, and lab vocabulary](docs/product-model.md).
+The SPA is Sean's internal interactive capability notebook: it shows what AP2
+can run, what else AP2 has proven, and a few proven scenario compositions. It is
+not the product, a product prototype, a learner interface, or a lab platform.
+Its explanatory content is visible before sign-in; authentication only enables
+real action buttons. See [the internal SPA role and contents](docs/spa-surface-inventory.md)
+and [capability, scenario, and lab vocabulary](docs/product-model.md).
 
 ## Architecture
 

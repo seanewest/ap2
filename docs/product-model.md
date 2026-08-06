@@ -45,11 +45,13 @@ At the current stage, scenario work is technical composition:
 A scenario is useful even when no student instructions, teaching content, or
 assessment exists.
 
-The repository currently contains code named `scenario` and schema-v2 scenario
-manifests. Those are experimental technical contracts created during Pass 3.
-They may remain useful, but their existence does not make learner-lab design the
-project's current objective and does not require every new capability to adopt
-them.
+The repository currently contains an experimental generalized scenario and lab
+framework created during earlier Pass 3 work. It includes manifests, registries,
+planning, receipts, compatibility checks, catalogs, and learner-oriented
+structures. That framework is not authoritative and must not govern new
+capabilities or scenarios. Preserve useful Microsoft action, observation, and
+cleanup code independently; remove framework machinery that has no current
+concrete use rather than maintaining it for hypothetical future work.
 
 ## Lab
 

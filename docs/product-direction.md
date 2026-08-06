@@ -40,6 +40,22 @@ can be valuable even when no learner workflow has been designed.
 
 See [the product vocabulary](product-model.md) for the fuller distinction.
 
+## Current SPA role
+
+The SPA is Sean's internal, interactive view of AP2's exploration. It helps him
+see which capabilities have controls, run those controls himself, and understand
+what else has been proven. It is the interactive counterpart to the factual
+proven-capabilities record.
+
+It is not the eventual product, an early product prototype, a learner surface,
+or a lab platform. No future product interface should be inferred from its
+layout. Explanations should be visible without authentication; authentication
+exists only to enable real action controls.
+
+The SPA may list proven scenarios, but that does not create a generalized
+scenario architecture. Direct capability code and direct scenario composition
+remain the default until repeated concrete work demonstrates another need.
+
 ## Dedicated sandbox model
 
 The fixed Student tenant currently used by AP2, and any future student-provided
