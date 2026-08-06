@@ -11,7 +11,6 @@ import {
   LearnerLabValidationError,
   parseLearnerLabDefinition,
 } from "./learner-lab";
-import { LEARNER_LAB_CATALOG } from "./lab-catalog";
 
 const candidate = {
   schemaVersion: 1,
@@ -66,7 +65,6 @@ describe("unexpected SharePoint document-change lab publication gap", () => {
   it("keeps the candidate unpublished while required runtime capabilities are absent", () => {
     const canonicalIds = new Set(SCENARIO_MANIFESTS.map(({ id }) => id));
 
-    expect(LEARNER_LAB_CATALOG).toHaveLength(0);
     expect(canonicalIds).not.toContain("sharepoint-document-version-change");
     expect(canonicalIds).not.toContain("purview-sharepoint-audit-boundary");
     expect(() => parseLearnerLabDefinition(candidate, canonicalIds)).toThrow(

@@ -13,7 +13,6 @@ import {
   CALENDAR_MEETING_ORGANIZER,
   CALENDAR_MEETING_RUN_ID,
   CALENDAR_MEETING_START,
-  CALENDAR_MEETING_SUBJECT,
   CONTACT_PROOF_DISPLAY_NAME,
   CONTACT_PROOF_EMAIL,
   CONTACT_PROOF_RUN_ID,
@@ -30,7 +29,6 @@ import { withApiSupportReference } from "./api/support-reference";
 import {
   FIXED_PROOF_BY_ID,
   bindFixedProofActions,
-  createFixedProofPanels,
   fixedProofStorageKey,
   hasBusyFixedProof,
   isAllowedFixedProofAction,
@@ -39,18 +37,12 @@ import {
   type FixedProofId,
   type FixedProofStates,
 } from "./operations/fixed-proofs";
+import { createFixedProofPanel } from "./operations/fixed-proof";
 import {
   appendIdentity,
   createButton,
   createStatus,
 } from "./ui/elements";
-import { createPanelBoundary } from "./ui/panel-boundary";
-import { createScenarioCatalog } from "./scenarios/scenario-catalog";
-import {
-  createLabCatalog,
-  LEARNER_LAB_CATALOG,
-} from "./labs/lab-catalog";
-import { SCENARIO_MANIFESTS } from "./scenarios/scenarios";
 
 type SimulatedEmailState =
   | { kind: "idle" }
@@ -695,19 +687,19 @@ function createShell(
   const introduction = document.createElement("p");
   introduction.className = "introduction";
   introduction.textContent =
-    "Sign in with your Microsoft work or school account to continue.";
+    "Browse what AP2 can do and what it has already demonstrated. Sign in only when you want to use one of the available actions.";
   shell.append(
     introduction,
-    createStatePanel(state, contactProof),
+    createAuthenticationPanel(state),
+    createCapabilitiesSection(state, contactProof),
+    createOtherProvenSection(),
+    createProvenScenariosSection(),
   );
 
   return shell;
 }
 
-function createStatePanel(
-  state: ViewState,
-  contactProof: ContactProofState,
-): HTMLElement {
+function createAuthenticationPanel(state: ViewState): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "auth-panel";
   panel.setAttribute("aria-live", "polite");
@@ -727,45 +719,9 @@ function createStatePanel(
       );
       break;
     case "signed-in":
-      const apiOperationLoading = isApiOperationBusy(state, contactProof);
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
-        createPanelBoundary(
-          "Lab catalog",
-          () =>
-            createLabCatalog(LEARNER_LAB_CATALOG, {
-              knownCapabilityIds: new Set(
-                SCENARIO_MANIFESTS.map(({ id }) => id),
-              ),
-            }),
-        ),
-        createPanelBoundary(
-          "Capability building blocks",
-          () => createScenarioCatalog(SCENARIO_MANIFESTS),
-        ),
-        createStatus(
-          "Capability actions below make the specific Microsoft 365 change described beside each button. Review the stated effect before continuing.",
-          "notice",
-        ),
-        createSimulatedEmailPanel(
-          state.simulatedEmail,
-          apiOperationLoading,
-        ),
-        createHelpDeskScenarioPanel(
-          state.helpDeskScenario,
-          apiOperationLoading,
-        ),
-        createOneDriveProofPanel(
-          state.oneDriveProof,
-          apiOperationLoading,
-        ),
-        createCalendarMeetingPanel(
-          state.calendarMeeting,
-          apiOperationLoading,
-        ),
-        createContactProofPanel(contactProof, apiOperationLoading),
-        ...createFixedProofPanels(state.fixedProofs, apiOperationLoading),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -784,6 +740,216 @@ function createStatePanel(
   }
 
   return panel;
+}
+
+function createCapabilitiesSection(
+  state: ViewState,
+  contactProof: ContactProofState,
+): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "notebook-section";
+  section.dataset.surface = "capabilities";
+  const heading = document.createElement("h2");
+  heading.textContent = "Capabilities";
+  section.append(
+    heading,
+    createStatus(
+      "These actions make the specific Microsoft 365 change described beside each button. Sign in to enable them, and review the stated effect before continuing.",
+      "notice",
+    ),
+  );
+
+  const signedIn = state.kind === "signed-in" ? state : undefined;
+  const actionsDisabled = signedIn === undefined ||
+    isApiOperationBusy(signedIn, contactProof);
+  const fixedProofs = signedIn?.fixedProofs ?? emptyFixedProofStates();
+
+  section.append(
+    createCapabilityGroup("Outlook", [
+      createCapabilityItem(
+        "Send an email from Homer to Marge.",
+        createSimulatedEmailPanel(
+          signedIn?.simulatedEmail ?? { kind: "idle" },
+          actionsDisabled,
+        ),
+      ),
+      createCapabilityItem(
+        "Send a help-desk email from Kobe to Cory.",
+        createHelpDeskScenarioPanel(
+          signedIn?.helpDeskScenario ?? { kind: "idle" },
+          actionsDisabled,
+        ),
+      ),
+      createCapabilityItem(
+        "Create and remove a contact in Cory's account.",
+        createContactProofPanel(
+          signedIn === undefined
+            ? { stage: "not-started", activity: "idle" }
+            : contactProof,
+          actionsDisabled,
+        ),
+      ),
+      createCapabilityItem(
+        "Create and remove a disabled Inbox rule in Cory's account.",
+        createFixedProofPanel(
+          FIXED_PROOF_BY_ID.inboxRuleProof,
+          fixedProofs.inboxRuleProof,
+          actionsDisabled,
+        ),
+      ),
+      createCapabilityItem(
+        "Create and remove an Outlook category in Cory's account.",
+        createFixedProofPanel(
+          FIXED_PROOF_BY_ID.categoryProof,
+          fixedProofs.categoryProof,
+          actionsDisabled,
+        ),
+      ),
+      createCapabilityItem(
+        "Create and remove an unsent draft in Cory's account.",
+        createFixedProofPanel(
+          FIXED_PROOF_BY_ID.draftProof,
+          fixedProofs.draftProof,
+          actionsDisabled,
+        ),
+      ),
+    ]),
+    createCapabilityGroup("Calendar and tasks", [
+      createCapabilityItem(
+        "Create and cancel a meeting from Cory to Kobe and Marge.",
+        createCalendarMeetingPanel(
+          signedIn?.calendarMeeting ?? {
+            stage: "not-started",
+            activity: "idle",
+          },
+          actionsDisabled,
+        ),
+      ),
+      createCapabilityItem(
+        "Create and remove a Microsoft To Do task in Cory's account.",
+        createFixedProofPanel(
+          FIXED_PROOF_BY_ID.todoTaskProof,
+          fixedProofs.todoTaskProof,
+          actionsDisabled,
+        ),
+      ),
+    ]),
+    createCapabilityGroup("Files", [
+      createCapabilityItem(
+        "Create a OneDrive file as Homer, share it read-only with Marge, and remove it.",
+        createOneDriveProofPanel(
+          signedIn?.oneDriveProof ?? {
+            stage: "not-started",
+            activity: "idle",
+          },
+          actionsDisabled,
+        ),
+      ),
+      createCapabilityItem(
+        "Create and remove a SharePoint file.",
+        createFixedProofPanel(
+          FIXED_PROOF_BY_ID.sharePointFileProof,
+          fixedProofs.sharePointFileProof,
+          actionsDisabled,
+        ),
+      ),
+    ]),
+  );
+  return section;
+}
+
+function emptyFixedProofStates(): FixedProofStates {
+  return {
+    inboxRuleProof: { stage: "not-started", activity: "idle" },
+    categoryProof: { stage: "not-started", activity: "idle" },
+    sharePointFileProof: { stage: "not-started", activity: "idle" },
+    draftProof: { stage: "not-started", activity: "idle" },
+    todoTaskProof: { stage: "not-started", activity: "idle" },
+  };
+}
+
+function createCapabilityGroup(
+  title: string,
+  items: readonly HTMLElement[],
+): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "capability-group";
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  const list = document.createElement("div");
+  list.className = "capability-items";
+  list.append(...items);
+  section.append(heading, list);
+  return section;
+}
+
+function createCapabilityItem(
+  description: string,
+  controls: HTMLElement,
+): HTMLElement {
+  const item = document.createElement("article");
+  item.className = "capability-item";
+  const summary = document.createElement("p");
+  summary.className = "capability-description";
+  summary.textContent = description;
+  item.append(summary, controls);
+  return item;
+}
+
+function createOtherProvenSection(): HTMLElement {
+  return createStaticListSection("Other things AP2 has proven", "other-proven", [
+    "Read directory memberships and basic mailbox, OneDrive, and SharePoint information through an application.",
+    "Observe that application's Microsoft Graph sign-in through a separate audit-reading application.",
+    "Read users' registered authentication methods and MFA/SSPR registration status.",
+    "Check whether the simulated users hold Entra directory roles.",
+    "Read basic Entra device-registration information.",
+    "Create and delete an empty Azure resource group.",
+    "Deploy, join, enroll, secure, use, and remove a personal Azure Virtual Desktop Windows machine.",
+    "Deploy and remove a private environment containing one Windows machine and two Linux machines.",
+    "Create and remove a security group and change its membership.",
+    "Change and restore a user profile field.",
+    "Set and remove a user's manager.",
+    "Create and remove a disabled Conditional Access policy.",
+    "Read Exchange configuration and message-trace information.",
+    "Read Microsoft Defender Secure Score information.",
+    "Create and remove a mail folder.",
+    "Create and remove temporary Microsoft To Do lists and tasks.",
+    "Stage a private OneDrive document for another fictional user and remove it.",
+    "Produce a real Teams missed-call entry through a controlled user-to-user call.",
+    "Confirm that Microsoft Graph ignored If-Match on the tested calendar-event deletion.",
+    "Create an application-owned unsent draft and observe it separately.",
+  ]);
+}
+
+function createProvenScenariosSection(): HTMLElement {
+  return createStaticListSection("Proven scenarios", "proven-scenarios", [
+    "SharePoint document tampering and recovery: Create a document, change its contents, observe versions and audit evidence, restore the original, and clean it up.",
+    "Inbox-rule persistence and effect: Create an enabled rule, send a matching email, and observe that the rule marked the message as read.",
+    "Dormant OAuth application remediation: Create an inert application with a temporary credential, discover it through inventory, remove it, and confirm its absence.",
+    "Defender email-attachment prevention: Send Microsoft's EICAR test attachment and observe Defender block and quarantine it through message trace and security evidence.",
+    "Teams group-chat membership remediation: Create a group chat, add an unexpected participant, post a warning message, and have Cory remove that participant.",
+  ]);
+}
+
+function createStaticListSection(
+  title: string,
+  surface: string,
+  items: readonly string[],
+): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "notebook-section";
+  section.dataset.surface = surface;
+  const heading = document.createElement("h2");
+  heading.textContent = title;
+  const list = document.createElement("ul");
+  list.className = "notebook-list";
+  for (const text of items) {
+    const item = document.createElement("li");
+    item.textContent = text;
+    list.append(item);
+  }
+  section.append(heading, list);
+  return section;
 }
 
 function isServerShuttingDownError(
@@ -906,19 +1072,19 @@ function createOneDriveProofPanel(
     panel.append(
       createStatus(
         state.activity === "sharing"
-          ? "Creating and sharing the fixed OneDrive proof…"
-          : "Validating and removing the fixed OneDrive proof…",
+          ? "Creating and sharing the fixed OneDrive file…"
+          : "Validating and removing the fixed OneDrive file…",
       ),
     );
   } else {
     const message =
       state.stage === "not-started"
-        ? "OneDrive proof: not started in this browser."
+        ? "OneDrive file: not started in this browser."
         : state.stage === "configured"
-          ? "OneDrive proof: Microsoft accepted Marge's read permission and the request to send a sharing invitation. Email delivery and opening are not yet confirmed."
+          ? "OneDrive file: Microsoft accepted Marge's read permission and the request to send a sharing invitation. Email delivery and opening are not yet confirmed."
             : state.stage === "removed"
-              ? "OneDrive proof: removed to Homer's recycle bin."
-              : "OneDrive proof: the last change outcome is uncertain. Do not share again; clean up explicitly.";
+              ? "OneDrive file: removed to Homer's recycle bin."
+              : "OneDrive file: the last change outcome is uncertain. Do not share again; remove it explicitly.";
     panel.append(createStatus(message, state.stage === "uncertain" ? "notice" : "status"));
   }
   if (state.message) {
@@ -933,14 +1099,14 @@ function createOneDriveProofPanel(
 
   panel.append(
     createButton(
-      "Create and share OneDrive proof",
+      "Create and share OneDrive file",
       "share-onedrive-proof",
       "primary",
       apiOperationLoading ||
         (state.stage !== "not-started" && state.stage !== "removed"),
     ),
     createButton(
-      "Clean up OneDrive proof",
+      "Remove OneDrive file",
       "remove-onedrive-proof",
       "secondary",
       apiOperationLoading ||
@@ -976,14 +1142,14 @@ function createCalendarMeetingPanel(
   } else {
     const message =
       state.stage === "not-started"
-        ? "Calendar rehearsal: not started in this browser."
+        ? "Calendar meeting: not started in this browser."
         : state.stage === "configured"
-          ? "Calendar rehearsal: Configured. Microsoft accepted the meeting and invitations; attendee receipt or response is not confirmed."
+          ? "Calendar meeting: configured. Microsoft accepted the meeting and invitations; attendee receipt or response is not confirmed."
           : state.stage === "cancellation-accepted"
-            ? "Calendar rehearsal: Cancellation accepted. Attendee receipt is not confirmed."
+            ? "Calendar meeting: cancellation accepted. Attendee receipt is not confirmed."
             : state.stage === "cancellation-uncertain"
-              ? "Calendar rehearsal: cancellation is uncertain. Do not repeat it."
-              : "Calendar rehearsal: creation is uncertain. Do not create again; Cancel can explicitly find and cancel one exact matching meeting.";
+              ? "Calendar meeting: cancellation is uncertain. Do not repeat it."
+              : "Calendar meeting: creation is uncertain. Do not create again; Cancel can explicitly find and cancel one exact matching meeting.";
     panel.append(
       createStatus(
         message,
@@ -1020,11 +1186,10 @@ function createCalendarMeetingDetails(): HTMLDListElement {
   list.className = "identity-list";
   appendIdentity(list, "Organizer", CALENDAR_MEETING_ORGANIZER);
   appendIdentity(list, "Required attendees", CALENDAR_MEETING_ATTENDEES.join(", "));
-  appendIdentity(list, "Subject", CALENDAR_MEETING_SUBJECT);
   appendIdentity(
     list,
-    "Body",
-    "Harmless AP2 calendar rehearsal. No action or response is required. The organizer will cancel it after observation.",
+    "Invitation content",
+    "The fixed AP2 subject identifies a calendar test and says no action is required. The fixed harmless body says no action or response is required and says the organizer will cancel the meeting after observation.",
   );
   appendIdentity(
     list,
@@ -1093,8 +1258,8 @@ function createOneDriveHumanVerificationInstructions(): HTMLOListElement {
   for (const instruction of [
     "In a separate browser or profile, sign in to Outlook as marge.simpson@corywest.onmicrosoft.com.",
     "Open the Microsoft sharing invitation for AP2-OneDrive-share-proof.txt, then use its Open link.",
-    "Do not treat an empty OneDrive Shared view as proof that access is absent.",
-    "Return here and click Clean up OneDrive proof when finished.",
+    "Do not treat an empty OneDrive Shared view as confirmation that access is absent.",
+    "Return here and click Remove OneDrive file when finished.",
   ]) {
     const item = document.createElement("li");
     item.textContent = instruction;
@@ -1121,12 +1286,12 @@ function createContactProofPanel(
       : state.activity === "removing"
         ? "Removing the fixed contact…"
         : state.stage === "configured"
-          ? "Contact rehearsal: Configured."
+          ? "Contact: configured."
           : state.stage === "removed"
-            ? "Contact rehearsal: Removed."
+            ? "Contact: removed."
             : state.stage === "uncertain"
-              ? "Contact rehearsal: the last change is uncertain. Do not create again; Remove can reconcile it safely."
-              : "Contact rehearsal: not started in this browser.";
+              ? "Contact: the last change is uncertain. Do not create again; Remove can reconcile it safely."
+              : "Contact: not started in this browser.";
   if (state.activity !== "idle") {
     panel.setAttribute("aria-busy", "true");
   }
@@ -1143,13 +1308,13 @@ function createContactProofPanel(
   panel.append(
     details,
     createButton(
-      "Create contact proof",
+      "Create contact",
       "create-contact-proof",
       "primary",
       apiOperationLoading || state.stage !== "not-started",
     ),
     createButton(
-      "Remove contact proof",
+      "Remove contact",
       "remove-contact-proof",
       "secondary",
       apiOperationLoading ||

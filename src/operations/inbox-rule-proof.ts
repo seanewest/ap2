@@ -13,13 +13,13 @@ export const inboxRuleProofDefinition = {
   notice:
     "Real tenant activity: Cory creates one fixed harmless disabled Inbox rule, then explicitly removes it.",
   messages: {
-    "not-started": "Inbox-rule rehearsal: not started in this browser.",
+    "not-started": "Inbox rule: not started in this browser.",
     uncertain:
-      "Inbox-rule rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "Inbox-rule rehearsal: Configured and disabled.",
+      "Inbox rule: creation is uncertain. Do not create again; Remove can reconcile it safely.",
+    configured: "Inbox rule: configured and disabled.",
     "removal-uncertain":
-      "Inbox-rule rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "Inbox-rule rehearsal: Removed.",
+      "Inbox rule: removal is uncertain. Do not repeat it.",
+    removed: "Inbox rule: removed.",
   },
   activityTarget: "the fixed disabled Inbox rule",
   details: [

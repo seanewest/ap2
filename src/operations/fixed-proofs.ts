@@ -2,7 +2,6 @@ import type { AccountIdentity } from "../auth/authentication";
 import { categoryProofDefinition } from "./category-proof";
 import { draftProofDefinition } from "./draft-proof";
 import {
-  createFixedProofPanel,
   fixedProofStorageKey,
   readFixedProofStage,
   type FixedProofDefinition,
@@ -55,19 +54,6 @@ export function readFixedProofStates(
 export function hasBusyFixedProof(states: FixedProofStates): boolean {
   return FIXED_PROOF_DEFINITIONS.some(
     ({ id }) => states[id].activity !== "idle",
-  );
-}
-
-export function createFixedProofPanels(
-  states: FixedProofStates,
-  apiOperationLoading: boolean,
-): HTMLElement[] {
-  return FIXED_PROOF_DEFINITIONS.map((definition) =>
-    createFixedProofPanel(
-      definition,
-      states[definition.id],
-      apiOperationLoading,
-    )
   );
 }
 

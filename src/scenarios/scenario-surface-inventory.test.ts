@@ -20,7 +20,6 @@ import { HELP_DESK_EMAIL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scr
 import { PRIVATE_DOCUMENT_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-private-document-rehearsal-output.ts";
 import { TEAMS_MISSED_CALL_REHEARSAL_OFFLINE_VERIFIER_CAPABILITY } from "../../scripts/verify-teams-missed-call-rehearsal-output.ts";
 import { SCENARIO_API_CLIENT_CAPABILITIES } from "../api/client.ts";
-import { CAPABILITY_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
 import { PRIVATE_DOCUMENT_RECEIPT_ADAPTER_CAPABILITY } from "./private-document-receipt-adapter.ts";
 import {
   formatScenarioSurfaceInventory,
@@ -40,7 +39,6 @@ function surfaceDeclarations(): unknown[] {
     SCENARIO_RECEIPT_API_CAPABILITY,
     REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
     ...SCENARIO_API_CLIENT_CAPABILITIES,
-    CAPABILITY_CATALOG_UI_CAPABILITY,
     AVD_THREE_VM_REHEARSAL_CAPABILITY,
     HELP_DESK_EMAIL_REHEARSAL_CAPABILITY,
     OAUTH_APPLICATION_RECON_REHEARSAL_CAPABILITY,
@@ -90,9 +88,6 @@ describe("canonical scenario surface inventory", () => {
       expect(
         row.surfaces["authenticated-batch-feasibility-api-client"].status,
       ).toBe("implemented");
-      expect(row.surfaces["capability-catalog-ui"].status).toBe(
-        "implemented",
-      );
       expect(row.surfaces["operator-preview-ui"].status).toBe("missing");
       expect(row.surfaces["operator-verify-ui"]).toEqual({
         status: "missing",
