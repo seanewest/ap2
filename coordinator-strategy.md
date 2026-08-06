@@ -32,6 +32,13 @@ substance of the project. Fill them accurately and briefly.
 A worker's sense of progress must remain tied to the intent and stop condition,
 not to a checklist the coordinator invented.
 
+Preserve the parent purpose that made the goal worth doing. This does not
+require another mandatory goal-card field: use `why` or concise context to tell
+the peer what larger outcome the current subgoal serves. Separate real hard
+constraints from a proposed implementation path. The peer owns reasonable
+judgment inside the boundary and may report that a premise is obsolete or that
+the assigned means is beginning to work against the parent purpose.
+
 The authoritative goal card must survive chat, terminal, app-server, WSL, and
 host restarts. Store it in durable assignment state or in one named owner-only
 local artifact referenced by that assignment. `CURRENT.md` may summarize active
@@ -75,6 +82,19 @@ to stop.
 
 Do not turn a worker's optional suggestion into a new goal without checking it
 against the original intent.
+
+A reviewer finding is not automatically a blocking requirement. Judge its
+materiality against the parent purpose: does it realistically threaten the
+answer, meaningful durable state, a hard boundary, or the next useful step? A
+theoretical edge case may be correct and still not deserve more machinery.
+
+As a lightweight complexity brake, reconsider the approach before assigning
+another correction after either (a) a second review/fix round on the same
+subgoal or (b) a failed live attempt. Ask whether the premise behind the
+subgoal is still true and whether a simpler route now serves the parent purpose
+better. This is a judgment checkpoint, not a requirement to escalate every
+second defect to Sean. Escalate only when the answer changes direction or
+requires his judgment.
 
 ## Handle waits, outages, and stalls
 
