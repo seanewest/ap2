@@ -6,8 +6,8 @@ rules belong in `AGENTS.md` and focused architecture documents.
 
 ## Current objective
 
-Refine the reorganized internal SPA from Sean's local review before considering
-removal of the obsolete generalized scenario/lab framework.
+Refine the reorganized internal SPA from Sean's local review while retiring the
+obsolete generalized scenario/lab framework on a separate parallel branch.
 
 ## Current state
 
