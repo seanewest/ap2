@@ -6,8 +6,8 @@ rules belong in `AGENTS.md` and focused architecture documents.
 
 ## Current objective
 
-Reorganize the internal SPA around the approved capability-notebook role before
-considering removal of the obsolete generalized scenario/lab framework.
+Refine the reorganized internal SPA from Sean's local review before considering
+removal of the obsolete generalized scenario/lab framework.
 
 ## Current state
 
@@ -15,14 +15,15 @@ considering removal of the obsolete generalized scenario/lab framework.
   another 30 days, so replacement-tenant migration is no longer current work.
 - PR #172 remains useful as a reconstruction specification, but AP2 is not
   presently moving tenants or rebuilding the control plane.
-- PR #175 is merged and records the authoritative internal SPA role and
-  contents approved by Sean.
+- PR #175 records the authoritative internal SPA role and contents.
+- PR #178 is merged and reorganizes the SPA as the approved capability notebook.
 - AP2 Coordinator and peers Alpha, Beta, Gamma, Delta, and Epsilon remain
-  configured and idle. The SPA reorganization goal is complete in draft PR
-  #178 and no peer goal is active.
+  configured. One peer goal is active: remove only the redundant introductory
+  brown subtext from capability cards while preserving status, details, controls,
+  and behavior.
 
 ## Next dependency
 
-Sean reviews draft PR #178 and the reorganized SPA before deciding whether to
-merge it. Framework cleanup and the hosted Kobe-to-Cory email proof remain
-later, separately reviewed stages and are not yet authorized.
+Sean reviews the focused capability-subtext pull request when the active peer
+returns. Framework cleanup and the hosted Kobe-to-Cory email proof remain later,
+separately reviewed stages and are not yet authorized.
