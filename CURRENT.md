@@ -18,12 +18,13 @@ removal of the obsolete generalized scenario/lab framework.
 - PR #175 records the authoritative internal SPA role and contents.
 - PR #178 is merged and reorganizes the SPA as the approved capability notebook.
 - AP2 Coordinator and peers Alpha, Beta, Gamma, Delta, and Epsilon remain
-  configured. One peer goal is active: remove only the redundant introductory
-  brown subtext from capability cards while preserving status, details, controls,
-  and behavior.
+  configured. Two parallel peer lanes are underway: the focused capability-card
+  subtext correction is awaiting its durable report, and the generalized
+  scenario/lab framework retirement is active on a separate branch.
 
 ## Next dependency
 
-Sean reviews the focused capability-subtext pull request when the active peer
-returns. Framework cleanup and the hosted Kobe-to-Cory email proof remain later,
-separately reviewed stages and are not yet authorized.
+Sean reviews each focused pull request when it returns. The two branches must
+remain independently reviewable and be reconciled only after their separate
+outcomes are understood. The hosted Kobe-to-Cory email proof remains a later,
+separately reviewed stage and is not yet authorized.
