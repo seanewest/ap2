@@ -18,11 +18,11 @@ considering removal of the obsolete generalized scenario/lab framework.
 - PR #175 is merged and records the authoritative internal SPA role and
   contents approved by Sean.
 - AP2 Coordinator and peers Alpha, Beta, Gamma, Delta, and Epsilon remain
-  configured. One peer goal is active: reorganize the SPA around the approved
-  capability-notebook role without beginning framework cleanup or deployment.
+  configured and idle. The SPA reorganization goal is complete in draft PR
+  #178 and no peer goal is active.
 
 ## Next dependency
 
-Sean reviews the focused SPA reorganization pull request when the active peer
-returns. Framework cleanup and the hosted Kobe-to-Cory email proof remain later,
-separately reviewed stages and are not authorized by the active goal.
+Sean reviews draft PR #178 and the reorganized SPA before deciding whether to
+merge it. Framework cleanup and the hosted Kobe-to-Cory email proof remain
+later, separately reviewed stages and are not yet authorized.
