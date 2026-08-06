@@ -1186,11 +1186,10 @@ function createCalendarMeetingDetails(): HTMLDListElement {
   list.className = "identity-list";
   appendIdentity(list, "Organizer", CALENDAR_MEETING_ORGANIZER);
   appendIdentity(list, "Required attendees", CALENDAR_MEETING_ATTENDEES.join(", "));
-  appendIdentity(list, "Subject", "Fixed harmless AP2 meeting — no action required");
   appendIdentity(
     list,
-    "Body",
-    "Harmless AP2 calendar meeting. No action or response is required. The organizer will cancel it after observation.",
+    "Invitation content",
+    "The fixed AP2 subject identifies a calendar test and says no action is required. The fixed harmless body says no action or response is required and says the organizer will cancel the meeting after observation.",
   );
   appendIdentity(
     list,

@@ -190,6 +190,20 @@ describe("After Party primary SPA", () => {
     );
   });
 
+  it("describes the fixed meeting content without presenting altered field values", async () => {
+    authentication.initialize.mockResolvedValue({ kind: "signed-out" });
+    await createAfterPartyApp(root, authentication, api).start();
+
+    const details = [...section("capabilities").querySelectorAll("dl")].find(
+      (list) => list.textContent?.includes("Required attendees"),
+    );
+    expect(details?.textContent).toContain(
+      "The fixed AP2 subject identifies a calendar test and says no action is required. The fixed harmless body says no action or response is required and says the organizer will cancel the meeting after observation.",
+    );
+    expect([...details!.querySelectorAll("dt")].map((item) => item.textContent))
+      .not.toEqual(expect.arrayContaining(["Subject", "Body"]));
+  });
+
   it("runs a plainly labeled real action only after its button is selected", async () => {
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",
