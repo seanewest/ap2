@@ -18,6 +18,15 @@ It is not a continuously running coordinator. It must not poll workers, invent
 work, turn possibilities into a backlog, directly micromanage peers, or create
 structure around strategizing unless repeated use proves a need.
 
+## Observer conversations
+
+Sean may use other ChatGPT conversations as observers. An observer may inspect
+repository state and other read-only material Sean deliberately exposes, and it
+may help Sean think. It does not dispatch work, change local or external state,
+or define AP2 intent. Observer conclusions become project direction only when
+Sean adopts them through the primary strategy session. Do not create machinery
+for sharing observer state unless repeated use proves a concrete need.
+
 ## Starting a replacement session
 
 Read `chatgpt-strategy.md`, `CURRENT.md`, `AGENTS.md`,
