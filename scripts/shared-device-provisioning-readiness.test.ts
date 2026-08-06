@@ -26,7 +26,7 @@ function readyInput(): SharedDeviceProvisioningReadiness {
       authoredInIsolatedWindowsClient: true,
       bulkTokenAcquiredInteractively: true,
       protectedCustody: true,
-      expiresAt: "2026-08-01T00:00:00Z",
+      expiresAt: "2099-08-01T00:00:00Z",
     },
     authoring: {
       usesPhysicalHostDesktop: false,

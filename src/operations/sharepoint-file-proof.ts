@@ -12,13 +12,13 @@ export const sharePointFileProofDefinition = {
   notice:
     "Real tenant activity: the API managed identity creates one fixed harmless file in SharePoint root Documents, then explicitly removes it to the recycle bin.",
   messages: {
-    "not-started": "SharePoint file rehearsal: not started in this browser.",
+    "not-started": "SharePoint file: not started in this browser.",
     uncertain:
-      "SharePoint file rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "SharePoint file rehearsal: Configured.",
+      "SharePoint file: creation is uncertain. Do not create again; Remove can reconcile it safely.",
+    configured: "SharePoint file: configured.",
     "removal-uncertain":
-      "SharePoint file rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "SharePoint file rehearsal: Removed to SharePoint recycle bin.",
+      "SharePoint file: removal is uncertain. Do not repeat it.",
+    removed: "SharePoint file: removed to SharePoint recycle bin.",
   },
   activityTarget: "the fixed SharePoint file",
   details: [
@@ -28,11 +28,11 @@ export const sharePointFileProofDefinition = {
     ["Content size", "78 ASCII bytes"],
   ],
   createButton: {
-    label: "Create SharePoint file proof",
+    label: "Create SharePoint file",
     action: "create-sharepoint-file-proof",
   },
   removeButton: {
-    label: "Remove SharePoint file proof",
+    label: "Remove SharePoint file",
     action: "remove-sharepoint-file-proof",
   },
   create: (api, accessToken) => api.createSharePointFileProof(accessToken),

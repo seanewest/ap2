@@ -46,7 +46,8 @@ describe("canonical capability documentation", () => {
     expect(current).not.toContain("## Closed/do not reopen");
     expect(current).not.toContain("AVD personal-host learner lane");
     expect(current).toContain("docs/proven-capabilities.md");
-    expect(current).toContain("No AP2 product implementation goal is active.");
+    expect(current).toContain("## Current objective");
+    expect(current).toContain("## Next dependency");
   });
 });
 

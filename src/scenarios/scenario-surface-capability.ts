@@ -12,7 +12,6 @@ export const SCENARIO_SURFACE_DECLARATION_NAMES = [
   "learner-evidence-briefing-ui",
   "manual-rehearsal-verification-panel",
   "offline-rehearsal-verifier",
-  "capability-catalog-ui",
   "operator-plan-preview-ui",
   "operator-receipt-verify-ui",
   "rehearsal-only",

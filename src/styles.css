@@ -133,118 +133,47 @@ h2 {
   margin-top: 0;
 }
 
-.lab-catalog,
-.scenario-catalog {
+.notebook-section {
   display: grid;
   gap: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #d4d8df;
+  margin-top: 1.25rem;
+  padding: 1.4rem;
+  border: 1px solid #d4d8df;
+  border-radius: 1rem;
+  background: rgb(255 255 255 / 88%);
 }
 
-.lab-catalog-requirements {
-  padding: 1rem;
-  border: 1px solid #abc9b8;
-  border-radius: 0.8rem;
-  background: #f4fbf7;
-}
-
-.lab-catalog-requirements h3 {
-  margin: 0;
-}
-
-.lab-catalog-requirements ul {
-  margin-bottom: 0;
-  padding-left: 1.25rem;
-  line-height: 1.5;
-}
-
-.lab-catalog-cards,
-.scenario-catalog-cards {
+.capability-group,
+.capability-items {
   display: grid;
   gap: 0.85rem;
 }
 
-.lab-catalog-card,
-.scenario-catalog-card {
+.capability-group h3 {
+  margin: 0;
+}
+
+.capability-item {
   padding: 1rem;
   border: 1px solid #c8d5e5;
   border-radius: 0.8rem;
   background: #f8fbff;
 }
 
-.lab-catalog-card h3,
-.lab-catalog-card dl,
-.capability-catalog-kind,
-.scenario-catalog-purpose {
-  margin: 0.4rem 0 0;
-}
-
-.capability-catalog-kind {
-  width: fit-content;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  background: #e6eef9;
-  color: #244e82;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.scenario-catalog-purpose {
-  color: #4f596d;
+.capability-description {
+  margin: 0;
+  font-weight: 750;
   line-height: 1.5;
 }
 
-.scenario-catalog-card h3,
-.scenario-catalog-card h4 {
+.notebook-list {
   margin: 0;
-}
-
-.scenario-catalog-card details {
-  margin-top: 0.8rem;
-}
-
-.scenario-catalog-card summary {
-  width: fit-content;
-  color: #285b99;
-  font-weight: 750;
-  cursor: pointer;
-}
-
-.scenario-catalog-card summary:focus-visible {
-  border-radius: 0.2rem;
-  outline: 0.2rem solid #86aee0;
-  outline-offset: 0.2rem;
-}
-
-.scenario-catalog-details {
-  display: grid;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.scenario-catalog-list {
-  display: grid;
-  grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
-  gap: 0.4rem 0.8rem;
-  margin: 0.6rem 0 0;
-  font-size: 0.9rem;
-}
-
-.scenario-catalog-list dt {
-  color: #667085;
-}
-
-.scenario-catalog-list dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.scenario-catalog-items {
-  margin: 0.6rem 0 0;
   padding-left: 1.25rem;
   line-height: 1.5;
+}
+
+.notebook-list li + li {
+  margin-top: 0.65rem;
 }
 
 .identity-list {
@@ -275,11 +204,4 @@ h2 {
     margin-bottom: 0.5rem;
   }
 
-  .scenario-catalog-list {
-    grid-template-columns: 1fr;
-  }
-
-  .scenario-catalog-list dd:not(:last-child) {
-    margin-bottom: 0.4rem;
-  }
 }

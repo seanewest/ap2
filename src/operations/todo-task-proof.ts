@@ -12,13 +12,13 @@ export const todoTaskProofDefinition = {
   notice:
     "Real tenant activity: Cory creates one fixed harmless Microsoft To Do task, then explicitly removes it. The task is never completed or shared.",
   messages: {
-    "not-started": "To Do task rehearsal: not started in this browser.",
+    "not-started": "To Do task: not started in this browser.",
     uncertain:
-      "To Do task rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "To Do task rehearsal: Configured.",
+      "To Do task: creation is uncertain. Do not create again; Remove can reconcile it safely.",
+    configured: "To Do task: configured.",
     "removal-uncertain":
-      "To Do task rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "To Do task rehearsal: Removed.",
+      "To Do task: removal is uncertain. Do not repeat it.",
+    removed: "To Do task: removed.",
   },
   activityTarget: "the fixed To Do task",
   details: [
@@ -31,11 +31,11 @@ export const todoTaskProofDefinition = {
     ["Categories", "None"],
   ],
   createButton: {
-    label: "Create To Do task proof",
+    label: "Create To Do task",
     action: "create-todo-task-proof",
   },
   removeButton: {
-    label: "Remove To Do task proof",
+    label: "Remove To Do task",
     action: "remove-todo-task-proof",
   },
   create: (api, accessToken) => api.createTodoTaskProof(accessToken),

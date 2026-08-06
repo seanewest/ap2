@@ -14,13 +14,13 @@ export const draftProofDefinition = {
   notice:
     "Real tenant activity: Cory creates one fixed harmless unsent Outlook draft, then explicitly removes it. This operation never sends mail.",
   messages: {
-    "not-started": "Draft rehearsal: not started in this browser.",
+    "not-started": "Unsent draft: not started in this browser.",
     uncertain:
-      "Draft rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "Draft rehearsal: Configured as an unsent draft.",
+      "Unsent draft: creation is uncertain. Do not create again; Remove can reconcile it safely.",
+    configured: "Unsent draft: configured.",
     "removal-uncertain":
-      "Draft rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "Draft rehearsal: Removed.",
+      "Unsent draft: removal is uncertain. Do not repeat it.",
+    removed: "Unsent draft: removed.",
   },
   activityTarget: "the fixed unsent draft",
   details: [
@@ -34,11 +34,11 @@ export const draftProofDefinition = {
     ["Attachments", "None"],
   ],
   createButton: {
-    label: "Create unsent draft proof",
+    label: "Create unsent draft",
     action: "create-draft-proof",
   },
   removeButton: {
-    label: "Remove unsent draft proof",
+    label: "Remove unsent draft",
     action: "remove-draft-proof",
   },
   create: (api, accessToken) => api.createDraftProof(accessToken),

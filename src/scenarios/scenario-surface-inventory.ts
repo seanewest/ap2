@@ -22,7 +22,6 @@ import {
   API_ROUTE_OWNER_KEYS,
   type ApiRouteOwnerKey,
 } from "../api/api-route-contract.ts";
-import { CAPABILITY_CATALOG_UI_CAPABILITY } from "./scenario-catalog.ts";
 import {
   HELP_DESK_EMAIL_RECEIPT_ADAPTER_CAPABILITY,
 } from "./help-desk-email-receipt-adapter.ts";
@@ -77,7 +76,6 @@ export const SCENARIO_INVENTORY_SURFACES = [
   "authenticated-rehearsal-verification-api-client",
   "manual-rehearsal-verification-panel",
   "learner-evidence-ui",
-  "capability-catalog-ui",
   "operator-preview-ui",
   "operator-verify-ui",
 ] as const;
@@ -113,8 +111,6 @@ export type ScenarioSurfaceReason =
   | "manual-rehearsal-verification-panel-missing"
   | "learner-evidence-ui-exported"
   | "learner-evidence-ui-missing"
-  | "capability-catalog-exported"
-  | "capability-catalog-missing"
   | "operator-plan-preview-exported"
   | "operator-plan-preview-missing"
   | "operator-receipt-verify-ui-exported"
@@ -180,7 +176,6 @@ const AUTHORITATIVE_SURFACE_DECLARATIONS = [
   REHEARSAL_OUTPUT_VERIFICATION_API_CAPABILITY,
   TEAMS_MISSED_CALL_REHEARSAL_VERIFICATION_API_CAPABILITY,
   ...SCENARIO_API_CLIENT_CAPABILITIES,
-  CAPABILITY_CATALOG_UI_CAPABILITY,
   AVD_THREE_VM_REHEARSAL_CAPABILITY,
   HELP_DESK_EMAIL_REHEARSAL_CAPABILITY,
   OAUTH_APPLICATION_RECON_REHEARSAL_CAPABILITY,
@@ -778,12 +773,6 @@ function inventoryRow(
         )
         ? cell("implemented", "learner-evidence-ui-exported")
         : cell("missing", "learner-evidence-ui-missing"),
-      "capability-catalog-ui": supports(
-          declarations.get("capability-catalog-ui"),
-          manifest.id,
-        )
-        ? cell("implemented", "capability-catalog-exported")
-        : cell("missing", "capability-catalog-missing"),
       "operator-preview-ui": supports(
           declarations.get("operator-plan-preview-ui"),
           manifest.id,
@@ -1016,7 +1005,6 @@ function mapSurface(
     "manual-rehearsal-verification-panel":
       "manual-rehearsal-verification-panel",
     "offline-rehearsal-verifier": "offline-rehearsal-verifier",
-    "capability-catalog-ui": "capability-catalog-ui",
     "operator-plan-preview-ui": "operator-preview-ui",
     "operator-receipt-verify-ui": "operator-verify-ui",
     "rehearsal-only": "rehearsal",

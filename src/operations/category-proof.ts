@@ -13,13 +13,13 @@ export const categoryProofDefinition = {
   notice:
     "Real tenant activity: Cory creates one fixed harmless Outlook category, then explicitly removes it.",
   messages: {
-    "not-started": "Category rehearsal: not started in this browser.",
+    "not-started": "Outlook category: not started in this browser.",
     uncertain:
-      "Category rehearsal: Create is uncertain. Do not create again; Remove can reconcile it safely.",
-    configured: "Category rehearsal: Configured.",
+      "Outlook category: creation is uncertain. Do not create again; Remove can reconcile it safely.",
+    configured: "Outlook category: configured.",
     "removal-uncertain":
-      "Category rehearsal: Remove is uncertain. Do not repeat it.",
-    removed: "Category rehearsal: Removed.",
+      "Outlook category: removal is uncertain. Do not repeat it.",
+    removed: "Outlook category: removed.",
   },
   activityTarget: "the fixed Outlook category",
   details: [
@@ -28,11 +28,11 @@ export const categoryProofDefinition = {
     ["Color preset", CATEGORY_PROOF_COLOR],
   ],
   createButton: {
-    label: "Create Outlook category proof",
+    label: "Create Outlook category",
     action: "create-category-proof",
   },
   removeButton: {
-    label: "Remove Outlook category proof",
+    label: "Remove Outlook category",
     action: "remove-category-proof",
   },
   create: (api, accessToken) => api.createCategoryProof(accessToken),
