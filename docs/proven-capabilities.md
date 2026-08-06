@@ -172,8 +172,10 @@ factual evidence, not entries in a registry or templates for future work.
   email generator as the honest non-call fallback. It is explicitly labeled as
   Outlook email—not a Teams call, missed call, or voicemail. One reviewed,
   one-shot local product-route rehearsal received Graph `202` and proved the
-  exact message in Cory's Inbox. This establishes the real workload artifact
-  and product contract, but not a hosted deployment of the new route.
+  exact message in Cory's Inbox. A later single-click hosted-SPA rehearsal used
+  the dedicated CBA operator, reached the deployed API, received `202`, and
+  produced exactly one new matching Kobe-to-Cory message in Cory's Inbox. This
+  establishes the real workload artifact, product contract, and hosted route.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted
