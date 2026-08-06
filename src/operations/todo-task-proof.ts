@@ -9,8 +9,6 @@ export const todoTaskProofDefinition = {
   storageName: "todo-task-proof",
   runId: TODO_TASK_PROOF_RUN_ID,
   label: "To Do task",
-  notice:
-    "Real tenant activity: Cory creates one fixed harmless Microsoft To Do task, then explicitly removes it. The task is never completed or shared.",
   messages: {
     "not-started": "To Do task: not started in this browser.",
     uncertain:

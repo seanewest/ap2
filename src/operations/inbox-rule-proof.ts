@@ -10,8 +10,6 @@ export const inboxRuleProofDefinition = {
   storageName: "inbox-rule-proof",
   runId: INBOX_RULE_PROOF_RUN_ID,
   label: "inbox-rule",
-  notice:
-    "Real tenant activity: Cory creates one fixed harmless disabled Inbox rule, then explicitly removes it.",
   messages: {
     "not-started": "Inbox rule: not started in this browser.",
     uncertain:

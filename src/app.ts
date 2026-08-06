@@ -966,13 +966,6 @@ function createSimulatedEmailPanel(
   const panel = document.createElement("div");
   panel.className = "api-access";
 
-  panel.append(
-    createStatus(
-      "This creates real tenant activity: one internal email from Homer Simpson to Marge Simpson. This page has no email cleanup action; if Microsoft delivers the email, it remains until separately removed.",
-      "notice",
-    ),
-  );
-
   if (state.kind === "loading") {
     panel.setAttribute("aria-busy", "true");
     panel.append(createStatus("Submitting the internal email…"));
@@ -1011,12 +1004,6 @@ function createHelpDeskScenarioPanel(
 ): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "api-access";
-  panel.append(
-    createStatus(
-      "Prepared Outlook email action: one clearly labeled AP2 help desk email from Kobe to Cory. This is not a Teams call, missed call, or voicemail. This page has no email cleanup action; if Microsoft delivers the email, it remains until separately removed.",
-      "notice",
-    ),
-  );
 
   if (state.kind === "loading") {
     panel.setAttribute("aria-busy", "true");
@@ -1060,12 +1047,6 @@ function createOneDriveProofPanel(
 ): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "api-access";
-  panel.append(
-    createStatus(
-      "Real tenant activity: Homer creates one fixed harmless file, shares it read-only with Marge, and cleanup moves it to Homer's recycle bin.",
-      "notice",
-    ),
-  );
 
   if (state.activity !== "idle") {
     panel.setAttribute("aria-busy", "true");
@@ -1122,13 +1103,7 @@ function createCalendarMeetingPanel(
 ): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "api-access";
-  panel.append(
-    createStatus(
-      "Real tenant activity: Cory creates one fixed harmless 15-minute meeting inviting only Kobe and Marge, then explicitly cancels it.",
-      "notice",
-    ),
-    createCalendarMeetingDetails(),
-  );
+  panel.append(createCalendarMeetingDetails());
 
   if (state.activity !== "idle") {
     panel.setAttribute("aria-busy", "true");
@@ -1274,12 +1249,6 @@ function createContactProofPanel(
 ): HTMLElement {
   const panel = document.createElement("div");
   panel.className = "api-access";
-  panel.append(
-    createStatus(
-      "Real tenant activity: Cory creates one fixed harmless Outlook contact for Kobe, then explicitly removes it.",
-      "notice",
-    ),
-  );
   const message =
     state.activity === "creating"
       ? "Creating the fixed contact…"

@@ -156,6 +156,36 @@ describe("After Party primary SPA", () => {
     expect(apiRequest).not.toHaveBeenCalled();
   });
 
+  it("omits static card notices while preserving status, details, and controls", async () => {
+    authentication.initialize.mockResolvedValue({ kind: "signed-out" });
+    await createAfterPartyApp(root, authentication, api).start();
+
+    const cards = [...section("capabilities").querySelectorAll<HTMLElement>(
+      ".capability-item",
+    )];
+    expect(cards).toHaveLength(10);
+    expect(cards.every((card) => card.querySelector(".api-access > .notice") === null))
+      .toBe(true);
+    expect(section("capabilities").textContent).not.toMatch(
+      /This creates real tenant activity|Prepared Outlook email action|Real tenant activity:/,
+    );
+    for (const status of [
+      "Contact: not started in this browser.",
+      "Inbox rule: not started in this browser.",
+      "Outlook category: not started in this browser.",
+      "Unsent draft: not started in this browser.",
+      "Calendar meeting: not started in this browser.",
+      "To Do task: not started in this browser.",
+      "OneDrive file: not started in this browser.",
+      "SharePoint file: not started in this browser.",
+    ]) {
+      expect(section("capabilities").textContent).toContain(status);
+    }
+    expect(section("capabilities").textContent).toContain("Required attendees");
+    expect(section("capabilities").textContent).toContain("Color preset");
+    expect(section("capabilities").querySelectorAll("button")).toHaveLength(18);
+  });
+
   it("enables creation actions when signed in without API or token work during rendering", async () => {
     authentication.initialize.mockResolvedValue({
       kind: "signed-in",
