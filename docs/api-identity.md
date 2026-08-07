@@ -87,12 +87,15 @@ the help-desk fallback. The container needs outbound access to Microsoft
 login, certificate authentication, and Graph endpoints. This application work
 does not create consent, identity, certificate, or tenant configuration.
 
-The disposable rehearsal assumes one controlled click against one API replica.
-The `/api/help-desk-scenario` operation consumes a singleton process-local
-attempt before authentication or Graph, so success, refusal, and ambiguous
-failure cannot be retried on that replica. It does not claim exactly-once
-delivery across replicas or restarts, and intentionally adds no job or durable
-idempotency system.
+The `/api/help-desk-scenario` operation accepts separate explicit button
+invocations on its one API replica. A process-local busy boundary rejects a
+concurrent send. A token or identity failure before Graph, a definite Graph
+refusal, or confirmed Graph `202` returns the operation to ready; the API never
+automatically retries. An ambiguous Graph transport, timeout, or server failure
+latches the replica uncertain and blocks another send so a possibly accepted
+message is not replayed blindly. It does not claim exactly-once delivery across
+replicas or restarts, and intentionally adds no job or durable idempotency
+system.
 
 ## OneDrive share proof
 
