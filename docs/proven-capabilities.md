@@ -59,7 +59,7 @@ not mean the operation has been added to the SPA/API product path.
 | Exchange and message-trace diagnostics | Connected app-only to Exchange Online, read bounded organization configuration, and ran bounded message-trace diagnostics. The official Transport Data Platform Graph service principal also returned a successful trace read. | Dev diagnostic app and Microsoft Transport Data Platform service principal | Read-only; the Dev permissions and Exchange Administrator assignment remain |
 | Defender posture snapshot | Read the latest Microsoft Secure Score and reduced 69 controls to tenant-level and category-level score aggregates. Older score history was reported as truncated and deliberately not paged. | Dev diagnostic app | Read-only |
 | Mail folder | Created and deleted one ordinary visible top-level Cory mail folder. No message or send route was used. | c91 delegated — Cory | Exact folder absent |
-| Help-desk scenario email | One app-only authorized local API request invoked the merged fixed operation. Exact Kobe CBA submitted one marker-bound Outlook email to Cory; Graph returned `202`, and the second of three allowed marker reads found exactly one non-draft message in Cory's Inbox with the exact Kobe sender, sole Cory recipient, subject, and body. | Dev diagnostic app triggered the API; c91 delegated — Kobe was the Microsoft mail actor; c91 delegated — Cory performed the learner-mailbox read | The message is intentionally retained and privately inventoried for later cleanup; this proves Outlook email only, not a Teams call, missed call, or voicemail |
+| Help-desk scenario email | The fixed operation succeeded once through the local product route and twice through the hosted SPA/API route. The latest authorized hosted button click made exactly one API `POST`, received `202`, and added exactly one non-draft message in Cory's Inbox with the exact Kobe sender, sole Cory recipient, subject, and body. | Dev diagnostic app triggered the local proof and observed the mailbox; the dedicated CBA operator triggered the hosted proofs; c91 delegated — Kobe was the Microsoft mail actor | Three exact messages are intentionally retained and privately inventoried for later cleanup; this proves Outlook email only, not a Teams call, missed call, or voicemail |
 | Private document staging | One reviewed delegated canary created a unique private run folder and fixed harmless text document in the producer-owned tenant-local business drive, then reconciled one direct signed-in learner `read` permission with no link or invitation. | c91 delegated — fictional document producer for staging and cleanup; c91 delegated — distinct fictional learner for the bounded visibility read | The learner backend read did not prove visibility, so interpretation, response, audit, and detection are unclaimed. Permission, file, and empty-folder cleanup succeeded; three fresh-token terminal rounds proved producer object absence and learner access absence. |
 | Disabled Inbox rule | Created and deleted one exact harmless disabled rule. | c91 delegated — Cory | Exact rule absent |
 | Outlook category | Created and deleted one exact category. | c91 delegated — Cory | Exact category absent |
@@ -172,10 +172,16 @@ factual evidence, not entries in a registry or templates for future work.
   email generator as the honest non-call fallback. It is explicitly labeled as
   Outlook email—not a Teams call, missed call, or voicemail. One reviewed,
   one-shot local product-route rehearsal received Graph `202` and proved the
-  exact message in Cory's Inbox. A later single-click hosted-SPA rehearsal used
-  the dedicated CBA operator, reached the deployed API, received `202`, and
-  produced exactly one new matching Kobe-to-Cory message in Cory's Inbox. This
-  establishes the real workload artifact, product contract, and hosted route.
+  exact message in Cory's Inbox. The first hosted SPA click also received `202`,
+  but its replica-lifetime one-shot latch then caused two later explicit clicks
+  to return `500` before Kobe authentication or Graph; mailbox reconciliation
+  proved those failures created no message. Revision `ca-ap2-api--0000016`
+  replaced that latch with a per-send busy boundary while retaining an
+  uncertainty block for ambiguous Graph outcomes. One authorized hosted SPA
+  click then made exactly one API `POST`, received `202`, and produced exactly
+  one new matching Kobe-to-Cory message in Cory's Inbox. This establishes the
+  current workload artifact, product contract, and hosted route without claiming
+  exactly-once behavior across replicas or restarts.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted

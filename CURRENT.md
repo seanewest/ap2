@@ -25,19 +25,17 @@ new architecture work.
   purpose through delegation, treats review findings by materiality, and uses a
   complexity brake after repeated correction loops or failed live attempts.
 - The other tenant-backed SPA actions were exercised successfully from the local
-  SPA through the hosted API. The remaining current capability gap is the fixed
-  Kobe-to-Cory help-desk Outlook email through the SPA/API path.
-- Gamma owns durable assignment `51a7f211-ac7d-43f8-8443-3ab00a229c26` to close
-  that gap. The working diagnosis is that the deployed Container App lacks
-  Kobe's existing CBA configuration. Gamma is active; the coordinator is idle.
+  SPA through the hosted API.
+- The Kobe-to-Cory help-desk button gap is closed in draft PR #189 and deployed
+  revision `ca-ap2-api--0000016`. The two supplied `500` responses were caused
+  by a replica-lifetime one-shot latch after an earlier `202`, not missing Kobe
+  CBA; mailbox reconciliation proved neither failure sent mail. One authorized
+  hosted SPA click against the correction made exactly one API `POST`, received
+  `202`, and added exactly one matching message in Cory's Inbox.
 
 ## Next dependency
 
-Wait for Gamma's bounded result. Success means the deployed API reuses the
-existing Kobe CBA configuration, one authorized SPA click is accepted, and the
-fixed email is observed in Cory's mailbox. If the diagnosis is materially
-wrong, the goal explicitly stops for Sean rather than opening a broader repair
-tree.
+Sean reviews draft PR #189. No further help-desk send is needed for this proof.
 
 Sean is also watching whether the coordinator applies the recently clarified
 judgment rules well in practice; preserve that emphasis without creating extra
