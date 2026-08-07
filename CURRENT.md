@@ -6,40 +6,63 @@ rules belong in `AGENTS.md` and focused architecture documents.
 
 ## Current objective
 
-Finish proving the internal SPA as a real control surface for the tenant
-capabilities AP2 has already built, without expanding small deployment gaps into
-new architecture work.
+Explore how AP2 can create, preserve, and reopen genuine simulated-user Windows
+endpoints, while beginning one realistic third-party SaaS identity-lifecycle
+integration. Measure the available cost/performance shapes before making product
+architecture decisions.
 
 ## Current state
 
-- The Microsoft 365 Business Premium and Defender licenses were extended for
-  another 30 days, so replacement-tenant migration is not current work. PR #172
-  remains useful as a reconstruction specification.
-- PR #178 reorganized the SPA as the approved internal capability notebook.
-  PRs #181 and #184 are merged: redundant capability-card subtext is removed
-  and the obsolete generalized scenario/lab framework is retired.
-- PR #186 is merged and adds the local Vite proxy used by `ap2-local`, so local
-  SPA testing can reach the hosted Azure API without changing production CORS.
-- The coordinator dispatcher repair is complete and live on the simplified
-  schema-2 design. The current coordinator strategy explicitly preserves parent
-  purpose through delegation, treats review findings by materiality, and uses a
-  complexity brake after repeated correction loops or failed live attempts.
-- The other tenant-backed SPA actions were exercised successfully from the local
-  SPA through the hosted API.
-- The Kobe-to-Cory help-desk button gap is complete and independently reviewed
-  through PR #189 and deployed revision `ca-ap2-api--0000016`. The two supplied
-  `500` responses were caused by a replica-lifetime one-shot latch after an
-  earlier `202`, not missing Kobe CBA; mailbox reconciliation proved neither
-  failure sent mail. One authorized hosted SPA click against the correction
-  made exactly one API `POST`, received `202`, and added exactly one matching
-  message in Cory's Inbox.
+- The internal SPA/control-surface cleanup is no longer the active frontier. The
+  Kobe-to-Cory help-desk path is fixed and independently proven; do not reopen
+  that work without new evidence.
+- A genuine Windows 11 Enterprise 24H2 AVD personal-host path is proven through
+  Entra join, Intune enrollment/compliance, Defender onboarding, assignment,
+  unattended simulated-user sign-in, and a visible user desktop.
+- Endpoint-local delegated Graph is also proven from a genuine Kobe Windows
+  session: Windows native SSO through WAM used the signed-in Windows account to
+  obtain a delegated Graph token and create the fixed OneDrive marker without
+  CBA, app-only identity, browser UI, or a runtime LLM.
+- Two clean fresh-workstation timing runs are now consistent: request/start to a
+  visible usable simulated-user desktop took **14m 00.770s** and **15m 11.119s**.
+  The VM itself was running in roughly a minute; most delay came from Entra,
+  Intune, AVD, and first-session readiness.
+- The same enrolled workstation, after verified deallocation, returned from an
+  explicit open/start request to a visible usable Homer desktop in **2m
+  58.578s**. This preserved its Entra, Intune, Defender, AVD, profile,
+  assignment, and consent state.
+- These measurements are evidence, not a product-cost decision. Deallocated VMs
+  are useful during development. For a future learner flow, temporary warm state
+  (for example, provision once, later hibernate/deallocate, then delete after a
+  bounded period) remains one possible shape, but cost consciousness should not
+  constrain exploration prematurely.
+- Gamma owns active assignment `f1f71836-0c7d-4cec-bf9a-a2209cbece7e`: create a
+  fresh enrolled Homer workstation, snapshot its enrolled OS state, reconstruct
+  one replacement workstation from that snapshot, and time snapshot-to-usable
+  desktop while observing Entra/Intune/Defender/AVD identity behavior. This is a
+  one-for-one resurrection experiment, not an attempt to clone an enrolled
+  endpoint into simultaneous copies.
+- Retention rule for that experiment: if the restored workstation proves
+  healthy, it becomes the canonical retained deallocated workstation and the
+  older source VM/disk is retired; retain the snapshot as well. If restored
+  identity is unhealthy or ambiguous, preserve the source instead. Do not run
+  source and restored copies simultaneously.
+- A second exploration line has begun around **YouTrack Cloud** as a non-Microsoft
+  SaaS integration. The first bounded target is Entra SSO + SCIM 2.0 lifecycle:
+  Entra assignment/group -> provision Cory/Kobe -> Entra SSO -> remove Kobe ->
+  observe YouTrack deactivation/ban. Use a durable personal/admin YouTrack owner
+  account outside the disposable Microsoft tenant. Defender for Cloud Apps
+  Conditional Access App Control is a possible later experiment, not part of the
+  first YouTrack proof.
 
-## Next dependency
+## Next dependencies
 
-Gamma's active unattended-AVD-session assignment
-`d643f5ed-6eca-4b6f-a03b-17de5525660f` is the next dependency. No further
-help-desk email send is needed for this proof.
-
-Sean is also watching whether the coordinator applies the recently clarified
-judgment rules well in practice; preserve that emphasis without creating extra
-process around it.
+1. Wait for Gamma's bounded snapshot-resurrection result: headline elapsed time,
+   whether the resurrected endpoint is still coherently recognized by Entra,
+   Intune, Defender, and AVD, and the storage/cost shape that remains afterward.
+2. Continue the manual YouTrack setup far enough to establish the Entra auth
+   module and SCIM connection, then prove one small joiner/leaver lifecycle before
+   adding CASB/session-control complexity.
+3. Keep observing coordinator judgment rather than making goals increasingly
+   prescriptive. Routine reversible sandbox prerequisites should remain within a
+   bounded goal unless repeated behavior shows the strategy needs correction.
