@@ -27,7 +27,7 @@ new architecture work.
 - The other tenant-backed SPA actions were exercised successfully from the local
   SPA through the hosted API.
 - The Kobe-to-Cory help-desk button gap is complete and independently reviewed
-  in draft PR #189 and deployed revision `ca-ap2-api--0000016`. The two supplied
+  through PR #189 and deployed revision `ca-ap2-api--0000016`. The two supplied
   `500` responses were caused by a replica-lifetime one-shot latch after an
   earlier `202`, not missing Kobe CBA; mailbox reconciliation proved neither
   failure sent mail. One authorized hosted SPA click against the correction
