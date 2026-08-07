@@ -36,7 +36,7 @@ export class DelegatedGraphHelpDeskScenarioOperation
 {
   readonly #tokenProvider: DelegatedGraphTokenProvider;
   readonly #request: typeof fetch;
-  #attempted = false;
+  #state: "ready" | "sending" | "uncertain" = "ready";
 
   constructor(
     tokenProvider: DelegatedGraphTokenProvider,
@@ -47,55 +47,76 @@ export class DelegatedGraphHelpDeskScenarioOperation
   }
 
   async send(): Promise<HelpDeskScenarioResult> {
-    if (this.#attempted) {
-      throw new Error("Help desk scenario was already attempted");
+    if (this.#state === "sending") {
+      throw new Error("Help desk scenario send is already in progress");
     }
-    this.#attempted = true;
+    if (this.#state === "uncertain") {
+      throw new Error("Previous help desk scenario send outcome is uncertain");
+    }
+    this.#state = "sending";
 
-    const delegatedToken = await this.#tokenProvider.getToken(
-      GRAPH_MAIL_SEND_SCOPE,
-    );
-    if (!delegatedToken?.token) {
-      throw new Error("Token provider returned no delegated Graph token");
-    }
-    if (
-      delegatedToken.identity.tenantId !== KOBE_IDENTITY.tenantId ||
-      delegatedToken.identity.objectId !== KOBE_IDENTITY.objectId ||
-      delegatedToken.identity.userPrincipalName !==
-        KOBE_IDENTITY.userPrincipalName
-    ) {
-      throw new Error("Delegated Graph token is not for Kobe West");
+    let delegatedToken;
+    try {
+      delegatedToken = await this.#tokenProvider.getToken(
+        GRAPH_MAIL_SEND_SCOPE,
+      );
+      if (!delegatedToken?.token) {
+        throw new Error("Token provider returned no delegated Graph token");
+      }
+      if (
+        delegatedToken.identity.tenantId !== KOBE_IDENTITY.tenantId ||
+        delegatedToken.identity.objectId !== KOBE_IDENTITY.objectId ||
+        delegatedToken.identity.userPrincipalName !==
+          KOBE_IDENTITY.userPrincipalName
+      ) {
+        throw new Error("Delegated Graph token is not for Kobe West");
+      }
+    } catch (error) {
+      this.#state = "ready";
+      throw error;
     }
 
-    const response = await this.#request(GRAPH_SEND_MAIL_URL, {
-      method: "POST",
-      redirect: "error",
-      headers: {
-        Authorization: `Bearer ${delegatedToken.token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: {
-          subject: HELP_DESK_SCENARIO_SUBJECT,
-          body: {
-            contentType: "Text",
-            content: HELP_DESK_SCENARIO_BODY,
-          },
-          toRecipients: [
-            {
-              emailAddress: {
-                address: CORY_USER_PRINCIPAL_NAME,
-              },
-            },
-          ],
+    let response: Response;
+    try {
+      response = await this.#request(GRAPH_SEND_MAIL_URL, {
+        method: "POST",
+        redirect: "error",
+        headers: {
+          Authorization: `Bearer ${delegatedToken.token}`,
+          "Content-Type": "application/json",
         },
-      }),
-    });
+        body: JSON.stringify({
+          message: {
+            subject: HELP_DESK_SCENARIO_SUBJECT,
+            body: {
+              contentType: "Text",
+              content: HELP_DESK_SCENARIO_BODY,
+            },
+            toRecipients: [
+              {
+                emailAddress: {
+                  address: CORY_USER_PRINCIPAL_NAME,
+                },
+              },
+            ],
+          },
+        }),
+      });
+    } catch (error) {
+      this.#state = "uncertain";
+      throw error;
+    }
+
     if (response.status !== 202) {
+      this.#state =
+        response.status === 408 || response.status >= 500
+          ? "uncertain"
+          : "ready";
       throw new Error(
         `Microsoft Graph sendMail returned HTTP ${response.status}`,
       );
     }
+    this.#state = "ready";
 
     return {
       accepted: true,

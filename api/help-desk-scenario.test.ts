@@ -112,10 +112,11 @@ describe("delegated Graph help desk scenario", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
-  it("does not retry a refused submission", async () => {
+  it("allows a later explicit send after a definite Graph refusal", async () => {
     const request = vi
       .fn<typeof fetch>()
-      .mockResolvedValue(new Response(null, { status: 429 }));
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+      .mockResolvedValueOnce(new Response(null, { status: 202 }));
     const operation = new DelegatedGraphHelpDeskScenarioOperation(
       { getToken: vi.fn().mockResolvedValue(kobeToken) },
       request,
@@ -124,13 +125,11 @@ describe("delegated Graph help desk scenario", () => {
     await expect(operation.send()).rejects.toThrow(
       "Microsoft Graph sendMail returned HTTP 429",
     );
-    await expect(operation.send()).rejects.toThrow(
-      "Help desk scenario was already attempted",
-    );
-    expect(request).toHaveBeenCalledOnce();
+    await expect(operation.send()).resolves.toMatchObject({ accepted: true });
+    expect(request).toHaveBeenCalledTimes(2);
   });
 
-  it("does not issue a second request after success", async () => {
+  it("allows a later explicit send after a confirmed acceptance", async () => {
     const request = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response(null, { status: 202 }));
@@ -140,9 +139,51 @@ describe("delegated Graph help desk scenario", () => {
     );
 
     await operation.send();
-    await expect(operation.send()).rejects.toThrow(
-      "Help desk scenario was already attempted",
+    await expect(operation.send()).resolves.toMatchObject({ accepted: true });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses a concurrent send while one is in progress", async () => {
+    let resolveToken!: (token: DelegatedGraphToken) => void;
+    const token = new Promise<DelegatedGraphToken>((resolve) => {
+      resolveToken = resolve;
+    });
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const operation = new DelegatedGraphHelpDeskScenarioOperation(
+      { getToken: vi.fn().mockReturnValue(token) },
+      request,
     );
+
+    const firstSend = operation.send();
+    await expect(operation.send()).rejects.toThrow(
+      "Help desk scenario send is already in progress",
+    );
+    resolveToken(kobeToken);
+    await expect(firstSend).resolves.toMatchObject({ accepted: true });
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it("allows a later explicit send after a pre-Graph identity failure", async () => {
+    const tokenProvider = {
+      getToken: vi
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(kobeToken),
+    };
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const operation = new DelegatedGraphHelpDeskScenarioOperation(
+      tokenProvider,
+      request,
+    );
+
+    await expect(operation.send()).rejects.toThrow(
+      "Token provider returned no delegated Graph token",
+    );
+    await expect(operation.send()).resolves.toMatchObject({ accepted: true });
     expect(request).toHaveBeenCalledOnce();
   });
 
@@ -159,7 +200,25 @@ describe("delegated Graph help desk scenario", () => {
       "ambiguous transport failure",
     );
     await expect(operation.send()).rejects.toThrow(
-      "Help desk scenario was already attempted",
+      "Previous help desk scenario send outcome is uncertain",
+    );
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it("does not repeat an ambiguous Graph server failure", async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(new Response(null, { status: 500 }));
+    const operation = new DelegatedGraphHelpDeskScenarioOperation(
+      { getToken: vi.fn().mockResolvedValue(kobeToken) },
+      request,
+    );
+
+    await expect(operation.send()).rejects.toThrow(
+      "Microsoft Graph sendMail returned HTTP 500",
+    );
+    await expect(operation.send()).rejects.toThrow(
+      "Previous help desk scenario send outcome is uncertain",
     );
     expect(request).toHaveBeenCalledOnce();
   });
