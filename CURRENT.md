@@ -26,16 +26,19 @@ new architecture work.
   complexity brake after repeated correction loops or failed live attempts.
 - The other tenant-backed SPA actions were exercised successfully from the local
   SPA through the hosted API.
-- The Kobe-to-Cory help-desk button gap is closed in draft PR #189 and deployed
-  revision `ca-ap2-api--0000016`. The two supplied `500` responses were caused
-  by a replica-lifetime one-shot latch after an earlier `202`, not missing Kobe
-  CBA; mailbox reconciliation proved neither failure sent mail. One authorized
-  hosted SPA click against the correction made exactly one API `POST`, received
-  `202`, and added exactly one matching message in Cory's Inbox.
+- The Kobe-to-Cory help-desk button gap is complete and independently reviewed
+  in draft PR #189 and deployed revision `ca-ap2-api--0000016`. The two supplied
+  `500` responses were caused by a replica-lifetime one-shot latch after an
+  earlier `202`, not missing Kobe CBA; mailbox reconciliation proved neither
+  failure sent mail. One authorized hosted SPA click against the correction
+  made exactly one API `POST`, received `202`, and added exactly one matching
+  message in Cory's Inbox.
 
 ## Next dependency
 
-Sean reviews draft PR #189. No further help-desk send is needed for this proof.
+Gamma's active unattended-AVD-session assignment
+`d643f5ed-6eca-4b6f-a03b-17de5525660f` is the next dependency. No further
+help-desk email send is needed for this proof.
 
 Sean is also watching whether the coordinator applies the recently clarified
 judgment rules well in practice; preserve that emphasis without creating extra
