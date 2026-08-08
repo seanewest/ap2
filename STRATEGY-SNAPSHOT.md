@@ -1,93 +1,139 @@
-# Strategy snapshot — 2026-08-07
+# Strategy snapshot — 2026-08-08
 
 This is a point-in-time orientation artifact for a replacement strategy session
-or read-only observer. It is **not** live execution state and is not expected to
-track every peer assignment or report. Before relying on who is working on what,
-inspect the coordinator's durable state; `coordinator-dispatcher peer-status` is
-the quickest human-readable check. Durable coordinator state wins for execution
-status. Canonical project documents remain authoritative for durable product and
-workflow rules.
+or read-only observer. It is **not** live execution state. For worker status use
+`coordinator-dispatcher peer-status`; durable coordinator state wins for current
+execution status. Canonical project documents remain authoritative for durable
+product and workflow rules.
 
 Completed capability evidence belongs in `docs/proven-capabilities.md`; durable
-product rules belong in `AGENTS.md` and focused architecture documents.
+product and agent-workflow rules belong in `AGENTS.md` and the focused strategy
+and architecture documents.
 
-## Strategic frontier at this snapshot
+## Strategic frontier
 
-AP2 is exploring how to create, preserve, reopen, and use genuine simulated-user
-Windows endpoints while beginning one realistic third-party SaaS
-identity-lifecycle integration. The immediate endpoint question is no longer
-whether the path works, but how quickly a genuinely fresh disposable endpoint
-can become useful without prematurely choosing a long-lived workstation
-architecture.
+The next likely exploration is third-party SaaS identity/security integration,
+not further endpoint timing optimization. The genuine Windows/AVD endpoint path
+works well enough for current purposes, and Sean does not want the next goals to
+turn into another latency-optimization project unless a later product need makes
+that useful.
 
-## Recent endpoint evidence
+The SPA remains Sean's internal capability notebook/operator console, not the
+learner product or a generalized lab framework. AP2 should continue favoring
+small, decisive capability experiments over infrastructure or ceremony that is
+not needed to answer the current question.
 
-- A genuine Windows 11 Enterprise 24H2 AVD personal-host path is proven through
-  Entra join, Intune enrollment/compliance, Defender onboarding, assignment,
-  unattended simulated-user sign-in, and a visible user desktop.
-- Endpoint-local delegated Graph is proven from a genuine Kobe Windows session:
-  Windows-native SSO through WAM used the signed-in Windows account to obtain a
-  delegated Graph token and create the fixed OneDrive marker without CBA,
-  app-only identity, browser UI, or a runtime LLM.
-- Two clean fresh-workstation runs reached a visible usable simulated-user
-  desktop in **14m 00.770s** and **15m 11.119s**. In the 15m11s run, the VM was
-  running at about 1m22s, Entra registration appeared at about 6m41s, Intune
-  enrollment followed roughly 17 seconds later, AVD became Available at about
-  11m58s, and the visible Homer desktop arrived at 15m11s.
-- The same enrolled workstation, after verified deallocation, returned from an
-  explicit open request to a visible Homer desktop in **2m 58.578s** without
-  reprovisioning its Entra, Intune, Defender, AVD, profile, assignment, or
-  consent state.
-- A one-for-one enrolled-disk snapshot resurrection reached Homer in **8m
-  19.077s**. Entra, Intune, AVD, and the Defender machine identity were reused,
-  but Defender cloud `lastSeen` stayed at its pre-snapshot timestamp through the
-  bounded post-restore observation even though local Sense was healthy. The
-  restored copy was therefore treated as ambiguous and retired; the original
-  source VM/disk remains deallocated with the snapshot retained.
+## Endpoint / AVD state
 
-These timings are exploration evidence, not a product architecture decision.
-Development cost is low enough that retaining useful deallocated test VMs for
-follow-up experiments is acceptable when it accelerates learning.
+Recent timing work established a useful learner-side calibration for a genuinely
+fresh generalized-image Marge endpoint:
 
-## Endpoint questions to explore next
+- fresh deployment -> learner connection accepted: about **9m00s**;
+- fresh deployment -> genuinely usable desktop: about **11m13s**;
+- the final Windows `Welcome` / first-profile phase was about **2m13s**.
 
-Prefer small, fast experiments that answer one timing or dependency question at
-a time rather than one long optimization project. Promising questions include:
+Earlier clean raw-marketplace runs were roughly **14-15 minutes** to visible
+usable desktop, but those were measured with more backend polling and unattended
+login automation. Several cloud/backend timestamps proved to be observation
+points rather than exact transition times, so do not over-interpret small timing
+differences without a learner-side apples-to-apples test.
 
-- whether a newer/faster CPU or more vCPUs materially shorten first boot,
-  extension execution, AVD readiness, or first-profile creation;
-- whether AVD preparation or connection attempts can begin earlier instead of
-  waiting on conservative readiness gates;
-- what consumes the several-minute first-user `Welcome`/desktop transition and
-  which supported first-logon optimizations matter;
-- whether a clean pre-enrollment generalized base image can safely pre-bake
-  non-identity work and beat a raw marketplace image while still creating fresh
-  Entra/Intune/Defender identity at deployment time;
-- which endpoint, app-installation, and access steps can proceed concurrently.
+A newer/faster CPU also showed a promising pre-login AVD improvement, but the
+full desktop comparison was contaminated by a simulated-user CBA readiness
+mistake. First-login forensics separately indicated that genuine fresh-profile
+initialization is usually around two minutes and is a meaningful component of
+learner-visible latency.
 
-The fresh-marketplace path remains the most generally promising shape because a
-future lab may not know its user or required applications in advance. Snapshot
-and warm-state approaches remain useful comparison points rather than assumed
-answers.
+For now, treat all of this as useful evidence rather than the active frontier.
+As of this snapshot, all retained AP2 test VMs are **deallocated**. The older
+Marge duplicate VM/NIC/disk was removed; only the newer `ap2margefresh-vm`
+remains in the Marge environment. Retained endpoint state can be cleaned up later
+when it no longer has learning value.
 
-## SaaS exploration at this snapshot
+## Coordinator / peer cutover just completed
 
-A second exploration line has begun around **YouTrack Cloud**. The first bounded
-target is Entra SSO plus SCIM 2.0 lifecycle: Entra assignment/group -> provision
-Cory/Kobe -> Entra SSO -> remove Kobe -> observe YouTrack deactivation or ban.
-Use a durable personal/admin YouTrack owner account outside the disposable
-Microsoft tenant.
+The Codex team was freshly cut over on 2026-08-08:
 
-Defender for Cloud Apps is a later layer, with two distinct paths worth keeping
-separate: native API App Connectors for supported SaaS products, and Conditional
-Access App Control/session proxy experiments for suitable SaaS without a native
-connector. Do not add that complexity to the first YouTrack lifecycle proof.
+- `AP2 Coordinator`: fresh thread, GPT-5.6 Sol, **High** reasoning;
+- `AP2 Alpha`, `Beta`, `Gamma`, `Delta`, `Epsilon`: fresh threads, GPT-5.6 Sol,
+  **Medium** reasoning;
+- approvals are `never`, with the existing hardened app-server execution
+  boundary;
+- old threads were renamed `old AP2 ... 8-8 3am`;
+- the dispatcher was atomically rotated to the fresh thread IDs and a new team
+  epoch;
+- the reusable coordinator/peer worktrees were clean and advanced to current
+  AP2 `main` before orientation.
+
+The fresh coordinator and peers read their role/project guidance and are idle.
+`coordinator-dispatcher peer-status` remains the intended human-readable watch
+interface.
+
+Two `codex-agent-tools` reliability changes were also merged during cutover.
+Automatic peer-report capture was added, and then a live canary exposed that
+Codex app-server `turn/completed` notifications are connection-local rather than
+broadcast across independent clients. The dispatcher was corrected to perform a
+lightweight bounded durable-state reconciliation sweep, so it can discover a
+peer completion even when another app-server connection created the assignment.
+A live post-fix canary proved: fresh coordinator assignment -> peer completion ->
+automatic durable capture -> coordinator acknowledgment -> peer AVAILABLE,
+without restarting the dispatcher. Keep an eye on this new path during ordinary
+work rather than assuming it is flawless merely because the canary passed.
+
+The source/install used for this workflow is the separate
+`/home/west/codex-agent-tools-source` repository. A replacement strategist should
+read it as well as the AP2 docs before changing coordinator/dispatcher behavior.
+
+## Judgment and coordination
+
+A recent priority is preserving **bottom-up judgment**. The coordinator should
+translate strategist/user intent into a bounded durable goal, preserve the real
+purpose and invariants, and then leave ordinary implementation judgment to the
+peer worker. Do not compensate for one peer mistake by making every later goal
+increasingly prescriptive.
+
+Likewise, avoid cycles of procedural ceremony. Goal cards, reports, independent
+review, or another peer are useful when they reduce a real risk or answer an
+independent question; they should not become mandatory layers that crowd out the
+technical work. The recent coordinator guidance was adjusted in this direction,
+but continue watching for drift back toward overspecific delegation or ritual.
+
+## SaaS exploration
+
+**YouTrack Cloud** has now successfully connected to Entra for SSO, including a
+successful test login. That proves the basic Entra enterprise-application / SSO
+relationship, but the interesting lifecycle/security work has **not** yet been
+proven:
+
+- SCIM provisioning/deprovisioning has not been tested end-to-end;
+- the intended group/assignment -> create users -> SSO -> remove user -> observe
+  deactivation flow remains to be proven;
+- Defender for Cloud Apps Conditional Access App Control/session-control behavior
+  has not been tested with YouTrack.
+
+Those are likely near-term experiments. Keep native Defender API App Connectors
+separate conceptually from Conditional Access App Control: YouTrack is useful
+precisely as a SaaS product without the native API connector if the session proxy
+path works.
+
+Other third-party SaaS candidates worth experimenting with next include
+**GitHub Enterprise, Snowflake, Tableau, and Webex**. The point is not to collect
+vendors for its own sake; use them when they let AP2 prove a distinct realistic
+SSO, SCIM, SaaS governance, Defender connector, or session-control capability.
+Prefer options that work with the disposable `onmicrosoft.com` tenant and do not
+create avoidable learner billing/trial friction.
 
 ## Strategy reminders
 
-Keep experiments bounded and let the coordinator and peer own ordinary execution
-judgment inside the approved goal. Treat reversible sandbox prerequisites as
-ordinary execution unless they cross a real authority, architecture, spending,
-or destructive-state boundary. When this snapshot and live execution differ,
-refresh understanding from the durable coordinator state rather than trying to
-make this file behave like a live status board.
+- Before acting on worker status, inspect durable coordinator state rather than
+  treating this snapshot as a live docket.
+- Strategist co-creates goals with Sean; the coordinator executes approved work
+  through peers.
+- Preserve original purpose through delegation and let peers exercise technical
+  judgment inside the real boundaries.
+- Prefer fast empirical experiments over speculative architecture.
+- Do not turn the current pause in endpoint optimization into a permanent
+  architecture decision; simply do not prioritize it now.
+- The Student tenant and endpoint infrastructure should remain disposable and
+  reproducible; nothing important should depend on preserving one specific
+  tenant or VM forever.
