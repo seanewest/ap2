@@ -56,3 +56,11 @@ Read `chatgpt-strategy.md`, `STRATEGY-SNAPSHOT.md`, `AGENTS.md`,
 inspect the coordinator's durable state for current execution status. Before
 dispatching any work, summarize your understanding to Sean and let him correct
 it.
+
+When first contacting the coordinator, handle app-server transport quirks
+internally. If `agent-turn` reports an interrupted reconciliation after the
+turn was accepted, do not resend it: inspect the exact durable coordinator turn
+once and continue from that state. If the coordinator thread is merely not
+loaded for direct input, resume the exact configured thread and retry. Do not
+pass this reconciliation play-by-play to Sean unless it creates a real blocker
+or requires a decision.
