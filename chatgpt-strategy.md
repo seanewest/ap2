@@ -50,8 +50,9 @@ for sharing observer state unless repeated use proves a concrete need.
 
 ## Starting a replacement session
 
-Read `chatgpt-strategy.md`, `CURRENT.md`, `AGENTS.md`,
+Read `chatgpt-strategy.md`, `STRATEGY-SNAPSHOT.md`, `AGENTS.md`,
 `coordinator-strategy.md`, `docs/product-direction.md`, and
-`docs/product-model.md`. Inspect the coordinator's durable state when it is
-available. Before dispatching any work, summarize your understanding to Sean
-and let him correct it.
+`docs/product-model.md`. Treat the snapshot as point-in-time orientation, then
+inspect the coordinator's durable state for current execution status. Before
+dispatching any work, summarize your understanding to Sean and let him correct
+it.

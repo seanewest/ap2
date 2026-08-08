@@ -147,7 +147,8 @@ Use the canonical documents for their distinct jobs:
 - `docs/development-workflow.md` describes the short exploration loop.
 - `chatgpt-strategy.md` describes the ChatGPT strategy-session role.
 - `coordinator-strategy.md` describes the local coordinator role.
-- `CURRENT.md` contains only the current docket and immediate decisions.
+- `STRATEGY-SNAPSHOT.md` is a point-in-time handoff/orientation snapshot, not
+  live execution state.
 - `docs/proven-capabilities.md` records evidence and limitations from completed
   work.
 

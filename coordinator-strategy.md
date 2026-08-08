@@ -41,9 +41,10 @@ the assigned means is beginning to work against the parent purpose.
 
 The authoritative goal card must survive chat, terminal, app-server, WSL, and
 host restarts. Store it in durable assignment state or in one named owner-only
-local artifact referenced by that assignment. `CURRENT.md` may summarize active
-goals, but conversational history and the worker's latest technical message are
-not authoritative copies.
+local artifact referenced by that assignment. `STRATEGY-SNAPSHOT.md` is a
+point-in-time handoff aid, not an authoritative copy of active goals.
+Conversational history and the worker's latest technical message are not
+authoritative copies either.
 
 ## Assign durable peers, not disguised children
 
@@ -141,20 +142,21 @@ boundary, cause an unintended external effect, lose administrative control,
 exceed spending, or block the next useful experiment. Most other findings are
 local fixes, notes, or future ideas.
 
-## Maintain a small docket
+## Maintain a strategy handoff snapshot
 
-`CURRENT.md` is the shared current docket. It should contain only:
+`STRATEGY-SNAPSHOT.md` is a point-in-time orientation aid for replacement
+strategy sessions and read-only observers. It is not live execution state and
+should not mirror active peer assignments. Current peer status and goal
+lifecycle come from the coordinator's durable state.
 
-- the current larger objective;
-- active peer goals and waits;
-- decisions that constrain the next action;
-- the next point where Sean or the strategy session should interpret results.
+Keep the snapshot limited to the larger strategic frontier, important recent
+outcomes needed for orientation, decisions that shape the next experiments, and
+unresolved questions Sean or the strategy session should interpret. Completed
+evidence still belongs in `docs/proven-capabilities.md` or a feature-specific
+record. Git history preserves superseded snapshots.
 
-Do not use it as a history ledger. Completed evidence belongs in
-`docs/proven-capabilities.md` or a feature-specific record. Git history already
-preserves superseded wording.
-
-Update the docket at meaningful transitions, not after every technical step.
+Refresh the snapshot when a handoff or meaningful strategy transition makes it
+useful, not after every technical step or worker event.
 
 ## Reports
 
