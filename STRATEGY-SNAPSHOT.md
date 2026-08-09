@@ -64,8 +64,11 @@ The current Codex team is:
 As of this snapshot all five peers are **AVAILABLE**.
 
 The source/install for the workflow is the separate
-`/home/west/codex-agent-tools-source` repository. Important recent reliability
-fixes are on its `main`:
+`/home/west/codex-agent-tools-source` repository. For a replacement strategist,
+read that repo's human-facing `README.md` and then its compact agent-oriented
+`AGENTS.md`; the latter is intentionally the fast operating/state/recovery model
+and keeps project-specific AP2 strategy out of the reusable tooling repo.
+Important recent reliability fixes are on its `main`:
 
 - PR #22: automatic durable peer-report capture;
 - PR #23: durable completion reconciliation across app-server connections;
