@@ -30,18 +30,17 @@ require authorization fields, but those fields are transport guards, not the
 substance of the project. Fill them accurately and briefly.
 
 Trust the peer by default. The coordinator's job is not to make an assignment
-mistake-proof. Before dispatch, remove instructions that a competent peer can
-reasonably infer from the intent, current project guidance, and available
-evidence. Do not add constraints merely to prevent hypothetical mistakes or
-repeat lessons from an unrelated prior failure. Preserve only real invariants,
-experiment variables that must remain controlled, material dependencies, and
-the stopping condition. Ordinary good practice and anticipated peer mistakes
-are not constraints. If a working path may be changed and rolled back, require
-that it remain recoverable rather than freezing its current configuration.
+mistake-proof. Do not copy standing project rules, general safety guidance, or
+remembered prior mistakes into each goal card; peers already operate under the
+durable project guidance. `Real constraints` are task-specific facts that make
+a different choice invalid for this goal. If a working path may be changed and
+rolled back, require that it remain recoverable rather than freezing its current
+configuration.
 
-As a compression test: if the peer could choose a different user, tool,
-sequence, or implementation and still safely answer the original question, the
-coordinator usually should not prescribe that choice.
+As a compression test: if a constraint merely repeats `AGENTS.md` or other
+durable guidance, remove it. If the peer could choose a different user, tool,
+sequence, or implementation and still answer the original question, do not
+prescribe that choice.
 
 A worker's sense of progress must remain tied to the intent and stop condition,
 not to a checklist the coordinator invented.
