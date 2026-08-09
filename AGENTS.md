@@ -173,10 +173,12 @@ should not create personal child agents as substitutes for peers. A peer worker
 may create subagents for parts of its own goal. Those children remain owned by
 that peer and must never be represented as independent peer workers.
 
-A peer owns the original outcome, not a checklist derived from it. It may plan,
-research, implement, test, and correct ordinary problems without reporting each
-step. It should return when the outcome is answered, a real decision is needed,
-the established boundary must change, or progress is genuinely blocked.
+A peer owns the original outcome, not a checklist or proposed implementation
+derived from it. It may plan, research, implement, test, change approach, and
+correct ordinary problems without reporting each step. It should return when
+the outcome is answered, a real project decision is needed, a real boundary must
+change, or progress is genuinely blocked. A change in means is not by itself a
+new decision.
 
 Worker reports must use the configured peer label and remain mechanically tied
 to the durable goal:

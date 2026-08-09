@@ -36,7 +36,8 @@ evidence. Do not add constraints merely to prevent hypothetical mistakes or
 repeat lessons from an unrelated prior failure. Preserve only real invariants,
 experiment variables that must remain controlled, material dependencies, and
 the stopping condition. Ordinary good practice and anticipated peer mistakes
-are not constraints.
+are not constraints. If a working path may be changed and rolled back, require
+that it remain recoverable rather than freezing its current configuration.
 
 As a compression test: if the peer could choose a different user, tool,
 sequence, or implementation and still safely answer the original question, the
@@ -87,8 +88,9 @@ choose one of four actions:
    follows directly from the original intent.
 3. **Use another peer:** an independent question is now necessary and was
    already implied by the goal.
-4. **Escalate:** the result changes product direction, requires Sean's judgment,
-   expands a real boundary, or reveals that the goal itself may be wrong.
+4. **Escalate:** the result changes product direction, requires a materially new
+   choice, expands a real boundary, or reveals that the goal itself may be wrong.
+   A reversible change of implementation inside the same goal is not escalation.
 
 Do not create a fifth option called “find more useful work.” Unfinished product
 possibilities are not an automatic backlog. A completed experiment is allowed
