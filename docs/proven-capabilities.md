@@ -90,6 +90,8 @@ factual evidence, not entries in a registry or templates for future work.
 
 ## Identity and infrastructure proofs
 
+- YouTrack proved an Entra-managed SaaS lifecycle: assignment through `AP2 YouTrack Users` and SCIM created/updated Marge, Entra SSO succeeded, removal from scope sent `active=false` and YouTrack retained the account as banned rather than deleting it, and the entitlement group now contains exactly Homer, Cory, Marge, and Kobe.
+- A parallel non-gallery `AP2 YouTrack SAML + SCIM (staged)` enterprise app successfully provisioned all four assigned users through its own Entra SCIM job. Marge then completed SP-initiated SAML through that staged app and its Marge-scoped Conditional Access App Control policy applied. Defender session-control effect is **not** yet proven: Defender still reports no onboarded CA App Control proxy apps, so a clipboard-blocking session policy cannot yet select YouTrack.
 - A Product-owned multitenant app can produce a Student service principal
   through real external-tenant sign-in.
 - Real delegated operator tokens and real Dev app-only tokens pass the same

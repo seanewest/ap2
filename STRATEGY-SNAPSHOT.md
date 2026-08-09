@@ -1,4 +1,4 @@
-# Strategy snapshot — 2026-08-08
+# Strategy snapshot — 2026-08-09
 
 This is a point-in-time orientation artifact for a replacement strategy session
 or read-only observer. It is **not** live execution state. For worker status use
@@ -12,16 +12,17 @@ and architecture documents.
 
 ## Strategic frontier
 
-The next likely exploration is third-party SaaS identity/security integration,
-not further endpoint timing optimization. The genuine Windows/AVD endpoint path
-works well enough for current purposes, and Sean does not want the next goals to
-turn into another latency-optimization project unless a later product need makes
-that useful.
+The active frontier is third-party SaaS identity/security integration. YouTrack
+has now proven a useful non-gallery Entra SSO + SCIM lifecycle, and the immediate
+open question is Defender for Cloud Apps Conditional Access App Control. GitHub
+Enterprise Cloud with Enterprise Managed Users is the next likely SaaS because
+it can add a first-party Defender API App Connector / deeper CASB example rather
+than merely repeating YouTrack.
 
 The SPA remains Sean's internal capability notebook/operator console, not the
-learner product or a generalized lab framework. AP2 should continue favoring
-small, decisive capability experiments over infrastructure or ceremony that is
-not needed to answer the current question.
+learner product or a generalized lab framework. Continue favoring small,
+decisive capability experiments over infrastructure or ceremony that is not
+needed to answer the current question.
 
 ## Endpoint / AVD state
 
@@ -33,95 +34,193 @@ fresh generalized-image Marge endpoint:
 - the final Windows `Welcome` / first-profile phase was about **2m13s**.
 
 Earlier clean raw-marketplace runs were roughly **14-15 minutes** to visible
-usable desktop, but those were measured with more backend polling and unattended
-login automation. Several cloud/backend timestamps proved to be observation
-points rather than exact transition times, so do not over-interpret small timing
-differences without a learner-side apples-to-apples test.
+usable desktop. A newer/faster CPU improved pre-login readiness, but its full
+desktop comparison was contaminated by Rachel initially lacking the retained
+simulated-user CBA prerequisites. Rachel was then given a certificate mapping and
+added to the live CBA group; the successful run reached a real Rachel desktop.
+Do not use a static repo list as current CBA authority: query the live
+`AP2 Simulated User CBA` Entra group.
 
-A newer/faster CPU also showed a promising pre-login AVD improvement, but the
-full desktop comparison was contaminated by a simulated-user CBA readiness
-mistake. First-login forensics separately indicated that genuine fresh-profile
-initialization is usually around two minutes and is a meaningful component of
-learner-visible latency.
+Current retained VM state:
 
-For now, treat all of this as useful evidence rather than the active frontier.
-As of this snapshot, all retained AP2 test VMs are **deallocated**. The older
-Marge duplicate VM/NIC/disk was removed; only the newer `ap2margefresh-vm`
-remains in the Marge environment. Retained endpoint state can be cleaned up later
-when it no longer has learning value.
+- `ap2margefresh-vm`: **running** for the current YouTrack/Defender browser work;
+- Rachel, Kobe, and Homer retained test VMs: **deallocated**;
+- the older duplicate Marge VM/NIC/disk was already removed.
 
-## Coordinator / peer cutover just completed
+An unrelated AVD clipboard annoyance was observed on Marge: VM -> local Windows
+clipboard worked while local Windows -> VM paste did not, despite host-pool
+clipboard redirection being enabled. Treat that as a separate endpoint-policy
+issue; do not confuse it with Defender browser/session clipboard controls.
 
-The Codex team was freshly cut over on 2026-08-08:
+## Coordinator / peer workflow
 
-- `AP2 Coordinator`: fresh thread, GPT-5.6 Sol, **High** reasoning;
-- `AP2 Alpha`, `Beta`, `Gamma`, `Delta`, `Epsilon`: fresh threads, GPT-5.6 Sol,
-  **Medium** reasoning;
-- approvals are `never`, with the existing hardened app-server execution
-  boundary;
-- old threads were renamed `old AP2 ... 8-8 3am`;
-- the dispatcher was atomically rotated to the fresh thread IDs and a new team
-  epoch;
-- the reusable coordinator/peer worktrees were clean and advanced to current
-  AP2 `main` before orientation.
+The current Codex team is:
 
-The fresh coordinator and peers read their role/project guidance and are idle.
-`coordinator-dispatcher peer-status` remains the intended human-readable watch
-interface.
+- `AP2 Coordinator`: GPT-5.6 Sol, **High** reasoning;
+- `AP2 Alpha`, `Beta`, `Gamma`, `Delta`, `Epsilon`: GPT-5.6 Sol, **Medium**;
+- approvals `never`, using the hardened app-server boundary;
+- `coordinator-dispatcher peer-status` is the intended human watch interface.
 
-Two `codex-agent-tools` reliability changes were also merged during cutover.
-Automatic peer-report capture was added, and then a live canary exposed that
-Codex app-server `turn/completed` notifications are connection-local rather than
-broadcast across independent clients. The dispatcher was corrected to perform a
-lightweight bounded durable-state reconciliation sweep, so it can discover a
-peer completion even when another app-server connection created the assignment.
-A live post-fix canary proved: fresh coordinator assignment -> peer completion ->
-automatic durable capture -> coordinator acknowledgment -> peer AVAILABLE,
-without restarting the dispatcher. Keep an eye on this new path during ordinary
-work rather than assuming it is flawless merely because the canary passed.
+As of this snapshot all five peers are **AVAILABLE**.
 
-The source/install used for this workflow is the separate
-`/home/west/codex-agent-tools-source` repository. A replacement strategist should
-read it as well as the AP2 docs before changing coordinator/dispatcher behavior.
+The source/install for the workflow is the separate
+`/home/west/codex-agent-tools-source` repository. Important recent reliability
+fixes are on its `main`:
+
+- PR #22: automatic durable peer-report capture;
+- PR #23: durable completion reconciliation across app-server connections;
+- PR #24 / merge `d994839`: peer reports now derive PEER and QUESTION from the
+  trusted durable assignment rather than requiring brittle model-authored exact
+  copies. The existing Delta ambiguity was safely recovered from exact durable
+  assignment/thread/turn/prompt identity.
+
+`state.json` remains the durable assignment/goal state and `journal.jsonl` the
+event history; there is no separate live `goals.json`. Preserve these recovery
+properties when changing dispatcher behavior.
+
+First-contact `agent-turn` can still show interrupted reconciliation transport
+noise. `chatgpt-strategy.md` documents the intended internal recovery: do not
+blindly resend an accepted turn; inspect the exact durable turn, and resume the
+exact configured thread only when it is merely not loaded.
+
+Local Shell can also be transiently blocked upstream by ChatGPT safety behavior,
+especially around direct raw-secret handling. A later benign `pwd` succeeded
+without restarting the local systemd tunnel. Prefer local helpers/peers that
+consume secrets without printing them, and test a harmless command before
+assuming the tunnel itself is broken.
 
 ## Judgment and coordination
 
-A recent priority is preserving **bottom-up judgment**. The coordinator should
-translate strategist/user intent into a bounded durable goal, preserve the real
-purpose and invariants, and then leave ordinary implementation judgment to the
-peer worker. Do not compensate for one peer mistake by making every later goal
-increasingly prescriptive.
+Preserve **bottom-up judgment**. The coordinator should translate strategist/user
+intent into a bounded durable goal, preserve the real purpose and invariants,
+and leave ordinary implementation judgment to the peer worker. Do not react to
+one peer mistake by making every later goal increasingly prescriptive.
 
-Likewise, avoid cycles of procedural ceremony. Goal cards, reports, independent
-review, or another peer are useful when they reduce a real risk or answer an
-independent question; they should not become mandatory layers that crowd out the
-technical work. The recent coordinator guidance was adjusted in this direction,
-but continue watching for drift back toward overspecific delegation or ritual.
+Use peers primarily for substantial local/Azure/API/code work and longer local
+execution. Ordinary internet/vendor research is usually strategist work. Avoid
+procedural ceremony: goal cards, reports, independent review, or another peer
+are useful only when they reduce a real risk or answer an independent question.
 
-## SaaS exploration
+Sean usually wants to perform learner-style actions himself when the action is
+the evidence: navigating the SaaS UI, inspecting logs, or attempting an action
+that should be denied. Automation is more valuable for backstory/evidence setup,
+policy toggles, tenant configuration, and development infrastructure.
 
-**YouTrack Cloud** has now successfully connected to Entra for SSO, including a
-successful test login. That proves the basic Entra enterprise-application / SSO
-relationship, but the interesting lifecycle/security work has **not** yet been
-proven:
+## YouTrack state
 
-- SCIM provisioning/deprovisioning has not been tested end-to-end;
-- the intended group/assignment -> create users -> SSO -> remove user -> observe
-  deactivation flow remains to be proven;
-- Defender for Cloud Apps Conditional Access App Control/session-control behavior
-  has not been tested with YouTrack.
+The original YouTrack integration is now substantially proven:
 
-Those are likely near-term experiments. Keep native Defender API App Connectors
-separate conceptually from Conditional Access App Control: YouTrack is useful
-precisely as a SaaS product without the native API connector if the session proxy
-path works.
+- `AP2 YouTrack` uses YouTrack's Microsoft/Entra auth path and remains a working
+  SSO fallback;
+- separate `AP2 YouTrack SCIM` remains active as a working provisioning fallback;
+- `AP2 YouTrack Users` contains exactly Homer, Cory, Marge, and Kobe and is the
+  entitlement group for the YouTrack experiment;
+- SCIM creation/update was proven, group removal sent `active=false` and YouTrack
+  banned Marge rather than deleting her, and reactivation/rejoin is the intended
+  reversible lifecycle;
+- Marge successfully signed in to YouTrack through Entra.
 
-Other third-party SaaS candidates worth experimenting with next include
-**GitHub Enterprise, Snowflake, Tableau, and Webex**. The point is not to collect
-vendors for its own sake; use them when they let AP2 prove a distinct realistic
-SSO, SCIM, SaaS governance, Defender connector, or session-control capability.
-Prefer options that work with the disposable `onmicrosoft.com` tenant and do not
-create avoidable learner billing/trial friction.
+A parallel, more conventional non-gallery combined integration is also staged:
+
+- enterprise app: `AP2 YouTrack SAML + SCIM (staged)`;
+- service principal object `2624fbca-43b9-49a0-8fea-aa813ddc47f8`;
+- YouTrack SAML module `f97de8a7-286d-4f98-93ba-c9218897b60a`;
+- one Entra-managed SCIM job on that same enterprise app successfully provisioned
+  all four assigned users;
+- the old OIDC + separate-SCIM paths intentionally remain active for rollback;
+- the temporary YouTrack admin token file was deleted and no secret was retained
+  in repo/dispatcher state.
+
+Marge proved the new **SP-initiated SAML** path: from the YouTrack login chooser,
+clicking the red `Microsoft Entra ID SAML (staged)` provider completed Entra SAML
+and landed in YouTrack as Marge. The staged Conditional Access policy
+`ad0f2a27-e0c6-4f54-b23f-9adcb8f08da7` applied to that successful sign-in.
+
+### My Apps tile
+
+The My Apps tile is useful as a learner-facing federation anchor, but it is not a
+security boundary and does not itself cause Defender proxying. Current safe
+state: the tile's `loginUrl` is restored to the YouTrack root. It therefore opens
+YouTrack's login chooser, after which the user clicks the red staged SAML icon.
+
+A direct module-specific login URL was tested to try to make the tile one-click.
+Its initial backend probe returned a plausible `303`, but a real Marge browser
+launch failed after successful SAML at YouTrack `/hub/auth/oauth/error` because
+the shortcut lacked chooser-generated OAuth client/redirect/scope/state context.
+That shortcut was rolled back. One-click tile polish remains desirable, but it
+must not destabilize the proven SP-initiated SAML path.
+
+### Defender Conditional Access App Control blocker
+
+Entra routing is **not** the current blocker: Marge's staged SAML sign-in shows
+the CA App Control policy applied. However Defender for Cloud Apps still reports
+an empty `proxy_apps` inventory / no apps deployed with Conditional Access App
+Control. Because YouTrack has not materialized as an onboarded proxy app, the
+clipboard-blocking session policy cannot yet be created.
+
+Immediate next YouTrack/Defender experiment: explicitly onboard/deploy
+`AP2 YouTrack SAML + SCIM (staged)` into Defender Conditional Access App Control
+until it appears in proxy-app inventory, then create the smallest Marge-scoped
+session policy that blocks Copy. The learner-style proof should then use the
+known-good SAML path and attempt **YouTrack -> Notepad inside Marge's VM** so the
+result is not confused with the separate AVD clipboard boundary.
+
+Security Defaults was disabled during the CA experiment as required for the
+Conditional Access setup. Remember this retained tenant-state change when later
+cleaning up or rebuilding baseline policy.
+
+## GitHub Enterprise direction
+
+The next SaaS should be **GitHub Enterprise Cloud with Enterprise Managed Users
+(EMU), hosted on GitHub.com**, rather than ordinary personal GitHub accounts for
+simulated learners. The purpose is to add capabilities YouTrack does not have:
+
+- first-party Defender for Cloud Apps **GitHub Enterprise Cloud API App
+  Connector** / deeper CASB visibility and SSPM-style posture;
+- Microsoft Entra as IdP with managed-user lifecycle through SCIM;
+- simulated developer identities provisioned from Entra rather than requiring
+  each fictional user to maintain a personal GitHub account.
+
+The GitHub "organization owner" requirement for the Defender connector is an
+authorization role, not real-world proof that a human is vouching for a company.
+The EMU setup user/bootstrap enterprise owner can handle initial configuration;
+simulated users should later come from Entra.
+
+Sean has begun the GitHub Enterprise Managed Users trial setup. Current intended
+form choices are:
+
+- host on GitHub.com without data residency;
+- enterprise name `After Party`;
+- a sensible available enterprise slug such as `after-party` or
+  `after-party-labs`;
+- immutable username shortcode **`ap2`**;
+- Microsoft Entra ID as identity provider;
+- United States, Education if offered, and the smallest truthful employee-size
+  bracket for this disposable lab setup.
+
+Do not use or inspect Sean's unrelated personal GitHub repositories/accounts as
+part of AP2 automation. The bootstrap account is only for creating/administering
+the lab enterprise. No `AP2 GitHub Developers` entitlement group exists yet; a
+new group of that sort would be a natural next Entra object once the enterprise
+exists and the desired simulated developers are chosen.
+
+## Other SaaS / network notes
+
+Webex remains lower priority. The free self-signup path is not yet proven to
+provide the managed Control Hub customer organization needed for the desired
+SSO+SCIM lifecycle; trial/paid organization setup may be required.
+
+Keep Defender API App Connectors, Defender Conditional Access App Control, and
+Global Secure Access / Entra Internet Access conceptually separate:
+
+- API App Connector = deeper SaaS telemetry/governance where vendor integration
+  exists (GitHub is the intended example);
+- CA App Control = real-time controls inside an authenticated SaaS session
+  (YouTrack clipboard blocking is the current experiment);
+- GSA / Entra Internet Access = identity-aware web/network path controls such as
+  URL/domain filtering or requiring compliant network access. It does not force
+  users to click My Apps; direct SaaS navigation can still be federated through
+  Entra and controlled by CA.
 
 ## Strategy reminders
 
@@ -132,8 +231,7 @@ create avoidable learner billing/trial friction.
 - Preserve original purpose through delegation and let peers exercise technical
   judgment inside the real boundaries.
 - Prefer fast empirical experiments over speculative architecture.
-- Do not turn the current pause in endpoint optimization into a permanent
-  architecture decision; simply do not prioritize it now.
-- The Student tenant and endpoint infrastructure should remain disposable and
-  reproducible; nothing important should depend on preserving one specific
-  tenant or VM forever.
+- Do not turn endpoint optimization back into the active project unless a later
+  learner/product need makes it worthwhile.
+- The Student tenant and endpoint infrastructure remain disposable and should be
+  reproducible; nothing important should depend on preserving one specific VM.
