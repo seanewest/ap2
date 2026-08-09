@@ -65,7 +65,10 @@ Prefer delegated simulated-user identities for user-like actions, such as
 sending email or Teams messages.
 
 Use Entra user certificate-based auth (CBA) when fresh login is required, with
-a separate token cache per simulated user.
+a separate token cache per simulated user. Treat the live membership of the
+`AP2 Simulated User CBA` Entra group as the authority for which simulated users
+currently have CBA enabled; do not infer current membership from a static list
+in this repository.
 
 Use the runtime managed identity for other backend operations.
 

@@ -86,25 +86,26 @@ temporary or attempted observer identities are excluded.
 
 ## CBA and protected references
 
-CBA is enabled for exactly two static security groups: the dedicated SPA
-operator alone, and Cory/Homer/Kobe/Marge together. It uses high-affinity
-Subject Key Identifier mapping to one `certificateUserIds` value per identity,
-multi-factor mode, no custom rules, no exclusions, no issuer hints, and no CRL
-validation.
+CBA is enabled through two security groups: the dedicated SPA operator group
+and `AP2 Simulated User CBA`. The live Entra membership of the simulated-user
+group is authoritative; this document intentionally does not duplicate its
+current user list. CBA uses high-affinity Subject Key Identifier mapping to one
+`certificateUserIds` value per enabled identity, multi-factor mode, no custom
+rules, no exclusions, no issuer hints, and no CRL validation.
 
 Reconstruction generates new roots, leaf certificates, encrypted keys, PFX
 files, passphrases, SKIs, and protected reference records. Leaf subjects are the
 user display names and SAN email values are their fresh UPNs. The observed
 simulated-user issuer convention, `After Party Lisa CBA Proof CA`, has a
-historical name but currently backs all four supported simulated users, so it is
-preserved as a naming convention without reconstructing the Lisa user or old
-CBA group. No old certificate or fingerprint is copied.
+historical name but backs the simulated-user CBA identities, so it is preserved
+as a naming convention without reconstructing the Lisa user or old CBA group.
+No old certificate or fingerprint is copied.
 
 Private artifacts remain outside Git in mode-0700 directories with mode-0600
 private files. Validate chain and key match, validity, unique SKI mappings,
 policy and group shape, then run one fresh nonpersistent CBA `/me` sign-in for
-each of the five CBA identities. The SPA remains a public client and receives no
-backend credential.
+each identity that is expected to be CBA-enabled. The SPA remains a public
+client and receives no backend credential.
 
 ## Azure runtime and rehearsal shape
 
