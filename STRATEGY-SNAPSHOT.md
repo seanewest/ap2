@@ -97,10 +97,18 @@ the timeout-safe submit/result contract. The dedicated Secure MCP Tunnel is
 and healthy and is separate from the existing Local Codex/Local Shell tunnel.
 
 This bridge is new. Expect possible small integration kinks and prefer diagnosing
-its bounded tool behavior over falling immediately back to raw shell. Local
-Shell remains useful for genuinely general machine work, but it has also shown
-intermittent upstream safety/connector failures; the separate tunnels should
-avoid tool-schema cross-talk between the two custom apps.
+its bounded tool behavior over falling immediately back to raw shell. One known
+boundary: repository tools can safely read/write allowlisted text but do not
+commit/push; the strategist can own wording through the bridge and use a
+coordinator turn for a mechanical publish when needed. The first real handoff
+used exactly that pattern successfully.
+
+Local Shell remains useful for genuinely general machine work, but at this
+handoff its old `Local Codex` MCP tunnel returned HTTP 404 from ChatGPT. Do not
+block strategy work on that: Durable Coordinator covers the routine strategist
+surface. Repair/restart the Local Shell tunnel separately if broad shell access
+is later needed. The separate tunnels should prevent tool-schema cross-talk
+between the two custom apps.
 
 For a replacement strategist, read `codex-agent-tools` `README.md` and
 `AGENTS.md` after the AP2 strategy docs, then use Durable Coordinator to inspect
