@@ -76,13 +76,13 @@ and connected as the **Durable Coordinator** custom app. This should be the
 replacement strategist's normal control/observation surface instead of arbitrary
 Local Shell whenever possible.
 
-It exposes a bounded 12-tool surface for:
+It exposes a bounded 13-tool surface for:
 
 - workflow status, durable goals/reports/state/journal;
 - recent coordinator or peer messages;
 - timeout-safe durable coordinator turn submission plus exact later result
   reconciliation/cached retrieval;
-- allowlisted repository text reads and race-aware conditional writes.
+- allowlisted repository text reads, race-aware conditional whole-file writes, and targeted unique exact-text replacement with prior-version compare-and-swap.
 
 The timeout-safe coordinator contract matters: the older workflow sometimes
 looked ambiguous when the ChatGPT Local Shell caller stopped waiting after five
@@ -95,6 +95,8 @@ the timeout-safe submit/result contract. The dedicated Secure MCP Tunnel is
 **Durable Coordinator**, tunnel ID
 `tunnel_6a792321dee08191bc9f4a3e3170f636`. Its local profile/service is enabled
 and healthy and is separate from the existing Local Codex/Local Shell tunnel.
+
+PR #27 / release `798fe93` added the targeted `repository_edit_text` operation. It replaces one unique exact-text match without requiring the caller to resend the whole file, still requires the SHA-256 from a prior read, and fails closed on stale source, ambiguous targeting, path violations, or symlinks.
 
 This bridge is new. Expect possible small integration kinks and prefer diagnosing
 its bounded tool behavior over falling immediately back to raw shell. One known
@@ -149,16 +151,11 @@ The current session policy is intentionally narrow: Marge + JetBrains YouTrack +
 Cut/Copy -> block. Ordinary visible YouTrack text is enough for the proof; the
 policy is not merely detection-only.
 
-### My Apps tile remains two-step
+### My Apps tile is now one-click
 
-The learner-facing My Apps tile still opens the YouTrack login chooser rather
-than jumping straight through the staged SAML provider. A direct module-specific
-shortcut was previously tested and rolled back because a browser launch lacked
-chooser-generated OAuth context and failed after SAML at YouTrack.
+The learner-facing launch is now live-proven as a smooth My Apps -> authenticated/proxied YouTrack path. Beta made the proven staged SAML module YouTrack's default authentication provider, so the existing root-targeting My Apps tile generates the SP-initiated SAML request automatically rather than opening the provider chooser. Sean then tested a fresh Marge InPrivate session: one tile click reached the authenticated YouTrack workspace on the `.mcas.ms` reverse-proxy origin with no red-provider clicks, and the existing Cut/Copy block still applied.
 
-Sean still finds the extra red-provider click inelegant. Treat one-click launch
-as optional polish, not as a reason to destabilize the now-proven SAML + CAAC
-path.
+The earlier failed direct module-specific shortcut remains useful evidence: bypassing the normal root launch lacked chooser-generated OAuth context and failed after SAML. The successful solution did not require that brittle shortcut; it preserved the root launch and changed the application's default authentication-provider behavior instead.
 
 ## GitHub Enterprise / EMU state
 
@@ -183,46 +180,15 @@ The special GitHub EMU setup account `ap2_admin` is distinct from `admin_ap2`.
 email used to bootstrap the enterprise; normal enterprise administration is
 being done by the SCIM-managed `admin_ap2` account.
 
-### Defender GitHub API App Connector blocker
+### Defender GitHub API App Connector connected
 
-An organization-owned OAuth app named **`AP2 Defender Connector`** exists under
-`ap2-v2-lab` with the Microsoft Defender callback URL. One protected client
-secret remains. Defender itself still has **no working GitHub connector** and no
-matching GitHub `CloudAppEvents` because GitHub OAuth consent could not be
-completed.
+The Microsoft Defender for Cloud Apps GitHub API App Connector is now connected. Earlier agent-driven browser attempts had repeatedly observed a disabled GitHub OAuth-consent control for the verified managed Enterprise Owner `admin_ap2`, even after several reasonable scope/session/restriction checks. Read-only role verification later showed that `admin@corywest.onmicrosoft.com` already had permanent Global Administrator and therefore was not missing Defender connector authority; `after-party-operator@corywest.onmicrosoft.com` is a second permanent human Global Administrator.
 
-Gamma's final live result: GitHub server-rendered OAuth consent remained disabled
-for the verified managed Enterprise Owner `admin_ap2`, even after session
-refresh, multiple scope combinations (including effectively no scopes), GitHub
-CLI's OAuth client, and a temporary test with organization OAuth restrictions
-relaxed. Restrictions were restored afterward. Do not keep burning turns on
-browser retries without a new hypothesis.
+Sean then manually completed the Defender/GitHub connector flow successfully. Therefore the prior disabled-consent observation must not be carried forward as an EMU/platform blocker or as evidence that a dedicated organization-owner identity is required. The exact reason the agent-controlled browser saw a disabled control remains unknown. This is a useful operating lesson: prefer supported API/CLI paths where available, use straightforward supported browser automation when it works, and hand genuinely tricky interactive browser edge cases to Sean rather than overfitting architecture or identity around an automation failure.
 
-A plausible explanation is GitHub sudo-mode / EMU interaction: managed users do
-not hold GitHub-native credentials, while sensitive OAuth authorization may
-require reauthentication. This is a hypothesis, not yet a proven general rule;
-GitHub documentation also refers to OAuth app authorizations associated with
-managed users, so "EMU users cannot authorize OAuth apps" is too broad a
-conclusion.
+Treat connector creation and connector telemetry as separate claims. The connector itself is now proven connected; matching GitHub `CloudAppEvents` or other ingested Defender evidence should be recorded only after it is actually observed.
 
-### GitHub next experiment to remember
-
-Before assuming the entire EMU + Defender connector combination is broken, try a
-cleaner managed identity experiment:
-
-- provision a dedicated managed **organization-owner** identity for
-  `ap2-v2-lab`;
-- do **not** make it Enterprise Owner;
-- attempt the base Defender connector with organization-level scopes and omit
-  `read:enterprise` / SSPM initially.
-
-This tests whether the disabled-consent behavior is tied to the enterprise-owner
-/ enterprise-scope path. If it still fails, a GitHub Enterprise Support case is
-much more justified. Sean also wants to inspect the supposedly-impossible OAuth
-flow manually before treating the support escalation as settled.
-
-Do not make Cory or other simulated learner identities special merely because
-they are convenient test accounts.
+Do not make Cory or other simulated learner identities special merely because they are convenient test accounts.
 
 ## Other SaaS / network notes
 
@@ -248,7 +214,10 @@ proven on the free path.
 - Preserve original purpose through delegation and let peers exercise technical
   judgment inside real boundaries.
 - Prefer supported API/CLI paths first, straightforward supported browser UI
-  second, and brittle/private workarounds last.
+  second, and brittle/private workarounds last. When a supported interactive
+  browser edge case resists automation without a clear technical reason, a
+  bounded human step is preferable to reshaping the architecture around the
+  automation failure.
 - Learner-style actions that are themselves the evidence are good manual Sean
   actions; backstory/configuration/policy setup should be automated where
   reasonably possible.
