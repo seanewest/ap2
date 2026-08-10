@@ -1,228 +1,288 @@
-# Strategy snapshot — 2026-08-09
+# Strategy snapshot — 2026-08-10
 
 This is a point-in-time orientation artifact for a replacement strategy session
 or read-only observer. It is **not** live execution state. Use the Durable
-Coordinator MCP bridge or the coordinator's durable state for current execution
-status. Canonical project documents remain authoritative for durable product and
-workflow rules.
+Coordinator MCP bridge for current peer/goal/report status. Canonical project
+documents remain authoritative for durable product and workflow rules.
 
 Completed capability evidence belongs in `docs/proven-capabilities.md`; durable
-product and agent-workflow rules belong in `AGENTS.md` and the focused strategy
-documents.
+product and workflow rules belong in `AGENTS.md` and the focused strategy docs.
 
 ## Strategic frontier
 
-AP2 is still in capability exploration. The current frontier is third-party SaaS
-identity/security integration rather than more AVD timing optimization.
+AP2 is still in capability exploration. The current work is increasingly about
+how identity, endpoint, SaaS, Defender, and network controls can each contribute
+small deterministic facts that can later compose into realistic incident
+backgrounds and learning environments.
 
-Two complementary SaaS paths are now clear:
+The useful mental model remains:
 
-- **YouTrack** proves a non-gallery Entra SSO + SCIM lifecycle and a genuine
-  Defender for Cloud Apps Conditional Access App Control session-control path.
-- **GitHub Enterprise Cloud with Enterprise Managed Users** has proven Entra
-  OIDC + SCIM managed-user lifecycle and enterprise administration. The open
-  question is the first-party Defender for Cloud Apps GitHub API App Connector.
+**capability -> scenario -> incident background -> future detect/prevent/respond learning**
+
+Do not jump ahead into generalized lab design. Continue proving small technical
+primitives that could later create or expose authentic incident state.
+
+The strongest current threads are:
+
+- **YouTrack / Defender Conditional Access App Control:** authenticated SaaS
+  session controls, now beyond clipboard blocking toward differentiated download
+  behavior and protected downloads.
+- **GitHub Enterprise Cloud / Defender API App Connector:** native SaaS telemetry
+  is now proven in Defender `CloudAppEvents`.
+- **Global Secure Access / Entra Internet Access:** network-layer controls that do
+  not depend on the destination SaaS integrating with Microsoft are now proving
+  useful.
+- **Endpoint / Shadow IT:** MDE -> Defender for Cloud Apps discovery is being
+  enabled/proven as a separate endpoint telemetry path.
+- **Agent infrastructure:** after a serious host-memory crash, Sean is strongly
+  considering moving the long-lived coordinator/agent environment from WSL to
+  a Proxmox CT so the laptop can sleep without disrupting work.
 
 The SPA remains Sean's internal capability notebook/operator console, not the
-learner product or a generalized lab framework. Continue favoring small,
-decisive capability experiments over infrastructure or ceremony that is not
-needed to answer the current question.
+learner product or a generalized lab framework.
+
+## Current capability evidence and open edges
+
+### GitHub Enterprise / Defender connector
+
+The `ap2-v2` GitHub Enterprise Cloud EMU environment is real and usable:
+
+- Entra OIDC SSO and SCIM lifecycle work;
+- managed account `admin_ap2` is Enterprise Owner;
+- organization `ap2-v2-lab` exists with attributable lab activity;
+- Sean manually completed the Microsoft Defender for Cloud Apps GitHub API App
+  Connector after agent-controlled browser attempts incorrectly appeared blocked
+  by a disabled OAuth-consent control.
+
+The connector is now **telemetry-proven**, not merely connected. Defender
+`CloudAppEvents` contains a GitHub `repo.create` for
+`ap2-v2-lab/defender-connector-proof` attributable to `admin_ap2`; GitHub's
+organization audit log independently records the same action/repository and
+millisecond timestamp.
+
+This establishes a useful distinction from a SaaS app with only SSO/SCIM or
+browser proxying: GitHub can contribute SaaS-native audit/activity evidence to
+Defender regardless of whether the action came through the Defender session
+proxy.
+
+The earlier disabled-consent observation must not be treated as an EMU/platform
+blocker. It is a reminder that supported browser automation can still hit odd
+interactive edges; API/CLI remains preferable, and a bounded human browser step
+is better than redesigning identity or architecture around an automation failure.
+
+### YouTrack / Conditional Access App Control
+
+The core YouTrack path remains proven:
+
+- non-gallery Entra SAML + SCIM lifecycle works;
+- the staged SAML provider is YouTrack's default authentication provider;
+- My Apps can launch directly into the authenticated YouTrack path without the
+  former red-provider chooser clicks;
+- Defender Conditional Access App Control has produced a genuine controlled
+  session and explicitly blocked ordinary Cut/Copy.
+
+A new, more realistic session-control experiment is in progress: **Cory as a
+normal internal user should be able to download a harmless attachment while
+Marge as a restricted support/vendor-style user is blocked from downloading the
+same attachment**, with no managed/unmanaged-device premise.
+
+Beta had staged Cory as monitor-only and Marge as FileDownload-block, but Sean's
+first live retest exposed a regression: both Cory and Marge reached YouTrack but
+could not access Issues, and Edge prompted for Entra authentication more than
+expected. Beta currently owns repair/reconciliation of that learner access/session
+path. Do not keep manually retrying until Beta reports a clean retest path.
+
+Sean normally uses separate managed Edge work profiles for Cory, Kobe, Marge,
+and admin on his personal Windows machine. InPrivate is not inherently required
+for CA App Control tests; separate browser profiles provide clean identity/session
+separation. Managed Edge may use Defender in-browser protection rather than a
+visible `.mcas.ms` origin, so the enforcement outcome matters more than the URL
+shape for those tests.
+
+Two existing encrypted Purview sensitivity labels are already published,
+synchronized, and visible in Defender's Protect-download selector:
+
+- `Confidential-All Employees`
+- `Highly Confidential-All Employees`
+
+No new label publication/propagation is needed. Epsilon currently owns a proof
+that Defender can allow a supported YouTrack Office/PDF download while applying
+one of those existing encrypted labels to the downloaded copy without changing
+the SaaS original.
+
+### Global Secure Access / Entra Internet Access
+
+A meaningful network-layer exfiltration-prevention capability is now **proven**.
+On Kobe's managed endpoint, ordinary HTTPS access to the benign external test
+destination remained allowed (`GET 200`) while GSA blocked the same harmless PDF
+upload (`POST 403`). GSA transaction evidence attributed the block to Kobe, the
+managed device, the intended security profile/content rule, and TLS inspection.
+The temporary proof configuration and endpoint artifacts were then removed and
+the VM deallocated.
+
+This is a useful GSA primitive because the destination does not need Entra SSO,
+SCIM, Defender API integration, or AP2 integration. Enforcement occurs at the
+identity-aware network layer.
+
+A separate Universal CAE containment experiment did **not** prove the desired
+behavior. Gamma disabled Kobe exactly once after establishing working GSA-routed
+access; roughly 100 seconds later Kobe-owned requests still returned HTTP 200.
+Kobe was restored immediately and remains enabled/licensed. The result cannot
+distinguish propagation delay from a client/token path that was not CAE-capable.
+Do not simply repeat the disable/wait cycle. Any retest should first establish
+that the relevant GSA client/token state is actually capable of the Universal
+CAE challenge being tested.
+
+### Endpoint Shadow IT / Cloud Discovery
+
+A simple signed-out ChatGPT visit from Kobe's Defender-managed endpoint was used
+as the modern Shadow IT canary. The first attempt established that the Defender
+for Endpoint -> Defender for Cloud Apps integration itself was **Off**, so there
+was no MDE Cloud Discovery stream. Alpha stopped there too conservatively; this
+was a fixable supported prerequisite rather than a human blocker.
+
+Alpha currently owns the corrected goal: enable the documented MDE integration
+and then prove that Kobe's ChatGPT usage appears in Defender for Cloud Apps Cloud
+Discovery with user/device/app/time attribution through the MDE source. Keep
+this separate from GSA discovery/enforcement.
 
 ## Endpoint / AVD state
 
-Recent timing work established a useful learner-side calibration for a genuinely
-fresh generalized-image Marge endpoint:
+Fresh generalized-image AVD timing remains adequately calibrated:
 
 - fresh deployment -> learner connection accepted: about **9m00s**;
 - fresh deployment -> genuinely usable desktop: about **11m13s**;
-- the final Windows `Welcome` / first-profile phase was about **2m13s**.
+- final Windows Welcome/first-profile phase: about **2m13s**.
 
-Earlier clean raw-marketplace runs were roughly **14-15 minutes** to visible
-usable desktop. Do not restart endpoint optimization unless a later learner or
-product need makes it worthwhile.
+Do not restart AVD timing optimization unless a real learner/product need makes
+it worthwhile. Endpoint infrastructure remains disposable and reproducible.
 
-The retained Marge endpoint has been used for the live YouTrack/Defender proof.
-Verify current Azure power state when it matters rather than relying on this
-snapshot. The live `AP2 Simulated User CBA` Entra group remains authoritative
-for current simulated-user CBA membership.
+The GSA upload/CAE experiments used Kobe's AVD endpoint and returned it to a
+deallocated state after cleanup. Verify live Azure power state when it matters.
 
-An unrelated AVD clipboard annoyance was observed earlier: VM -> local Windows
-clipboard worked while local Windows -> VM paste did not. Keep that conceptually
-separate from Defender browser/session clipboard controls.
+## Host crash, resource controls, and infrastructure direction
 
-## Coordinator / peer workflow
+On 2026-08-10 Sean's Dell Precision 5770 suffered a severe Windows crash after
+host-wide commit exhaustion. Windows recorded **63.588 GiB committed against a
+63.692 GiB limit** immediately before the crash; WSL then reported memory
+pressure, Windows shell/graphics components faulted, the host bugchecked with
+`0x7E`, and NTFS repair ran on reboot. No decisive hardware/WHEA error was found.
 
-The current Codex team is `AP2 Coordinator` plus durable peers Alpha through
-Epsilon. All five peers are **AVAILABLE** as of this snapshot.
+WSL/Codex likely contributed but cannot explain the full 63.6 GiB host commit:
+WSL had only about 7.6 GiB guest RAM plus 2 GiB swap. Surviving Windows telemetry
+did not preserve the top commit consumer, so the exact host-side culprit is
+unknown.
 
-Preserve **bottom-up judgment**. A peer owns the outcome, not a checklist or a
-proposed implementation. Goal cards should not repeat standing project rules or
-remembered prior mistakes; task-specific constraints are only facts that truly
-narrow what counts as a valid answer. A reversible change of means inside the
-same goal is not escalation.
+Two safeguards are now installed:
 
-Recent workflow/doc changes reinforced this after repeated over-specification
-caused agents to treat implementation details as contracts. The generic durable
-peer prompt in `codex-agent-tools` was also shortened so it no longer injects
-large standing judgment/completion paragraphs into every assignment.
+1. `codex-app-server.service` has an active systemd cgroup guardrail:
+   - `MemoryHigh=4G`
+   - `MemoryMax=5G`
+   - `MemorySwapMax=1G`
+2. Windows has a built-in PerfMon/logman collector `Host Memory Commit History`
+   sampling every 15 seconds. It records commit/pagefile/kernel-pool and
+   per-process private-memory counters into bounded circular BLGs:
+   - current boot: `C:\ProgramData\HostDiagnostics\MemoryCommit\memory-commit.blg`
+   - previous boot: `memory-commit-previous.blg`
+   - 256 MiB cap each, with startup rotation, so ongoing retention is bounded.
 
-`state.json` remains the durable assignment/goal state and `journal.jsonl` the
-event history; there is no separate live `goals.json`.
+The memory guardrail was applied live without restarting the app server.
 
-### New Durable Coordinator MCP bridge
+### Proxmox direction
 
-A new project-agnostic ChatGPT MCP bridge in `codex-agent-tools` is now installed
-and connected as the **Durable Coordinator** custom app. This should be the
-replacement strategist's normal control/observation surface instead of arbitrary
-Local Shell whenever possible.
+Sean is strongly interested in making the coordinator/agent environment
+independent of his Windows laptop so the laptop can sleep without interrupting
+long-running work. The likely first experiment is **not** a distributed cluster;
+it is a straightforward migration of the current long-lived stack into one
+Proxmox LXC CT:
 
-It exposes a bounded 13-tool surface for:
+- Codex app-server;
+- coordinator and peer threads;
+- `codex-agent-tools` dispatcher/durable state;
+- Durable Coordinator Secure MCP Tunnel;
+- AP2 repositories/worktrees and required local tooling.
 
-- workflow status, durable goals/reports/state/journal;
-- recent coordinator or peer messages;
-- timeout-safe durable coordinator turn submission plus exact later result
-  reconciliation/cached retrieval;
-- allowlisted repository text reads, race-aware conditional whole-file writes, and targeted unique exact-text replacement with prior-version compare-and-swap.
+Sean prefers CTs over full VMs. AP2 agents sometimes run containers during
+backend/sign-in testing, so nested-container capability inside an unprivileged
+Proxmox CT must be tested explicitly before committing to the migration.
 
-The timeout-safe coordinator contract matters: the older workflow sometimes
-looked ambiguous when the ChatGPT Local Shell caller stopped waiting after five
-seconds even though `agent-turn` had already submitted the coordinator turn.
-The new MCP bridge separates fast durable submission from later result retrieval,
-so caller timeout should no longer create that uncertainty.
+A related idea is for AP2 itself to define a reproducible **agent development
+environment** containing project dependencies such as Azure CLI, GitHub CLI,
+Node/Python, Playwright/browser dependencies, PowerShell where needed, etc.,
+while Codex/app-server and `codex-agent-tools` remain host/runtime concerns.
+That could make AP2 work portable across WSL, Proxmox, and later other spare
+machines. Do not design a large distributed scheduler yet; prove a single CT can
+run ordinary AP2 agent work, including one existing container-based AP2 workflow,
+first.
 
-`codex-agent-tools` PR #25 shipped the bridge; PR #26 / merge `b090cde` shipped
-the timeout-safe submit/result contract. The dedicated Secure MCP Tunnel is
-**Durable Coordinator**, tunnel ID
-`tunnel_6a792321dee08191bc9f4a3e3170f636`. Its local profile/service is enabled
-and healthy and is separate from the existing Local Codex/Local Shell tunnel.
+Longer term, Sean also has spare compute (a 16 GiB Proxmox host, an unused Intel
+Mac with 16 GiB, other laptops, custom router/managed switch). A multi-node agent
+pool may eventually be worthwhile, but the first useful infrastructure question
+is simply whether the current WSL control/agent environment can move cleanly to
+Proxmox and stay available while the laptop sleeps.
 
-PR #27 / release `798fe93` added the targeted `repository_edit_text` operation. It replaces one unique exact-text match without requiring the caller to resend the whole file, still requires the SHA-256 from a prior read, and fails closed on stale source, ambiguous targeting, path violations, or symlinks.
+## Coordinator / Durable Coordinator state
 
-This bridge is new. Expect possible small integration kinks and prefer diagnosing
-its bounded tool behavior over falling immediately back to raw shell. One known
-boundary: repository tools can safely read/write allowlisted text but do not
-commit/push; the strategist can own wording through the bridge and use a
-coordinator turn for a mechanical publish when needed. The first real handoff
-used exactly that pattern successfully.
+The project uses one configured coordinator plus durable peers Alpha through
+Epsilon. `state.json` is the durable assignment/goal/report source of truth and
+`journal.jsonl` is event history; there is no separate live `goals.json`.
 
-Local Shell remains useful for genuinely general machine work, but at this
-handoff its old `Local Codex` MCP tunnel returned HTTP 404 from ChatGPT. Do not
-block strategy work on that: Durable Coordinator covers the routine strategist
-surface. Repair/restart the Local Shell tunnel separately if broad shell access
-is later needed. The separate tunnels should prevent tool-schema cross-talk
-between the two custom apps.
+The **Durable Coordinator** custom app is the strategist's normal control surface.
+The dedicated Secure MCP Tunnel is
+`tunnel_6a792321dee08191bc9f4a3e3170f636`.
 
-For a replacement strategist, read `codex-agent-tools` `README.md` and
-`AGENTS.md` after the AP2 strategy docs, then use Durable Coordinator to inspect
-live workflow state before dispatching anything.
+`codex-agent-tools` now exposes 13 MCP operations, including
+`repository_edit_text`, which performs unique exact-text replacement using the
+SHA-256 from a prior read and fails closed on stale/ambiguous/racing targets.
+The ChatGPT plugin must be explicitly **refreshed** after MCP tool-schema changes;
+restarting the tunnel alone does not refresh the already-registered action list.
+A fresh ChatGPT session after refresh can see the 13th function.
 
-## YouTrack state — CA App Control proven
+PR #25 introduced the bridge, PR #26 added timeout-safe durable coordinator
+submit/result reconciliation, PR #27 added targeted repository editing, and PR
+#28 changed MCP `serverInfo.version` to `2.0.0` as a cache experiment. The
+version change did not automatically refresh ChatGPT's action catalog; the UI
+Refresh action did.
 
-The YouTrack identity lifecycle is proven:
+Repository tools can edit allowlisted text but still do not commit/push. The
+strategy session should own canonical wording and use a coordinator turn only
+for the mechanical commit/push when needed.
 
-- original OIDC SSO fallback remains working;
-- separate SCIM fallback remains working;
-- combined non-gallery `AP2 YouTrack SAML + SCIM (staged)` successfully
-  provisions the assigned simulated users through Entra SCIM;
-- removal from provisioning scope deactivates/bans rather than deletes the
-  YouTrack user, and reactivation is reversible;
-- Marge successfully signs in through the staged Entra SAML provider.
+At this handoff, several peer goals are or recently were active. **Do not rely on
+this snapshot for their lifecycle. Inspect Durable Coordinator live state first.**
+The most important known questions are:
 
-The Defender Conditional Access App Control experiment is now **end-to-end
-proven**. The final successful Marge path was:
-
-1. fresh Edge InPrivate on the retained Marge endpoint;
-2. My Apps staged YouTrack tile;
-3. red staged SAML provider;
-4. Defender monitored-access page and `.mcas.ms` reverse-proxy origin;
-5. a second proxied YouTrack login chooser, then the red staged SAML provider
-   once more;
-6. Marge's YouTrack workspace remained on `.mcas.ms`;
-7. Defender explicitly blocked an ordinary Cut/Copy action.
-
-Earlier failed clipboard tests were useful diagnostics rather than policy
-semantics: one failure came from Marge still being a Defender onboarding /
-maintenance user (`BypassProxy`), and another from having used Defender's
-Non-MS-IdP onboarding shape for an Entra-authenticated app. Beta corrected those
-premises, restored the native Entra-authenticated SAML shape, and the final
-reverse-proxy proof succeeded.
-
-The current session policy is intentionally narrow: Marge + JetBrains YouTrack +
-Cut/Copy -> block. Ordinary visible YouTrack text is enough for the proof; the
-policy is not merely detection-only.
-
-### My Apps tile is now one-click
-
-The learner-facing launch is now live-proven as a smooth My Apps -> authenticated/proxied YouTrack path. Beta made the proven staged SAML module YouTrack's default authentication provider, so the existing root-targeting My Apps tile generates the SP-initiated SAML request automatically rather than opening the provider chooser. Sean then tested a fresh Marge InPrivate session: one tile click reached the authenticated YouTrack workspace on the `.mcas.ms` reverse-proxy origin with no red-provider clicks, and the existing Cut/Copy block still applied.
-
-The earlier failed direct module-specific shortcut remains useful evidence: bypassing the normal root launch lacked chooser-generated OAuth context and failed after SAML. The successful solution did not require that brittle shortcut; it preserved the root launch and changed the application's default authentication-provider behavior instead.
-
-## GitHub Enterprise / EMU state
-
-The lab GitHub Enterprise Cloud EMU environment is now real and substantially
-proven:
-
-- enterprise slug: **`ap2-v2`**;
-- Entra OIDC SSO works;
-- Entra SCIM provisioning works;
-- `admin@corywest.onmicrosoft.com` is provisioned as managed GitHub account
-  **`admin_ap2`** with **Enterprise Owner** through the existing IdP/SCIM path;
-- Cory remains an ordinary simulated managed user rather than an administrator;
-- isolated CLI wrapper **`gh-ap2`** uses its own `GH_CONFIG_DIR` and is separate
-  from Sean's normal personal `gh` profile;
-- managed `admin_ap2` created organization **`ap2-v2-lab`** through GitHub's
-  supported enterprise GraphQL API;
-- attributable lab activity exists, including a proof repository/issue and
-  organization audit events.
-
-The special GitHub EMU setup account `ap2_admin` is distinct from `admin_ap2`.
-`ap2_admin` is the GitHub setup/recovery identity originally associated with the
-email used to bootstrap the enterprise; normal enterprise administration is
-being done by the SCIM-managed `admin_ap2` account.
-
-### Defender GitHub API App Connector connected
-
-The Microsoft Defender for Cloud Apps GitHub API App Connector is now connected. Earlier agent-driven browser attempts had repeatedly observed a disabled GitHub OAuth-consent control for the verified managed Enterprise Owner `admin_ap2`, even after several reasonable scope/session/restriction checks. Read-only role verification later showed that `admin@corywest.onmicrosoft.com` already had permanent Global Administrator and therefore was not missing Defender connector authority; `after-party-operator@corywest.onmicrosoft.com` is a second permanent human Global Administrator.
-
-Sean then manually completed the Defender/GitHub connector flow successfully. Therefore the prior disabled-consent observation must not be carried forward as an EMU/platform blocker or as evidence that a dedicated organization-owner identity is required. The exact reason the agent-controlled browser saw a disabled control remains unknown. This is a useful operating lesson: prefer supported API/CLI paths where available, use straightforward supported browser automation when it works, and hand genuinely tricky interactive browser edge cases to Sean rather than overfitting architecture or identity around an automation failure.
-
-Treat connector creation and connector telemetry as separate claims. The connector itself is now proven connected; matching GitHub `CloudAppEvents` or other ingested Defender evidence should be recorded only after it is actually observed.
-
-Do not make Cory or other simulated learner identities special merely because they are convenient test accounts.
-
-## Other SaaS / network notes
-
-Keep Defender API App Connectors, Defender Conditional Access App Control, and
-Global Secure Access / Entra Internet Access conceptually separate:
-
-- API App Connector = deeper SaaS telemetry/governance where vendor integration
-  exists (GitHub is the intended example);
-- CA App Control = real-time controls inside an authenticated SaaS session
-  (YouTrack Cut/Copy blocking is now the proven example);
-- GSA / Entra Internet Access = identity-aware web/network path controls such as
-  URL/domain filtering or requiring compliant network access.
-
-Webex remains lower priority; a managed Control Hub organization is not yet
-proven on the free path.
+- Alpha: enable MDE -> Defender for Cloud Apps integration and prove Kobe/ChatGPT
+  Cloud Discovery attribution;
+- Beta: repair Cory/Marge YouTrack issue access and repeated-authentication
+  behavior while preserving differentiated download policy;
+- Epsilon: prove Purview-protected YouTrack download using an existing encrypted
+  label;
+- Delta's GSA PDF-upload block is already proven and cleaned up;
+- Gamma's Universal CAE containment attempt did not prove enforcement and should
+  not simply be repeated without verifying CAE-capable client/token state.
 
 ## Strategy reminders
 
 - Inspect Durable Coordinator live state before acting; this snapshot is not a
   live docket.
-- Strategist co-creates goals with Sean; the coordinator executes approved work
-  through peers.
-- Preserve original purpose through delegation and let peers exercise technical
-  judgment inside real boundaries.
+- Strategist co-creates goals with Sean; coordinator executes approved work
+  through durable peers.
+- Preserve the original purpose and let peers exercise bottom-up technical
+  judgment. A fixable prerequisite is normally something to fix and continue,
+  not a reason to stop and ask Sean.
 - Prefer supported API/CLI paths first, straightforward supported browser UI
-  second, and brittle/private workarounds last. When a supported interactive
-  browser edge case resists automation without a clear technical reason, a
-  bounded human step is preferable to reshaping the architecture around the
-  automation failure.
+  second, and brittle/private workarounds last. For genuinely tricky interactive
+  browser edges, a bounded human step is preferable to architecture changes or
+  hours of automation struggle.
 - Learner-style actions that are themselves the evidence are good manual Sean
-  actions; backstory/configuration/policy setup should be automated where
-  reasonably possible.
+  actions; configuration/backstory should be automated when that is actually
+  efficient.
+- Avoid tight polling around Microsoft propagation. Use bounded waits and later
+  observations; do not interpret silence as failure prematurely.
 - Prefer fast empirical experiments over speculative architecture.
-- Do not turn endpoint optimization back into the active project unless a later
-  learner/product need makes it worthwhile.
-- The Student tenant and endpoint infrastructure remain disposable and should be
-  reproducible; nothing important should depend on preserving one specific VM.
+- Keep Defender API App Connector, Conditional Access App Control, MDE Cloud
+  Discovery, GSA/Entra Internet Access, and Purview conceptually separate; they
+  contribute different evidence/enforcement layers.
+- The Student tenant, endpoints, and experimental state are disposable around
+  the retained AP2 control plane and should remain reproducible.
