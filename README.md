@@ -1,48 +1,61 @@
 # AP2
 
-AP2 is an exploratory TypeScript SPA, API, and collection of automation used to
-learn what can be created, changed, observed, composed, and reset across
-Microsoft 365, Azure, endpoints, and related security systems.
+AP2 is an exploratory project for learning what can be created, changed,
+observed, detected, controlled, and reset across Microsoft 365, Azure,
+endpoints, SaaS applications, and related security systems.
 
-The SPA is Sean's internal interactive capability notebook: it shows what AP2
-can run, what else AP2 has proven, and a few proven scenario compositions. It is
-not the product, a product prototype, a learner interface, or a lab platform.
-Its explanatory content is visible before sign-in; authentication only enables
-real action buttons. See [the internal SPA role and contents](docs/spa-surface-inventory.md)
-and [capability, scenario, and lab vocabulary](docs/product-model.md).
+The long-term direction is a realistic cybersecurity learning environment where
+incident-like state can be staged across those systems and investigated with the
+real administrative and security products. AP2 is **not at the lab-authoring
+stage yet**. Current work is primarily capability exploration and early scenario
+composition: first learn which technical building blocks are reliable, then
+combine them into useful incident backgrounds, and only later build teaching and
+assessment around them.
 
-## Architecture
+The current SPA is an internal operator console and capability notebook. It
+shows runnable capabilities, other things AP2 has proven, and a few proven
+scenario compositions. It is not the eventual learner interface or a prototype
+of the final product.
 
-See:
+## Start here
 
-- [Product direction and current exploration](docs/product-direction.md)
-- [Capability, scenario, and lab vocabulary](docs/product-model.md)
-- [Identities](docs/identities.md)
-- [Proven capabilities](docs/proven-capabilities.md)
-- [Pass 3 exploration workflow](docs/development-workflow.md)
-- [Private document evidence contract](docs/private-document-evidence.md)
-- [Lab reset strategy](docs/lab-reset-strategy.md)
+The repository has many focused technical notes. These are the useful orientation
+points:
 
-## Developer bootstrap
+- [Product direction](docs/product-direction.md) — what AP2 is trying to learn
+  now and how that differs from the eventual product.
+- [Capability, scenario, and lab vocabulary](docs/product-model.md) — the core
+  distinctions used throughout the project.
+- [Proven capabilities](docs/proven-capabilities.md) — the factual inventory of
+  live evidence and known limitations.
+- [Exploration workflow](docs/development-workflow.md) — the short loop used to
+  investigate a new capability without prematurely building a framework.
+- [Identities](docs/identities.md) — the Product/Student tenant and simulated-user
+  identity model.
+- [AGENTS.md](AGENTS.md) — durable project guidance for agents working in this
+  repository.
+- [Strategy snapshot](STRATEGY-SNAPSHOT.md) — a point-in-time handoff for a
+  replacement strategy session. Live execution state comes from the Durable
+  Coordinator, not from this file.
 
-See the [Microsoft Entra developer bootstrap guide](gh-docs/developer-bootstrap.md)
-to create or verify the minimal multi-tenant application registration from
-Azure Cloud Shell. Its teardown path is only for an explicit control-plane
-replacement or retirement goal, not routine sandbox cleanup.
+For the strategy/coordinator workflow itself, see
+[chatgpt-strategy.md](chatgpt-strategy.md) and
+[coordinator-strategy.md](coordinator-strategy.md).
 
-## Develop
+## Development
 
-Install dependencies and start Vite:
+The SPA and API are TypeScript/Node projects. Install dependencies and start the
+local SPA with:
 
 ```sh
 npm install
 npm run dev
 ```
 
-Open <http://localhost:5173/>. The exact local URL must be registered as an SPA
-redirect URI in Microsoft Entra.
+Open <http://localhost:5173/>. The local URL must be registered as an SPA
+redirect URI in Microsoft Entra for authenticated actions.
 
-Run the deterministic checks without Azure:
+Run the deterministic checks with:
 
 ```sh
 npm test
@@ -50,129 +63,55 @@ npm run typecheck
 npm run build
 ```
 
-## Student-owned API
-
-The API is a separate, framework-free Node/TypeScript process. `GET /health` is
-public for container health checks. `GET /api/whoami` first verifies an RS256
-Bearer token's signature, issuer, audience, and lifetime, then permits only:
-
-- delegated tokens with `access_as_user` from the human product operator
-  `5ce59710-7ea3-448c-bd7b-8e8d2b75bb1f` or dedicated CBA test operator
-  `ba97e987-da4c-43e1-ab79-3daa8014440e`; or
-- app-only tokens from development automation client ID
-  `7eb78f18-b49c-495c-a571-af03f06b58a9`.
-
-Both must be issued in immutable Student tenant
-`92563293-315c-4b6c-9b90-bcb47ee8c970`. Delegated and app-only claim shapes are
-kept distinct. Authorized callers can also use `GET /api/rehearsal-status`.
-That operation uses the API's runtime managed identity to read the fixed
-Student rehearsal Container App and returns only its name, region, running
-status, and latest ready revision. The read fails closed unless ARM reports
-both minimum and maximum replicas as exactly one. See
-[API identity](docs/api-identity.md) for the fixed target and the Dev-app
-command.
-
-`POST /api/simulated-email` uses the same caller policy, then signs the fixed
-Homer test user in through headless Microsoft CBA and makes one Graph
-`sendMail` attempt to the fixed Marge recipient. The SPA exposes one explicit
-control and reports only Graph acceptance—not delivery. This path is disabled
-until the shared client and Homer CBA settings are configured; see
-[API identity](docs/api-identity.md).
-
-`/api/onedrive-share-proof` adds two explicit controls for one fixed
-Homer-to-Marge view-only share rehearsal: create/configure read access and
-validate/remove to Homer's recycle bin. After configuration, the SPA gives
-simple instructions for Marge to inspect the file in OneDrive from a separate
-browser or profile. Mutations are never retried. The exact configuration and
-boundaries are in [API identity](docs/api-identity.md).
-
-Build and start the API locally with explicit verification configuration:
+Build the API with:
 
 ```sh
 npm run build:api
-AUTH_ISSUER='https://issuer.example/tenant/v2.0' \
-AUTH_AUDIENCE='api://audience' \
-AUTH_JWKS_URL='https://issuer.example/discovery/v2.0/keys' \
-npm run api
 ```
 
-Startup fails if any of those three settings is absent. The delegated-user
-allowlist and automation ID can be overridden with the comma-separated
-`AUTH_DELEGATED_USER_OBJECT_IDS` and `AUTH_AUTOMATION_CLIENT_ID`; the Student
-tenant cannot be overridden. Plain HTTP JWKS is disabled unless
-`AUTH_ALLOW_INSECURE_JWKS=true`, which exists only for isolated local tests.
+The API has its own authentication and runtime configuration. See
+[API identity](docs/api-identity.md) rather than copying tenant IDs, client IDs,
+or secrets from examples in source or old transcripts.
 
-`npm test` includes claims-policy unit tests and signed-JWT tests through a real
-local HTTP server. With rootless Podman available, the following also builds and
-starts the image, waits for container health, sends signed delegated and app-only
-Bearer requests, checks a rejection, launches the production headless Chromium,
-and verifies SIGTERM shutdown:
+When rootless Podman is available, AP2 can also exercise the production-shaped
+container path:
 
 ```sh
 npm run test:container
 ```
 
-The real browser CBA check is intentionally separate because it signs the
-dedicated test operator in and out against Microsoft Entra. See the
-[CBA browser test guide](docs/cba-browser-test.md).
+That test builds and starts the API image, exercises the authenticated boundary,
+checks container health, launches the bundled headless browser path, and verifies
+clean shutdown. Browser CBA tests that interact with Microsoft are intentionally
+separate; see the [CBA browser test guide](docs/cba-browser-test.md).
 
-Run an Azure CLI command only after asserting the exact tenant selected by the
-CLI and its access token:
+For Azure CLI work, use the tenant guard rather than assuming the current CLI
+context:
 
 ```sh
 scripts/az-in-tenant.sh '<tenant-id>' -- account show
 ```
 
-Preview calendar objects created since a required lab construction timestamp
-without changing Microsoft 365:
+The Microsoft Entra control-plane bootstrap is documented separately in
+[gh-docs/developer-bootstrap.md](gh-docs/developer-bootstrap.md).
 
-```sh
-AP2_AUTOMATION_CERTIFICATE_PATH='<certificate-pem-outside-git>' \
-  npm run preview:calendar-reset -- \
-  --lab-constructed-at '2026-07-23T00:00:00Z' \
-  --output '/home/west/.config/after-party/calendar-reset-preview.json'
-```
+## Repository principles
 
-The tool is fixed to the exact Student tenant and immutable Cory, Homer, Kobe,
-and Marge object ID/UPN pairs. Every calendar GET requests immutable Outlook
-IDs, follows every page, and writes a new owner-only mode-0400 schema-v2
-manifest outside the repository. The command prints the manifest SHA-256.
-The manifest retains the exact per-mailbox immutable ID, literal
-`@odata.etag`, change key, `iCalUId` logical key, transaction ID, marker,
-organizer/attendee metadata, read-only diagnostic classification, and
-count/refusal summary, but no token, body, subject, or other presentation
-fields. Its contract declares `applyScope: "none"`; every otherwise actionable
-shape is refused with `apply_scope_disabled`, every `plannedAction` is `null`,
-and all planned-action summary counts are zero.
+AP2 is deliberately optimized for exploration speed rather than production
+architecture. A capability does not automatically need a generalized manifest,
+planner, learner contract, hosted route, or reset framework. Prefer the smallest
+live experiment that answers the current question, record what was actually
+proven, and keep reusable code only when another capability or product path needs
+it.
 
-Calendar reset remains preview-only. There is no package command, confirmation
-flag, or executable Graph mutation path for applying a calendar reset. The
-failed conditional-delete safety assumption and live canary result are recorded
-in the [lab reset strategy](docs/lab-reset-strategy.md) and
-[proven-capabilities ledger](docs/proven-capabilities.md).
+The Product and Student tenant control plane is retained infrastructure; staged
+mail, files, meetings, SaaS activity, endpoint state, temporary grants, and other
+experiment-specific artifacts are disposable or resettable. Secrets and
+privileged credentials stay out of the public SPA and repository.
 
-Summarize a local Codex transcript, including wall and Codex-reported active
-time, slow tool calls, likely stalls, token use, and automatic goal retries.
-Select the worker explicitly when several agents share `CODEX_HOME`:
+## Deployment
 
-```sh
-npm run report:codex -- --name Worker-A
-npm run report:codex -- --name Worker-B
-```
-
-You can also select with `--thread-id` or `--path`. For valid JSON with no npm
-banner, use npm's silent mode or invoke the script directly:
-
-```sh
-npm run --silent report:codex -- --name Worker-A --json
-node scripts/codex-session-report.ts --name Worker-A --json
-```
-
-See the [Codex session report guide](docs/codex-session-report.md) for timing
-semantics and selection fallbacks.
-
-## Deploy
-
-GitHub Actions builds the Vite `dist/` output and deploys it to
-<https://seanewest.github.io/ap2/>. The public client ID lives in
-`src/auth/config.ts`; it is configuration, not a secret.
+GitHub Actions builds the Vite SPA and deploys it to
+<https://seanewest.github.io/ap2/>. The hosted API is deployed separately; its
+current identity and deployment contract is documented in
+[docs/api-identity.md](docs/api-identity.md).
