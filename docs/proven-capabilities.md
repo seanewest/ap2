@@ -59,6 +59,7 @@ not mean the operation has been added to the SPA/API product path.
 | Exchange and message-trace diagnostics | Connected app-only to Exchange Online, read bounded organization configuration, and ran bounded message-trace diagnostics. The official Transport Data Platform Graph service principal also returned a successful trace read. | Dev diagnostic app and Microsoft Transport Data Platform service principal | Read-only; the Dev permissions and Exchange Administrator assignment remain |
 | Defender posture snapshot | Read the latest Microsoft Secure Score and reduced 69 controls to tenant-level and category-level score aggregates. Older score history was reported as truncated and deliberately not paged. | Dev diagnostic app | Read-only |
 | MDE Cloud Discovery telemetry | The MDE-only Cloud Discovery stream recorded one ChatGPT transaction attributed to `kobe@corywest.onmicrosoft.com` on managed endpoint `ap2flakobe`. This proves that the enabled MDE integration can contribute attributable endpoint network activity to Cloud Discovery, not completeness for other users, devices, or applications. | Kobe on `ap2flakobe` | Read-only; the MDE integration remains enabled |
+| Universal CAE through Global Secure Access | With supported GSA client 2.31.125, a fresh PRT, and attributable traffic, disabling Kobe at 00:56:02Z caused `AADSTS50057` reauthentication prompts from 00:59:32Z, disconnected the Internet channel at 01:03:33Z, and disconnected all GSA channels by 01:05:03Z. Restoring Kobe reconnected all channels at 01:09:43Z and attributable traffic resumed. | Kobe through the Global Secure Access client | Kobe is enabled, the temporary client is removed, and the VM is deallocated. This contained the GSA channels; it did not isolate the endpoint or block all direct HTTPS. |
 | Global Secure Access PDF upload control | From Kobe's managed endpoint, the same harmless PDF upload to a benign external HTTPS destination was first allowed and then blocked with HTTP `403` after applying the narrow GSA content rule, while an ordinary `GET` to that destination still returned `200`. GSA transactions attributed the enforcement to Kobe, the managed device, the intended security profile and rule, and TLS inspection. | Kobe through the Global Secure Access client | The experimental tenant policy, client, certificate, and endpoint artifacts were removed, and the VM was deallocated. |
 | Mail folder | Created and deleted one ordinary visible top-level Cory mail folder. No message or send route was used. | c91 delegated — Cory | Exact folder absent |
 | Help-desk scenario email | The fixed operation succeeded once through the local product route and twice through the hosted SPA/API route. The latest authorized hosted button click made exactly one API `POST`, received `202`, and added exactly one non-draft message in Cory's Inbox with the exact Kobe sender, sole Cory recipient, subject, and body. | Dev diagnostic app triggered the local proof and observed the mailbox; the dedicated CBA operator triggered the hosted proofs; c91 delegated — Kobe was the Microsoft mail actor | Three exact messages are intentionally retained and privately inventoried for later cleanup; this proves Outlook email only, not a Teams call, missed call, or voicemail |
@@ -137,13 +138,6 @@ factual evidence, not entries in a registry or templates for future work.
   to be authored in an isolated interactive Windows client before using the
   retained [headless execution contract](shared-device-provisioning-package.md).
   This is a limitation, not an active backlog item.
-- Universal CAE identity containment through Global Secure Access is not proven.
-  Kobe remained GSA-routed and Kobe-owned HTTP still returned `200` roughly 100
-  seconds after one account-disable action; no corresponding sign-in challenge
-  appeared. This cannot distinguish propagation delay from a client or token
-  path that was not CAE-capable. Kobe was restored enabled and licensed, and the
-  VM was deallocated. Any future retest must first establish CAE-capable client
-  and token state.
 - The dedicated Teams Call Canary's first authorized audio-only create attempt
   retained only a `4xx` class. A separately authorized unanswered
   follow-up then made exactly one create attempt with the corrected diagnostic
