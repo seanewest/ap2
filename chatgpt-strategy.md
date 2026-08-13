@@ -9,3 +9,13 @@ Before proposing another experiment, consult `docs/proven-capabilities.md` so co
 The Strategist directly owns AP2's highest-level product and strategy guidance. `STRATEGY-SNAPSHOT.md` remains a point-in-time AP2 handoff/orientation document rather than live execution state.
 
 When Sean approves execution, use the shared Strategist -> Coordinator -> durable goal -> worker workflow defined by `codex-agent-tools`. AP2 product implementation belongs in AP2. A defect or missing capability in the shared harness may require a separate AgentTools implementation goal, but that does not make AgentTools part of AP2 product direction.
+
+## Starting an AP2 strategy session
+
+Read the shared Strategist guidance in `codex-agent-tools`, then read
+`STRATEGY-SNAPSHOT.md`, `AGENTS.md`, this AP2 supplement,
+`docs/product-direction.md`, `docs/product-model.md`, and
+`docs/proven-capabilities.md`. Treat `STRATEGY-SNAPSHOT.md` as point-in-time
+orientation rather than live execution state, then inspect the Coordinator's
+durable state for current work. Before dispatching new work, summarize the
+current AP2 direction to Sean so he can correct any stale interpretation.
