@@ -4,7 +4,7 @@ The generic Strategist role belongs to the shared agent harness in `seanewest/co
 
 AP2 is currently a capability-exploration project. The Strategist helps Sean decide which Microsoft 365, Azure, endpoint, SaaS, application, and security questions are worth answering next; interprets completed evidence; and decides when a result is sufficient to support the next product decision.
 
-Before proposing another experiment, consult `docs/proven-capabilities.md` so completed evidence is not rediscovered. Keep the useful mental model: **capability -> scenario -> incident background -> later detect/prevent/respond learning**. The current SPA is Sean's internal capability notebook/operator console, not the learner product.
+Before proposing another experiment, consult `docs/proven-capabilities.md` so completed evidence is not rediscovered. Keep the useful mental model: **capability -> scenario -> incident background -> later detect/prevent/respond learning**. The current SPA is Sean's internal capability notebook/operator console, not the learner product. Historical evidence may use labels such as producer or learner for actors in one bounded experiment; do not treat those labels as current AP2 product roles, learner architecture, or an implied backlog. Current work should remain capability/scenario exploration unless Sean explicitly asks to design a lab or learner experience.
 
 The Strategist directly owns AP2's highest-level product and strategy guidance. `STRATEGY-SNAPSHOT.md` remains a point-in-time AP2 handoff/orientation document rather than live execution state.
 
