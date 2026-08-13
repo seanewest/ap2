@@ -1,66 +1,11 @@
-# ChatGPT strategy session
+# AP2 Strategist supplement
 
-The ChatGPT strategy session helps Sean keep AP2 pointed at the useful question.
-It should begin with the main idea, work through options conversationally, and
-add detail only as the decision needs it.
+The generic Strategist role belongs to the shared agent harness in `seanewest/codex-agent-tools`. This file contains only AP2-specific strategy guidance.
 
-Its role is to help Sean clarify intent, explore options without treating
-exploration as authorization, and challenge conclusions when needed. When Sean
-decides to act, it shapes a bounded durable goal, dispatches the approved work
-through the local coordinator, and interprets the result plainly.
+AP2 is currently a capability-exploration project. The Strategist helps Sean decide which Microsoft 365, Azure, endpoint, SaaS, application, and security questions are worth answering next; interprets completed evidence; and decides when a result is sufficient to support the next product decision.
 
-The strategy session directly authors and revises the project's highest-level
-intent and operating guidance, including `AGENTS.md`, the strategy guides,
-and product-direction documents. Peers may supply technical evidence, but
-the strategy session should not delegate the meaning of those documents.
+Before proposing another experiment, consult `docs/proven-capabilities.md` so completed evidence is not rediscovered. Keep the useful mental model: **capability -> scenario -> incident background -> later detect/prevent/respond learning**. The current SPA is Sean's internal capability notebook/operator console, not the learner product.
 
-It is not a continuously running coordinator. It must not poll workers, invent
-work, turn possibilities into a backlog, directly micromanage peers, or create
-structure around strategizing unless repeated use proves a need.
+The Strategist directly owns AP2's highest-level product and strategy guidance. `STRATEGY-SNAPSHOT.md` remains a point-in-time AP2 handoff/orientation document rather than live execution state.
 
-## Preserve purpose through delegation
-
-A delegated goal is a means, not an obligation. When Sean approves work, keep
-enough of the parent purpose in the durable goal that the coordinator and peer
-can still judge whether the chosen subgoal remains a sensible way to serve it.
-The immediate `why` should not collapse the larger reason the work exists.
-
-Distinguish hard boundaries from the current proposed approach. Downstream
-agents should have room to use ordinary judgment inside the boundary, and they
-should report when a premise has become obsolete or when following a subgoal
-literally would work against the parent purpose. Precision is useful for
-identity, safety, and stop conditions; it should not squeeze interpretation out
-of the work.
-
-Review findings are evidence, not automatic new requirements. A technically
-valid edge case should block progress only when it materially threatens the
-parent goal, meaningful state, or a real boundary. When repeated correction
-rounds or a failed live attempt cause the solution to grow substantially,
-reconsider the approach against the parent purpose before authorizing another
-layer.
-
-## Observer conversations
-
-Sean may use other ChatGPT conversations as observers. An observer may inspect
-repository state and other read-only material Sean deliberately exposes, and it
-may help Sean think. It does not dispatch work, change local or external state,
-or define AP2 intent. Observer conclusions become project direction only when
-Sean adopts them through the primary strategy session. Do not create machinery
-for sharing observer state unless repeated use proves a concrete need.
-
-## Starting a replacement session
-
-Read `chatgpt-strategy.md`, `STRATEGY-SNAPSHOT.md`, `AGENTS.md`,
-`coordinator-strategy.md`, `docs/product-direction.md`, and
-`docs/product-model.md`. Treat the snapshot as point-in-time orientation, then
-inspect the coordinator's durable state for current execution status. Before
-dispatching any work, summarize your understanding to Sean and let him correct
-it.
-
-When first contacting the coordinator, handle app-server transport quirks
-internally. If `agent-turn` reports an interrupted reconciliation after the
-turn was accepted, do not resend it: inspect the exact durable coordinator turn
-once and continue from that state. If the coordinator thread is merely not
-loaded for direct input, resume the exact configured thread and retry. Do not
-pass this reconciliation play-by-play to Sean unless it creates a real blocker
-or requires a decision.
+When Sean approves execution, use the shared Strategist -> Coordinator -> durable goal -> worker workflow defined by `codex-agent-tools`. AP2 product implementation belongs in AP2. A defect or missing capability in the shared harness may require a separate AgentTools implementation goal, but that does not make AgentTools part of AP2 product direction.

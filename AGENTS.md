@@ -1,5 +1,9 @@
 # AGENTS.md
 
+This file is AP2 repository guidance. Runtime Coordinator and worker behavior
+comes from the shared harness `$CODEX_HOME/AGENTS.md` and the generic AgentTools
+workflow documents.
+
 ## What AP2 is doing now
 
 AP2 is an exploratory project for learning what can be created, changed,
@@ -145,8 +149,8 @@ Use the canonical documents for their distinct jobs:
 - `docs/product-direction.md` explains the project and current exploration stage.
 - `docs/product-model.md` defines capability, scenario, and lab vocabulary.
 - `docs/development-workflow.md` describes the short exploration loop.
-- `chatgpt-strategy.md` describes the ChatGPT strategy-session role.
-- `coordinator-strategy.md` describes the local coordinator role.
+- `chatgpt-strategy.md` is the AP2 Strategist supplement.
+- `coordinator-strategy.md` is the AP2 Coordinator supplement.
 - `STRATEGY-SNAPSHOT.md` is a point-in-time handoff/orientation snapshot, not
   live execution state.
 - `docs/proven-capabilities.md` records evidence and limitations from completed
@@ -158,41 +162,10 @@ They do not become new project goals merely because they exist.
 When changing a rule, replace obsolete guidance rather than stacking another
 qualification on top. Avoid duplicating the same rule across documents.
 
-## Coordinator, peers, and subagents
+## Shared agent workflow
 
-Sean's primary strategy conversation defines product intent and interprets
-whether the work is still useful. The local coordinator keeps approved work
-moving; it does not redefine the product direction.
-
-Configured peer workers are durable top-level threads with exact runtime thread
-IDs. A child subagent is not a peer worker, even if someone gives it the same
-friendly name. Only the configured mapping establishes peer identity.
-
-The local coordinator should use the configured peer pool for project work and
-should not create personal child agents as substitutes for peers. A peer worker
-may create subagents for parts of its own goal. Those children remain owned by
-that peer and must never be represented as independent peer workers.
-
-A peer owns the original outcome, not a checklist or proposed implementation
-derived from it. It may plan, research, implement, test, change approach, and
-correct ordinary problems without reporting each step. It should return when
-the outcome is answered, a real project decision is needed, a real boundary must
-change, or progress is genuinely blocked. A change in means is not by itself a
-new decision.
-
-Worker reports must use the configured peer label and remain mechanically tied
-to the durable goal:
-
-```text
-PEER: Copy the exact configured peer label.
-QUESTION: Copy the goal card's INTENT exactly.
-ANSWER: Give the plain-language result.
-NEXT: Say Stop, the direct remaining dependency, or the one decision needed.
-EVIDENCE: Name only the decisive reference or observation.
-```
-
-Do not paraphrase `INTENT` in `QUESTION`; exact copying lets the durable report
-path detect accidental goal substitution.
+AP2 uses the AgentTools Strategist -> Coordinator -> goal-owned-worker workflow.
+AP2 workers follow their runtime role instructions plus this AP2 `AGENTS.md`.
 
 ## Simplicity
 
