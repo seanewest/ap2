@@ -25,6 +25,7 @@ podman $podman_args image exists "$image" || {
 exec podman $podman_args run --rm --network=none --user 0 \
   --security-opt label=disable \
   -e AP2_RUNTIME_ROOT=/runtime \
+  -e AP2_RUNTIME_RECORD_ROOT="$runtime_root" \
   -v "$repo_root:/work:ro" \
   -v "$runtime_root:/runtime:rw" \
   -w /work \

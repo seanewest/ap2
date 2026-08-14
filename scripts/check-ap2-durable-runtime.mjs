@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, X509Certificate } from "node:crypto";
 import {
   chmodSync,
   lstatSync,
@@ -86,6 +86,26 @@ function publicKeyHashFromPrivateKey(path, passphrasePath) {
   return createHash("sha256").update(openssl(arguments_)).digest("hex");
 }
 
+function certificateSki(path) {
+  const output = openssl([
+    "x509",
+    "-in",
+    path,
+    "-noout",
+    "-ext",
+    "subjectKeyIdentifier",
+  ]).toString("utf8");
+  const lines = output.trim().split("\n");
+  const ski = lines.at(-1)?.replaceAll(/[:\s]/g, "").toUpperCase();
+  if (!ski || !/^[0-9A-F]{40}$/.test(ski)) fail(`certificate SKI unavailable for ${path}`);
+  return ski;
+}
+
+function assertDerMatchesPem(pemPath, derPath) {
+  const derived = openssl(["x509", "-in", pemPath, "-outform", "DER"]);
+  if (!derived.equals(readFileSync(derPath))) fail(`${derPath} does not match its PEM certificate`);
+}
+
 async function browserAndFakeMicrophoneProof(
   runtimeRoot,
   pfx,
@@ -162,6 +182,9 @@ async function main() {
   const runtimeRoot = realpathSync(
     resolve(process.env.AP2_RUNTIME_ROOT ?? DEFAULT_RUNTIME_ROOT),
   );
+  const recordRuntimeRoot = resolve(
+    process.env.AP2_RUNTIME_RECORD_ROOT ?? runtimeRoot,
+  );
   assertPrivatePath(runtimeRoot, "directory");
   assertPrivatePath(join(runtimeRoot, "secrets"), "directory");
   assertPrivatePath(join(runtimeRoot, "runs"), "directory");
@@ -193,6 +216,10 @@ async function main() {
 
   const issuer = join(runtimeRoot, "secrets/cba/issuer");
   openssl(["x509", "-in", join(issuer, "ca-certificate.pem"), "-checkend", "0", "-noout"]);
+  assertDerMatchesPem(
+    join(issuer, "ca-certificate.pem"),
+    join(issuer, "ca-certificate.cer"),
+  );
   if (
     publicKeyHashFromCertificate(join(issuer, "ca-certificate.pem")) !==
     publicKeyHashFromPrivateKey(
@@ -203,11 +230,19 @@ async function main() {
     fail("issuer certificate and private key do not match");
   }
 
+  const userSkis = new Set();
   for (const alias of ["cory", "homer", "kobe", "marge"]) {
     const directory = join(runtimeRoot, "secrets/cba/users", alias);
-    openssl(["x509", "-in", join(directory, "certificate.pem"), "-checkend", "0", "-noout"]);
+    const certificatePath = join(directory, "certificate.pem");
+    openssl(["x509", "-in", certificatePath, "-checkend", "0", "-noout"]);
+    openssl([
+      "verify",
+      "-CAfile",
+      join(issuer, "ca-certificate.pem"),
+      certificatePath,
+    ]);
     if (
-      publicKeyHashFromCertificate(join(directory, "certificate.pem")) !==
+      publicKeyHashFromCertificate(certificatePath) !==
       publicKeyHashFromPrivateKey(
         join(directory, "private-key.pem"),
         join(directory, "private-key-passphrase.txt"),
@@ -215,14 +250,69 @@ async function main() {
     ) {
       fail(`${alias} certificate and private key do not match`);
     }
-    openssl([
+    const pfxCertificate = openssl([
       "pkcs12",
       "-in",
       join(directory, "certificate.pfx"),
       "-passin",
       `file:${join(directory, "pfx-passphrase.txt")}`,
-      "-noout",
+      "-clcerts",
+      "-nokeys",
     ]);
+    const certificate = new X509Certificate(readFileSync(certificatePath));
+    const pfxLeaf = new X509Certificate(pfxCertificate);
+    if (certificate.fingerprint256 !== pfxLeaf.fingerprint256) {
+      fail(`${alias} PFX leaf does not match certificate.pem`);
+    }
+    const ski = certificateSki(certificatePath);
+    if (userSkis.has(ski)) fail(`${alias} reuses another simulated-user SKI`);
+    userSkis.add(ski);
+    const record = JSON.parse(
+      readFileSync(join(directory, "record.json"), "utf8"),
+    );
+    const expectedPaths = {
+      certificatePath: join(
+        recordRuntimeRoot,
+        "secrets/cba/users",
+        alias,
+        "certificate.pem",
+      ),
+      privateKeyPath: join(
+        recordRuntimeRoot,
+        "secrets/cba/users",
+        alias,
+        "private-key.pem",
+      ),
+      privateKeyPassphrasePath: join(
+        recordRuntimeRoot,
+        "secrets/cba/users",
+        alias,
+        "private-key-passphrase.txt",
+      ),
+      pfxPath: join(
+        recordRuntimeRoot,
+        "secrets/cba/users",
+        alias,
+        "certificate.pfx",
+      ),
+      pfxPassphrasePath: join(
+        recordRuntimeRoot,
+        "secrets/cba/users",
+        alias,
+        "pfx-passphrase.txt",
+      ),
+    };
+    for (const [name, expected] of Object.entries(expectedPaths)) {
+      if (record[name] !== expected) fail(`${alias} record ${name} is not retargeted`);
+    }
+    if (
+      record.certificateUserId !== `X509:<SKI>${ski}` ||
+      record.certificateFingerprint256 !== certificate.fingerprint256 ||
+      record.certificateValidFrom !== new Date(certificate.validFrom).toISOString() ||
+      record.certificateValidTo !== new Date(certificate.validTo).toISOString()
+    ) {
+      fail(`${alias} record certificate metadata does not match the renewed leaf`);
+    }
   }
 
   const operator = join(runtimeRoot, "secrets/cba/operator");
@@ -239,6 +329,17 @@ async function main() {
 
   const devGraph = join(runtimeRoot, "secrets/dev-graph");
   openssl(["x509", "-in", join(devGraph, "certificate.pem"), "-checkend", "0", "-noout"]);
+  assertDerMatchesPem(
+    join(devGraph, "certificate.pem"),
+    join(devGraph, "certificate.cer"),
+  );
+  const devConfig = JSON.parse(readFileSync(join(devGraph, "config.json"), "utf8"));
+  if (
+    devConfig.certificatePath !==
+    join(recordRuntimeRoot, "secrets/dev-graph/credential.pem")
+  ) {
+    fail("Dev/Graph config certificatePath is not retargeted");
+  }
   if (
     publicKeyHashFromCertificate(join(devGraph, "certificate.pem")) !==
     publicKeyHashFromPrivateKey(join(devGraph, "credential.pem"))
@@ -253,7 +354,7 @@ async function main() {
     readFileSync(join(kobeDirectory, "pfx-passphrase.txt"), "utf8").trim(),
   );
   console.log(
-    `PASS files=${REQUIRED_FILES.length} hashes=verified keys=matched pfx=validated browser=fresh-headless-chromium cba=${basename(kobeDirectory)} microphone=deterministic-wav network=loopback-only`,
+    `PASS files=${REQUIRED_FILES.length} hashes=verified keys=matched chains=verified skis=unique records=retargeted pfx=validated browser=fresh-headless-chromium cba=${basename(kobeDirectory)} microphone=deterministic-wav network=loopback-only`,
   );
 }
 
