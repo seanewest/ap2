@@ -100,6 +100,11 @@ must not be embedded in the public SPA or returned to the browser. Keep them in
 the backend, external secret/configuration paths, or another appropriate
 non-public boundary.
 
+Ordinary browser, CBA, and Dev/Graph automation runs from the owner-only AP2
+runtime described in `docs/durable-runtime.md`. Do not depend on WSL or Local
+Shell for normal work; use Local Shell only for an explicitly authorized
+one-time migration or emergency recovery.
+
 Capability and scenario runs create disposable experimental state around the
 control plane. Messages, meetings, files, calls, temporary permissions, marked
 Azure resources, security signals, and similar staged activity may be removed

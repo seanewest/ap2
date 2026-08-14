@@ -15,9 +15,8 @@ Install Chromium once:
 npx playwright install chromium
 ```
 
-Use the existing operator PFX under
-`~/.config/after-party/spa-operator/`. Keep the directory at mode `0700` and
-private files at mode `0600`.
+Use the operator PFX in the durable AP2 runtime. Keep the runtime directories at
+mode `0700` and private files at mode `0600`.
 
 Start the local API at `http://127.0.0.1:3000` with the real Student
 issuer/JWKS, Product audience, and
@@ -25,8 +24,8 @@ issuer/JWKS, Product audience, and
 [API identity](api-identity.md). Then run:
 
 ```sh
-export AP2_CBA_PFX_PATH=/home/west/.config/after-party/spa-operator/operator-certificate.pfx
-export AP2_CBA_PFX_PASSPHRASE="$(</home/west/.config/after-party/spa-operator/operator-pfx-passphrase.txt)"
+export AP2_CBA_PFX_PATH=/var/lib/codex-agent-tools-replacement/worker/ap2-runtime/secrets/cba/operator/operator-certificate.pfx
+export AP2_CBA_PFX_PASSPHRASE="$(</var/lib/codex-agent-tools-replacement/worker/ap2-runtime/secrets/cba/operator/operator-pfx-passphrase.txt)"
 export VITE_API_BASE_URL=http://127.0.0.1:3000
 npm run test:e2e:cba
 ```

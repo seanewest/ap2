@@ -43,6 +43,9 @@ Stable broad development authority does not permit secrets in the SPA. Public
 browser code may contain public IDs but never client secrets, certificates,
 private keys, refresh tokens, or privileged backend credentials.
 
+Browser, CBA, and Dev/Graph experiments use the Proxmox-side owner-only
+[durable runtime](durable-runtime.md). WSL is not a normal execution dependency.
+
 ## 3. Run the smallest decisive test
 
 Start with a read that can disprove readiness cheaply. Then perform one live
