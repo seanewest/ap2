@@ -55,6 +55,27 @@ Authoritative sources are the established `cba-proof`, `user-simulator`,
 `/home/west/.config/after-party`, not either temporary location above. Keep the
 WSL originals as rollback evidence after validation.
 
+### One-time protected transfer
+
+Do not encode protected files into Local Shell output. After the connector is
+restored and the two ambiguous locations above are reconciled, use one temporary
+SSH key created on ravioli for the transfer:
+
+1. Print only that key's public half and temporarily install it in the durable
+   worker's `authorized_keys`.
+2. Pin the worker's SSH host-key fingerprint from both endpoints, then copy the
+   exact authoritative files into a new mode-0700 directory below `runs/`.
+3. Compare source and staged names, types, sizes, and SHA-256 values before
+   placing files under `secrets/` with mode `0600` and writing the protected
+   inventory.
+4. Remove the temporary authorization, the ravioli transfer key, and the staged
+   Proxmox directory after the full readiness result is recorded. Retain the
+   original standing WSL directories as rollback evidence.
+
+The durable worker has no standing inbound migration key. Local Shell is used
+only to reconcile source state and initiate this one-time authenticated copy;
+it is not a normal execution or secret-serialization path.
+
 ## Readiness
 
 Install repository dependencies with `npm ci`. The readiness wrapper uses the
