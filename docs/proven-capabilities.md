@@ -177,26 +177,23 @@ factual evidence, not entries in a registry or templates for future work.
   This proves bounded human-assisted user-to-user artifact creation, not
   unattended automation. Exact elapsed time and all voicemail behavior remain
   unproven and were not inspected. The Graph-bot `7505` blocker is unchanged.
-- An operator-free Teams Web readiness harness established an exact,
-  non-persistent Kobe caller session, but three bounded attempts could not
-  establish the independent Cory observer session needed to reconcile a native
-  missed-call artifact. No call was placed. No ACS resource exists, the shared
-  client lacks ACS `Teams.ManageCalls` and `Teams.ManageChats` delegated
-  grants, and no Teams Phone resource account or Enterprise Voice prerequisite
-  exists. The repository now includes a deterministic Kobe-to-Cory help-desk
-  email generator as the honest non-call fallback. It is explicitly labeled as
-  Outlook email—not a Teams call, missed call, or voicemail. One reviewed,
-  one-shot local product-route rehearsal received Graph `202` and proved the
-  exact message in Cory's Inbox. The first hosted SPA click also received `202`,
-  but its replica-lifetime one-shot latch then caused two later explicit clicks
-  to return `500` before Kobe authentication or Graph; mailbox reconciliation
-  proved those failures created no message. Revision `ca-ap2-api--0000016`
-  replaced that latch with a per-send busy boundary while retaining an
-  uncertainty block for ambiguous Graph outcomes. One authorized hosted SPA
-  click then made exactly one API `POST`, received `202`, and produced exactly
-  one new matching Kobe-to-Cory message in Cory's Inbox. This establishes the
-  current workload artifact, product contract, and hosted route without claiming
-  exactly-once behavior across replicas or restarts.
+- The later bounded operator-free Teams Web voicemail experiment reached a
+  precise negative boundary. Fresh nonpersistent Kobe CBA authentication
+  succeeded in Teams Web. Attempt 1, using fresh headless Chromium with the
+  deterministic fake-microphone WAV, placed one genuine Kobe-to-Cory call that
+  Cory independently recorded as `Missed incoming` at 05:56 UTC with duration
+  0:00, but the call control collapsed before the WAV's delayed markers and no
+  Cloud Voicemail appeared. Attempt 2 used a technically distinct headed
+  Chromium/Xvfb path but failed locally before Microsoft accepted another call,
+  and Cory showed no second history entry. Final accepted outbound call count
+  was 1 of the authorized maximum 3; both permitted Teams Web variants are
+  exhausted. This proves unattended browser automation can originate the native
+  missed-call artifact, but **Cloud Voicemail deposit is not proven by this
+  path**. A materially different media/calling path or human-assisted voicemail
+  deposit would be a new experiment requiring fresh approval; Graph bot error
+  `7505` should not be retried as though still unresolved. The separately proven
+  Kobe-to-Cory help-desk Outlook email remains an honest non-call fallback and
+  must not be described as Teams voicemail.
 - One reviewed direct provider request registered
   `Microsoft.DesktopVirtualization` in the exact Student lab subscription.
   That provider and possible Microsoft provider-identity residue are accepted

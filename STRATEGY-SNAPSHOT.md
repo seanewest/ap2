@@ -1,315 +1,292 @@
-# Strategy snapshot — 2026-08-12
+# Strategy snapshot — 2026-08-14
 
-This is the orientation handoff for the next primary ChatGPT strategy session.
-It now covers **two repositories**:
+This is the point-in-time orientation handoff for the next primary ChatGPT
+Strategist. It covers two repositories:
 
-- `seanewest/ap2` — the Microsoft 365 / Azure / security capability-exploration
-  project;
-- `seanewest/codex-agent-tools` — the increasingly project-agnostic agent
-  harness used to run AP2 and intended to support other projects later.
+- `seanewest/ap2` — Microsoft 365 / Azure / endpoint / SaaS / security
+  capability exploration;
+- `seanewest/codex-agent-tools` — the project-agnostic durable multi-agent
+  harness used to execute AP2 work.
 
-This file is a point-in-time strategic snapshot, **not live execution state**.
-For current goals, worker activity, reports, or blockers, use the **Durable
-Coordinator** custom app first.
+This file is **not live execution state**. Always use the Durable Coordinator
+for current goals, reports, worker activity, and exact durable dispositions.
 
-## Read these next
+## First orientation steps
 
-For AP2 orientation, read:
+The intended new-session opening prompt asks the Strategist to verify both tool
+surfaces before reading this snapshot:
+
+1. confirm the **Durable Coordinator** tool works;
+2. run `pwd` with **Local Shell** and confirm it returns `/home/west`.
+
+That Local Shell check is only a connectivity sanity check. Local Shell lands in
+Sean's external WSL environment (`ravioli`, user `west`) and is **not part of the
+Coordinator/worker execution path**. The Coordinator and workers must not use or
+depend on it. The Strategist may use it deliberately as an external operator/root
+jump host when a host-level action really requires that authority.
+
+After this file, read the AP2 documents in this order:
 
 1. `AGENTS.md`
 2. `chatgpt-strategy.md`
 3. `docs/product-direction.md`
 4. `docs/product-model.md`
-5. `docs/proven-capabilities.md` for completed live evidence
+5. `docs/proven-capabilities.md`
 
-For the agent harness, read in `seanewest/codex-agent-tools`:
+For the shared harness, read in `seanewest/codex-agent-tools`:
 
 1. `README.md`
 2. `AGENTS.md`
-3. `docs/operating-contract.md`
-4. the focused replacement/service/CT documents linked from those files when
-   needed for the current migration
+3. `docs/chatgpt-strategy.md`
+4. `docs/operating-contract.md`
+5. `docs/coordinator-strategy.md` / `docs/worker-strategy.md` as needed
 
-The generic Strategist -> Coordinator -> worker workflow is becoming a
-`codex-agent-tools` concern rather than an AP2 concern. AP2 should increasingly
-contain only AP2 product/strategy guidance plus project configuration that uses
-that harness.
+## AP2 direction
 
-## How the strategy session works
-
-Sean uses ChatGPT as a conversational **Strategist**. The Strategist helps Sean
-interpret results, decide what is worth doing next, and turn approved direction
-into bounded goals for the local Coordinator. The Coordinator delegates and
-operates; it should not become the product strategist.
-
-The intended flow is:
-
-**Sean <-> ChatGPT Strategist -> Durable Coordinator -> durable goal -> worker**
-
-The Coordinator is event-driven. After assigning work it should end its turn and
-let the dispatcher wake it when reports arrive. It should not repeatedly poll
-workers merely to see whether they are finished. It may inspect or steer the
-exact worker that owns a goal when there is a concrete suspected stall,
-ambiguity, or reason to preserve that worker's context.
-
-The replacement harness is moving away from permanent named peers. A **goal** is
-the durable primary object. A goal retains the exact worker/thread that owns it
-so the Coordinator can continue that same worker, steer it, or inspect bounded
-history when context matters. Warm anonymous workers may be reused; more can be
-created as needed; eligible idle workers can retire after a TTL without losing
-DONE/BLOCKED goal history.
-
-## ChatGPT custom apps / plugins
-
-Two ChatGPT custom apps are available from the current WSL rollback environment:
-
-### Durable Coordinator — primary
-
-Use **Durable Coordinator** for normal strategy work. It is deliberately bounded
-and exposes workflow status, durable goals/reports/journal, coordinator turns,
-and protected repository text operations rather than arbitrary shell access.
-
-Important behavior already fixed in `codex-agent-tools`: if the exact configured
-Coordinator thread is merely `notLoaded`, the bridge safely resumes that exact
-thread, rechecks identity/idle/direct-input eligibility, and then submits the
-turn. A terminal does not need to be kept open just so ChatGPT can talk to the
-Coordinator.
-
-### Local Shell — fallback only
-
-A separate **Local Shell** app exists as an emergency/fallback mechanism. It
-uses `shell-exec-mcp` through its own Secure MCP Tunnel and can execute arbitrary
-commands in WSL; a harmless `pwd` has been proven to return `/home/west`.
-
-**Use Local Shell sparingly.** It is broad, can trigger platform safety blocks,
-and should not replace Durable Coordinator for ordinary implementation or
-workflow observation. Its useful roles are recovery when Durable Coordinator is
-unavailable and occasional independent host-level diagnosis.
-
-Current WSL Local Shell and Durable Coordinator are intentionally preserved as
-the rollback path during the Proxmox migration.
-
-## AP2 strategic state
-
-AP2 is still primarily **capability exploration**, not lab-authoring. The useful
-mental model remains:
+AP2 is still **capability exploration**, not lab-authoring. The useful mental
+model remains:
 
 **capability -> scenario -> incident background -> later detect/prevent/respond learning**
 
-The SPA remains Sean's internal capability notebook/operator console, not the
-learner product.
+A capability is one repeatable action or observation with a known boundary. A
+scenario composes capabilities into useful incident-like state. A lab is a later
+educational product. Do not grow generalized learner, lesson, assessment, or
+scenario-framework architecture unless Sean explicitly asks for it.
 
-A great deal of Microsoft/SaaS capability evidence was added since the previous
-snapshot. `docs/proven-capabilities.md` is canonical; the most strategically
-important recent results are:
+The current SPA is Sean's internal capability notebook/operator console. It is
+not the learner product or a prototype of the eventual learner UI.
 
-- **YouTrack SAML + SCIM + Defender Conditional Access App Control** is proven.
-  Cory and Marge can reach the same staged SaaS content with different download
-  treatment. Defender can also allow a supported YouTrack download while
-  applying an existing encrypted Purview sensitivity label to the downloaded
-  copy without changing the SaaS original.
-- A YouTrack **permanent token survives SCIM deactivation as a record but loses
-  authorization** while the user is banned (`200 -> 403 -> 200` across
-  deactivate/reactivate). A harmless custom app configured by that user remained
-  configured/operational through deactivation.
-- **MDE -> Defender for Cloud Apps Cloud Discovery** is proven: Kobe's ChatGPT
-  use from a managed endpoint appeared with user/device attribution.
-- **Universal CAE through Global Secure Access** is proven with the supported
-  client: disabling Kobe triggered reauthentication and GSA channel disconnect;
-  restoration reconnected the channels. This is session/channel containment,
-  not endpoint isolation.
-- **Purview Endpoint DLP paste-to-browser** is partially proven: a synthetic
-  credit-card sample pasted into an unsent ChatGPT prompt was blocked and
-  appeared in Activity Explorer. The intended destination-differentiated
-  YouTrack allow/audit path did not complete and remains an observed limitation.
-- **Purview Network Data Security through Global Secure Access** is proven for a
-  direct sensitive upload. The same sensitive file later passed inside a normal
-  Windows Git HTTPS `receive-pack`: GSA intercepted TLS but Purview produced no
-  content-policy match. This is a useful demonstrated **Git pack/protocol opacity
-  boundary** for that DLP path.
-- GitHub Enterprise Cloud EMU + Entra SSO/SCIM + Defender's GitHub API connector
-  are proven. Defender ingests some GitHub activity such as `repo.create`, but a
-  later 45-minute recheck still found no Defender `CloudAppEvents` for the tested
-  branch-protection destroy/create actions.
-- A YouTrack -> GitHub workflow proved that a Purview-encrypted downloaded blob
-  could be committed unchanged to GitHub, while full cross-system attribution of
-  that movement was not available.
+Optimize for learning and feedback speed. Prefer one decisive live experiment
+over a generalized framework. Broad development authority is acceptable inside
+the dedicated sandbox when it reduces exploration friction, while credentials,
+public exposure, spending, and actor identity remain real boundaries.
 
-Do not re-prove these merely because they are interesting. Build on them when a
-new strategic question actually benefits from the evidence.
+## Current AP2 execution environment
 
-## `codex-agent-tools` strategic state
+Normal AP2 execution is now durable on Proxmox; the WSL dependency has been
+removed.
 
-The harness has changed substantially. It is no longer merely an AP2-specific
-named-peer dispatcher.
+- Proxmox host: `10.0.0.10`
+- control CT: `harness-control.lan` / `10.0.0.11` / VMID 125
+- worker CT: `harness-worker.lan` / `10.0.0.12` / VMID 126
+- AP2 worker checkout: `/srv/replacement-worker-workspace/ap2`
+- durable protected AP2 runtime:
+  `/var/lib/codex-agent-tools-replacement/worker/ap2-runtime`
 
-Canonical source now contains a staged **goal-centric elastic replacement
-harness** with:
+The durable runtime contains the standing CBA/operator/Dev-Graph material needed
+for normal experiments. Lisa's issuer and the simulated-user leaves were renewed
+with the same keys/SKIs; fresh Kobe CBA sign-in is proven after the trust update.
+The owner-only durable `admin_ap2` GitHub classic PAT is also present and proven
+for the bounded enterprise/org/repository authority used by the GitHub canaries.
+Do not ask Sean to paste credentials into chat.
 
-- project-agnostic Strategist / Coordinator / goal-owned worker semantics;
-- exact goal -> worker/thread ownership with same-worker continuation, steering,
-  and bounded history inspection;
-- warm anonymous worker reuse, bounded top-level worker creation, and TTL-based
-  retirement without losing goal history;
-- a simple goal-centric terminal status view that keeps RUNNING/BLOCKED/DONE
-  outcomes visible after workers go idle or retire;
-- configurable worker runtime/location binding so control can operate a worker
-  runtime on another host/CT without embedding Proxmox or AP2 semantics;
-- **event-driven remote completion** with exact runtime/thread/turn routing and
-  bounded reconnect reconciliation. A five-second completion polling sweep was
-  explicitly identified as a material architectural defect and removed;
-- a goal-centric Durable Coordinator MCP bridge while preserving fixed-team
-  compatibility for the current rollback environment;
-- source-controlled replacement service/config bundles for distinct control and
-  worker roles;
-- authenticated worker transport and a minimal TLS design for non-local
-  WebSocket use: authenticated Codex app-server on loopback behind an unprivileged
-  nginx TLS proxy, with owner-only CA/token material and normal certificate /
-  hostname validation;
-- fail-closed two-CT staging assets and nested-container canary support;
-- deterministic isolated end-to-end split-service rehearsal covering assignment,
-  event/report capture, continuation/steer/history, wrong-token refusal,
-  restart/reconnect recovery without replay, warm reuse/TTL behavior, durable
-  goal status, and bounded shutdown.
+AVD is practical but slow enough that startup/propagation time should be treated
+as normal platform latency rather than worker failure. Temporary VMs should be
+deallocated when an experiment is finished.
 
-The fully rehearsed source line was advanced through PRs #31-#42. The most recent
-known canonical source after the TLS work is commit
-`2d0366b5fb785f66b9117dafba536b1ea33d2c81`, with 197 tests passing plus the
-isolated service rehearsal and focused TLS/service tests. Before relying on that
-hash operationally, verify current `origin/main`; later migration work may have
-advanced it.
+## AP2 work status at handoff
 
-A sealed replacement staging root was built at:
+**There is no unfinished AP2 experiment right now.** All recent AP2 work is
+terminal. The flat `goals` command mixes AP2 capability work with AP2 enabling
+work and AgentTools engineering, so do not infer the product frontier from that
+list alone.
 
-`/home/west/codex-agent-tools-replacement-stage-2d0366b`
+The most important recent AP2 conclusions are:
 
-with a reproducible package and no embedded secrets. The final live overlay is
-supposed to remain incomplete until actual CT addressing/DNS, fresh Codex
-authentication, a fresh top-level Coordinator identity, new epoch, and protected
-TLS/token material exist.
+### Endpoint DLP destination differentiation — complete
 
-## Proxmox replacement migration — immediate frontier
+W20 added a controlled A/B proof, not merely another ChatGPT block observation.
+On the same managed endpoint, under the same bounded policy and using the same
+synthetic credit-card clipboard content:
 
-This is the **main current infrastructure project**.
+- an unsaved YouTrack dashboard-name field accepted and retained the value for
+  60 seconds;
+- an unsent ChatGPT prompt remained empty and showed the Purview blocked-paste
+  dialog by 22 seconds;
+- Activity Explorer later attributed YouTrack as `Audit` and ChatGPT as `Block`.
 
-The goal is to move the generic harness off Sean's Windows/WSL laptop so long
-runs do not depend on the laptop staying awake. The target is intentionally
-simple and should grow naturally rather than starting as a distributed
-scheduler.
+The key new fact is that this exact Endpoint DLP policy can **differentiate the
+two browser destinations**. Activity Explorer is retrospective: it showed
+nothing around eight minutes and had the decisive records by roughly 50 minutes.
+Cleanup completed and the VM was deallocated. Evidence commit: `a78d41c`.
 
-### Target layout
+### GitHub write deploy key — complete
 
-Use two Proxmox LXC CT roles on `vmbr1` / `10.0.0.x`:
+W31 proved a narrow repo-scoped machine authority. With current enterprise/org
+settings, one temporary Ed25519 deploy key attached to private
+`ap2-v2-lab/maintainer-control-proof` with `read_only=false`:
 
-- **control CT** — Coordinator, dispatcher, durable goal state, goal-status view,
-  MCP bridge, tunnel staging, project configuration;
-- **worker CT** — Codex worker app-server/runtime, anonymous worker pool,
-  worktrees/build tooling, nested-container capability.
+- cloned the repository over SSH;
+- pushed a marker commit to a temporary branch;
+- returned the exact pushed commit via SSH `ls-remote`;
+- populated GitHub's `last_used` field.
 
-Worker location is an abstraction so additional worker CTs can be added later
-if real RAM/compute pressure justifies it. Do **not** build automatic RAM
-resizing, service discovery, or a cluster scheduler now. Proxmox CT resources
-can be increased manually as needed.
+The key was **disposable only in the experimental sense**: it was created for
+this canary and deleted afterward. The result is simply that a write-enabled
+deploy key can independently read/write that exact private repository. It does
+not grant organization-wide authority.
 
-### Infrastructure access
+GitHub audit immediately recorded key create/verify/delete under `admin_ap2`,
+but no distinct push action. Defender Advanced Hunting showed no matching GitHub
+`CloudAppEvents` within the bounded ~4/~10 minute checks. All temporary key,
+branch, commit, and runtime state was removed; target `main` was unchanged.
+Evidence commit: `aa0820e`.
 
-From WSL, the existing SSH key can access:
+### Teams voicemail automation — complete negative boundary
 
-- Proxmox: `root@10.0.0.10` (`prox.lan` currently resolves to `10.0.0.10`);
-- OpenWrt: `root@10.0.0.1` — Sean has now installed the WSL public key with
-  `ssh-copy-id`, specifically so agents can manage DHCP/DNS/network state when
-  needed.
+W23 is **not an intermediate blocker**. The authorized browser approaches were
+exhausted and the experiment closed:
 
-`.lan` is the existing local naming convention and is fine to continue using;
-do not create work merely to replace it with `home.arpa`.
+- exact Kobe Teams Web CBA authentication worked;
+- the first automated browser attempt produced one genuine Cory `Missed
+  incoming` Teams artifact;
+- it did **not** deposit Cloud Voicemail;
+- the second technically distinct browser path failed before Microsoft accepted
+  a second call;
+- final accepted outbound call count was 1/3, with both permitted Teams Web
+  variants exhausted.
 
-Sean has explicitly authorized routine infrastructure work needed to build the
-isolated replacement: DHCP/static-address choices, CT creation/configuration,
-packages, accounts, service configuration, local DNS, TLS/capability-token
-material, and tests should normally be handled by the agents. Do **not** offload
-ordinary infrastructure choices to Sean merely because a preferred candidate
-IP or configuration is inconvenient. Ask only for a genuine credential,
-physical action, judgment boundary, or the final authority cutover.
+So unattended browser automation can originate the missed-call artifact, but
+this fake-microphone path has not produced voicemail. A materially different
+calling/media mechanism or human-assisted voicemail deposit would be a **new
+experiment requiring fresh approval**, not a continuation that should happen
+automatically. The Graph bot `7505` path is also exhausted absent genuinely new
+Microsoft evidence.
 
-Candidate CT identities from earlier discovery were control VMID 125 /
-`10.0.0.11` and worker VMID 126 / `10.0.0.12`, but these are not sacred. Recheck
-live Proxmox/OpenWrt state before non-idempotent creation and choose equivalent
-safe values if necessary.
+### YouTrack deactivation persistence — complete
 
-### Physical-host caveat
+A Kobe-configured YouTrack backend app remained configured and operational while
+Kobe was SCIM-deactivated/banned; an administrator could invoke it and obtain a
+successful outbound delivery. Kobe's own retained token was unauthorized while
+banned (`200 -> 403 -> 200` across deactivate/reactivate). This proves retained
+configuration/backend execution, not continued banned-user authority.
 
-The Proxmox laptop was unexpectedly powered off during the migration. Sean has
-physically started it again. Previous read-only inspection strongly suggested an
-**abrupt loss of power/hard power-off rather than an orderly agent-issued
-shutdown**: the prior boot ended as a crash, the journal stopped without normal
-poweroff/reboot units, and logind is configured to ignore lid closure. Do not
-assume agents caused it, but keep the distinction visible if host reliability
-becomes relevant.
+### Other important existing evidence
 
-### Migration safety invariant
+Do not casually re-prove the following; `docs/proven-capabilities.md` is the
+canonical detailed inventory:
 
-**OLD SYSTEM BUILDS NEW SYSTEM.**
+- YouTrack Entra SAML + SCIM lifecycle and Defender Conditional Access App
+  Control;
+- user-differentiated YouTrack download behavior and protected/encrypted
+  downloaded copies;
+- YouTrack -> GitHub movement of the protected encrypted blob;
+- MDE -> Defender for Cloud Apps Cloud Discovery attribution;
+- Universal CAE through Global Secure Access;
+- GSA/Purview direct-upload blocking plus the observed Git HTTPS protocol-opacity
+  boundary;
+- GitHub EMU Entra OIDC/SCIM and partial Defender GitHub connector telemetry;
+- SharePoint tamper/restore, Inbox-rule effect, EICAR attachment prevention,
+  Teams membership remediation, and many smaller Graph/Azure capabilities.
 
-The replacement CT system must not modify, rotate, unload, repoint, or replace
-the current WSL Coordinator/team/tunnels/services/state while being built and
-tested. The WSL system remains the rollback path.
+## Current strategic frontier
 
-The old named Alpha/Beta/Gamma/Delta/Epsilon team is temporary construction
-machinery. The replacement design does not depend on permanent names.
+There is intentionally **no automatically generated AP2 backlog** at handoff.
+The next Strategist should first discuss with Sean what platform question is worth
+learning next rather than interpreting DONE work as an obligation to add another
+layer.
 
-### Cutover boundary
+Potential future areas exist—broader endpoint controls, more SaaS behavior,
+applications/identity/attack paths, Azure/Kubernetes surfaces, richer scenario
+composition, or a materially different Teams voicemail path—but these are
+examples of unexplored medium, **not queued work**.
 
-The **final ChatGPT/Durable Coordinator authority cutover is intentionally
-reserved for Sean + the Strategist** after the CT replacement is provisioned and
-passes real cross-CT lifecycle/restart/recovery tests.
+When considering a new experiment, consult `docs/proven-capabilities.md` first
+and ask what new decision the experiment would enable.
 
-Staging a separate candidate tunnel/profile on the new control CT is fine if it
-remains non-authoritative. Do not silently repoint the currently registered
-ChatGPT Durable Coordinator app.
+## Agent harness — current settled state
 
-The next Strategist should expect that this final cutover is coming soon and
-should personally review the replacement state before authorizing it.
+The Proxmox replacement is no longer a migration project. It is the live harness.
+Normal path:
 
-## Current live work
+**ChatGPT Strategist -> Durable Coordinator tunnel/MCP on harness-control ->
+Coordinator/dispatcher -> TLS worker runtime on harness-worker -> durable worker**
 
-Do not use this section as a durable docket; inspect Durable Coordinator first.
-At the moment of this snapshot, the Coordinator had just been told that:
+The generic workflow is:
 
-- the Proxmox laptop is back online and reachable as `root@10.0.0.10`;
-- OpenWrt is now reachable by key as `root@10.0.0.1`;
-- routine network/DHCP/DNS/CT decisions are already authorized and should not be
-  bounced back to Sean unnecessarily;
-- it should resume live Proxmox preflight/provisioning through a peer and remain
-  event-driven rather than polling that peer.
+**Sean <-> Strategist -> Coordinator -> durable goal -> goal-owned worker**
 
-The exact assignment may already have advanced by the time the next Strategist
-reads this. **Start by checking Durable Coordinator live status and recent
-reports.**
+The Coordinator is event-driven. It owns durable recording, assignment,
+continuation/recovery, and reporting. It should end its turn after dispatch and
+wait for events rather than polling quiet workers. Worker capacity should be
+viewed as elastic from the Strategist's perspective; do not ration goals simply
+because a small number of warm workers happen to exist.
 
-## Handoff guidance for the next Strategist
+Workers own technical execution and course correction. The Strategist owns the
+highest-level strategy/product guidance and directly authors documents such as
+this snapshot and AP2 product direction. Do not delegate the meaning of those
+documents to workers.
 
-1. Orient to **both repos**, not just AP2.
-2. Use Durable Coordinator as the normal control surface; use Local Shell only
-   when the bounded bridge is unavailable or host-level recovery truly requires
-   it.
-3. Treat `codex-agent-tools` as a project-agnostic harness in its own right.
-   Avoid sneaking AP2-specific assumptions back into its core.
-4. Keep the Coordinator event-driven. Do not encourage peer polling.
-5. Preserve exact goal/worker/thread identity and same-worker context when
-   continuation or steering matters, even though worker names are disappearing.
-6. Continue the real Proxmox deployment rather than reopening already-proven
-   source architecture questions unless live deployment exposes a material
-   defect.
-7. Keep the WSL harness untouched as rollback until the new control+worker CT
-   environment passes real cross-CT tests.
-8. The upcoming final ChatGPT/Durable Coordinator tunnel/app authority cutover
-   is a deliberate Strategist/Sean action, not something the Coordinator or a
-   worker should perform opportunistically.
-9. For AP2 itself, consult `docs/proven-capabilities.md` before proposing another
-   Microsoft/SaaS experiment so completed evidence is not rediscovered.
+### Live-code model
 
-The intended next-session opening prompt is intentionally simple:
+`codex-agent-tools` deliberately removed the ordinary installed-release/staging
+layer. The **canonical Git checkouts are the live AgentTools code**:
 
-> You are the new AP2 strategist. We are developing seanewest/ap2 and
-> seanewest/codex-agent-tools. Read strategy-snapshot.md in the ap2 repository,
-> and any docs it points you to, and tell me when you are properly oriented.
+- control checkout:
+  `/srv/replacement-control-workspace/codex-agent-tools`
+- worker checkout:
+  `/srv/replacement-worker-workspace/codex-agent-tools`
+
+At this handoff both are at AgentTools commit
+`90e4d72b72f0ce827f3ad56671f3d5561b8d248e`.
+
+Control wrappers, dispatcher `ExecStart`, and the Durable Coordinator MCP
+launcher execute from the control checkout. Runtime role files point to strategy
+and operating docs in the appropriate checkout. A normal AgentTools change is
+integrated by clean fast-forwarding the relevant live checkout(s). Short-lived
+commands see it on their next invocation; restart/reconnect only a long-running
+process whose loaded implementation changed. Do **not** recreate ordinary
+release staging, `/current` promotion, activation, or whole-harness cutover
+ceremony. Historical `/opt` release trees remain only as rollback evidence.
+
+The latest MCP launcher also exports the existing protected worker capability
+token and TLS CA paths, so direct `recent_messages` reads for durable pooled
+workers work through the Durable Coordinator bridge.
+
+### Local Shell boundary
+
+Local Shell is an account-level ChatGPT App that reaches Sean's WSL machine. It
+is separate from Durable Coordinator. WSL can SSH root to both harness CTs, so
+the Strategist may deliberately use it as an **external operator jump host** for
+a bounded host/root action when necessary. Coordinator and workers must not use
+Local Shell as a fallback or route normal work through WSL.
+
+## Durable Coordinator state at handoff
+
+At the time this snapshot was written:
+
+- all durable work items are terminal (`DONE`);
+- no AP2 or AgentTools worker is active;
+- four durable workers are AVAILABLE;
+- no pending report batch exists;
+- W37, the one-time live-checkout conversion, is authoritatively DONE even
+  though its preserved original worker report describes the earlier failed
+  attempt; the later external-operator reconciliation is the authoritative
+  completion evidence.
+
+Always check the live Durable Coordinator state rather than assuming this remains
+true.
+
+## Handoff guidance
+
+1. Verify Durable Coordinator first; that is the normal control surface.
+2. Verify Local Shell returns `/home/west`, but remember that this proves only the
+   external WSL operator connector—not the harness path.
+3. Orient to both repositories, but keep their purposes separate: AP2 is the
+   product/exploration project; AgentTools is the reusable harness.
+4. Consult `docs/proven-capabilities.md` before proposing AP2 experiments.
+5. Do not treat a negative completed experiment (especially W23 Teams voicemail)
+   as unfinished work.
+6. Do not manufacture a backlog from worker suggestions, available worker
+   capacity, or interesting adjacent questions.
+7. Keep the Coordinator event-driven and preserve exact durable identity when
+   continuing work.
+8. Prefer simple files/Git/process behavior over deployment or orchestration
+   machinery unless a concrete failure mode requires more.
+9. When AP2 work genuinely needs a new capability experiment, discuss the
+   strategic question with Sean first, then dispatch a bounded goal through the
+   Coordinator.
+
+The next Strategist's job is not to reconstruct every historical implementation
+detail. It is to recover the current mental model quickly, understand what AP2
+has actually proven, and help Sean choose the next useful question.
