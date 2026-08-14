@@ -99,8 +99,8 @@ W20/W23-class work.
 
 The migrated simulated-user issuer and leaves had expired. W27 renewed them
 locally with the same protected keys, preserving the issuer SKI, all four leaf
-SKIs, and existing Microsoft user mappings. The full local gate passes, but the
-renewed issuer has not been installed in Entra. W20 may resume entirely from
-Proxmox to perform that separately authorized trust update and its bounded paste
-comparison. W23 remains paused until the trust update and a fresh CBA sign-in
-prove the renewed chain; its call-attempt budget remains untouched.
+SKIs, and existing Microsoft user mappings. W20 then replaced only the expired
+Lisa issuer in Entra's classic CBA trust with the renewed same-key issuer and
+proved a fresh Kobe CBA sign-in from this runtime. The operator issuer and Kobe
+mapping remained unchanged. W20 did not start or consume W23, and did not use
+its call-attempt budget.
