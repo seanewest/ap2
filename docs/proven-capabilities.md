@@ -101,7 +101,8 @@ factual evidence, not entries in a registry or templates for future work.
 ## Identity and infrastructure proofs
 
 - Native Azure Virtual Desktop personal-host scaling now provides standing cost
-  control for the four retained endpoint pools. The single East US plan
+  control for the four retained endpoint pools. The single East US plan in
+  `rg-ap2-avd-fast-rachel`,
   `ap2-retained-personal-host-cost-control` references and enables
   `ap2fastrachel-hp`, `ap2flakobe-hp`, `ap2imgmarge-hp`, and
   `ap2timedhomer-hp`. Its seven-day personal schedule has scheduled ramp-up
@@ -121,8 +122,7 @@ factual evidence, not entries in a registry or templates for future work.
   to delete child schedule `ap2-all-days`,
   delete that scaling plan, delete role assignment
   `095b11b2-054c-45c0-abe8-50ce96bfa85b`, and restore each of the four host
-  pools' recorded prior `startVMOnConnect=false` value if Azure has not already
-  done so when the plan is removed.
+  pools' recorded prior `startVMOnConnect=false` value.
 - YouTrack proved an Entra-managed SaaS lifecycle: assignment through `AP2 YouTrack Users` and SCIM created/updated Marge, Entra SSO succeeded, removal from scope sent `active=false` and YouTrack retained the account as banned rather than deleting it, and the entitlement group now contains exactly Homer, Cory, Marge, and Kobe.
 - A parallel non-gallery `AP2 YouTrack SAML + SCIM (staged)` enterprise app successfully provisioned all four assigned users through its own Entra SCIM job. Marge completed the staged Entra SAML path under Defender Conditional Access App Control, remained on the `.mcas.ms` reverse-proxy origin, and had an ordinary Cut/Copy action explicitly blocked. After making that staged SAML module YouTrack's default authentication provider, Sean also live-proved the learner-facing one-click path: a fresh My Apps tile launch went directly into the authenticated proxied YouTrack workspace without either provider-chooser click, while Cut/Copy remained blocked.
 - Defender allowed Cory to download a DOCX through the proxied YouTrack path, applied the existing `Confidential - All Employees` encrypted Purview label to the downloaded CDFV2 copy, and left the original attachment's SHA-256 unchanged. This proves protected download transformation without source-file mutation; it does not prove enforcement for other labels or file types.
