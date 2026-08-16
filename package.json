@@ -25,6 +25,7 @@
     "preview:calendar-reset": "node scripts/preview-calendar-reset.ts",
     "preview:oauth-app-recon": "node scripts/preview-oauth-app-recon.ts",
     "observe:oauth-recon-signin": "node scripts/observe-oauth-recon-signin.ts",
+    "observe:defender-endpoint-follow-up": "node scripts/observe-defender-endpoint-follow-up.ts",
     "plan:avd-three-vm": "node scripts/plan-avd-three-vm-lab.ts",
     "package:calling-bot-app": "node scripts/package-teams-calling-bot-app.ts",
     "report:codex": "node scripts/codex-session-report.ts",
