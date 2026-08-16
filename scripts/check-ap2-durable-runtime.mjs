@@ -19,25 +19,32 @@ import {
 
 const DEFAULT_RUNTIME_ROOT =
   "/var/lib/codex-agent-tools-replacement/worker/ap2-runtime";
-const REQUIRED_FILES = [
+const MIGRATED_USER_ALIASES = ["cory", "homer", "kobe", "marge"];
+const SIMULATED_USER_ALIASES = [...MIGRATED_USER_ALIASES, "rachel"];
+const userFiles = (aliases) => aliases.flatMap((alias) => [
+  `secrets/cba/users/${alias}/certificate.pem`,
+  `secrets/cba/users/${alias}/certificate.pfx`,
+  `secrets/cba/users/${alias}/private-key.pem`,
+  `secrets/cba/users/${alias}/private-key-passphrase.txt`,
+  `secrets/cba/users/${alias}/pfx-passphrase.txt`,
+  `secrets/cba/users/${alias}/record.json`,
+]);
+const MIGRATED_REQUIRED_FILES = [
   "secrets/cba/issuer/ca-certificate.pem",
   "secrets/cba/issuer/ca-certificate.cer",
   "secrets/cba/issuer/ca-key.pem",
   "secrets/cba/issuer/ca-key-passphrase.txt",
-  ...["cory", "homer", "kobe", "marge"].flatMap((alias) => [
-    `secrets/cba/users/${alias}/certificate.pem`,
-    `secrets/cba/users/${alias}/certificate.pfx`,
-    `secrets/cba/users/${alias}/private-key.pem`,
-    `secrets/cba/users/${alias}/private-key-passphrase.txt`,
-    `secrets/cba/users/${alias}/pfx-passphrase.txt`,
-    `secrets/cba/users/${alias}/record.json`,
-  ]),
+  ...userFiles(MIGRATED_USER_ALIASES),
   "secrets/cba/operator/operator-certificate.pfx",
   "secrets/cba/operator/operator-pfx-passphrase.txt",
   "secrets/dev-graph/certificate.pem",
   "secrets/dev-graph/certificate.cer",
   "secrets/dev-graph/config.json",
   "secrets/dev-graph/credential.pem",
+];
+const REQUIRED_FILES = [
+  ...MIGRATED_REQUIRED_FILES,
+  ...userFiles(["rachel"]),
 ];
 
 function fail(message) {
@@ -206,6 +213,9 @@ async function main() {
     const absolutePath = join(runtimeRoot, relativePath);
     assertPrivatePath(dirname(absolutePath), "directory");
     assertPrivatePath(absolutePath, "file");
+  }
+  for (const relativePath of MIGRATED_REQUIRED_FILES) {
+    const absolutePath = join(runtimeRoot, relativePath);
     const entry = entries.get(relativePath);
     if (!entry) fail(`migration inventory is missing ${relativePath}`);
     const metadata = statSync(absolutePath);
@@ -231,7 +241,7 @@ async function main() {
   }
 
   const userSkis = new Set();
-  for (const alias of ["cory", "homer", "kobe", "marge"]) {
+  for (const alias of SIMULATED_USER_ALIASES) {
     const directory = join(runtimeRoot, "secrets/cba/users", alias);
     const certificatePath = join(directory, "certificate.pem");
     openssl(["x509", "-in", certificatePath, "-checkend", "0", "-noout"]);
@@ -354,7 +364,7 @@ async function main() {
     readFileSync(join(kobeDirectory, "pfx-passphrase.txt"), "utf8").trim(),
   );
   console.log(
-    `PASS files=${REQUIRED_FILES.length} hashes=verified keys=matched chains=verified skis=unique records=retargeted pfx=validated browser=fresh-headless-chromium cba=${basename(kobeDirectory)} microphone=deterministic-wav network=loopback-only`,
+    `PASS files=${REQUIRED_FILES.length} migrated_hashes=${MIGRATED_REQUIRED_FILES.length} keys=matched chains=verified skis=unique records=retargeted pfx=validated browser=fresh-headless-chromium cba=${basename(kobeDirectory)} microphone=deterministic-wav network=loopback-only`,
   );
 }
 

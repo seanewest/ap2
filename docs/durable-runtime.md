@@ -41,6 +41,11 @@ The standing WSL source aliases were `cory`, `homer.simpson`, `kobe`, and
 `marge`. Other WSL user-simulator bundles are not required by the retained AP2
 control plane and were not migrated.
 
+Rachel was added later from the durable runtime rather than migrated from WSL.
+Her standing encrypted key, passphrase references, certificate, PFX, and
+protected record are in `secrets/cba/users/rachel/`. They are deliberately not
+part of the immutable one-time migration hash inventory.
+
 Do not migrate WSL `node_modules`, browser caches, cookies, storage state,
 screenshots, old run directories, or `graph-admin/live-testing-lock.json`.
 Historical readiness scripts are stale residue when their useful behavior is
@@ -82,7 +87,7 @@ only the durable runtime.
 Install repository dependencies with `npm ci`. The readiness wrapper uses the
 same digest-pinned Playwright image as the API container and disables container
 networking. It checks owner/mode boundaries, protected migration hashes,
-certificate/private-key matches, all four simulated-user PFX passphrases, the
+certificate/private-key matches, all five simulated-user PFX passphrases, the
 current certificate validity windows, the Dev credential key match, a fresh
 Chromium context loaded with Kobe's PFX, and the deterministic fake microphone
 against a loopback-only page. It makes no
@@ -104,3 +109,14 @@ Lisa issuer in Entra's classic CBA trust with the renewed same-key issuer and
 proved a fresh Kobe CBA sign-in from this runtime. The operator issuer and Kobe
 mapping remained unchanged. W20 did not start or consume W23, and did not use
 its call-attempt budget.
+
+On 2026-08-16, live policy inspection confirmed that `AP2 Simulated User CBA`
+is a direct include target of the enabled X.509 authentication-method policy;
+its membership is the standing simulated-user eligibility gate. Rachel was
+already a direct member. AP2 issued her a unique high-affinity SKI leaf under
+the existing Lisa issuer, replaced only her unusable prior SKI mapping, and
+stored the prior value in her protected record. A fresh nonpersistent run
+through the shared simulated-user client returned an RSA/MFA delegated token
+and Graph `/me` confirmed Rachel's exact Student identity. The protected proof
+and final policy/mapping reconciliation are in
+`runs/rachel-cba-baseline-20260816/`.

@@ -139,9 +139,12 @@ factual evidence, not entries in a registry or templates for future work.
   fail-closed API boundary only with the fixed Student issuer, audience,
   signature, lifetime, caller ID, and exact delegated scope or application
   role. Delegated and app-only claim shapes remain separate.
-- Homer, Cory, Marge, and Kobe have each completed fresh CBA sign-in through
-  the shared simulated-user client for the delegated scopes needed by the
-  bounded rehearsals.
+- Homer, Cory, Marge, Kobe, and Rachel have each completed fresh CBA sign-in
+  through the shared simulated-user client for the delegated scopes needed by
+  the bounded rehearsals. For Rachel, live policy reads also confirmed that
+  `AP2 Simulated User CBA` is an explicit X.509 policy include target and that
+  Rachel is a direct member; her fresh RSA/MFA token and Graph `/me` bound the
+  new standing protected credential to her exact Student object.
 - The deployed in-memory MSAL cache completed one cold Cory workload action
   followed by a different-scope Cory action without a second interactive CBA
   flow, then removed both created artifacts.
