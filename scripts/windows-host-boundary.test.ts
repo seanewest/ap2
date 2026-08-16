@@ -154,6 +154,12 @@ describe("Windows host boundary", () => {
 
     expect(isWindowsHostBoundarySurface("docs/example.ts")).toBe(false);
     expect(
+      isWindowsHostBoundarySurface("scripts/w52-kobe-collection-boundary.mjs"),
+    ).toBe(false);
+    expect(
+      isWindowsHostBoundarySurface("scripts/w52-kobe-youtrack-boundary.mjs"),
+    ).toBe(false);
+    expect(
       isWindowsHostBoundarySurface(
         "scripts/fixtures/windows-host-boundary/mutations.json",
       ),

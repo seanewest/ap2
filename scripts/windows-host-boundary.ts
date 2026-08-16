@@ -79,6 +79,11 @@ const EXECUTABLE_EXTENSIONS = new Set([
 const EXACT_EXCLUDED_FILES = new Set([
   "package-lock.json",
   "scripts/windows-host-boundary-signatures.ts",
+  // These fixed archived-W52 methods send input only to an isolated remote
+  // AVD canvas or ARM guest Run Command. Their own tests reject local launch
+  // primitives and Windows-mounted paths.
+  "scripts/w52-kobe-collection-boundary.mjs",
+  "scripts/w52-kobe-youtrack-boundary.mjs",
 ]);
 
 const EXACT_EXCLUDED_PREFIXES = [
