@@ -1,0 +1,432 @@
+# Stage this inert source as user-impact.ps1 only after an external preflight
+# proves ap2timedhomer-vm deallocated with zero AVD sessions. Run all three
+# phases in the same exact Homer session, capture Cleanup output, then log off
+# that session and explicitly deallocate the VM.
+
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory)]
+  [ValidatePattern('^AP2-HOMER-RANSOM-BG-[0-9]{8}T[0-9]{6}Z$')]
+  [string]$RunId,
+
+  [Parameter(Mandatory)]
+  [ValidateSet('Prepare', 'Impact', 'Cleanup')]
+  [string]$Phase,
+
+  [Parameter(Mandatory)]
+  [ValidateRange(1, 65535)]
+  [int]$ExpectedSessionId
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$ExpectedComputerName = 'AP2TIMEDHOMER'
+$ExpectedIdentityName = 'AzureAD\HomerSimpson'
+$ExpectedUserSid = 'S-1-12-1-1851057065-1159755345-1963209123-3396316752'
+$ExpectedUsername = 'HomerSimpson'
+$ExpectedProfile = 'C:\Users\HomerSimpson'
+$ExpectedLocalAppData = 'C:\Users\HomerSimpson\AppData\Local'
+$ExpectedOneDriveRoot = 'C:\Users\HomerSimpson\OneDrive'
+$SyntheticFolderName = "AP2-Synthetic-Company-Impact-$RunId"
+$SyntheticRoot = Join-Path $ExpectedOneDriveRoot $SyntheticFolderName
+$EvidenceRoot = Join-Path $env:LOCALAPPDATA "AP2\SyntheticFileImpact\$RunId"
+$StatePath = Join-Path $EvidenceRoot 'state.json'
+$LockedSuffix = '.ap2locked'
+$NoteName = 'AP2-RESTORE-NOTE.txt'
+$NotePath = Join-Path $SyntheticRoot $NoteName
+$Utf8NoBom = [Text.UTF8Encoding]::new($false)
+
+$Specs = @(
+  @('Quarterly-Finance-Projection.txt', 'Synthetic quarterly projection; no real financial data.'),
+  @('Employee-Onboarding-Checklist.txt', 'Synthetic onboarding checklist; no real employee data.'),
+  @('Vendor-Renewal-Plan.txt', 'Synthetic vendor renewal plan; no real vendor data.'),
+  @('Customer-Support-Handoff.txt', 'Synthetic support handoff; no real customer data.'),
+  @('Product-Roadmap-Draft.txt', 'Synthetic product roadmap; no real product data.'),
+  @('Executive-Meeting-Notes.txt', 'Synthetic meeting notes; no real company data.')
+)
+
+function Get-Sha256Bytes([byte[]]$Bytes) {
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    return (($sha.ComputeHash($Bytes) | ForEach-Object { $_.ToString('X2') }) -join '')
+  }
+  finally {
+    $sha.Dispose()
+  }
+}
+
+function Get-XorBytes([byte[]]$Bytes) {
+  $copy = [byte[]]::new($Bytes.Length)
+  for ($index = 0; $index -lt $Bytes.Length; $index++) {
+    $copy[$index] = $Bytes[$index] -bxor 0x5A
+  }
+  return $copy
+}
+
+function Assert-ExactPath([string]$Actual, [string]$Expected, [string]$Label) {
+  $actualFull = [IO.Path]::GetFullPath($Actual)
+  $expectedFull = [IO.Path]::GetFullPath($Expected)
+  if (-not $actualFull.Equals($expectedFull, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "$Label path mismatch: $actualFull"
+  }
+}
+
+function Assert-ExecutionBoundary {
+  if (-not $env:COMPUTERNAME.Equals($ExpectedComputerName, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Wrong VM: $($env:COMPUTERNAME)"
+  }
+
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $process = Get-Process -Id $PID
+  if ($identity.Name -cne $ExpectedIdentityName -or
+      $identity.User.Value -cne $ExpectedUserSid -or
+      $identity.AuthenticationType -cne 'CloudAP' -or
+      $env:USERNAME -cne $ExpectedUsername -or
+      $env:USERPROFILE -cne $ExpectedProfile -or
+      $env:LOCALAPPDATA -cne $ExpectedLocalAppData) {
+    throw "Wrong user identity boundary: $($identity.Name), $($identity.User.Value), $($identity.AuthenticationType)"
+  }
+  if ($process.SessionId -ne $ExpectedSessionId -or $process.SessionId -le 0 -or
+      -not [Environment]::UserInteractive) {
+    throw "Wrong interactive session boundary: $($process.SessionId)"
+  }
+
+  $integrity = @(whoami /groups 2>$null | Where-Object { $_ -match 'Mandatory Label' }) -join "`n"
+  if ($integrity -notmatch 'S-1-16-8192') {
+    throw 'The process is not running at medium integrity.'
+  }
+
+  Assert-ExactPath $ExpectedProfile 'C:\Users\HomerSimpson' 'profile'
+  Assert-ExactPath $env:LOCALAPPDATA $ExpectedLocalAppData 'local application data root'
+  Assert-ExactPath $ExpectedOneDriveRoot 'C:\Users\HomerSimpson\OneDrive' 'OneDrive root'
+  Assert-ExactPath $SyntheticRoot ("C:\Users\HomerSimpson\OneDrive\$SyntheticFolderName") 'synthetic root'
+  Assert-ExactPath $EvidenceRoot ("C:\Users\HomerSimpson\AppData\Local\AP2\SyntheticFileImpact\$RunId") 'phase-state root'
+
+  if (-not (Test-Path -LiteralPath $ExpectedOneDriveRoot -PathType Container)) {
+    throw 'The retained OneDrive folder is absent; this script does not install or configure sync.'
+  }
+  $oneDriveItem = Get-Item -LiteralPath $ExpectedOneDriveRoot -Force
+  if (($oneDriveItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw 'The exact retained OneDrive folder is a reparse point.'
+  }
+
+  $configuredRoots = @($env:OneDriveCommercial, $env:OneDrive) |
+    Where-Object { $_ } |
+    ForEach-Object { [IO.Path]::GetFullPath($_) }
+  if (-not ($configuredRoots | Where-Object {
+        $_.Equals($ExpectedOneDriveRoot, [StringComparison]::OrdinalIgnoreCase)
+      })) {
+    throw 'The exact retained OneDrive folder is not exposed by this user session.'
+  }
+  $sameSessionOneDrive = @(Get-Process -Name OneDrive -ErrorAction SilentlyContinue |
+    Where-Object { $_.SessionId -eq $process.SessionId })
+  if ($sameSessionOneDrive.Count -lt 1) {
+    throw 'No existing same-session OneDrive process is present; sync is not forced.'
+  }
+}
+
+function Write-State($State) {
+  $json = $State | ConvertTo-Json -Depth 12
+  $temporaryPath = "$StatePath.tmp"
+  [IO.File]::WriteAllText($temporaryPath, $json, $Utf8NoBom)
+  Move-Item -LiteralPath $temporaryPath -Destination $StatePath -Force
+}
+
+function Read-State {
+  if (-not (Test-Path -LiteralPath $StatePath -PathType Leaf)) {
+    throw "Exact state is absent: $StatePath"
+  }
+  $state = Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json
+  if ($state.schemaVersion -ne 1 -or $state.runId -cne $RunId -or
+      $state.syntheticRoot -cne $SyntheticRoot) {
+    throw 'State identity or path mismatch.'
+  }
+  if ($state.expectedComputerName -cne $ExpectedComputerName -or
+      $state.expectedIdentityName -cne $ExpectedIdentityName -or
+      $state.expectedUserSid -cne $ExpectedUserSid -or
+      $state.expectedSessionId -ne $ExpectedSessionId -or
+      $state.oneDriveRoot -cne $ExpectedOneDriveRoot -or
+      @($state.files).Count -ne $Specs.Count -or
+      $state.noteSha256 -cne (Get-Sha256Bytes (Get-NoteBytes))) {
+    throw 'State execution boundary or fixed file contract mismatch.'
+  }
+  for ($index = 0; $index -lt $Specs.Count; $index++) {
+    $actual = @($state.files)[$index]
+    $expected = New-FileRecord $index
+    Assert-ExactPath $actual.originalPath $expected.originalPath 'state original file'
+    Assert-ExactPath $actual.lockedPath $expected.lockedPath 'state locked file'
+    if ($actual.originalName -cne $expected.originalName -or
+        $actual.lockedName -cne $expected.lockedName -or
+        $actual.originalSha256 -cne $expected.originalSha256 -or
+        $actual.originalBytes -ne $expected.originalBytes -or
+        $actual.contentBase64 -cne $expected.contentBase64) {
+      throw "State file contract mismatch at ordinal $($index + 1)."
+    }
+  }
+  return $state
+}
+
+function Assert-Children([string[]]$AllowedNames) {
+  if (-not (Test-Path -LiteralPath $SyntheticRoot -PathType Container)) {
+    throw "Exact synthetic root is absent: $SyntheticRoot"
+  }
+  $unexpected = @(Get-ChildItem -LiteralPath $SyntheticRoot -Force | Where-Object {
+    $_.PSIsContainer -or $_.Name -cnotin $AllowedNames
+  })
+  if ($unexpected.Count -ne 0) {
+    throw "Unexpected content exists under the exact synthetic root: $($unexpected.Name -join ', ')"
+  }
+}
+
+function New-FileRecord([int]$Index) {
+  $name = $Specs[$Index][0]
+  $path = Join-Path $SyntheticRoot $name
+  $content = @(
+    'AP2 synthetic company document',
+    "Run: $RunId",
+    "Ordinal: $($Index + 1)",
+    $Specs[$Index][1],
+    ''
+  ) -join [Environment]::NewLine
+  $bytes = $Utf8NoBom.GetBytes($content)
+  return [ordered]@{
+    originalName = $name
+    originalPath = $path
+    lockedName = "$name$LockedSuffix"
+    lockedPath = Join-Path $SyntheticRoot "$name$LockedSuffix"
+    originalSha256 = Get-Sha256Bytes $bytes
+    originalBytes = $bytes.Length
+    impactedSha256 = $null
+    transformedUtc = $null
+    contentBase64 = [Convert]::ToBase64String($bytes)
+  }
+}
+
+function Get-NoteBytes {
+  $text = @(
+    'AP2 HARMLESS SIMULATION ONLY',
+    "Run: $RunId",
+    'Only the six synthetic files in this marked folder were reversibly transformed.',
+    'No payment, contact, credential, or action is requested.',
+    ''
+  ) -join [Environment]::NewLine
+  return $Utf8NoBom.GetBytes($text)
+}
+
+function Invoke-Prepare {
+  if (Test-Path -LiteralPath $EvidenceRoot) {
+    throw "Exact evidence root already exists: $EvidenceRoot"
+  }
+  if (Test-Path -LiteralPath $SyntheticRoot) {
+    throw "Exact synthetic root already exists: $SyntheticRoot"
+  }
+
+  $files = @()
+  for ($index = 0; $index -lt $Specs.Count; $index++) {
+    $files += New-FileRecord $index
+  }
+  $state = [ordered]@{
+    schemaVersion = 1
+    runId = $RunId
+    purpose = 'bounded harmless synthetic company document impact'
+    phase = 'prepare-in-progress'
+    expectedComputerName = $ExpectedComputerName
+    expectedIdentityName = $ExpectedIdentityName
+    expectedUserSid = $ExpectedUserSid
+    expectedSessionId = $ExpectedSessionId
+    oneDriveRoot = $ExpectedOneDriveRoot
+    syntheticRoot = $SyntheticRoot
+    files = $files
+    impactStartedUtc = $null
+    impactCompletedUtc = $null
+    noteSha256 = Get-Sha256Bytes (Get-NoteBytes)
+  }
+
+  New-Item -ItemType Directory -Path $EvidenceRoot | Out-Null
+  Write-State $state
+  New-Item -ItemType Directory -Path $SyntheticRoot | Out-Null
+  foreach ($file in $state.files) {
+    Assert-ExactPath $file.originalPath (Join-Path $SyntheticRoot $file.originalName) 'synthetic file'
+    [IO.File]::WriteAllBytes($file.originalPath, [Convert]::FromBase64String($file.contentBase64))
+    $readBytes = [IO.File]::ReadAllBytes($file.originalPath)
+    if ((Get-Sha256Bytes $readBytes) -cne $file.originalSha256) {
+      throw "Original hash mismatch for $($file.originalName)"
+    }
+  }
+  Assert-Children @($state.files.originalName)
+  $state.phase = 'original-ready'
+  $state.originalReadyUtc = (Get-Date).ToUniversalTime().ToString('o')
+  Write-State $state
+
+  [pscustomobject]@{ runId = $RunId; phase = $state.phase; syntheticFileCount = $state.files.Count }
+}
+
+function Invoke-Impact {
+  $state = Read-State
+  if ($state.phase -cne 'original-ready') {
+    throw "Impact requires exact original-ready phase; found $($state.phase)."
+  }
+  if ($state.expectedSessionId -ne $ExpectedSessionId) {
+    throw 'Session gate differs from preparation.'
+  }
+  Assert-Children @($state.files.originalName)
+  foreach ($file in $state.files) {
+    Assert-ExactPath $file.originalPath (Join-Path $SyntheticRoot $file.originalName) 'original file'
+    Assert-ExactPath $file.lockedPath (Join-Path $SyntheticRoot $file.lockedName) 'locked file'
+    if ((Get-FileHash -LiteralPath $file.originalPath -Algorithm SHA256).Hash -cne $file.originalSha256) {
+      throw "Pre-impact hash mismatch for $($file.originalName)"
+    }
+    if (Test-Path -LiteralPath $file.lockedPath) {
+      throw "Locked collision exists: $($file.lockedPath)"
+    }
+  }
+
+  $state.phase = 'impact-in-progress'
+  $state.impactStartedUtc = (Get-Date).ToUniversalTime().ToString('o')
+  Write-State $state
+  foreach ($file in $state.files) {
+    Move-Item -LiteralPath $file.originalPath -Destination $file.lockedPath
+    $transformed = Get-XorBytes ([IO.File]::ReadAllBytes($file.lockedPath))
+    [IO.File]::WriteAllBytes($file.lockedPath, $transformed)
+    $file.impactedSha256 = Get-Sha256Bytes $transformed
+    $file.transformedUtc = (Get-Date).ToUniversalTime().ToString('o')
+    Write-State $state
+    Start-Sleep -Milliseconds 500
+  }
+  [IO.File]::WriteAllBytes($NotePath, (Get-NoteBytes))
+  if ((Get-FileHash -LiteralPath $NotePath -Algorithm SHA256).Hash -cne $state.noteSha256) {
+    throw 'Marker-note hash mismatch.'
+  }
+  Assert-Children (@($state.files.lockedName) + @($NoteName))
+  $state.phase = 'impact-ready'
+  $state.impactCompletedUtc = (Get-Date).ToUniversalTime().ToString('o')
+  Write-State $state
+
+  [pscustomobject]@{
+    runId = $RunId
+    phase = $state.phase
+    transformedFileCount = $state.files.Count
+    noteName = $NoteName
+  }
+}
+
+function Invoke-Cleanup {
+  $state = Read-State
+  $allowedPhases = @('prepare-in-progress', 'original-ready', 'impact-in-progress', 'impact-ready')
+  if ($state.phase -cnotin $allowedPhases) {
+    throw "Cleanup cannot reconcile phase $($state.phase)."
+  }
+  if ($state.expectedSessionId -ne $ExpectedSessionId) {
+    throw 'Session gate differs from preparation.'
+  }
+
+  if (-not (Test-Path -LiteralPath $SyntheticRoot)) {
+    if ($state.phase -cne 'prepare-in-progress') {
+      throw "Exact synthetic root is absent during phase $($state.phase)."
+    }
+    $result = [ordered]@{
+      schemaVersion = 1
+      runId = $RunId
+      phase = 'complete'
+      restoredFiles = @()
+      restoredFileCount = 0
+      allRestoredHashesMatched = $true
+      syntheticRootAbsent = $true
+      noteAbsent = $true
+      cleanupCompletedUtc = (Get-Date).ToUniversalTime().ToString('o')
+      operatorReminder = 'After capturing this receipt, log off the exact AVD session and explicitly deallocate ap2timedhomer-vm; this guest script performs neither action.'
+    }
+    $json = $result | ConvertTo-Json -Depth 12
+    Remove-Item -LiteralPath $StatePath -Force
+    Remove-Item -LiteralPath $EvidenceRoot -Force
+    return $json
+  }
+
+  $allowedNames = @($state.files.originalName) + @($state.files.lockedName) + @($NoteName)
+  Assert-Children $allowedNames
+  $restored = @()
+  foreach ($file in $state.files) {
+    $originalExists = Test-Path -LiteralPath $file.originalPath -PathType Leaf
+    $lockedExists = Test-Path -LiteralPath $file.lockedPath -PathType Leaf
+    if ($originalExists -and $lockedExists) {
+      throw "Both original and locked paths exist for $($file.originalName)."
+    }
+    if (-not $originalExists -and -not $lockedExists) {
+      if ($state.phase -cne 'prepare-in-progress') {
+        throw "Both original and locked paths are absent for $($file.originalName)."
+      }
+      continue
+    }
+
+    if ($lockedExists) {
+      $lockedBytes = [IO.File]::ReadAllBytes($file.lockedPath)
+      if ((Get-Sha256Bytes $lockedBytes) -ceq $file.originalSha256) {
+        Move-Item -LiteralPath $file.lockedPath -Destination $file.originalPath
+      }
+      else {
+        $restoredBytes = Get-XorBytes $lockedBytes
+        if ((Get-Sha256Bytes $restoredBytes) -cne $file.originalSha256) {
+          throw "Restoration hash mismatch for $($file.originalName)"
+        }
+        [IO.File]::WriteAllBytes($file.lockedPath, $restoredBytes)
+        Move-Item -LiteralPath $file.lockedPath -Destination $file.originalPath
+      }
+    }
+
+    $restoredHash = (Get-FileHash -LiteralPath $file.originalPath -Algorithm SHA256).Hash
+    if ($restoredHash -cne $file.originalSha256) {
+      throw "Final restoration hash mismatch for $($file.originalName)"
+    }
+    $restored += [ordered]@{
+      name = $file.originalName
+      restoredSha256 = $restoredHash
+      matchedOriginal = $true
+    }
+  }
+
+  if (Test-Path -LiteralPath $NotePath -PathType Leaf) {
+    if ((Get-FileHash -LiteralPath $NotePath -Algorithm SHA256).Hash -cne $state.noteSha256) {
+      throw 'Marker note changed; cleanup refuses to delete it.'
+    }
+    Remove-Item -LiteralPath $NotePath -Force
+  }
+  Assert-Children @($state.files.originalName)
+  foreach ($file in $state.files) {
+    if (Test-Path -LiteralPath $file.originalPath -PathType Leaf) {
+      Remove-Item -LiteralPath $file.originalPath -Force
+    }
+  }
+  Remove-Item -LiteralPath $SyntheticRoot -Force
+  if (Test-Path -LiteralPath $SyntheticRoot) {
+    throw 'Exact synthetic root survived cleanup.'
+  }
+
+  $result = [ordered]@{
+    schemaVersion = 1
+    runId = $RunId
+    phase = 'complete'
+    restoredFiles = $restored
+    restoredFileCount = $restored.Count
+    allRestoredHashesMatched = (@($restored | Where-Object { -not $_.matchedOriginal }).Count -eq 0)
+    syntheticRootAbsent = $true
+    noteAbsent = (-not (Test-Path -LiteralPath $NotePath))
+    cleanupCompletedUtc = (Get-Date).ToUniversalTime().ToString('o')
+    operatorReminder = 'After capturing this receipt, log off the exact AVD session and explicitly deallocate ap2timedhomer-vm; this guest script performs neither action.'
+  }
+  Write-State $result
+  $json = $result | ConvertTo-Json -Depth 12
+  Remove-Item -LiteralPath $StatePath -Force
+  Remove-Item -LiteralPath $EvidenceRoot -Force
+  if (Test-Path -LiteralPath $EvidenceRoot) {
+    throw 'Exact phase-state root survived cleanup.'
+  }
+  return $json
+}
+
+Assert-ExecutionBoundary
+switch ($Phase) {
+  'Prepare' { Invoke-Prepare }
+  'Impact' { Invoke-Impact }
+  'Cleanup' { Invoke-Cleanup }
+}
