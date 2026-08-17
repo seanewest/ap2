@@ -8,6 +8,8 @@ Before proposing another experiment, consult `docs/proven-capabilities.md` so co
 
 The Strategist directly owns AP2's highest-level product and strategy guidance. `STRATEGY-SNAPSHOT.md` remains a point-in-time AP2 handoff/orientation document rather than live execution state.
 
+AP2 is an authorized cybersecurity lab owned and controlled by Sean. Its Product/Student tenants, named simulated users, retained endpoints, AP2 SaaS instances, and synthetic experiment data are lab assets rather than external victims unless a goal explicitly says otherwise. When constructing an AP2 goal, carry that authorization context in one compact sentence when relevant, then describe the exact technical action, actor context, evidence needed, and cleanup boundary. Prefer concrete operations over unnecessary attacker-story language: preserve the security meaning, but do not add persona, compromise, persistence, evasion, exfiltration, or similar narrative labels when the worker only needs the underlying technical operation. This is context minimization for clarity, not concealment of intent.
+
 When Sean approves execution, use the shared Strategist -> Coordinator -> durable goal -> worker workflow defined by `codex-agent-tools`. AP2 product implementation belongs in AP2. A defect or missing capability in the shared harness may require a separate AgentTools implementation goal, but that does not make AgentTools part of AP2 product direction.
 
 ## Starting an AP2 strategy session
