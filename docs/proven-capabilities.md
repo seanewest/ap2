@@ -137,10 +137,18 @@ factual evidence, not entries in a registry or templates for future work.
   registry value; its current `rdpclipcdv.exe` and `rdpinputcdv.exe` processes
   were running in Marge's active session with no matching AppLocker or Code
   Integrity block event. No Azure, Intune, guest, session, VM, or scaling-plan
-  setting was changed. A client that still lacks clipboard must refresh its
-  Windows App resources and then establish a new connection so it consumes the
-  current host-pool `.rdp` data; Marge's active session was deliberately left
-  intact, so that client-side validation remains outstanding.
+  setting was changed. A fresh Rachel Windows App context then reloaded its
+  `SessionDesktop` resource and established a new connection. A unique text
+  marker written to the client clipboard appeared exactly in the remote Run
+  dialog; a Rachel-owned guest receipt independently read the same clipboard
+  value as `AzureAD\RachelGreen` in interactive session 2. Cleanup removed the
+  receipt and guest root, logged Rachel off, and deallocated her VM while the
+  standing scaling plan and Marge's exact active session remained unchanged.
+  This proves the reconciled AP2 server path and a freshly loaded Windows App
+  web client. Marge's observed failure is therefore isolated to her cached
+  resource/existing connection or local client state: refresh Windows App
+  resources, fully disconnect that connection, and establish a new one before
+  retesting clipboard.
 - YouTrack proved an Entra-managed SaaS lifecycle: assignment through `AP2 YouTrack Users` and SCIM created/updated Marge, Entra SSO succeeded, removal from scope sent `active=false` and YouTrack retained the account as banned rather than deleting it, and the entitlement group now contains exactly Homer, Cory, Marge, and Kobe.
 - A parallel non-gallery `AP2 YouTrack SAML + SCIM (staged)` enterprise app successfully provisioned all four assigned users through its own Entra SCIM job. Marge completed the staged Entra SAML path under Defender Conditional Access App Control, remained on the `.mcas.ms` reverse-proxy origin, and had an ordinary Cut/Copy action explicitly blocked. After making that staged SAML module YouTrack's default authentication provider, Sean also live-proved the learner-facing one-click path: a fresh My Apps tile launch went directly into the authenticated proxied YouTrack workspace without either provider-chooser click, while Cut/Copy remained blocked.
 - Defender allowed Cory to download a DOCX through the proxied YouTrack path, applied the existing `Confidential - All Employees` encrypted Purview label to the downloaded CDFV2 copy, and left the original attachment's SHA-256 unchanged. This proves protected download transformation without source-file mutation; it does not prove enforcement for other labels or file types.
