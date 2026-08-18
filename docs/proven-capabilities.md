@@ -130,6 +130,17 @@ factual evidence, not entries in a registry or templates for future work.
   pools' recorded prior `startVMOnConnect=false` value.
   Evidence commits `2108b9b` and `cda5c3c` changed documentation only; the
   exact provisioning and reconciliation executables were not retained in Git.
+  A 2026-08-18 live reconciliation found the same complete
+  `redirectclipboard:i:1` property on all four pools without changing their
+  other RDP properties. Intune contained no clipboard or Remote Desktop
+  configuration, and Marge's running host had no effective clipboard-blocking
+  registry value; its current `rdpclipcdv.exe` and `rdpinputcdv.exe` processes
+  were running in Marge's active session with no matching AppLocker or Code
+  Integrity block event. No Azure, Intune, guest, session, VM, or scaling-plan
+  setting was changed. A client that still lacks clipboard must refresh its
+  Windows App resources and then establish a new connection so it consumes the
+  current host-pool `.rdp` data; Marge's active session was deliberately left
+  intact, so that client-side validation remains outstanding.
 - YouTrack proved an Entra-managed SaaS lifecycle: assignment through `AP2 YouTrack Users` and SCIM created/updated Marge, Entra SSO succeeded, removal from scope sent `active=false` and YouTrack retained the account as banned rather than deleting it, and the entitlement group now contains exactly Homer, Cory, Marge, and Kobe.
 - A parallel non-gallery `AP2 YouTrack SAML + SCIM (staged)` enterprise app successfully provisioned all four assigned users through its own Entra SCIM job. Marge completed the staged Entra SAML path under Defender Conditional Access App Control, remained on the `.mcas.ms` reverse-proxy origin, and had an ordinary Cut/Copy action explicitly blocked. After making that staged SAML module YouTrack's default authentication provider, Sean also live-proved the learner-facing one-click path: a fresh My Apps tile launch went directly into the authenticated proxied YouTrack workspace without either provider-chooser click, while Cut/Copy remained blocked.
 - Defender allowed Cory to download a DOCX through the proxied YouTrack path, applied the existing `Confidential - All Employees` encrypted Purview label to the downloaded CDFV2 copy, and left the original attachment's SHA-256 unchanged. This proves protected download transformation without source-file mutation; it does not prove enforcement for other labels or file types.
