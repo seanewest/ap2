@@ -72,7 +72,7 @@ const scenario: LabScenario = {
   temporaryRoles: REQUIRED_TEMPORARY_ROLES,
   windowsImage,
   linuxImage,
-  windowsSku: "Standard_D2s_v3",
+  windowsSku: "Standard_D4s_v3",
   linuxSku: "Standard_F1als_v7",
   linuxVmCount: 2,
   availableWindowsVmCount,

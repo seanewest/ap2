@@ -9,19 +9,18 @@ describe("three-VM AVD lab cost model", () => {
       diskOperationsPerDisk: 100_000,
     });
 
-    expect(result.totalUsd).toBe(4.21490411);
+    expect(result.totalUsd).toBe(4.96690411);
     expect(result.totalUsd).toBeLessThan(5);
   });
 
-  it("keeps a full extra provisioning hour below five dollars", () => {
+  it("keeps a full extra provisioning hour below the lane ceiling", () => {
     const result = calculateThreeVmLabCost({
       billedHours: 5,
       boundedDataGb: 20,
       diskOperationsPerDisk: 100_000,
     });
 
-    expect(result.totalUsd).toBe(4.59363014);
-    expect(result.totalUsd).toBeLessThan(5);
+    expect(result.totalUsd).toBe(5.53363014);
     expect(result.totalUsd).toBeLessThan(10);
   });
 

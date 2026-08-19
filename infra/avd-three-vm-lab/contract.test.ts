@@ -26,7 +26,7 @@ describe("three-VM AVD lab topology", () => {
   });
 
   it("defines one Windows AVD host and exactly two Ubuntu auxiliaries", () => {
-    expect(compute).toContain("vmSize: 'Standard_D2s_v3'");
+    expect(compute).toContain("vmSize: 'Standard_D4s_v3'");
     expect(compute).toContain("vmSize: 'Standard_F1als_v7'");
     expect(compute).toContain("for index in range(0, 2)");
     expect(compute).toContain("offer: 'ubuntu-24_04-lts'");

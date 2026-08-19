@@ -105,23 +105,17 @@ factual evidence, not entries in a registry or templates for future work.
 
 ## Identity and infrastructure proofs
 
-- Kobe's retained `ap2flakobe-vm` was resized in place from
-  `Standard_D2s_v3` to exactly `Standard_NV4as_v4` after its VM-scoped resize
-  options, East US quota, deallocated power state, and zero AVD sessions all
-  passed a fresh gate. The Microsoft `AmdGpuDriverWindows` extension installed
-  the signed AMD driver (`31.0.21018.20001`); Windows reported the fractional
-  Radeon Instinct MI25 MxGPU healthy, and only the RDS hardware-adapter and
-  H.264/AVC hardware-encoding policies were enabled. The VM identity, Gen2
-  Standard SSD OS disk, accelerated-networking NIC and static IP, Entra login
-  and AVD registration extensions, Kobe assignment and roles, personal host
-  pool, desktop application group, workspace, and four-pool scaling plan
-  relationships remained unchanged. The same `SessionDesktop` assignment is
-  therefore still valid. Kobe finished deallocated with AVD host `Shutdown`
-  and zero sessions. East US quota then read 14/14 regional cores and 4/8
-  `standardNVSv4Family` cores. This is a short-lived comparison configuration:
-  Azure retires NVv4, including `Standard_NV4as_v4`, on September 30, 2026.
-  The generic disposable three-VM lab IaC was not changed because it does not
-  declare this retained Kobe VM.
+- After the short NVv4 comparison, Kobe's retained `ap2flakobe-vm` was resized
+  in place from `Standard_NV4as_v4` to the selected non-GPU baseline
+  `Standard_D4s_v3`. The AMD extension, its exact driver/software payload, and
+  the two experiment-only RDS graphics policies were removed. Kobe's VM,
+  disk, NIC, identity, security posture, named assignment, personal host pool,
+  desktop application group, workspace, RDP properties, and four-pool scaling
+  plan relationships remained unchanged, so the same `SessionDesktop` tile is
+  valid. Kobe finished deallocated with host `Shutdown` and zero sessions.
+  Homer remains deallocated at `Standard_D2s_v3`: Azure rejected the minimum
+  East US regional 14-to-16 request with `BadRequest` and the DSv3-family
+  10-to-12 request with `DeprecatedQuotaType`, so his resize was not attempted.
 - Native Azure Virtual Desktop personal-host scaling now provides standing cost
   control for the four retained endpoint pools. The single East US plan in
   `rg-ap2-avd-fast-rachel`,
