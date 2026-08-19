@@ -111,14 +111,16 @@ factual evidence, not entries in a registry or templates for future work.
 
 - A 2026-08-19 live reconciliation distinguished 16 enabled simulated users
   from two enabled control-plane humans, with no guest or disabled user in the
-  tenant. It preserved Kobe's and Rachel's active direct Microsoft Entra Suite
-  assignments and added the same SKU only to the other 14 simulated users.
-  All 16 then had active direct assignments with no disabled plans, and Entra
-  Premium Internet Access, Entra Premium Private Access, and AAD Premium P2
-  each reported `Success` for every user. The 25-seat pool finished with 16
-  consumed and 9 available. Global Secure Access tenant, forwarding, and
-  filtering state and Conditional Access were unchanged; the bounded writes
-  were license assignments only.
+  tenant. The first pass preserved Kobe and an overlapping temporary Rachel
+  assignment while adding the Suite only to the other 14 users. After that
+  experiment removed Rachel's temporary assignment, a fresh reconciliation
+  preserved the other 15 and restored only Rachel. All 16 now have active
+  direct assignments with no disabled plans; Entra Premium Internet Access,
+  Entra Premium Private Access, and AAD Premium P2 each report `Success` for
+  every user. The 25-seat pool has 16 consumed and 9 available. The temporary
+  GSA filtering and Conditional Access objects remain absent, Rachel has no
+  forwarding-profile assignment, and Kobe's pre-existing assignment remains;
+  the bounded repair wrote only Rachel's Suite license.
 - The retained AVD sizing preference is `Standard_D2as_v7`, with
   `Standard_D2as_v5` and `Standard_D2s_v3` as bounded in-place fallbacks.
   Rachel, Homer, Marge, and Kobe are at that preferred size. Homer, Marge, and
