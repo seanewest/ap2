@@ -14,6 +14,13 @@ for Pass 3 and should not be churned between experiments. A grant is ordinary
 cleanup only when it was explicitly introduced as temporary for the current
 experiment.
 
+Every enabled Student-tenant simulated user has Microsoft Entra Suite
+(`Microsoft_Entra_Suite`, SKU `f9602137-2203-447b-9fff-41b36e08ce5d`) as a
+standing entitlement with no disabled plans. Reconcile this live roster and
+seat prerequisite when rebuilding the environment. Entitlement does not by
+itself enable Global Secure Access traffic acquisition or change security
+policy.
+
 ## Identity diagram
 
 ```text
