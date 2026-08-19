@@ -179,16 +179,23 @@ factual evidence, not entries in a registry or templates for future work.
   dialog and launched nothing. The smallest tested AppLocker CSP profile used
   one Homer-device group and one EXE collection intended to allow the baseline
   while denying Windows PowerShell, but Intune reported the profile remediated
-  while the guest retained no CSP grouping, no `SrpV2` rules, no matching MDM
-  event, and an empty effective AppLocker policy. Branch 3b was therefore not
-  executed: this run establishes a delivery/effectiveness boundary, not a
-  PowerShell block. Deleting the Edge and NoRun profiles did not retract their
-  effective registry values after repeated check-ins (and, for Edge, a
-  reboot), so cleanup removed only those exact tattooed values after cloud
-  absence. All temporary policies, scope, grants, mock state, and sessions are
-  absent; Homer finished deallocated with AVD host `Shutdown` and the standing
-  four-pool scaling plan unchanged. The runtime-specific executable was not
-  retained in Git.
+  without creating its exact local WMI Bridge CSP instance or a matching MDM
+  event. Empty `Get-AppLockerPolicy` and `SrpV2` results are not CSP evidence:
+  Microsoft's AppLocker cmdlets cover local/domain Group Policy only. A
+  follow-up reproduced the remediated-without-CSP result, then applied the same
+  Homer-SID-only rule through supported local AppLocker policy. Local and
+  effective views showed `EnforcementMode=Enabled`, the Homer SID matched the
+  intended profile, a syntax/path evaluation returned denied, AppIDSvc was
+  running, and event 8001 confirmed policy application. The exact approved
+  Branch 3b command was submitted once through
+  Homer's AVD session, but produced no AppLocker allow/block event, process
+  creation record, PowerShell host event, or benign marker. Its behavioral
+  result is therefore indeterminate with no launch evidence, not a proved
+  block, and it was not retried. Cleanup restored the empty local policy,
+  removed the temporary CSP/profile/scope/grants and the prior NoRun provider
+  residue, and left Edge clipboard and NoRun absent. Homer finished deallocated
+  with AVD host `Shutdown`, zero sessions, and the standing four-pool scaling
+  plan unchanged. No runtime-specific executable was retained in Git.
 - YouTrack proved an Entra-managed SaaS lifecycle: assignment through `AP2 YouTrack Users` and SCIM created/updated Marge, Entra SSO succeeded, removal from scope sent `active=false` and YouTrack retained the account as banned rather than deleting it, and the entitlement group now contains exactly Homer, Cory, Marge, and Kobe.
 - A parallel non-gallery `AP2 YouTrack SAML + SCIM (staged)` enterprise app successfully provisioned all four assigned users through its own Entra SCIM job. Marge completed the staged Entra SAML path under Defender Conditional Access App Control, remained on the `.mcas.ms` reverse-proxy origin, and had an ordinary Cut/Copy action explicitly blocked. After making that staged SAML module YouTrack's default authentication provider, Sean also live-proved the learner-facing one-click path: a fresh My Apps tile launch went directly into the authenticated proxied YouTrack workspace without either provider-chooser click, while Cut/Copy remained blocked.
 - Defender allowed Cory to download a DOCX through the proxied YouTrack path, applied the existing `Confidential - All Employees` encrypted Purview label to the downloaded CDFV2 copy, and left the original attachment's SHA-256 unchanged. This proves protected download transformation without source-file mutation; it does not prove enforcement for other labels or file types.
