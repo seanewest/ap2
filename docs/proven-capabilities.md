@@ -187,11 +187,12 @@ factual evidence, not entries in a registry or templates for future work.
   effective views showed `EnforcementMode=Enabled`, the Homer SID matched the
   intended profile, a syntax/path evaluation returned denied, AppIDSvc was
   running, and event 8001 confirmed policy application. The exact approved
-  Branch 3b command was submitted once through
-  Homer's AVD session, but produced no AppLocker allow/block event, process
-  creation record, PowerShell host event, or benign marker. Its behavioral
-  result is therefore indeterminate with no launch evidence, not a proved
-  block, and it was not retried. Cleanup restored the empty local policy,
+  Branch 3b input sequence was sent once through Homer's AVD session, but that
+  path did not independently read back the Run field before Enter and produced
+  no AppLocker allow/block event, process creation record, PowerShell host
+  event, or benign marker. Its behavioral result is therefore indeterminate
+  with no launch evidence, not a proved block, and it was not retried. Cleanup
+  restored the empty local policy,
   removed the temporary CSP/profile/scope/grants and the prior NoRun provider
   residue, and left Edge clipboard and NoRun absent. Homer finished deallocated
   with AVD host `Shutdown`, zero sessions, and the standing four-pool scaling
