@@ -105,17 +105,18 @@ factual evidence, not entries in a registry or templates for future work.
 
 ## Identity and infrastructure proofs
 
-- After the short NVv4 comparison, Kobe's retained `ap2flakobe-vm` was resized
-  in place from `Standard_NV4as_v4` to the selected non-GPU baseline
-  `Standard_D4s_v3`. The AMD extension, its exact driver/software payload, and
-  the two experiment-only RDS graphics policies were removed. Kobe's VM,
-  disk, NIC, identity, security posture, named assignment, personal host pool,
-  desktop application group, workspace, RDP properties, and four-pool scaling
-  plan relationships remained unchanged, so the same `SessionDesktop` tile is
-  valid. Kobe finished deallocated with host `Shutdown` and zero sessions.
-  Homer remains deallocated at `Standard_D2s_v3`: Azure rejected the minimum
-  East US regional 14-to-16 request with `BadRequest` and the DSv3-family
-  10-to-12 request with `DeprecatedQuotaType`, so his resize was not attempted.
+- The retained AVD sizing preference is `Standard_D2as_v7`, with
+  `Standard_D2as_v5` and `Standard_D2s_v3` as bounded in-place fallbacks.
+  Rachel remains at the preferred `Standard_D2as_v7`. Fresh VM-scoped reads
+  omitted both AMD candidates for Marge, Kobe, and Homer; the v5 SKU was also
+  subscription-restricted with zero family quota. Kobe and Marge were therefore
+  resized in place from `Standard_D4s_v3` to `Standard_D2s_v3`, while Homer was
+  already at that fallback. Their VM, disk, NIC, identity, security posture,
+  assignments, personal host pools, desktop application groups, workspaces,
+  RDP properties, and four-pool scaling relationships remained unchanged, so
+  every existing `SessionDesktop` tile remains valid. Kobe, Marge, and Homer
+  finished deallocated with host `Shutdown` and zero sessions; Rachel's active
+  session was not disrupted.
 - Native Azure Virtual Desktop personal-host scaling now provides standing cost
   control for the four retained endpoint pools. The single East US plan in
   `rg-ap2-avd-fast-rachel`,

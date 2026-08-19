@@ -66,7 +66,7 @@ function scenario(
     windowsImage:
       "MicrosoftWindowsDesktop:windows-11:win11-24h2-ent:1.2.3",
     linuxImage: "Canonical:ubuntu-24_04-lts:server:1.2.3",
-    windowsSku: "Standard_D4s_v3",
+    windowsSku: "Standard_D2as_v7",
     linuxSku: "Standard_F1als_v7",
     linuxVmCount: 2,
     availableWindowsVmCount: 1,
@@ -233,7 +233,7 @@ describe("three-VM AVD plan validation", () => {
 
     expect(Object.isFrozen(plan)).toBe(true);
     expect(plan.resourceNames.resourceGroup).toBe("ap2l-a1b2c3-rg");
-    expect(plan.cost.bound.totalUsd).toBe(5.53363014);
+    expect(plan.cost.bound.totalUsd).toBe(4.56863014);
     expect(plan.phaseDependencies.compute).toEqual(["control"]);
     expect(plan.readinessGroups[1]).toEqual([
       "avd-availability",

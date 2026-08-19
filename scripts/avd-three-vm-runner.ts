@@ -30,7 +30,7 @@ export interface LabScenario {
   temporaryRoles: readonly string[];
   windowsImage: string;
   linuxImage: string;
-  windowsSku: "Standard_D4s_v3";
+  windowsSku: "Standard_D2as_v7";
   linuxSku: "Standard_F1als_v7";
   linuxVmCount: 2;
   availableWindowsVmCount: number;
@@ -191,7 +191,7 @@ export interface FrozenLabPlan {
   topology: Readonly<{
     windowsImage: string;
     linuxImage: string;
-    windowsSku: "Standard_D4s_v3";
+    windowsSku: "Standard_D2as_v7";
     linuxSku: "Standard_F1als_v7";
     linuxVmCount: 2;
     vmPublicIpCount: 0;
@@ -278,7 +278,7 @@ function validateScenario(
     "The Linux image is unsupported.",
   );
   invariant(
-    scenario.windowsSku === "Standard_D4s_v3" &&
+    scenario.windowsSku === "Standard_D2as_v7" &&
       scenario.linuxSku === "Standard_F1als_v7" &&
       scenario.linuxVmCount === 2,
     "The VM SKU or count is unsupported.",

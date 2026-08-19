@@ -9,7 +9,7 @@ describe("three-VM AVD lab cost model", () => {
       diskOperationsPerDisk: 100_000,
     });
 
-    expect(result.totalUsd).toBe(4.96690411);
+    expect(result.totalUsd).toBe(4.19490411);
     expect(result.totalUsd).toBeLessThan(5);
   });
 
@@ -20,7 +20,7 @@ describe("three-VM AVD lab cost model", () => {
       diskOperationsPerDisk: 100_000,
     });
 
-    expect(result.totalUsd).toBe(5.53363014);
+    expect(result.totalUsd).toBe(4.56863014);
     expect(result.totalUsd).toBeLessThan(10);
   });
 

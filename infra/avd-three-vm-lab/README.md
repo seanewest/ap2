@@ -24,7 +24,7 @@ The topology deliberately has:
 The live caller must first freeze exact East US image versions and verify
 subscription quota. The tested contract uses:
 
-- Windows 11 Enterprise 24H2 on `Standard_D4s_v3`, with an E10 128-GiB
+- Windows 11 Enterprise 24H2 on `Standard_D2as_v7`, with an E10 128-GiB
   Standard SSD and `Windows_Client` licensing for the eligible AVD learner;
 - Canonical Ubuntu Server 24.04 LTS on two `Standard_F1als_v7` VMs, each with
   an E4 32-GiB Standard SSD.
@@ -115,9 +115,8 @@ complete unpaged read, and a fresh token with exact tenant, actor, and audience.
 [`scripts/avd-three-vm-cost.ts`](../../scripts/avd-three-vm-cost.ts) uses
 fresh public East US retail-rate inputs. Four billed hours, 20 GB of bounded
 NAT and internet egress, and 100,000 operations per disk total
-`$4.96690411`. A full extra billed provisioning hour totals `$5.53363014`.
-The four-hour bound remains below the `$5` learning target; both bounds remain
-below the lane's `$10` ceiling.
+`$4.19490411`. A full extra billed provisioning hour totals `$4.56863014`.
+Both are below the `$5` learning target and the lane's `$10` ceiling.
 
 AVD control-plane resources, the VNet, NICs, and NSGs have no incremental
 meter in this contract. The model excludes disk-mount meters because no

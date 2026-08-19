@@ -17,7 +17,7 @@ export interface ThreeVmLabCostBreakdown {
 }
 
 export const eastUsRetailRates = {
-  windowsD4sV3Hourly: 0.376,
+  windowsD2asV7Hourly: 0.183,
   linuxF1alsV7Hourly: 0.0605,
   e10Monthly: 9.6,
   e4Monthly: 2.4,
@@ -45,7 +45,7 @@ export function calculateThreeVmLabCost(
   }
 
   const rates = eastUsRetailRates;
-  const windowsComputeUsd = input.billedHours * rates.windowsD4sV3Hourly;
+  const windowsComputeUsd = input.billedHours * rates.windowsD2asV7Hourly;
   const linuxComputeUsd =
     input.billedHours * 2 * rates.linuxF1alsV7Hourly;
   const disksUsd =

@@ -76,7 +76,7 @@ resource avdVm 'Microsoft.Compute/virtualMachines@2024-07-01' = {
   properties: {
     licenseType: 'Windows_Client'
     hardwareProfile: {
-      vmSize: 'Standard_D4s_v3'
+      vmSize: 'Standard_D2as_v7'
     }
     storageProfile: {
       imageReference: {
