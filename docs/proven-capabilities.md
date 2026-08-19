@@ -107,18 +107,20 @@ factual evidence, not entries in a registry or templates for future work.
 
 - The retained AVD sizing preference is `Standard_D2as_v7`, with
   `Standard_D2as_v5` and `Standard_D2s_v3` as bounded in-place fallbacks.
-  Rachel remains at that preferred size; Kobe and Marge remain at
-  `Standard_D2s_v3`. Homer was rebuilt with fresh Windows 11 guest state as
-  `ap2homerfresh-vm` on `Standard_D2as_v7`, with a new NVMe OS disk, NIC,
-  managed identity, Entra device, compliant Intune record, onboarded Defender
-  machine, and AVD session-host identity. His existing personal host pool,
-  direct assignment, desktop application group, workspace, `SessionDesktop`,
-  Start VM on Connect and RDP properties, and the four-pool scaling-plan
-  relationship were preserved. The old `ap2timedhomer` host, VM, disk, NIC,
-  managed identity, Entra device, and Intune record are absent; the marked
-  recovery snapshot and ordinary stale Defender history remain. Homer, Kobe,
-  and Marge finished deallocated with host `Shutdown` and zero sessions;
-  Rachel's active session was not disrupted.
+  Rachel, Homer, and Marge are at that preferred size; Kobe remains at
+  `Standard_D2s_v3`. Homer and Marge were rebuilt with fresh Windows 11 guest
+  state as `ap2homerfresh-vm` and `ap2margev7-vm`, each with a new NVMe OS disk,
+  NIC, managed identity, Entra device, compliant Intune record, onboarded
+  Defender machine, and AVD session-host identity. Their existing personal host
+  pools, direct assignments, desktop application groups, workspaces,
+  `SessionDesktop` resources, Start VM on Connect and RDP properties, and the
+  four-pool scaling-plan relationship were preserved. The old `ap2timedhomer`
+  and `ap2margefresh` hosts, VMs, disks, NICs, managed identities, Entra
+  devices, and Intune records are absent. Homer's marked recovery snapshot and
+  ordinary stale Defender history remain; Marge retained no snapshot or old
+  billable resource, only ordinary stale Defender history. Homer, Kobe, and
+  Marge finished deallocated with host `Shutdown` and zero sessions; Rachel's
+  active session was not disrupted.
 - Native Azure Virtual Desktop personal-host scaling now provides standing cost
   control for the four retained endpoint pools. The single East US plan in
   `rg-ap2-avd-fast-rachel`,
