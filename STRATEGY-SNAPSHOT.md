@@ -1,150 +1,73 @@
-# Strategy snapshot — 2026-08-15
+# Strategy snapshot — 2026-08-20
 
-This is a deliberately small orientation handoff for the next primary ChatGPT
-Strategist. It covers:
+This is a compact orientation handoff for a fresh AP2 Strategist. It is not
+live workflow state, a backlog, or authorization to resume or create work.
+Use the Durable Coordinator for current goals and `docs/proven-capabilities.md`
+for the detailed evidence and limitations behind this summary.
 
-- `seanewest/ap2`, the Microsoft 365 / Azure / endpoint / SaaS / security
-  capability-exploration project; and
-- `seanewest/codex-agent-tools`, the project-agnostic durable multi-agent
-  harness used to execute AP2 work.
+## Current direction
 
-This file is not live execution state, a backlog, or an instruction to resume
-historical work. Use the Durable Coordinator for current goals, reports, worker
-activity, and exact durable dispositions.
+AP2 is exploring reliable capabilities across Microsoft 365, Azure, endpoints,
+SaaS integrations, and security systems, then directly composing useful
+incident-like scenarios. It is not currently building labs, teaching content,
+or a generalized scenario framework. The SPA remains Sean's internal
+capability notebook and operator console, not a learner interface or a product
+prototype.
 
-## Start here
+Prefer the smallest experiment that answers the current product question.
+Treat completed positive and negative results as evidence, not as implied next
+work. Choose any new question with Sean before dispatching it.
 
-1. Confirm the Durable Coordinator tool works.
-2. Confirm Local Shell works with a harmless `hostname`, `id -un`, and `pwd`.
-   Its expected host is `harness-control`, user is
-   `codex_control_replacement`, and working directory is
-   `/srv/replacement-control-workspace`.
-3. Read the shared Strategist guidance in `seanewest/codex-agent-tools`.
-4. Read this repository's `AGENTS.md`, `chatgpt-strategy.md`,
-   `docs/product-direction.md`, and `docs/product-model.md`.
-5. Use `docs/proven-capabilities.md` as a reference for the specific product
-   question under discussion. It is an evidence inventory, not a queue.
-6. Summarize the current AP2 direction to Sean and ask what question is worth
-   answering next before dispatching any goal.
+## Learned endpoint architecture
 
-Do not begin by reconstructing every old goal, report, worker thread, or
-implementation detail. Do not continue work merely because it once had a work
-number, a partial result, a suggestion, or an archived thread. In particular,
-there is no inherited W49 (or other numbered-work) objective in the new team.
-If a historical result was merged into `docs/proven-capabilities.md`, treat it
-only as a factual result with the limitations recorded there.
+Guest-local ClickFix is now proven end to end: a trusted click in guest Edge
+wrote the exact corrected harmless command to the same guest clipboard, Win+R
+pasted and submitted it once, and PowerShell printed `Hello World`. Default
+Defender allowed the command and MDE later raised one High `Suspicious command
+in RunMRU registry` alert. The detailed run and cleanup boundary are recorded in
+`docs/proven-capabilities.md`.
 
-## AP2 direction
+AVD is learner transport into the desktop, not part of the fictional endpoint
+story. Endpoint background can combine orchestration outside the guest with
+genuine interaction in an authenticated user's session. The recent
+user-context proofs used the AVD remote canvas as that external control channel;
+their attribution came from the real user session, not from pretending the AVD
+transport itself was incident activity.
 
-AP2 is still capability exploration and early scenario composition, not lab
-authoring. Keep the mental model:
+Do not assume that a permanent in-guest AP2 agent is desirable. Its services,
+files, processes, credentials, logs, or control traffic could contaminate the
+incident evidence that AP2 is trying to create and observe. Machine-level Azure
+Run Command already serves cases where user attribution is irrelevant.
 
-**capability -> scenario -> incident background -> later detect/prevent/respond learning**
+A useful future product-design question is how to make deterministic,
+user-context endpoint manipulation repeatable without contaminating the
+evidence. That is an open design question, not a decision to install a guest
+agent and not authorization for new product work or experiments.
 
-A capability is one repeatable action or observation with a known boundary. A
-scenario combines capabilities into coherent incident-like state. A lab is a
-later educational product. Do not grow generalized learner, lesson, assessment,
-scenario-framework, or publishing architecture unless Sean explicitly asks for
-it.
+## Defender boundary
 
-The current SPA is Sean's internal capability notebook/operator console. It is
-not the learner product and should not be treated as a prototype of the eventual
-learner interface.
+Defender is authentically on Endpoint Plan 2: more than nine hours after the
+switch, authenticated portal reads returned `overrideMdeFlavor: P2`, the
+Licenses page selected Plan 2, and classic machine-group `GET` requests returned
+`200` with an empty set. The temporary CBA repair used for that confirmation was
+fully removed and the original mapping restored.
 
-Optimize for learning and feedback speed. Prefer the smallest decisive live
-experiment over a generalized framework. Preserve the original plain-language
-question and stop when the evidence is sufficient for the next product
-decision.
+Classic Device groups nevertheless remained unavailable or inconsistent beyond
+Microsoft's documented six-hour window: Endpoint settings omitted the entry,
+the documented direct page redirected home, and adjacent portal surfaces still
+showed mixed provisioning state. Do not rely on narrow device-group scoping
+unless a later Microsoft-side change or support decision establishes that the
+surface is usable.
 
-## Product evidence
+## Worker-goal lesson
 
-`docs/proven-capabilities.md` is the canonical inventory of completed evidence
-and limitations. It contains results across Microsoft 365 content, identity,
-endpoints, Defender/Purview, Global Secure Access, Azure Virtual Desktop,
-YouTrack, GitHub, and related integrations.
+Give workers a simple outcome, why it matters, the relevant context, a stopping
+point, and real boundaries. Prefer that over blanket read-only restrictions or
+procedural command lists. Workers should use ordinary judgment and repair
+harmless prerequisites within the authorized outcome, while preserving the
+actual tenant, credential, external-system, exposure, and spending boundaries.
 
-Consult only the sections relevant to the current question before proposing an
-experiment. Do not casually re-prove a completed fact, but also do not infer a
-new objective from an adjacent result, limitation, accepted residue, or worker
-recommendation. Negative boundaries are completed evidence unless Sean chooses
-a materially different experiment.
-
-The repository intentionally has no automatically generated strategic backlog.
-Unexplored surfaces are possibilities, not queued work.
-
-## Sandbox and execution boundaries
-
-The Product and Student tenants contain a retained AP2 control plane. Preserve
-standing identities, licensing, authentication, applications, permissions, and
-other selected baseline configuration by default. Experimental workload state
-around that control plane is disposable or resettable.
-
-Broad exploratory authority is acceptable inside the dedicated sandbox when it
-reduces friction, but actor identity, credentials, administrative recovery,
-systems outside the sandbox, public exposure, service-abuse limits, and spending
-remain real boundaries. Do not ask Sean to paste credentials into chat.
-
-Normal AP2 execution is CT-native on Proxmox:
-
-- control CT: `harness-control.lan`;
-- worker CT: `harness-worker.lan`;
-- AP2 worker checkout: `/srv/replacement-worker-workspace/ap2`;
-- protected AP2 runtime:
-  `/var/lib/codex-agent-tools-replacement/worker/ap2-runtime`.
-
-WSL is not part of the normal Coordinator, worker, or Local Shell path. Do not
-route work through it or reintroduce it as a dependency.
-
-## Harness model
-
-The normal path is:
-
-**Sean <-> Strategist -> Durable Coordinator -> durable goal -> goal-owned worker**
-
-The Strategist owns the product question and AP2's highest-level direction. The
-Coordinator owns durable recording, assignment, recovery, and reporting.
-Workers own bounded technical execution and course correction. The Coordinator
-should remain event-driven rather than polling quiet workers.
-
-AP2 product work belongs in `ap2`. A genuine shared-harness defect or feature
-belongs in `codex-agent-tools` as a separate goal. Do not let harness engineering
-become AP2 product direction.
-
-The canonical Git checkouts are the live AgentTools code. Do not recreate an
-ordinary release-staging or whole-harness cutover process. Restart or reconnect
-only a long-running process whose loaded implementation actually changed.
-
-## Fresh-team boundary
-
-On 2026-08-15 the previous Coordinator and peer-worker team was intentionally
-retired. Its durable epoch was archived as rollback/history rather than imported
-into the replacement team's working context.
-
-The replacement identities at this snapshot are:
-
-- team epoch: `8bddf22c-d7f5-46b3-b168-3056424deeb1`;
-- Coordinator: `01a006de-0091-7081-aa92-cc1701778f07`;
-- worker-pool limit: 4.
-
-At verification, the replacement epoch had zero workers, zero pending reports,
-no active report batch, and no inherited assignments. The new Coordinator was
-oriented and idle. AP2 was at `9c369f2`; AgentTools was at `c2723c3`.
-
-These are point-in-time facts. Always inspect live state before acting. The old
-epoch is protected historical evidence, not a source of goals to replay,
-summarize into new work, or reason through by default.
-
-## Handoff rule
-
-The next Strategist's job is to recover the compact mental model above, talk
-with Sean, and help choose the next useful product question. It is not to ingest
-the old team's history, reconstruct a supposedly unfinished plan, or keep agents
-busy.
-
-When Sean approves a new experiment:
-
-1. state the new question and stopping point plainly;
-2. consult only the relevant existing evidence;
-3. inspect the live Coordinator state;
-4. dispatch one bounded durable goal through the new Coordinator; and
-5. treat suggestions and follow-on ideas as optional until Sean chooses them.
+For deeper orientation, read `AGENTS.md`, `docs/product-direction.md`,
+`docs/product-model.md`, and only the relevant parts of
+`docs/proven-capabilities.md`. Then recover live work from the Durable
+Coordinator rather than from this snapshot or historical worker threads.
