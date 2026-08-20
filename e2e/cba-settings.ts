@@ -33,7 +33,6 @@ export function loadCbaE2eSettings(
   projectRoot = process.cwd(),
 ): CbaE2eSettings {
   const pfxPath = required(environment, "AP2_CBA_PFX_PATH");
-  const passphrase = required(environment, "AP2_CBA_PFX_PASSPHRASE");
   if (!isAbsolute(pfxPath)) {
     throw new Error("AP2_CBA_PFX_PATH must be an absolute path outside the repository.");
   }
@@ -50,6 +49,7 @@ export function loadCbaE2eSettings(
   if ((directoryMode & 0o077) !== 0) {
     throw new Error("The CBA PFX directory must not be accessible by group or other users.");
   }
+  const passphrase = cbaPassphrase(environment, projectRoot);
 
   const appUrl = validatedAppUrl(
     environment.AP2_E2E_APP_URL ?? LOCAL_APP_URL,
@@ -72,6 +72,41 @@ export function loadCbaE2eSettings(
     passphrase,
     pfx: readFileSync(absolutePfxPath),
   };
+}
+
+function cbaPassphrase(
+  environment: NodeJS.ProcessEnv,
+  projectRoot: string,
+): string {
+  const direct = environment.AP2_CBA_PFX_PASSPHRASE;
+  if (direct) return direct;
+
+  const configuredPath = required(
+    environment,
+    "AP2_CBA_PFX_PASSPHRASE_FILE",
+  );
+  if (!isAbsolute(configuredPath)) {
+    throw new Error("AP2_CBA_PFX_PASSPHRASE_FILE must be absolute.");
+  }
+  const path = realpathSync(configuredPath);
+  if (isInside(resolve(projectRoot), path)) {
+    throw new Error(
+      "AP2_CBA_PFX_PASSPHRASE_FILE must be outside the repository.",
+    );
+  }
+  const metadata = statSync(path);
+  if (!metadata.isFile() || (metadata.mode & 0o077) !== 0) {
+    throw new Error(
+      "AP2_CBA_PFX_PASSPHRASE_FILE must be a private regular file.",
+    );
+  }
+  const value = readFileSync(path, "utf8").trim();
+  if (!value || value.includes("\n")) {
+    throw new Error(
+      "AP2_CBA_PFX_PASSPHRASE_FILE must contain one nonempty line.",
+    );
+  }
+  return value;
 }
 
 function validatedAppUrl(value: string): string {

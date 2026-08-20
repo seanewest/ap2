@@ -1,14 +1,15 @@
 #!/bin/sh
 set -eu
 
-runtime_root=${AP2_RUNTIME_ROOT:-/var/lib/codex-agent-tools-replacement/worker/ap2-runtime}
+runtime_root=${AP2_RUNTIME_ROOT:-${XDG_DATA_HOME:-${HOME:?HOME is required}/.local/share}/ap2/runtime}
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-storage_root="$runtime_root/containers/storage"
-run_root="$runtime_root/containers/run"
+container_root=${AP2_CONTAINER_ROOT:-${XDG_CACHE_HOME:-${HOME}/.cache}/ap2/containers}
+storage_root="$container_root/storage"
+run_root="$container_root/run"
 image='mcr.microsoft.com/playwright:v1.61.1-noble@sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6'
 
 install -d -m 700 "$runtime_root" "$runtime_root/secrets" "$runtime_root/runs"
-install -d -m 700 "$runtime_root/containers" "$storage_root" "$run_root"
+install -d -m 700 "$container_root" "$storage_root" "$run_root"
 
 podman_args="--storage-driver=overlay --storage-opt overlay.ignore_chown_errors=true --runtime /usr/bin/crun --root $storage_root --runroot $run_root --cgroup-manager=cgroupfs"
 

@@ -1,12 +1,13 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
+import { resolveAp2RuntimeRoot } from "./ap2-runtime-root.mjs";
 
 const require = createRequire(`${process.cwd()}/package.json`);
 const { ClientCertificateCredential } = require("@azure/identity");
 const { chromium } = require("playwright");
 
-const RUNTIME = process.env.AP2_RUNTIME_ROOT ?? "/var/lib/codex-agent-tools-replacement/worker/ap2-runtime";
+const RUNTIME = resolveAp2RuntimeRoot();
 const ACTOR = (process.env.AP2_ACTOR ?? "homer").toLowerCase();
 const TARGETS = Object.freeze({
   homer: { upn: "homer.simpson@corywest.onmicrosoft.com", computer: "ap2homerfresh", resourceGroup: "rg-ap2-avd-timed-homer", vm: "ap2homerfresh-vm", hostPool: "ap2timedhomer-hp", sessionHost: "ap2homerfresh", profile: "C:\\Users\\HomerSimpson" },

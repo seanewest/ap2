@@ -65,6 +65,26 @@ describe("CBA browser settings", () => {
     expect(settings.outputDirectory).toBe(join(credentials, "results"));
   });
 
+  it("loads the operator passphrase from a private file", async () => {
+    const root = await temporaryDirectory("ap2-project-");
+    const credentials = await temporaryDirectory("ap2-cba-");
+    const pfxPath = await privatePfx(credentials);
+    const passphrasePath = join(credentials, "operator-passphrase.txt");
+    await writeFile(passphrasePath, "test-file-passphrase\n");
+    await chmod(passphrasePath, 0o600);
+
+    const settings = loadCbaE2eSettings(
+      {
+        AP2_CBA_PFX_PATH: pfxPath,
+        AP2_CBA_PFX_PASSPHRASE_FILE: passphrasePath,
+        AP2_PLAYWRIGHT_OUTPUT_DIR: join(credentials, "results"),
+      },
+      root,
+    );
+
+    expect(settings.passphrase).toBe("test-file-passphrase");
+  });
+
   it.each([
     [
       "https://seanewest.github.io/ap2/",

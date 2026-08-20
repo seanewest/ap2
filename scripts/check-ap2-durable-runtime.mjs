@@ -16,9 +16,8 @@ import {
   createDeterministicVoicemailWav,
   VOICEMAIL_WAV_SHA256,
 } from "./create-deterministic-voicemail-wav.mjs";
+import { resolveAp2RuntimeRoot } from "./ap2-runtime-root.mjs";
 
-const DEFAULT_RUNTIME_ROOT =
-  "/var/lib/codex-agent-tools-replacement/worker/ap2-runtime";
 const MIGRATED_USER_ALIASES = ["cory", "homer", "kobe", "marge"];
 const SIMULATED_USER_ALIASES = [...MIGRATED_USER_ALIASES, "rachel"];
 const userFiles = (aliases) => aliases.flatMap((alias) => [
@@ -45,6 +44,8 @@ const MIGRATED_REQUIRED_FILES = [
 const REQUIRED_FILES = [
   ...MIGRATED_REQUIRED_FILES,
   ...userFiles(["rachel"]),
+  "secrets/github/admin-ap2.metadata.json",
+  "secrets/github/admin-ap2.token",
 ];
 
 function fail(message) {
@@ -187,7 +188,7 @@ async function browserAndFakeMicrophoneProof(
 async function main() {
   const browserOnly = process.argv.includes("--browser-only");
   const runtimeRoot = realpathSync(
-    resolve(process.env.AP2_RUNTIME_ROOT ?? DEFAULT_RUNTIME_ROOT),
+    resolve(resolveAp2RuntimeRoot()),
   );
   const recordRuntimeRoot = resolve(
     process.env.AP2_RUNTIME_RECORD_ROOT ?? runtimeRoot,
@@ -205,7 +206,7 @@ async function main() {
   const inventoryPath = join(runtimeRoot, "migration-inventory.json");
   assertPrivatePath(inventoryPath, "file");
   const inventory = JSON.parse(readFileSync(inventoryPath, "utf8"));
-  if (inventory.schemaVersion !== 1 || !Array.isArray(inventory.files)) {
+  if (![1, 2].includes(inventory.schemaVersion) || !Array.isArray(inventory.files)) {
     fail("migration-inventory.json has an unsupported shape");
   }
   const entries = new Map(inventory.files.map((entry) => [entry.path, entry]));
@@ -214,7 +215,16 @@ async function main() {
     assertPrivatePath(dirname(absolutePath), "directory");
     assertPrivatePath(absolutePath, "file");
   }
-  for (const relativePath of MIGRATED_REQUIRED_FILES) {
+  const hashedFiles = inventory.schemaVersion === 2
+    ? REQUIRED_FILES
+    : MIGRATED_REQUIRED_FILES;
+  if (
+    inventory.schemaVersion === 2 &&
+    inventory.destinationRoot !== recordRuntimeRoot
+  ) {
+    fail("migration inventory destinationRoot is not retargeted");
+  }
+  for (const relativePath of hashedFiles) {
     const absolutePath = join(runtimeRoot, relativePath);
     const entry = entries.get(relativePath);
     if (!entry) fail(`migration inventory is missing ${relativePath}`);
@@ -357,6 +367,16 @@ async function main() {
     fail("Dev/Graph certificate and credential key do not match");
   }
 
+  const github = join(runtimeRoot, "secrets/github");
+  JSON.parse(readFileSync(join(github, "admin-ap2.metadata.json"), "utf8"));
+  const githubToken = readFileSync(
+    join(github, "admin-ap2.token"),
+    "utf8",
+  ).trim();
+  if (!githubToken || githubToken.includes("\n")) {
+    fail("GitHub automation token must contain one nonempty line");
+  }
+
   const kobeDirectory = join(runtimeRoot, "secrets/cba/users/kobe");
   await browserAndFakeMicrophoneProof(
     runtimeRoot,
@@ -364,7 +384,7 @@ async function main() {
     readFileSync(join(kobeDirectory, "pfx-passphrase.txt"), "utf8").trim(),
   );
   console.log(
-    `PASS files=${REQUIRED_FILES.length} migrated_hashes=${MIGRATED_REQUIRED_FILES.length} keys=matched chains=verified skis=unique records=retargeted pfx=validated browser=fresh-headless-chromium cba=${basename(kobeDirectory)} microphone=deterministic-wav network=loopback-only`,
+    `PASS files=${REQUIRED_FILES.length} inventory_hashes=${hashedFiles.length} keys=matched chains=verified skis=unique records=retargeted pfx=validated github=present browser=fresh-headless-chromium cba=${basename(kobeDirectory)} microphone=deterministic-wav network=loopback-only`,
   );
 }
 
