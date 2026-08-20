@@ -5,6 +5,7 @@ import {
   DRAFT_PROOF_SUBJECT,
 } from "../api/client";
 import type { FixedProofDefinition } from "./fixed-proof";
+import { installation } from "../installation";
 
 export const draftProofDefinition = {
   id: "draftProof",
@@ -22,7 +23,7 @@ export const draftProofDefinition = {
   },
   activityTarget: "the fixed unsent draft",
   details: [
-    ["Owner", "cory@corywest.onmicrosoft.com"],
+    ["Owner", installation.actors.cory.userPrincipalName],
     ["State", "Unsent draft"],
     ["Subject", DRAFT_PROOF_SUBJECT],
     ["Body", DRAFT_PROOF_BODY],

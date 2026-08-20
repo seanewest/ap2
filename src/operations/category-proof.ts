@@ -4,6 +4,7 @@ import {
   CATEGORY_PROOF_RUN_ID,
 } from "../api/client";
 import type { FixedProofDefinition } from "./fixed-proof";
+import { installation } from "../installation";
 
 export const categoryProofDefinition = {
   id: "categoryProof",
@@ -21,7 +22,7 @@ export const categoryProofDefinition = {
   },
   activityTarget: "the fixed Outlook category",
   details: [
-    ["Owner", "cory@corywest.onmicrosoft.com"],
+    ["Owner", installation.actors.cory.userPrincipalName],
     ["Category", CATEGORY_PROOF_DISPLAY_NAME],
     ["Color preset", CATEGORY_PROOF_COLOR],
   ],

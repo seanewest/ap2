@@ -3,6 +3,7 @@ import {
   TODO_TASK_PROOF_TITLE,
 } from "../api/client";
 import type { FixedProofDefinition } from "./fixed-proof";
+import { installation } from "../installation";
 
 export const todoTaskProofDefinition = {
   id: "todoTaskProof",
@@ -20,7 +21,7 @@ export const todoTaskProofDefinition = {
   },
   activityTarget: "the fixed To Do task",
   details: [
-    ["Owner", "cory@corywest.onmicrosoft.com"],
+    ["Owner", installation.actors.cory.userPrincipalName],
     ["List", "Default To Do list"],
     ["Title", TODO_TASK_PROOF_TITLE],
     ["Status", "Not started"],

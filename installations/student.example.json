@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "installationId": "replace-with-installation-name",
+  "student": {
+    "tenantId": "00000000-0000-4000-8000-000000000001",
+    "initialDomain": "replace.onmicrosoft.com",
+    "delegatedOperatorObjectIds": ["00000000-0000-4000-8000-000000000002"],
+    "automationClientId": "00000000-0000-4000-8000-000000000003"
+  },
+  "actors": {
+    "cory": { "objectId": "00000000-0000-4000-8000-000000000004", "displayName": "Cory West", "userPrincipalName": "cory@replace.onmicrosoft.com" },
+    "homer": { "objectId": "00000000-0000-4000-8000-000000000005", "displayName": "Homer Simpson", "userPrincipalName": "homer.simpson@replace.onmicrosoft.com" },
+    "kobe": { "objectId": "00000000-0000-4000-8000-000000000006", "displayName": "Kobe West", "userPrincipalName": "kobe@replace.onmicrosoft.com" },
+    "marge": { "objectId": "00000000-0000-4000-8000-000000000007", "displayName": "Marge Simpson", "userPrincipalName": "marge.simpson@replace.onmicrosoft.com" }
+  },
+  "azure": {
+    "subscriptionId": "00000000-0000-4000-8000-000000000008",
+    "apiResourceGroup": "replace-with-resource-group",
+    "apiContainerApp": "replace-with-container-app"
+  },
+  "spa": {
+    "apiBaseUrl": "https://api.example.invalid",
+    "allowedOrigin": "https://spa.example.invalid"
+  }
+}

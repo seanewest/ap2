@@ -21,7 +21,8 @@ The resource is requested with the Application ID URI. Its v2 access tokens use
 the API client ID as the `aud` claim.
 
 The API accepts delegated access only when the signed token contains the exact
-scope and one of these Student user object IDs:
+scope and one of the Student user object IDs in the selected installation
+configuration. For the development installation these are:
 
 - human product operator `admin@corywest.onmicrosoft.com`:
   `5ce59710-7ea3-448c-bd7b-8e8d2b75bb1f`
@@ -36,9 +37,12 @@ tenant, configured issuer and audience, and a verified Microsoft signature.
 The API uses `jose` remote JWKS resolution and JWT verification with only
 RS256 accepted.
 
-`AUTH_DELEGATED_USER_OBJECT_IDS` can replace the delegated allowlist with a
-comma-separated list. `AUTH_AUTOMATION_CLIENT_ID` can replace the app-only
-client ID. The Student tenant cannot be overridden.
+`AUTH_DELEGATED_USER_OBJECT_IDS` can temporarily replace the delegated allowlist
+with a comma-separated list. `AUTH_AUTOMATION_CLIENT_ID` can temporarily replace
+the app-only client ID. The normal tenant, caller, actor, Azure, and SPA/API
+bindings come from `AP2_INSTALLATION_CONFIG`, which defaults to
+`installations/development.json`. These values are ordinary non-secret
+installation data; credentials and certificate passphrases remain outside it.
 
 Browser access is disabled unless `CORS_ALLOWED_ORIGIN` names one exact
 HTTP(S) origin. Protected preflights accept only that origin and the
@@ -78,12 +82,16 @@ non-persistent context.
 Production enables each simulated-user operation only when the shared client
 and that actor's certificate settings are present:
 
-- `SIMULATED_USER_CLIENT_ID`: UUID of the existing shared multitenant public
-  client
 - `HOMER_CBA_PFX_PATH`: absolute path to the externally mounted Homer PFX
 - `HOMER_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
 - `KOBE_CBA_PFX_PATH`: absolute path to the externally mounted Kobe PFX
 - `KOBE_CBA_PFX_PASSPHRASE`: PFX passphrase supplied as a secret
+
+The shared Product-owned multitenant client ID and each actor's Student object
+ID and UPN are taken from the stable product identity and selected installation
+record respectively. `SIMULATED_USER_CLIENT_ID` and `CORY_CBA_OBJECT_ID` remain
+accepted as temporary compatibility overrides, but a normal installation does
+not need them.
 
 Kobe's settings enable only the fixed, clearly labeled Kobe-to-Cory help-desk
 email fallback. The public client must already allow the exact

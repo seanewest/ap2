@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "installationId": "development-student",
+  "student": {
+    "tenantId": "92563293-315c-4b6c-9b90-bcb47ee8c970",
+    "initialDomain": "corywest.onmicrosoft.com",
+    "delegatedOperatorObjectIds": [
+      "5ce59710-7ea3-448c-bd7b-8e8d2b75bb1f",
+      "ba97e987-da4c-43e1-ab79-3daa8014440e"
+    ],
+    "automationClientId": "7eb78f18-b49c-495c-a571-af03f06b58a9"
+  },
+  "actors": {
+    "cory": {
+      "objectId": "1d102db5-eea8-48f0-9074-8a4847384770",
+      "displayName": "Cory West",
+      "userPrincipalName": "cory@corywest.onmicrosoft.com"
+    },
+    "homer": {
+      "objectId": "6e54e3a9-7651-4520-a331-047550ae6fca",
+      "displayName": "Homer Simpson",
+      "userPrincipalName": "homer.simpson@corywest.onmicrosoft.com"
+    },
+    "kobe": {
+      "objectId": "646cb944-5637-4410-bfc6-f338598e5804",
+      "displayName": "Kobe West",
+      "userPrincipalName": "kobe@corywest.onmicrosoft.com"
+    },
+    "marge": {
+      "objectId": "9b7fc1a3-58a0-4440-8d09-796e4d405acd",
+      "displayName": "Marge Simpson",
+      "userPrincipalName": "marge.simpson@corywest.onmicrosoft.com"
+    }
+  },
+  "azure": {
+    "subscriptionId": "6d8ebd0e-017f-401e-950d-e5a35de93dc6",
+    "apiResourceGroup": "rg-ap2-rehearsal",
+    "apiContainerApp": "ca-ap2-api"
+  },
+  "spa": {
+    "apiBaseUrl": "https://ca-ap2-api.happycliff-97dcb6b8.eastus.azurecontainerapps.io",
+    "allowedOrigin": "https://seanewest.github.io"
+  }
+}

@@ -1,5 +1,5 @@
 import {
-  CORY_USER_PRINCIPAL_NAME,
+  CORY_USER_PRINCIPAL_NAME, KOBE_USER_PRINCIPAL_NAME,
   type DelegatedGraphToken,
   type DelegatedGraphTokenProvider,
   type SimulatedUserIdentity,
@@ -18,7 +18,7 @@ export const GRAPH_CONTACTS_READ_WRITE_SCOPE = "https://graph.microsoft.com/Cont
 export const CONTACT_RUN_ID = "ap2-contact-20260724-001";
 export const CONTACT_RUN_PROPERTY_ID = "String {95bf4d13-9a68-485d-92cf-7883b578f1a3} Name AP2RunId";
 export const CONTACT_DISPLAY_NAME = "AP2 Kobe Contact Proof";
-export const CONTACT_EMAIL = "kobe@corywest.onmicrosoft.com";
+export const CONTACT_EMAIL = KOBE_USER_PRINCIPAL_NAME;
 type ConfiguredContact = {
   state: "configured";
   displayName: typeof CONTACT_DISPLAY_NAME;

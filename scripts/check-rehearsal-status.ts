@@ -6,11 +6,11 @@ import {
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   STUDENT_TENANT_ID,
 } from "../api/identity.ts";
-import {
-  HttpAfterPartyApi,
-  type AfterPartyApi,
-  type RehearsalStatus,
+import type {
+  AfterPartyApi,
+  RehearsalStatus,
 } from "../src/api/client.ts";
+import { installation } from "../installation/server.ts";
 
 export const AUTOMATION_API_SCOPE =
   `api://${AFTER_PARTY_CLIENT_ID}/.default` as const;
@@ -34,7 +34,10 @@ async function main(): Promise<void> {
   const certificatePath = secureCertificatePath(
     process.env.AP2_AUTOMATION_CERTIFICATE_PATH,
   );
-  const apiBaseUrl = requiredApiBaseUrl(process.env.AP2_API_BASE_URL);
+  const apiBaseUrl = requiredApiBaseUrl(
+    process.env.AP2_API_BASE_URL ?? installation.spa.apiBaseUrl,
+  );
+  const { HttpAfterPartyApi } = await import("../src/api/client.ts");
   const credential = new ClientCertificateCredential(
     STUDENT_TENANT_ID,
     DEVELOPMENT_AUTOMATION_CLIENT_ID,

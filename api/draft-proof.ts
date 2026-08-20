@@ -1,5 +1,6 @@
 import {
-  CORY_USER_PRINCIPAL_NAME, type DelegatedGraphToken,
+  CORY_USER_PRINCIPAL_NAME, KOBE_USER_PRINCIPAL_NAME,
+  MARGE_USER_PRINCIPAL_NAME, type DelegatedGraphToken,
   type DelegatedGraphTokenProvider, type SimulatedUserIdentity,
 } from "./simulated-user.js";
 
@@ -18,8 +19,10 @@ export const DRAFT_RUN_PROPERTY_ID =
 export const DRAFT_SUBJECT =
   "AP2 Pass 3 harmless draft — ap2-draft-20260725-001";
 export const DRAFT_BODY = "Harmless AP2 draft. This message must not be sent.";
-export const DRAFT_RECIPIENTS = ["kobe@corywest.onmicrosoft.com",
-  "marge.simpson@corywest.onmicrosoft.com"] as const;
+export const DRAFT_RECIPIENTS = [
+  KOBE_USER_PRINCIPAL_NAME,
+  MARGE_USER_PRINCIPAL_NAME,
+] as const;
 
 export type DraftProofResult =
   { state: "configured" | "removed"; subject: typeof DRAFT_SUBJECT };

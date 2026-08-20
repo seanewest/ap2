@@ -1,7 +1,8 @@
 import { STUDENT_TENANT_ID } from "./identity.js";
+import { installation } from "../installation/server.ts";
 
 export interface SimulatedUserIdentity {
-  tenantId: typeof STUDENT_TENANT_ID;
+  tenantId: string;
   objectId: string;
   displayName: string;
   userPrincipalName: string;
@@ -9,24 +10,20 @@ export interface SimulatedUserIdentity {
 
 export const HOMER_IDENTITY: SimulatedUserIdentity = {
   tenantId: STUDENT_TENANT_ID,
-  objectId: "6e54e3a9-7651-4520-a331-047550ae6fca",
-  displayName: "Homer Simpson",
-  userPrincipalName: "homer.simpson@corywest.onmicrosoft.com",
+  ...installation.actors.homer,
 };
 
-export const CORY_DISPLAY_NAME = "Cory West";
-export const CORY_USER_PRINCIPAL_NAME =
-  "cory@corywest.onmicrosoft.com";
-export const KOBE_USER_PRINCIPAL_NAME =
-  "kobe@corywest.onmicrosoft.com";
+export const CORY_DISPLAY_NAME = installation.actors.cory.displayName;
+export const CORY_USER_PRINCIPAL_NAME = installation.actors.cory.userPrincipalName;
+export const KOBE_USER_PRINCIPAL_NAME = installation.actors.kobe.userPrincipalName;
 export const KOBE_IDENTITY: SimulatedUserIdentity = {
   tenantId: STUDENT_TENANT_ID,
-  objectId: "646cb944-5637-4410-bfc6-f338598e5804",
-  displayName: "Kobe West",
-  userPrincipalName: KOBE_USER_PRINCIPAL_NAME,
+  ...installation.actors.kobe,
 };
 
-export function coryIdentity(objectId: string): SimulatedUserIdentity {
+export function coryIdentity(
+  objectId = installation.actors.cory.objectId,
+): SimulatedUserIdentity {
   return {
     tenantId: STUDENT_TENANT_ID,
     objectId,
@@ -35,14 +32,11 @@ export function coryIdentity(objectId: string): SimulatedUserIdentity {
   };
 }
 
-export const MARGE_DISPLAY_NAME = "Marge Simpson";
-export const MARGE_USER_PRINCIPAL_NAME =
-  "marge.simpson@corywest.onmicrosoft.com";
+export const MARGE_DISPLAY_NAME = installation.actors.marge.displayName;
+export const MARGE_USER_PRINCIPAL_NAME = installation.actors.marge.userPrincipalName;
 export const MARGE_IDENTITY: SimulatedUserIdentity = {
   tenantId: STUDENT_TENANT_ID,
-  objectId: "9b7fc1a3-58a0-4440-8d09-796e4d405acd",
-  displayName: MARGE_DISPLAY_NAME,
-  userPrincipalName: MARGE_USER_PRINCIPAL_NAME,
+  ...installation.actors.marge,
 };
 
 export interface DelegatedGraphToken {

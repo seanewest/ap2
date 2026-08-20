@@ -4,6 +4,7 @@ import {
   INBOX_RULE_PROOF_SUBJECT,
 } from "../api/client";
 import type { FixedProofDefinition } from "./fixed-proof";
+import { installation } from "../installation";
 
 export const inboxRuleProofDefinition = {
   id: "inboxRuleProof",
@@ -21,7 +22,7 @@ export const inboxRuleProofDefinition = {
   },
   activityTarget: "the fixed disabled Inbox rule",
   details: [
-    ["Owner", "cory@corywest.onmicrosoft.com"],
+    ["Owner", installation.actors.cory.userPrincipalName],
     ["Rule", INBOX_RULE_PROOF_DISPLAY_NAME],
     ["Enabled", "No"],
     ["Subject contains", INBOX_RULE_PROOF_SUBJECT],

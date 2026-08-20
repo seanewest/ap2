@@ -89,7 +89,7 @@ describe("API container provenance", () => {
       baseRuntimeComponents: "reference-bound-not-enumerated",
       baseRootfsDiffIdsDigest: fixtureRootfsDigest,
       baseTag: "mcr.microsoft.com/playwright:v1.2.3-noble",
-      buildInputCount: 10,
+      buildInputCount: 11,
       buildInputsDigest: first.buildInputs.digest,
       buildArtifactClassification: "resolved-during-image-build",
       buildArtifactCount: 0,
@@ -300,6 +300,8 @@ function fixtureRepository(): string {
   temporaryRoots.push(root);
   for (const directory of [
     "api",
+    "installation",
+    "installations",
     "scripts",
     "src/api",
     "src/ui",
@@ -314,9 +316,11 @@ function fixtureRepository(): string {
     [
       `FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.2.3-noble@sha256:${"b".repeat(64)} AS build`,
       "WORKDIR /app",
-      "COPY .dockerignore Dockerfile container-base-lock.json package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./",
+      "COPY .dockerignore Dockerfile container-base-lock.json package.json package-lock.json product-identity.ts tsconfig.json tsconfig.api.json vite.api.config.ts ./",
       "RUN npm ci",
       "COPY api ./api",
+      "COPY installation ./installation",
+      "COPY installations ./installations",
       "COPY scripts ./scripts",
       "COPY src/api ./src/api",
       "COPY src/ui ./src/ui",
@@ -325,6 +329,7 @@ function fixtureRepository(): string {
       "RUN node scripts/api-container-provenance.ts --output container-provenance.json",
       `FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.2.3-noble@sha256:${"b".repeat(64)}`,
       "COPY --from=build /app/dist-api ./dist-api",
+      "COPY --from=build /app/installations ./installations",
       "COPY --from=build /app/node_modules ./node_modules",
       "COPY --from=build /app/container-provenance.json ./container-provenance.json",
       "",
@@ -333,6 +338,7 @@ function fixtureRepository(): string {
   writeFileSync(join(root, "package.json"), JSON.stringify({
     dependencies: { playwright: "1.2.3" },
   }));
+  writeFileSync(join(root, "product-identity.ts"), "export {};\n");
   writeFileSync(join(root, "container-base-lock.json"), JSON.stringify({
     schemaVersion: 2,
     kind: "ap2-api-container-base-lock",

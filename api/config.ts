@@ -1,9 +1,11 @@
 import { isAbsolute } from "node:path";
 import {
+  AFTER_PARTY_CLIENT_ID,
   DEVELOPMENT_AUTOMATION_CLIENT_ID,
   STUDENT_DELEGATED_USER_OBJECT_IDS,
   STUDENT_TENANT_ID,
 } from "./identity.js";
+import { installation } from "../installation/server.ts";
 import type { CallerPolicy } from "./auth-policy.js";
 
 export interface SimulatedUserCertificateConfig {
@@ -34,11 +36,15 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): Api
   return {
     host: environment.HOST ?? "0.0.0.0",
     port: parsePort(environment.PORT ?? "3000"),
-    issuer: required(environment, "AUTH_ISSUER"),
-    audience: required(environment, "AUTH_AUDIENCE"),
-    jwksUrl: required(environment, "AUTH_JWKS_URL"),
+    issuer: environment.AUTH_ISSUER ??
+      `https://login.microsoftonline.com/${STUDENT_TENANT_ID}/v2.0`,
+    audience: environment.AUTH_AUDIENCE ?? AFTER_PARTY_CLIENT_ID,
+    jwksUrl: environment.AUTH_JWKS_URL ??
+      `https://login.microsoftonline.com/${STUDENT_TENANT_ID}/discovery/v2.0/keys`,
     allowInsecureJwks: environment.AUTH_ALLOW_INSECURE_JWKS === "true",
-    allowedOrigin: parseAllowedOrigin(environment.CORS_ALLOWED_ORIGIN),
+    allowedOrigin: parseAllowedOrigin(
+      environment.CORS_ALLOWED_ORIGIN ?? installation.spa.allowedOrigin,
+    ),
     callerPolicy: {
       tenantId: STUDENT_TENANT_ID,
       delegatedUserObjectIds: parseDelegatedUserObjectIds(
@@ -54,7 +60,8 @@ export function loadApiConfig(environment: NodeJS.ProcessEnv = process.env): Api
 function parseSimulatedUsersCbaConfig(
   environment: NodeJS.ProcessEnv,
 ): SimulatedUsersCbaConfig | undefined {
-  const clientId = environment.SIMULATED_USER_CLIENT_ID;
+  const configuredClientId = environment.SIMULATED_USER_CLIENT_ID;
+  const clientId = configuredClientId ?? AFTER_PARTY_CLIENT_ID;
   const homer = parseCertificate(
     environment,
     "HOMER_CBA_PFX_PATH",
@@ -65,7 +72,8 @@ function parseSimulatedUsersCbaConfig(
     "CORY_CBA_PFX_PATH",
     "CORY_CBA_PFX_PASSPHRASE",
   );
-  const coryObjectId = environment.CORY_CBA_OBJECT_ID;
+  const configuredCoryObjectId = environment.CORY_CBA_OBJECT_ID;
+  const coryObjectId = configuredCoryObjectId ?? installation.actors.cory.objectId;
   const kobe = parseCertificate(
     environment,
     "KOBE_CBA_PFX_PATH",
@@ -73,15 +81,13 @@ function parseSimulatedUsersCbaConfig(
   );
 
   if (
-    clientId === undefined &&
-    !homer &&
-    !cory &&
-    !kobe &&
-    coryObjectId === undefined
+    !homer && !cory && !kobe &&
+    configuredClientId === undefined &&
+    configuredCoryObjectId === undefined
   ) {
     return undefined;
   }
-  if (!clientId || (!homer && !cory && !kobe)) {
+  if (!homer && !cory && !kobe) {
     throw new Error(
       "SIMULATED_USER_CLIENT_ID and at least one complete simulated-user certificate must be configured together",
     );
@@ -89,19 +95,19 @@ function parseSimulatedUsersCbaConfig(
   if (!isUuid(clientId)) {
     throw new Error("SIMULATED_USER_CLIENT_ID must be a UUID");
   }
-  if ((cory && !coryObjectId) || (!cory && coryObjectId !== undefined)) {
+  if (configuredCoryObjectId && !cory) {
     throw new Error(
       "CORY_CBA_OBJECT_ID and Cory's complete certificate must be configured together",
     );
   }
-  if (coryObjectId && !isUuid(coryObjectId)) {
+  if (!isUuid(coryObjectId)) {
     throw new Error("CORY_CBA_OBJECT_ID must be a UUID");
   }
   return {
     clientId,
     ...(homer ? { homer } : {}),
     ...(kobe ? { kobe } : {}),
-    ...(cory && coryObjectId
+    ...(cory
       ? { cory: { ...cory, objectId: coryObjectId } }
       : {}),
   };
@@ -158,14 +164,6 @@ function parseAllowedOrigin(value: string | undefined): string | undefined {
     throw new Error("CORS_ALLOWED_ORIGIN must be one exact HTTP(S) origin");
   }
   return url.origin;
-}
-
-function required(environment: NodeJS.ProcessEnv, name: string): string {
-  const value = environment[name];
-  if (!value) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
 }
 
 function parsePort(value: string): number {

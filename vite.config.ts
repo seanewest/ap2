@@ -1,23 +1,29 @@
 import { defineConfig } from "vite";
+import { loadInstallationConfig } from "./installation/server.ts";
 
-export default defineConfig(({ command }) => ({
-  base: command === "serve" ? "/" : "/ap2/",
-  server: {
-    host: "0.0.0.0",
-    port: 5173,
-    strictPort: true,
-    proxy: {
-      "/__ap2_api": {
-        target:
-          "https://ca-ap2-api.happycliff-97dcb6b8.eastus.azurecontainerapps.io",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/__ap2_api/, ""),
-        configure(proxy) {
-          proxy.on("proxyReq", (proxyReq) => {
-            proxyReq.removeHeader("origin");
-          });
+export default defineConfig(({ command }) => {
+  const installation = loadInstallationConfig();
+  return {
+    base: command === "serve" ? "/" : "/ap2/",
+    define: {
+      __AP2_INSTALLATION__: JSON.stringify(installation),
+    },
+    server: {
+      host: "0.0.0.0",
+      port: 5173,
+      strictPort: true,
+      proxy: {
+        "/__ap2_api": {
+          target: installation.spa.apiBaseUrl,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/__ap2_api/, ""),
+          configure(proxy) {
+            proxy.on("proxyReq", (proxyReq) => {
+              proxyReq.removeHeader("origin");
+            });
+          },
         },
       },
     },
-  },
-}));
+  };
+});

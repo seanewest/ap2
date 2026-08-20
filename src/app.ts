@@ -25,6 +25,7 @@ import {
   type SimulatedEmailResult,
 } from "./api/client";
 import { API_ACCESS_SCOPES } from "./api/config";
+import { installation } from "./installation";
 import { withApiSupportReference } from "./api/support-reference";
 import {
   FIXED_PROOF_BY_ID,
@@ -1232,7 +1233,7 @@ function inviteResponseShape(
 function createOneDriveHumanVerificationInstructions(): HTMLOListElement {
   const list = document.createElement("ol");
   for (const instruction of [
-    "In a separate browser or profile, sign in to Outlook as marge.simpson@corywest.onmicrosoft.com.",
+    `In a separate browser or profile, sign in to Outlook as ${installation.actors.marge.userPrincipalName}.`,
     "Open the Microsoft sharing invitation for AP2-OneDrive-share-proof.txt, then use its Open link.",
     "Do not treat an empty OneDrive Shared view as confirmation that access is absent.",
     "Return here and click Remove OneDrive file when finished.",
@@ -1271,7 +1272,7 @@ function createContactProofPanel(
   }
   const details = document.createElement("dl");
   details.className = "identity-list";
-  appendIdentity(details, "Owner", "cory@corywest.onmicrosoft.com");
+  appendIdentity(details, "Owner", installation.actors.cory.userPrincipalName);
   appendIdentity(details, "Display name", CONTACT_PROOF_DISPLAY_NAME);
   appendIdentity(details, "Email", CONTACT_PROOF_EMAIL);
   appendIdentity(details, "Other details", "None");

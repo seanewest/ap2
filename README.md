@@ -56,6 +56,17 @@ npm run dev
 Open <http://localhost:5173/>. The local URL must be registered as an SPA
 redirect URI in Microsoft Entra for authenticated actions.
 
+The checked-in development Student tenant is represented by the non-secret
+[`installations/development.json`](installations/development.json) installation
+record. To build or run against another Student tenant, copy
+[`installations/student.example.json`](installations/student.example.json), fill
+in that installation's tenant, actor, Azure, and SPA/API values, and set
+`AP2_INSTALLATION_CONFIG` to its path. The same selected record drives the SPA
+build/dev proxy, API identity bindings, and Azure target. Credentials,
+certificate paths, and passphrases remain runtime secrets and are not part of
+the installation record. This is a configuration seam only; it does not connect,
+provision, or discover a tenant.
+
 Run the deterministic checks with:
 
 ```sh

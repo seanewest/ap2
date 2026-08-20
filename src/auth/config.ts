@@ -1,4 +1,4 @@
-import { AFTER_PARTY_CLIENT_ID } from "../../api/identity";
+import { AFTER_PARTY_CLIENT_ID } from "../../product-identity";
 
 export { AFTER_PARTY_CLIENT_ID };
 export const ORGANIZATIONS_AUTHORITY =

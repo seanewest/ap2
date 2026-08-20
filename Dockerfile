@@ -1,9 +1,11 @@
 FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.61.1-noble@sha256:cf0daee9b994042e011bc29f20cdff1a9f682a039b43fcd738f7d8a9d3bcd9d6 AS build
 
 WORKDIR /app
-COPY .dockerignore Dockerfile container-base-lock.json package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./
+COPY .dockerignore Dockerfile container-base-lock.json package.json package-lock.json product-identity.ts tsconfig.json tsconfig.api.json vite.api.config.ts ./
 RUN npm ci
 COPY api ./api
+COPY installation ./installation
+COPY installations ./installations
 COPY scripts ./scripts
 COPY src/api ./src/api
 COPY src/ui ./src/ui
@@ -16,6 +18,7 @@ FROM --platform=linux/amd64 mcr.microsoft.com/playwright:v1.61.1-noble@sha256:cf
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/dist-api ./dist-api
+COPY --from=build /app/installations ./installations
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/container-provenance.json ./container-provenance.json
 USER pwuser

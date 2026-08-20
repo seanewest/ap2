@@ -8,18 +8,16 @@ import {
 import { loadApiConfig } from "./config.js";
 
 describe("loadApiConfig", () => {
-  it.each(["AUTH_ISSUER", "AUTH_AUDIENCE", "AUTH_JWKS_URL"])(
-    "fails closed without %s",
-    (missing) => {
-      const environment: NodeJS.ProcessEnv = {
-        AUTH_ISSUER: "https://issuer.example/",
-        AUTH_AUDIENCE: "api://audience",
-        AUTH_JWKS_URL: "https://issuer.example/keys",
-      };
-      delete environment[missing];
-      expect(() => loadApiConfig(environment)).toThrow(`${missing} is required`);
-    },
-  );
+  it("derives the Microsoft token boundary from the selected installation", () => {
+    const config = loadApiConfig({});
+    expect(config.issuer).toBe(
+      `https://login.microsoftonline.com/${STUDENT_TENANT_ID}/v2.0`,
+    );
+    expect(config.audience).toBe("c91c7af4-b1b8-4730-a240-4a1c6137ab15");
+    expect(config.jwksUrl).toBe(
+      `https://login.microsoftonline.com/${STUDENT_TENANT_ID}/discovery/v2.0/keys`,
+    );
+  });
 
   it("uses the immutable tenant and configured caller IDs", () => {
     const config = loadApiConfig({
@@ -205,15 +203,15 @@ describe("loadApiConfig", () => {
       KOBE_CBA_PFX_PATH: "/run/secrets/kobe.pfx",
       KOBE_CBA_PFX_PASSPHRASE: "kobe-passphrase",
     },
-  ])("rejects complete user CBA configuration without the shared client", (user) => {
-    expect(() =>
+  ])("uses the stable shared client with complete actor certificate configuration", (user) => {
+    expect(
       loadApiConfig({
         AUTH_ISSUER: "https://issuer.example/",
         AUTH_AUDIENCE: "api://audience",
         AUTH_JWKS_URL: "https://issuer.example/keys",
         ...user,
-      }),
-    ).toThrow("must be configured together");
+      }).simulatedUsersCba?.clientId,
+    ).toBe("c91c7af4-b1b8-4730-a240-4a1c6137ab15");
   });
 
   it("rejects an invalid Homer client ID or non-absolute PFX path", () => {
@@ -253,7 +251,7 @@ describe("loadApiConfig", () => {
     },
   );
 
-  it("accepts one exact browser origin and otherwise leaves CORS disabled", () => {
+  it("accepts one exact browser-origin override and otherwise uses the installation origin", () => {
     expect(
       loadApiConfig({
         AUTH_ISSUER: "https://issuer.example/",
@@ -268,7 +266,7 @@ describe("loadApiConfig", () => {
         AUTH_AUDIENCE: "api://audience",
         AUTH_JWKS_URL: "https://issuer.example/keys",
       }).allowedOrigin,
-    ).toBeUndefined();
+    ).toBe("https://seanewest.github.io");
   });
 
   it.each([

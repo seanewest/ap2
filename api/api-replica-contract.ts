@@ -1,3 +1,5 @@
+import { installation } from "../installation/server.ts";
+
 export const API_SINGLE_REPLICA_SCALE = Object.freeze({
   minReplicas: 1,
   maxReplicas: 1,
@@ -5,7 +7,7 @@ export const API_SINGLE_REPLICA_SCALE = Object.freeze({
 
 export const API_DEPLOYMENT_REPLICA_CONTRACT = Object.freeze({
   schemaVersion: 1,
-  target: "ca-ap2-api",
+  target: installation.azure.apiContainerApp,
   ...API_SINGLE_REPLICA_SCALE,
 } as const);
 

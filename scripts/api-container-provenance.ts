@@ -20,12 +20,15 @@ const INPUT_FILES = [
   "container-base-lock.json",
   "package-lock.json",
   "package.json",
+  "product-identity.ts",
   "tsconfig.api.json",
   "tsconfig.json",
   "vite.api.config.ts",
 ] as const;
 const INPUT_DIRECTORIES = [
   "api",
+  "installation",
+  "installations",
   "scripts",
   "src/api",
   "src/ui",
@@ -290,8 +293,10 @@ function validateContainerContract(
   const finalRuns = instructionLines(finalStage, "RUN");
   if (
     JSON.stringify(buildCopies) !== JSON.stringify([
-      "COPY .dockerignore Dockerfile container-base-lock.json package.json package-lock.json tsconfig.json tsconfig.api.json vite.api.config.ts ./",
+      "COPY .dockerignore Dockerfile container-base-lock.json package.json package-lock.json product-identity.ts tsconfig.json tsconfig.api.json vite.api.config.ts ./",
       "COPY api ./api",
+      "COPY installation ./installation",
+      "COPY installations ./installations",
       "COPY scripts ./scripts",
       "COPY src/api ./src/api",
       "COPY src/ui ./src/ui",
@@ -304,6 +309,7 @@ function validateContainerContract(
     ]) ||
     JSON.stringify(finalCopies) !== JSON.stringify([
       "COPY --from=build /app/dist-api ./dist-api",
+      "COPY --from=build /app/installations ./installations",
       "COPY --from=build /app/node_modules ./node_modules",
       "COPY --from=build /app/container-provenance.json ./container-provenance.json",
     ]) ||

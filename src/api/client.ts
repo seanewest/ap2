@@ -10,6 +10,7 @@ import {
   readApiSupportReference,
   type ApiSupportReferencedError,
 } from "./support-reference.ts";
+import { installation } from "../installation.ts";
 
 export interface ApiCallerIdentity {
   callerType: "delegated" | "app-only";
@@ -83,9 +84,9 @@ export interface SimulatedEmailResult {
 }
 
 export const HELP_DESK_SCENARIO_SENDER =
-  "kobe@corywest.onmicrosoft.com";
+  installation.actors.kobe.userPrincipalName;
 export const HELP_DESK_SCENARIO_RECIPIENT =
-  "cory@corywest.onmicrosoft.com";
+  installation.actors.cory.userPrincipalName;
 export const HELP_DESK_SCENARIO_SUBJECT =
   "AP2 help desk follow-up [ap2-help-desk-email-20260729-001]";
 export interface HelpDeskScenarioResult {
@@ -98,7 +99,7 @@ export interface HelpDeskScenarioResult {
 }
 
 export const CONTACT_PROOF_DISPLAY_NAME = "AP2 Kobe Contact Proof";
-export const CONTACT_PROOF_EMAIL = "kobe@corywest.onmicrosoft.com";
+export const CONTACT_PROOF_EMAIL = installation.actors.kobe.userPrincipalName;
 export const CONTACT_PROOF_RUN_ID = "ap2-contact-20260724-001";
 type ConfiguredContact = {
   state: "configured";
@@ -142,8 +143,8 @@ export const DRAFT_PROOF_SUBJECT =
 export const DRAFT_PROOF_BODY =
   "Harmless AP2 draft. This message must not be sent.";
 export const DRAFT_PROOF_RECIPIENTS = [
-  "kobe@corywest.onmicrosoft.com",
-  "marge.simpson@corywest.onmicrosoft.com",
+  installation.actors.kobe.userPrincipalName,
+  installation.actors.marge.userPrincipalName,
 ] as const;
 export type DraftProofResult =
   | { state: "configured"; subject: typeof DRAFT_PROOF_SUBJECT }
@@ -156,10 +157,10 @@ export type TodoTaskProofResult =
   | { state: "removed"; title: typeof TODO_TASK_PROOF_TITLE };
 
 export const CALENDAR_MEETING_ORGANIZER =
-  "cory@corywest.onmicrosoft.com";
+  installation.actors.cory.userPrincipalName;
 export const CALENDAR_MEETING_ATTENDEES = [
-  "kobe@corywest.onmicrosoft.com",
-  "marge.simpson@corywest.onmicrosoft.com",
+  installation.actors.kobe.userPrincipalName,
+  installation.actors.marge.userPrincipalName,
 ] as const;
 export const CALENDAR_MEETING_SUBJECT =
   "AP2 Pass 3 calendar rehearsal — no action required";
@@ -184,9 +185,9 @@ export type CalendarMeetingResult =
 
 export const ONEDRIVE_PROOF_PATH = "/AP2-OneDrive-share-proof.txt";
 const ONEDRIVE_PROOF_OWNER =
-  "homer.simpson@corywest.onmicrosoft.com";
+  installation.actors.homer.userPrincipalName;
 const ONEDRIVE_PROOF_RECIPIENT =
-  "marge.simpson@corywest.onmicrosoft.com";
+  installation.actors.marge.userPrincipalName;
 
 export type OneDriveProofResult =
   | {
@@ -219,9 +220,9 @@ export interface OneDriveInviteFailure {
 }
 
 const SIMULATED_EMAIL_SENDER =
-  "homer.simpson@corywest.onmicrosoft.com";
+  installation.actors.homer.userPrincipalName;
 const SIMULATED_EMAIL_RECIPIENT =
-  "marge.simpson@corywest.onmicrosoft.com";
+  installation.actors.marge.userPrincipalName;
 const SIMULATED_EMAIL_SUBJECT = "Dinner tonight";
 
 export interface AfterPartyApi {
