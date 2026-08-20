@@ -9,11 +9,11 @@ print certificate material.
 
 ## Run it
 
-> **Current runtime prerequisite:** after the 2026-08-20 AgentTools runtime
-> migration, the former protected AP2 runtime path is no longer present on
-> `work`, and a verified replacement path has not yet been established. Restore
-> the protected runtime first and set `AP2_RUNTIME_ROOT`; do not copy these
-> commands back to the retired replacement-state path.
+> **Current identity prerequisite:** the protected AP2 development runtime is
+> restored and usable on `work`, but the dedicated operator certificate expired
+> on 2026-08-19 at 01:56 UTC. This browser test remains blocked until a replacement
+> operator certificate is issued and its Entra CBA mapping is updated together.
+> Do not work around that expiry by weakening CBA or reusing another identity.
 
 Install Chromium once:
 
@@ -32,7 +32,7 @@ issuer/JWKS, Product audience, and
 ```sh
 test -n "$AP2_RUNTIME_ROOT"
 export AP2_CBA_PFX_PATH="$AP2_RUNTIME_ROOT/secrets/cba/operator/operator-certificate.pfx"
-export AP2_CBA_PFX_PASSPHRASE="$(<"$AP2_RUNTIME_ROOT/secrets/cba/operator/operator-pfx-passphrase.txt")"
+export AP2_CBA_PFX_PASSPHRASE_FILE="$AP2_RUNTIME_ROOT/secrets/cba/operator/operator-pfx-passphrase.txt"
 export VITE_API_BASE_URL=http://127.0.0.1:3000
 npm run test:e2e:cba
 ```

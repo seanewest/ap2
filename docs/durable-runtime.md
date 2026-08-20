@@ -1,35 +1,36 @@
 # Durable AP2 runtime boundary
 
-AP2 browser, CBA, and Dev/Graph automation requires an owner-only protected
-runtime on the durable `work` CT. The AgentTools runtime redesign removed the
-legacy replacement-state tree that previously held this material. As of the
-2026-08-20 post-migration reconciliation, that protected AP2 runtime has **not**
-been found at a new live path on `work`.
+AP2 browser, CBA, and Dev/Graph automation uses one owner-only protected
+development runtime on the durable `work` CT. After the AgentTools redesign it
+was restored at:
 
-Do not treat the former
-`/var/lib/codex-agent-tools-replacement/worker/ap2-runtime` path as current and
-do not invent a replacement location in an assignment. Browser/CBA-heavy AP2
-work that needs this material must first restore/rehome the protected runtime
-from the retained migration recovery sources and then set `AP2_RUNTIME_ROOT` to
-that verified owner-only location.
+```text
+/home/agent/.local/share/ap2/runtime
+```
 
-The intended layout remains:
+Fresh workers receive the path-only runtime environment from
+`/home/agent/.config/ap2/runtime.env`. AP2 tooling resolves the runtime in this
+order: explicit `AP2_RUNTIME_ROOT`, then `$XDG_DATA_HOME/ap2/runtime`, then
+`$HOME/.local/share/ap2/runtime`.
+
+The live layout is:
 
 ```text
 $AP2_RUNTIME_ROOT/
-├── secrets/       # standing protected AP2 material
-├── runs/          # disposable outputs; never reusable browser state
-└── containers/    # reproducible browser image storage
+├── secrets/       # standing protected AP2 development material
+└── runs/          # disposable outputs; currently empty between runs
 ```
 
-On the current `work` CT the runtime, once restored, should be owned by `agent`
-and remain private: root/private directories mode `0700`, protected files mode
-`0600`. Secrets, cookies, browser storage state, cached interactive sessions,
-and machine profiles do not belong in Git or report output.
+Reproducible container/browser cache lives separately under
+`/home/agent/.cache/ap2/containers`; it is not authoritative credential state.
+The runtime is owned by `agent`; protected directories are mode `0700` and
+protected files are mode `0600`. Secrets, cookies, browser storage state,
+cached interactive sessions, historical run evidence, and machine profiles do
+not belong in Git or report output.
 
 ## Standing protected material
 
-The protected runtime is expected to restore the standing material previously used by AP2:
+The protected runtime contains the standing development material used by AP2:
 
 - the Lisa simulated-user CBA issuer material;
 - Cory, Homer, Kobe, Marge, and Rachel user certificates, encrypted keys, PFX
@@ -42,10 +43,10 @@ Create a fresh nonpersistent browser context from the applicable standing
 certificate for each run. Do not preserve cookies or export reusable signed-in
 browser state.
 
-Once restored, normal work should use only this durable runtime. Historical WSL
-copies, Proxmox snapshots, or dated backups are recovery sources, not ordinary
-execution dependencies. Routine AP2 work must not recreate the retired bridge or
-depend on a human workstation.
+Normal development work should use this live runtime. Historical WSL copies,
+Proxmox snapshots, and dated backups are recovery sources, not ordinary
+execution dependencies. Routine AP2 work must not recreate the retired bridge
+or depend on a human workstation.
 
 ## Current identity boundary
 
@@ -60,11 +61,11 @@ record a specific simulated user.
 
 ## Readiness
 
-After a verified `AP2_RUNTIME_ROOT` has been restored, install repository
-dependencies with `npm ci`, export that path, then run:
+Fresh AgentTools workers normally inherit `AP2_RUNTIME_ROOT`; an interactive
+shell may also source `/home/agent/.config/ap2/runtime.env`. After repository
+dependencies are installed, run:
 
 ```sh
-export AP2_RUNTIME_ROOT=/verified/owner-only/ap2-runtime
 npm run check:durable-runtime
 ```
 
@@ -84,6 +85,14 @@ npm run check:durable-runtime -- --browser-only
 That proves only the pinned browser and fake-microphone layer. A successful
 readiness check proves local protected material and browser preparation, not a
 live Microsoft capability.
+
+The 2026-08-20 restoration validated all 42 live secret-file hashes, the original
+migration-inventory anchor, simulated-user chains/keys/PFX files and unique SKIs,
+Dev/Graph Graph and ARM read-only authentication, GitHub read access, fresh
+Chromium, and deterministic microphone readiness. The dedicated SPA operator
+PFX is internally valid but its certificate expired on 2026-08-19 at 01:56 UTC;
+the full readiness command therefore correctly remains non-green until that
+operator certificate and Entra CBA mapping are renewed together.
 
 The initial migration, one-time WSL transfer, certificate renewal, Rachel
 addition, and exact validation evidence are retained separately in
