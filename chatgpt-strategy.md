@@ -1,6 +1,6 @@
 # AP2 Strategist supplement
 
-The generic Strategist role belongs to `seanewest/codex-agent-tools`. This file
+The generic Strategist role belongs to `seanewest/agent-tools`. This file
 contains only AP2-specific strategy guidance.
 
 AP2 is currently moving from isolated capability proofs toward direct
@@ -35,7 +35,7 @@ procedural contract for the worker.
 
 When Sean approves execution, use the shared Strategist -> Coordinator ->
 durable goal -> worker flow. AP2 product and capability work belongs in `ap2`.
-A generic harness defect or feature belongs in `codex-agent-tools` and does not
+A generic harness defect or feature belongs in `agent-tools` and does not
 become AP2 product direction.
 
 ## Starting an AP2 strategy session

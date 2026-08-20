@@ -1,7 +1,7 @@
 # AP2 repository guidance
 
 This file applies to work inside `ap2`. Generic Strategist, Coordinator, and
-worker behavior belongs to `seanewest/codex-agent-tools` and the runtime role
+worker behavior belongs to `seanewest/agent-tools` and the runtime role
 instructions in `$CODEX_HOME/AGENTS.md`.
 
 ## Current project stage
@@ -106,4 +106,4 @@ a real boundary, durable recoverability, or the next useful step.
 AP2 uses the shared AgentTools workflow, but project direction and evidence stay
 in this repository. Workers follow their runtime role instructions plus this
 file. Harness defects and generic workflow features belong in
-`codex-agent-tools`, not in AP2 product direction.
+`agent-tools`, not in AP2 product direction.

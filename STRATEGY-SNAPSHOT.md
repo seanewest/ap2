@@ -7,7 +7,7 @@ Coordinator/worker orientation. Use the Durable Coordinator for active work and
 
 ## Recover the project
 
-Read the shared Strategist guidance in `codex-agent-tools`, then this repository's
+Read the shared Strategist guidance in `agent-tools`, then this repository's
 `AGENTS.md`, `chatgpt-strategy.md`, `docs/product-direction.md`, and
 `docs/product-model.md`. Consult only the relevant sections of
 `docs/proven-capabilities.md`. Inspect the Durable Coordinator before assuming
@@ -118,7 +118,7 @@ evidence until Sean chooses a materially different question. Search it on demand
 do not use its size as a reason to re-ingest the entire project history.
 
 AP2 product work belongs in `ap2`. Generic Strategist/Coordinator/worker behavior
-and shared harness defects or features belong in `codex-agent-tools`. This
+and shared harness defects or features belong in `agent-tools`. This
 snapshot may explain that boundary to the next Strategist, but it does not become
 part of routine Coordinator orientation.
 

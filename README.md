@@ -41,7 +41,7 @@ points:
 The AP2-specific role supplements are
 [chatgpt-strategy.md](chatgpt-strategy.md) and
 [coordinator-strategy.md](coordinator-strategy.md). The generic role and workflow
-contract lives in `seanewest/codex-agent-tools`.
+contract lives in `seanewest/agent-tools`.
 
 ## Development
 

@@ -9,6 +9,12 @@ print certificate material.
 
 ## Run it
 
+> **Current runtime prerequisite:** after the 2026-08-20 AgentTools runtime
+> migration, the former protected AP2 runtime path is no longer present on
+> `work`, and a verified replacement path has not yet been established. Restore
+> the protected runtime first and set `AP2_RUNTIME_ROOT`; do not copy these
+> commands back to the retired replacement-state path.
+
 Install Chromium once:
 
 ```sh
@@ -24,8 +30,9 @@ issuer/JWKS, Product audience, and
 [Hosted API contracts](api-identity.md). Then run:
 
 ```sh
-export AP2_CBA_PFX_PATH=/var/lib/codex-agent-tools-replacement/worker/ap2-runtime/secrets/cba/operator/operator-certificate.pfx
-export AP2_CBA_PFX_PASSPHRASE="$(</var/lib/codex-agent-tools-replacement/worker/ap2-runtime/secrets/cba/operator/operator-pfx-passphrase.txt)"
+test -n "$AP2_RUNTIME_ROOT"
+export AP2_CBA_PFX_PATH="$AP2_RUNTIME_ROOT/secrets/cba/operator/operator-certificate.pfx"
+export AP2_CBA_PFX_PASSPHRASE="$(<"$AP2_RUNTIME_ROOT/secrets/cba/operator/operator-pfx-passphrase.txt")"
 export VITE_API_BASE_URL=http://127.0.0.1:3000
 npm run test:e2e:cba
 ```

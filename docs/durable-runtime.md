@@ -1,28 +1,35 @@
 # Durable AP2 runtime boundary
 
-Ordinary AP2 browser, CBA, and Dev/Graph automation runs on the durable worker as
-`codex_worker_replacement`. Its owner-only root is:
+AP2 browser, CBA, and Dev/Graph automation requires an owner-only protected
+runtime on the durable `work` CT. The AgentTools runtime redesign removed the
+legacy replacement-state tree that previously held this material. As of the
+2026-08-20 post-migration reconciliation, that protected AP2 runtime has **not**
+been found at a new live path on `work`.
+
+Do not treat the former
+`/var/lib/codex-agent-tools-replacement/worker/ap2-runtime` path as current and
+do not invent a replacement location in an assignment. Browser/CBA-heavy AP2
+work that needs this material must first restore/rehome the protected runtime
+from the retained migration recovery sources and then set `AP2_RUNTIME_ROOT` to
+that verified owner-only location.
+
+The intended layout remains:
 
 ```text
-/var/lib/codex-agent-tools-replacement/worker/ap2-runtime/
+$AP2_RUNTIME_ROOT/
 ├── secrets/       # standing protected AP2 material
 ├── runs/          # disposable outputs; never reusable browser state
-└── containers/    # pinned reproducible browser image storage
+└── containers/    # reproducible browser image storage
 ```
 
-The absolute path reflects the current site deployment; it is not a generic
-AgentTools product contract. AP2 scripts accept `AP2_RUNTIME_ROOT` when the same
-owner-only layout is installed elsewhere.
-
-The root and private directories are mode `0700`; protected files are mode
-`0600`; all are owned by
-`codex_worker_replacement:codex_worker_replacement`. Secrets, cookies, browser
-storage state, cached interactive sessions, and machine profiles do not belong
-in Git or report output.
+On the current `work` CT the runtime, once restored, should be owned by `agent`
+and remain private: root/private directories mode `0700`, protected files mode
+`0600`. Secrets, cookies, browser storage state, cached interactive sessions,
+and machine profiles do not belong in Git or report output.
 
 ## Standing protected material
 
-The runtime currently contains:
+The protected runtime is expected to restore the standing material previously used by AP2:
 
 - the Lisa simulated-user CBA issuer material;
 - Cory, Homer, Kobe, Marge, and Rachel user certificates, encrypted keys, PFX
@@ -35,10 +42,10 @@ Create a fresh nonpersistent browser context from the applicable standing
 certificate for each run. Do not preserve cookies or export reusable signed-in
 browser state.
 
-Normal work uses only this durable runtime. WSL copies are historical rollback
-evidence, not an execution dependency. A separately authorized recovery may
-consult that evidence, but routine AP2 work must not recreate the retired bridge
-or depend on a human workstation.
+Once restored, normal work should use only this durable runtime. Historical WSL
+copies, Proxmox snapshots, or dated backups are recovery sources, not ordinary
+execution dependencies. Routine AP2 work must not recreate the retired bridge or
+depend on a human workstation.
 
 ## Current identity boundary
 
@@ -53,9 +60,11 @@ record a specific simulated user.
 
 ## Readiness
 
-Install repository dependencies with `npm ci`, then run:
+After a verified `AP2_RUNTIME_ROOT` has been restored, install repository
+dependencies with `npm ci`, export that path, then run:
 
 ```sh
+export AP2_RUNTIME_ROOT=/verified/owner-only/ap2-runtime
 npm run check:durable-runtime
 ```
 
