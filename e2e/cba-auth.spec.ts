@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { AP2_INSTALLATION_EXTENSION_NAME } from "../product-identity";
 import {
   STUDENT_OPERATOR,
 } from "./cba-settings";
@@ -6,6 +7,25 @@ import {
 test("signs the dedicated operator in and out through Microsoft CBA", async ({
   page,
 }) => {
+  const discoveryStatuses: number[] = [];
+  const apiIdentityStatuses: number[] = [];
+  page.on("response", (response) => {
+    const url = new URL(response.url());
+    if (
+      response.request().method() === "GET" &&
+      url.hostname === "graph.microsoft.com" &&
+      url.pathname.endsWith(`/extensions/${AP2_INSTALLATION_EXTENSION_NAME}`)
+    ) {
+      discoveryStatuses.push(response.status());
+    }
+    if (
+      response.request().method() === "GET" &&
+      url.pathname === "/api/whoami"
+    ) {
+      apiIdentityStatuses.push(response.status());
+    }
+  });
+
   await page.goto("./");
   await expect(page.getByText("You are signed out.")).toBeVisible();
 
@@ -29,6 +49,8 @@ test("signs the dedicated operator in and out through Microsoft CBA", async ({
   await expect(
     page.getByText("Connected to this tenant's AP2 API.", { exact: true }),
   ).toBeVisible();
+  expect(discoveryStatuses).toEqual([200]);
+  expect(apiIdentityStatuses).toEqual([200]);
   await expect(
     page.getByRole("button", {
       name: "Send one internal email: Homer → Marge",
@@ -41,6 +63,16 @@ test("signs the dedicated operator in and out through Microsoft CBA", async ({
     page.getByRole("button", { name: "Cancel calendar meeting" }),
   ).toBeVisible();
   await expect(page.getByText(/bearer|access token|eyJ/i)).toHaveCount(0);
+
+  await page.reload();
+  await expect(
+    page.getByText("Connected to this tenant's AP2 API.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator("dd").getByText(STUDENT_OPERATOR, { exact: true }),
+  ).toBeVisible();
+  expect(discoveryStatuses).toEqual([200, 200]);
+  expect(apiIdentityStatuses).toEqual([200, 200]);
 
   const logoutRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());

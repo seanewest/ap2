@@ -39,11 +39,11 @@ npm run test:e2e:cba
 
 The command starts Vite at <http://localhost:5173/>, clicks the product sign-in
 button, completes Entra CBA, verifies the dedicated operator UPN and the enabled
-operator actions without invoking them, and confirms that tenant-side discovery
-connected the SPA to the selected installation's API. It then clicks the product
-sign-out button, completes Microsoft's logout redirect, and verifies the
-signed-out state and disabled actions again after a reload. Browser output defaults to
-`/tmp/ap2-playwright-cba` and contains no reusable storage state.
+operator actions without invoking them, then clicks the product sign-out button.
+It completes Microsoft's logout redirect and verifies the signed-out state and
+disabled actions again after a reload. The explicit local API override is a
+development path and does not prove tenant-side discovery. Browser output
+defaults to `/tmp/ap2-playwright-cba` and contains no reusable storage state.
 
 For a hosted non-mutating preflight, point both targets explicitly:
 
@@ -54,12 +54,11 @@ export AP2_PLAYWRIGHT_OUTPUT_DIR=/tmp/ap2-playwright-cba
 npm run test:e2e:cba
 ```
 
-The first API response has an explicit 90-second allowance for a Container Apps
-cold start. Every matching `/api/` request is attached to the Playwright result
-as `api-route-ledger.json`, including its method, path, safe response fields,
-status, and elapsed time. The attachment is written from test cleanup even when
-an assertion fails or a request is still pending. It never records request
-headers, request bodies, tokens, full URLs, or raw response bodies.
+The hosted preflight proves tenant-side discovery. It requires one successful
+Graph read of the selected installation record and one successful `/api/whoami`
+read at the discovered URL before enabling actions. It reloads the signed-in
+page and requires both reads to succeed again, then signs out. It records no
+request headers, bodies, tokens, full URLs, or raw responses.
 
 ## Required Student state
 
@@ -76,6 +75,10 @@ The test is fixed to Student tenant
 - licenses `SPB` (`cbdc14ab-d96c-4c30-b9f4-6ada7cdc1d46`) and
   `DEFENDER_AND_PURVIEW_SUITES_FOR_BUSINESS_PREMIUM_NEW`
   (`3c9fe495-e4c9-4e70-9669-6d0a4347aa38`).
+- delegated Microsoft Graph `User.Read` consent for the existing AP2 service
+  principal; and
+- the selected installation's `com.seanewest.ap2.installation` organization
+  extension described in [Tenant API discovery](tenant-installation-discovery.md).
 
 The test does not provision or modify this state. Before any separate tenant
 maintenance, use an isolated Azure CLI configuration with
