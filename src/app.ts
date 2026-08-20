@@ -928,6 +928,7 @@ function createProvenScenariosSection(): HTMLElement {
     "Dormant OAuth application remediation: Create an inert application with a temporary credential, discover it through inventory, remove it, and confirm its absence.",
     "Defender email-attachment prevention: Send Microsoft's EICAR test attachment and observe Defender block and quarantine it through message trace and security evidence.",
     "Teams group-chat membership remediation: Create a group chat, add an unexpected participant, post a warning message, and have Cory remove that participant.",
+    "Fake verification click through Win+R: Click Verify in guest Edge, paste the harmless command into Run, display Hello World, and observe the Defender alert.",
   ]);
 }
 
