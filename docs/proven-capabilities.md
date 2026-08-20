@@ -5,6 +5,10 @@ listed only when it was exercised through the hosted product path or by a
 bounded direct canary against the Student tenant. Unit tests, deployment alone,
 and code that has not touched Microsoft are not counted as live proof.
 
+Use this as a searchable evidence ledger, not cover-to-cover orientation. Search
+by workload, actor, product, or capability, then read the relevant row and its
+limitations. Entries are completed evidence, not an implied backlog.
+
 A bounded canary proves only the action or observation it exercised. It is not
 automatically a scenario or lab, and future capability work does not require a
 generalized manifest or learner contract.

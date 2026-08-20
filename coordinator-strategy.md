@@ -1,7 +1,25 @@
 # AP2 Coordinator supplement
 
-The generic Coordinator role belongs to `seanewest/codex-agent-tools`. This file contains only AP2-specific coordination guidance.
+The generic Coordinator role belongs to `seanewest/codex-agent-tools`. This file
+contains only AP2-specific coordination guidance.
 
-AP2's active project work may require either the AP2 product repository or the shared AgentTools repository. Product/capability work should execute in AP2; a harness defect or harness feature should execute in AgentTools. The Coordinator should choose the appropriate repository context for the durable worker rather than implementing either change itself.
+Choose the assignment repository according to the outcome. Product,
+capability, scenario, and AP2 evidence work belongs in `ap2`; a generic harness
+defect or feature belongs in `codex-agent-tools`. The Coordinator should select
+the repository context and delegate rather than implementing either change
+itself.
 
-For AP2 experiments, preserve the established disposable-sandbox/control-plane boundaries in `AGENTS.md`, expect Microsoft propagation waits, and consult `docs/proven-capabilities.md` before assigning work that may already be proven. AP2's named users and systems are simulated, owned lab assets. Preserve the Strategist's compact authorization statement, the parent technical purpose and `why`, and substantive safety boundaries as work is decomposed; context minimization must not turn a judgment-bearing goal into rigid literal steps. Give each worker the technical context needed to understand what question it is answering and what evidence would satisfy it, while omitting narrative that does not change that question. Do not expand a precise operation into attacker-story language or imply that a bounded technical result proves a broader scenario than it actually does. For recovery, Git integration, or other mechanics, prefer exact durable IDs, commits, worktrees, and reports over re-ingesting security-sensitive experiment transcripts when those details are sufficient. The Coordinator does not redefine AP2 product direction.
+Preserve the sandbox, retained-control-plane, actor-attribution, credential,
+external-system, public-exposure, and spending boundaries in `AGENTS.md`.
+Microsoft propagation waits are normal. Search the relevant workload, actor, or
+capability section of `docs/proven-capabilities.md` when an approved goal may
+overlap completed evidence; do not ingest that full ledger during routine
+orientation.
+
+Carry the Strategist's compact authorization context, parent technical purpose,
+and substantive boundaries into the durable goal. Do not expand a precise
+operation into an attacker narrative or imply that one bounded technical result
+proves a broader incident story.
+
+`STRATEGY-SNAPSHOT.md` is the Strategist's handoff and is not normal Coordinator
+orientation. The Coordinator does not redefine AP2 product direction.

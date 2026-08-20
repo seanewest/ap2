@@ -133,11 +133,11 @@ publishable-lab contract unless Sean explicitly changes the goal to lab design.
 
 ## Worker ownership
 
-One peer worker can own a coherent exploration question through research, live
-proof, ordinary correction, and the minimum useful record. The worker may use
-subagents, but it remains responsible for the original question.
+One goal-owned worker can own a coherent exploration question through research,
+live proof, ordinary correction, and the minimum useful record. The worker may
+use subagents, but it remains responsible for the original question.
 
-Return to the local coordinator when the question is answered, a real human or
+Return to the Coordinator when the question is answered, a real human or
 strategy decision is needed, a boundary must change, or an external dependency
 prevents useful progress.
 

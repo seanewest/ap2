@@ -1,183 +1,109 @@
-# AGENTS.md
+# AP2 repository guidance
 
-This file is AP2 repository guidance. Runtime Coordinator and worker behavior
-comes from the shared harness `$CODEX_HOME/AGENTS.md` and the generic AgentTools
-workflow documents.
+This file applies to work inside `ap2`. Generic Strategist, Coordinator, and
+worker behavior belongs to `seanewest/codex-agent-tools` and the runtime role
+instructions in `$CODEX_HOME/AGENTS.md`.
 
-## What AP2 is doing now
+## Current project stage
 
-AP2 is an exploratory project for learning what can be created, changed,
-observed, and reset across Microsoft 365, Azure, endpoints, SaaS integrations,
-applications, and related security systems.
+AP2 is exploring what can be created, changed, observed, detected, controlled,
+and reset across Microsoft 365, Azure, endpoints, SaaS applications, and related
+security systems. Current work is capability exploration and direct composition
+of realistic incident-like scenarios. Lab design, teaching, learner flow, and
+assessment are later work unless Sean explicitly requests them.
 
-The eventual product may contain cybersecurity labs. That is not the current
-work unless Sean explicitly asks for lab design, teaching content, learner
-objectives, assessment, or pedagogy.
+Use the capability/scenario/lab vocabulary in `docs/product-model.md`. Do not
+create a generalized scenario engine, learner contract, manifest system, or
+publishing architecture merely because a direct experiment could be abstracted.
 
-Use these terms consistently:
+The current SPA is Sean's internal capability notebook and operator console. It
+is not the learner product or a prototype of the eventual learner interface.
+Keep its language ordinary and avoid exposing obsolete internal terms such as
+rehearsal, canary, manifest, or learner role when they do not describe the
+visible action.
 
-- A **capability** is one action or observation we can perform reliably, such as
-  creating a calendar event, changing a SharePoint file, placing a Teams call,
-  observing an audit record, or removing an artifact.
-- A **scenario** combines capabilities to create incident-like state. It is a
-  technical composition, not automatically a learning experience.
-- A **lab** is a later educational product built around a scenario. It includes
-  teaching, investigation, learner decisions, and completion criteria.
+## AP2 operating boundaries
 
-Current work is mainly capability exploration and early scenario composition.
+The Product and Student tenants, named simulated users, retained Windows
+endpoints, AP2-owned SaaS instances, and synthetic experiment data are controlled
+sandbox assets.
 
-## The SPA is Sean's internal capability notebook
+Preserve the retained control plane by default: tenant identity, application and
+service-principal setup, standing development authority, simulated-user identity
+and authentication setup, licensing, protected credentials, and selected
+baseline infrastructure. Mail, files, meetings, Teams activity, temporary
+memberships or grants, endpoint artifacts, marked Azure resources, and other
+scenario state are disposable or resettable according to the experiment.
 
-The current SPA exists for Sean to see, understand, and personally run AP2
-capabilities. It is an interactive companion to `docs/proven-capabilities.md`,
-not the product, the beginning of a product interface, a learner interface, or
-a lab platform. Sean may show it informally to a friend, but that does not
-change its role.
+Protect the boundaries that materially matter:
 
-The SPA should make its explanatory content visible before sign-in. Signing in
-only enables controls that perform real actions. Its primary organization is:
+- the exact tenant, subscription, account, user, device, and target environment;
+- credentials, certificates, tokens, private keys, and administrative recovery;
+- people and systems outside the AP2 sandbox;
+- unintended public exposure, service abuse, and spending.
 
-1. **Capabilities:** only the actions that have buttons in the SPA;
-2. **Other things AP2 has proven:** factual results without action buttons;
-3. **Proven scenarios:** plain descriptions of direct capability compositions.
+Broad authority in the owned sandbox does not permit secrets in the public SPA,
+Git, logs, reports, or browser responses. Keep protected material in the backend
+or the owner-only runtime documented in `docs/durable-runtime.md`.
 
-Use ordinary descriptions in the interface. Do not expose internal architecture
-terms such as lab, learner, capability building block, rehearsal, canary,
-workload, or manifest in the SPA. Internal source names may lag temporarily
-while obsolete machinery is removed, but they do not define the interface or
-future architecture.
+Actor semantics matter when evidence must appear user-originated. Use the real
+simulated user's Microsoft 365 or Windows context when attribution, browser
+history, process ancestry, user registry state, or workload audit is part of the
+claim. Use simpler control-plane automation when actor fidelity is not relevant.
 
-A new capability does not need a generalized scenario manifest, planner,
-evidence receipt, learner contract, lab catalog, or compatibility framework.
-Implement capabilities directly. Compose a scenario directly when there is a
-real scenario to create or investigate.
-
-## Preserve the original question
-
-Every task should have a plain-language question or outcome and a clear stopping
-point. Keep returning to that original intent while working.
-
-Do not turn a useful experiment into a framework, production subsystem,
-compliance exercise, documentation program, or generalized lab model unless the
-current task actually requires it.
-
-Code, tests, deployment, integration, documentation, cleanup, and hardening are
-possible means. They are not automatic parts of every goal.
-
-Stop when the stated question is answered well enough to support the next
-product decision. Record unresolved facts honestly instead of creating more
-machinery to eliminate every uncertainty.
-
-## Work in a disposable sandbox
-
-The AP2 tenant and explicitly selected subscriptions are dedicated sandboxes,
-but the sandbox contains two different classes of state.
-
-The AP2 control plane spans two tenants. The Product tenant owns the
-multitenant After Party app registration and API resource. The Student tenant
-contains its enterprise application plus the development automation identity,
-the API and managed identity, standing roles and permissions, simulated-user
-identities, licenses, authentication setup, and other selected baseline
-configuration required to develop and run AP2. Preserve that control plane by
-default. Deleting or casually resetting it would disable the current
-architecture and is not ordinary scenario cleanup.
-
-A simulated user's identity, license, and authentication setup are baseline
-infrastructure. That user's mailbox, calendar, files, Teams activity,
-scenario-specific memberships, temporary permissions, and other staged workload
-state are disposable or resettable.
-
-Avoid permission churn. Standing development authority that AP2 already uses is
-part of the baseline and should not be repeatedly revoked, narrowed, and
-regranted between experiments. Remove a grant during routine cleanup only when
-it was explicitly introduced as temporary for that experiment. Change standing
-authority when the current question requires different actor semantics or when
-the permission choice changes the architecture in a meaningful way.
-
-Broad authority inside the sandbox does not relax architectural boundaries.
-Secrets, certificates, private keys, refresh tokens, and privileged credentials
-must not be embedded in the public SPA or returned to the browser. Keep them in
-the backend, external secret/configuration paths, or another appropriate
-non-public boundary.
-
-Ordinary browser, CBA, and Dev/Graph automation runs from the owner-only AP2
-runtime described in `docs/durable-runtime.md`. Do not depend on WSL or Local
-Shell for normal work; use Local Shell only for an explicitly authorized
-one-time migration or emergency recovery.
-
-Capability and scenario runs create disposable experimental state around the
-control plane. Messages, meetings, files, calls, temporary permissions, marked
-Azure resources, security signals, and similar staged activity may be removed
-or left as acceptable historical residue according to the current experiment.
-
-Protect the boundaries that actually matter:
-
-- the exact tenant, subscription, account, and target environment;
-- credentials, certificates, tokens, and administrative recovery;
-- people and systems outside the sandbox;
-- unintended public exposure or service abuse;
-- spending limits.
-
-Inside that boundary, marked experimental state is disposable. Cleanup should
-make later experiments practical when useful; it does not need to restore an
-exact prior state or erase ordinary Microsoft history.
-
-Do not automatically repeat an ambiguous non-idempotent mutation. Inspect its
+Do not automatically repeat an ambiguous non-idempotent mutation. Reconcile its
 result first. This is a narrow operational rule, not a reason to add ceremony to
 every experiment.
 
-## Prefer the shortest useful experiment
+## Work and evidence
 
-Start with the cheapest observation that could disprove the idea. Then run the
-smallest live proof that answers the real question.
+Begin with one plain-language question and the observation that would answer it.
+Run the cheapest read that could disprove readiness, then the smallest live proof
+that answers the real question.
 
-Microsoft 365 state often propagates slowly. Cleanup and confirmation may also
-require delayed observations. Treat those waits as normal platform behavior:
-record the state, do other useful work, and return later. Do not build a general
-orchestration system merely because one experiment needs a wait.
+Microsoft propagation delays are normal. Record accepted state and the later
+observation needed; do other useful work or stop the active turn instead of
+building a general polling or orchestration system around one wait.
 
-Use the actor whose recorded behavior matters. A broad development identity is
-fine for platform discovery when user attribution is not the question.
+Consult `docs/proven-capabilities.md` before repeating work that may already be
+proven. Search the relevant workload, actor, or capability section rather than
+reading the entire evidence ledger as routine orientation. Preserve only the
+smallest useful code, test, evidence entry, or focused technical document after
+the result is known.
 
-Add reusable product code only after an experiment reveals a repeated need or a
-real product path. Remove temporary experiment code when its useful result has
-been captured.
+Code, tests, deployment, cleanup, documentation, review, and hardening are means,
+not automatic phases. Stop when the question is answered well enough to support
+the next product decision. Record unknowns honestly instead of manufacturing
+more machinery to eliminate every uncertainty.
 
-## Keep documentation small and factual
+## Documentation authority
 
-Documentation should help a person recover the current mental model. It should
-not accumulate every caution, implementation detail, review observation, or
-historical exception as a standing rule.
+Use each canonical document for one job:
 
-Use the canonical documents for their distinct jobs:
+- `docs/product-direction.md` — current product direction and exploration stage;
+- `docs/product-model.md` — capability, scenario, lab, and evidence vocabulary;
+- `docs/development-workflow.md` — the AP2 exploration loop;
+- `docs/proven-capabilities.md` — completed live evidence and limitations;
+- `docs/durable-runtime.md` — current protected execution boundary;
+- `chatgpt-strategy.md` — AP2 Strategist supplement;
+- `coordinator-strategy.md` — AP2 Coordinator supplement;
+- `STRATEGY-SNAPSHOT.md` — point-in-time Strategist handoff, never live workflow
+  state or normal Coordinator orientation.
 
-- `docs/product-direction.md` explains the project and current exploration stage.
-- `docs/product-model.md` defines capability, scenario, and lab vocabulary.
-- `docs/development-workflow.md` describes the short exploration loop.
-- `chatgpt-strategy.md` is the AP2 Strategist supplement.
-- `coordinator-strategy.md` is the AP2 Coordinator supplement.
-- `STRATEGY-SNAPSHOT.md` is a point-in-time handoff/orientation snapshot, not
-  live execution state.
-- `docs/proven-capabilities.md` records evidence and limitations from completed
-  work.
+Feature documents preserve technical contracts that code and tests cannot carry.
+They do not become current goals merely because they exist. When guidance
+changes, revise the canonical source and remove obsolete duplicates rather than
+stacking another qualification in this file.
 
-Feature documents may preserve technical facts that code and tests cannot carry.
-They do not become new project goals merely because they exist.
+## Repository changes
 
-When changing a rule, replace obsolete guidance rather than stacking another
-qualification on top. Avoid duplicating the same rule across documents.
+Follow the development commands in `README.md` and run the checks relevant to the
+changed surface. Prefer direct, removable implementation over speculative
+architecture. A local defect is normally something to fix and continue; a review
+finding or edge case becomes additional work only when it threatens the result,
+a real boundary, durable recoverability, or the next useful step.
 
-## Shared agent workflow
-
-AP2 uses the AgentTools Strategist -> Coordinator -> goal-owned-worker workflow.
-AP2 workers follow their runtime role instructions plus this AP2 `AGENTS.md`.
-
-## Simplicity
-
-Prefer fewer concepts, fewer layers, fewer documents, and fewer moving parts.
-Do not preserve complexity merely because previous agents created it.
-
-A local defect is usually something to fix and continue. A speculative edge
-case is usually something to record or ignore. Hardening belongs in the current
-goal only when failure would invalidate the experiment, cross a real boundary,
-or prevent the next useful step.
+AP2 uses the shared AgentTools workflow, but project direction and evidence stay
+in this repository. Workers follow their runtime role instructions plus this
+file. Harness defects and generic workflow features belong in
+`codex-agent-tools`, not in AP2 product direction.

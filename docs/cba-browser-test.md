@@ -21,7 +21,7 @@ mode `0700` and private files at mode `0600`.
 Start the local API at `http://127.0.0.1:3000` with the real Student
 issuer/JWKS, Product audience, and
 `CORS_ALLOWED_ORIGIN=http://localhost:5173` described in
-[API identity](api-identity.md). Then run:
+[Hosted API contracts](api-identity.md). Then run:
 
 ```sh
 export AP2_CBA_PFX_PATH=/var/lib/codex-agent-tools-replacement/worker/ap2-runtime/secrets/cba/operator/operator-certificate.pfx

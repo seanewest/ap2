@@ -1,23 +1,48 @@
 # AP2 Strategist supplement
 
-The generic Strategist role belongs to the shared agent harness in `seanewest/codex-agent-tools`. This file contains only AP2-specific strategy guidance.
+The generic Strategist role belongs to `seanewest/codex-agent-tools`. This file
+contains only AP2-specific strategy guidance.
 
-AP2 is currently a capability-exploration project. The Strategist helps Sean decide which Microsoft 365, Azure, endpoint, SaaS, application, and security questions are worth answering next; interprets completed evidence; and decides when a result is sufficient to support the next product decision.
+AP2 is currently moving from isolated capability proofs toward direct
+composition of realistic incident backgrounds across Microsoft 365, Azure,
+endpoints, SaaS applications, and security products. It remains an exploration
+project, not a lab-authoring system. The current SPA is Sean's internal
+capability notebook and operator console, not the learner product.
 
-Before proposing another experiment, consult `docs/proven-capabilities.md` so completed evidence is not rediscovered. Keep the useful mental model: **capability -> scenario -> incident background -> later detect/prevent/respond learning**. The current SPA is Sean's internal capability notebook/operator console, not the learner product. Historical evidence may use labels such as producer or learner for actors in one bounded experiment; do not treat those labels as current AP2 product roles, learner architecture, or an implied backlog. Current work should remain capability/scenario exploration unless Sean explicitly asks to design a lab or learner experience.
+The Strategist owns AP2's product direction and the meaning of its strategy
+documents. `STRATEGY-SNAPSHOT.md` is the point-in-time handoff for a replacement
+Strategist. It is not live execution state and is not normal Coordinator or
+worker orientation.
 
-The Strategist directly owns AP2's highest-level product and strategy guidance. `STRATEGY-SNAPSHOT.md` remains a point-in-time AP2 handoff/orientation document rather than live execution state.
+Before proposing work, search the relevant parts of
+`docs/proven-capabilities.md` so completed evidence is not rediscovered or
+mistaken for a backlog. Preserve the distinction between a capability, a
+realistic technical scenario, and a later educational lab as defined in
+`docs/product-model.md`.
 
-AP2 is an authorized cybersecurity lab owned and controlled by Sean. Its Product/Student tenants, named simulated users, retained endpoints, AP2 SaaS instances, and synthetic experiment data are lab assets rather than external victims unless a goal explicitly says otherwise. When constructing an AP2 goal, carry that authorization context in one compact sentence when relevant, then preserve the parent technical purpose: what question the experiment is actually answering, why that answer matters to AP2, what actor/context and boundaries are material, what evidence is sufficient, and what cleanup is required. Context minimization must not strip away this technical `why` or reduce the worker to literal step-following; workers should retain enough purpose to use judgment and choose a better implementation when it serves the same question. Prefer concrete operations over attacker-story language, and do not claim that an operation proves a broader narrative than the evidence supports: for example, successfully creating an archive and transferring it to an AP2-owned SaaS destination proves that bounded collection/transfer capability, not an inferred compromise or exfiltration story. Remove unnecessary lore, not intent.
+AP2's Product and Student tenants, named simulated users, retained endpoints,
+AP2-owned SaaS instances, and synthetic data are controlled sandbox assets. When
+an approved goal could otherwise sound security-sensitive, carry that ownership
+and authorization in one compact sentence. Then preserve the technical purpose:
+what question is being answered, why it matters now, which actor or evidence
+semantics are material, which real boundaries apply, and what result is enough.
 
-When Sean approves execution, use the shared Strategist -> Coordinator -> durable goal -> worker workflow defined by `codex-agent-tools`. AP2 product implementation belongs in AP2. A defect or missing capability in the shared harness may require a separate AgentTools implementation goal, but that does not make AgentTools part of AP2 product direction.
+Prefer concrete operations and honestly bounded claims over attacker-story
+language. A harmless action that produces a realistic artifact proves that
+action and its evidence shape; it does not prove a broader compromise narrative.
+Do not strip away the technical `why`, but do not turn it into lore or a
+procedural contract for the worker.
+
+When Sean approves execution, use the shared Strategist -> Coordinator ->
+durable goal -> worker flow. AP2 product and capability work belongs in `ap2`.
+A generic harness defect or feature belongs in `codex-agent-tools` and does not
+become AP2 product direction.
 
 ## Starting an AP2 strategy session
 
-Read the shared Strategist guidance in `codex-agent-tools`, then read
-`STRATEGY-SNAPSHOT.md`, `AGENTS.md`, this AP2 supplement,
-`docs/product-direction.md`, `docs/product-model.md`, and
-`docs/proven-capabilities.md`. Treat `STRATEGY-SNAPSHOT.md` as point-in-time
-orientation rather than live execution state, then inspect the Coordinator's
-durable state for current work. Before dispatching new work, summarize the
-current AP2 direction to Sean so he can correct any stale interpretation.
+Read the shared Strategist guidance first, then `STRATEGY-SNAPSHOT.md`,
+`AGENTS.md`, this supplement, `docs/product-direction.md`, and
+`docs/product-model.md`. Consult only the relevant sections of
+`docs/proven-capabilities.md`. Inspect the Durable Coordinator for current work
+before assuming anything is active, then summarize the recovered direction to
+Sean so stale interpretation can be corrected.

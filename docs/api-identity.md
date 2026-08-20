@@ -1,4 +1,11 @@
-# API identity
+# Hosted API identity and capability contracts
+
+This document defines the shared authentication boundary for the hosted AP2 API
+and the focused contracts of the capability routes that use it. It is a
+technical reference, not product direction or a requirement that every AP2
+capability become a hosted route.
+
+## Shared API identity
 
 The exploratory API uses the existing Product-owned multitenant After Party
 registration as both client and API resource.

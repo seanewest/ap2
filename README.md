@@ -34,13 +34,14 @@ points:
   identity model.
 - [AGENTS.md](AGENTS.md) — durable project guidance for agents working in this
   repository.
-- [Strategy snapshot](STRATEGY-SNAPSHOT.md) — a point-in-time handoff for a
-  replacement strategy session. Live execution state comes from the Durable
-  Coordinator, not from this file.
+- [Strategy snapshot](STRATEGY-SNAPSHOT.md) — a point-in-time handoff for the
+  next AP2 Strategist. It is not normal Coordinator orientation; live execution
+  state comes from the Durable Coordinator.
 
-For the strategy/coordinator workflow itself, see
+The AP2-specific role supplements are
 [chatgpt-strategy.md](chatgpt-strategy.md) and
-[coordinator-strategy.md](coordinator-strategy.md).
+[coordinator-strategy.md](coordinator-strategy.md). The generic role and workflow
+contract lives in `seanewest/codex-agent-tools`.
 
 ## Development
 
@@ -69,9 +70,9 @@ Build the API with:
 npm run build:api
 ```
 
-The API has its own authentication and runtime configuration. See
-[API identity](docs/api-identity.md) rather than copying tenant IDs, client IDs,
-or secrets from examples in source or old transcripts.
+The API has its own authentication and runtime configuration. See the
+[hosted API contracts](docs/api-identity.md) rather than copying tenant IDs,
+client IDs, or secrets from examples in source or old transcripts.
 
 When rootless Podman is available, AP2 can also exercise the production-shaped
 container path:
