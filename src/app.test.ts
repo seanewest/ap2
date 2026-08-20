@@ -212,6 +212,26 @@ describe("After Party primary SPA", () => {
     expect(apiRequest).not.toHaveBeenCalled();
   });
 
+  it("keeps sign-in intact but disables actions when tenant discovery fails", async () => {
+    authentication.initialize.mockResolvedValue({
+      kind: "signed-in",
+      account,
+      source: "cache",
+    });
+    const resolveApi = vi.fn().mockRejectedValue(new Error("unavailable"));
+
+    await createAfterPartyApp(root, authentication, resolveApi).start();
+
+    expect(root.textContent).toContain("Signed in as Test Student");
+    expect(root.textContent).toContain(
+      "This tenant does not have a usable AP2 API connection. Actions are unavailable.",
+    );
+    expect([...section("capabilities").querySelectorAll<HTMLButtonElement>(
+      "button",
+    )].every(({ disabled }) => disabled)).toBe(true);
+    expect(action("Sign out")?.disabled).toBe(false);
+  });
+
   it("uses none of the disallowed product language", async () => {
     authentication.initialize.mockResolvedValue({ kind: "signed-out" });
     await createAfterPartyApp(root, authentication, api).start();

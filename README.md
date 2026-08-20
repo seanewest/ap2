@@ -62,10 +62,13 @@ record. To build or run against another Student tenant, copy
 [`installations/student.example.json`](installations/student.example.json), fill
 in that installation's tenant, actor, Azure, and SPA/API values, and set
 `AP2_INSTALLATION_CONFIG` to its path. The same selected record drives the SPA
-build/dev proxy, API identity bindings, and Azure target. Credentials,
-certificate paths, and passphrases remain runtime secrets and are not part of
-the installation record. This is a configuration seam only; it does not connect,
-provision, or discover a tenant.
+build/dev proxy, API identity bindings, and Azure target. The hosted SPA then
+uses the selected installation's
+[tenant-side API discovery record](docs/tenant-installation-discovery.md) after
+sign-in instead of relying on the API URL compiled into a prior browser visit.
+Credentials, certificate paths, and passphrases remain runtime secrets and are
+not part of either non-secret record. This does not provision an API or broader
+Student infrastructure.
 
 Run the deterministic checks with:
 

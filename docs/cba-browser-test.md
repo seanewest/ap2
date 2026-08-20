@@ -39,9 +39,10 @@ npm run test:e2e:cba
 
 The command starts Vite at <http://localhost:5173/>, clicks the product sign-in
 button, completes Entra CBA, verifies the dedicated operator UPN and the enabled
-operator actions without invoking them, then clicks the product sign-out button.
-It completes Microsoft's logout redirect and verifies the signed-out state and
-disabled actions again after a reload. Browser output defaults to
+operator actions without invoking them, and confirms that tenant-side discovery
+connected the SPA to the selected installation's API. It then clicks the product
+sign-out button, completes Microsoft's logout redirect, and verifies the
+signed-out state and disabled actions again after a reload. Browser output defaults to
 `/tmp/ap2-playwright-cba` and contains no reusable storage state.
 
 For a hosted non-mutating preflight, point both targets explicitly:

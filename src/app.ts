@@ -92,6 +92,11 @@ type ContactProofState = {
   message?: string;
 };
 
+type ApiConnection =
+  | { kind: "connected" }
+  | { kind: "unavailable"; message: string };
+type ApiResolver = (account: AccountIdentity) => Promise<AfterPartyApi>;
+
 type ViewState =
   | { kind: "initial" }
   | { kind: "processing"; message: string }
@@ -104,6 +109,7 @@ type ViewState =
       oneDriveProof: OneDriveProofState;
       calendarMeeting: CalendarMeetingState;
       fixedProofs: FixedProofStates;
+      apiConnection: ApiConnection;
     }
   | { kind: "cancelled" }
   | { kind: "error"; message: string };
@@ -118,9 +124,12 @@ export interface AfterPartyApp {
 export function createAfterPartyApp(
   root: HTMLElement,
   authentication: Authentication,
-  api: AfterPartyApi,
+  apiSource: AfterPartyApi | ApiResolver,
   storage: Pick<Storage, "getItem" | "setItem"> = window.localStorage,
 ): AfterPartyApp {
+  const resolveApi = typeof apiSource === "function" ? apiSource : undefined;
+  const fixedApi = typeof apiSource === "function" ? undefined : apiSource;
+  let api: AfterPartyApi | undefined;
   let state: ViewState = { kind: "initial" };
   let contactProof: ContactProofState = {
     stage: "not-started",
@@ -176,6 +185,7 @@ export function createAfterPartyApp(
   };
 
   const signOut = async (): Promise<void> => {
+    api = undefined;
     setState({ kind: "processing", message: "Signing out…" });
     try {
       await authentication.signOut();
@@ -186,7 +196,9 @@ export function createAfterPartyApp(
   };
 
   const sendSimulatedEmail = async (): Promise<void> => {
+    const connectedApi = api;
     if (
+      !connectedApi ||
       state.kind !== "signed-in" ||
       state.simulatedEmail.kind === "success" ||
       isApiOperationBusy(state, contactProof)
@@ -201,7 +213,7 @@ export function createAfterPartyApp(
     try {
       const accessToken =
         await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-      const result = await api.sendSimulatedEmail(accessToken);
+      const result = await connectedApi.sendSimulatedEmail(accessToken);
       setSignedInPatch(account, {
         simulatedEmail: { kind: "success", result },
       });
@@ -223,7 +235,9 @@ export function createAfterPartyApp(
   };
 
   const sendHelpDeskScenario = async (): Promise<void> => {
+    const connectedApi = api;
     if (
+      !connectedApi ||
       state.kind !== "signed-in" ||
       !["idle", "server-shutting-down"].includes(
         state.helpDeskScenario.kind,
@@ -240,7 +254,7 @@ export function createAfterPartyApp(
     try {
       const accessToken =
         await authentication.acquireAccessToken(API_ACCESS_SCOPES);
-      const result = await api.sendHelpDeskScenario(accessToken);
+      const result = await connectedApi.sendHelpDeskScenario(accessToken);
       setSignedInPatch(account, {
         helpDeskScenario: { kind: "success", result },
       });
@@ -269,7 +283,9 @@ export function createAfterPartyApp(
   const runOneDriveProofAction = async (
     action: "share" | "remove",
   ): Promise<void> => {
+    const connectedApi = api;
     if (
+      !connectedApi ||
       state.kind !== "signed-in" ||
       isApiOperationBusy(state, contactProof) ||
       !isAllowedOneDriveAction(state.oneDriveProof.stage, action)
@@ -300,8 +316,8 @@ export function createAfterPartyApp(
       });
       const result =
         action === "share"
-          ? await api.shareOneDriveProof(accessToken)
-          : await api.removeOneDriveProof(accessToken);
+          ? await connectedApi.shareOneDriveProof(accessToken)
+          : await connectedApi.removeOneDriveProof(accessToken);
       if (isCurrentSignedInAccount(state, account)) {
         const nextStage = oneDriveStage(result);
         persistOneDriveStage(storage, account, nextStage);
@@ -364,7 +380,9 @@ export function createAfterPartyApp(
   const runCalendarMeetingAction = async (
     action: "create" | "cancel",
   ): Promise<void> => {
+    const connectedApi = api;
     if (
+      !connectedApi ||
       state.kind !== "signed-in" ||
       isApiOperationBusy(state, contactProof) ||
       !isAllowedCalendarMeetingAction(state.calendarMeeting.stage, action)
@@ -397,8 +415,8 @@ export function createAfterPartyApp(
       });
       const result =
         action === "create"
-          ? await api.createCalendarMeeting(accessToken)
-          : await api.cancelCalendarMeeting(accessToken);
+          ? await connectedApi.createCalendarMeeting(accessToken)
+          : await connectedApi.cancelCalendarMeeting(accessToken);
       if (isCurrentSignedInAccount(state, account)) {
         const nextStage = calendarMeetingStage(result);
         persistCalendarMeetingStage(storage, account, nextStage);
@@ -452,7 +470,9 @@ export function createAfterPartyApp(
   const runContactProofAction = async (
     action: "create" | "remove",
   ): Promise<void> => {
+    const connectedApi = api;
     if (
+      !connectedApi ||
       state.kind !== "signed-in" ||
       isApiOperationBusy(state, contactProof) ||
       !isAllowedContactAction(contactProof.stage, action)
@@ -477,8 +497,8 @@ export function createAfterPartyApp(
       }, account);
       const result =
         action === "create"
-          ? await api.createContactProof(accessToken)
-          : await api.removeContactProof(accessToken);
+          ? await connectedApi.createContactProof(accessToken)
+          : await connectedApi.removeContactProof(accessToken);
       if (isCurrentSignedInAccount(state, account)) {
         setContactProof({ stage: result.state, activity: "idle" }, account);
       }
@@ -506,8 +526,10 @@ export function createAfterPartyApp(
     proof: FixedProofId,
     action: "create" | "remove",
   ): Promise<void> => {
+    const connectedApi = api;
     const definition = FIXED_PROOF_BY_ID[proof];
     if (
+      !connectedApi ||
       state.kind !== "signed-in" ||
       isApiOperationBusy(state, contactProof) ||
       !isAllowedFixedProofAction(state.fixedProofs[proof].stage, action)
@@ -542,7 +564,7 @@ export function createAfterPartyApp(
           [proof]: { stage: attemptedStage, activity },
         },
       });
-      const result = await definition[action](api, accessToken);
+      const result = await definition[action](connectedApi, accessToken);
       if (!isCurrentSignedInAccount(state, account)) {
         return;
       }
@@ -635,11 +657,25 @@ export function createAfterPartyApp(
     });
     try {
       const startup = await authentication.initialize();
+      let apiConnection: ApiConnection | undefined;
       if (startup.kind === "signed-in") {
         contactProof = {
           stage: readContactStage(storage, startup.account),
           activity: "idle",
         };
+        try {
+          api = resolveApi
+            ? await resolveApi(startup.account)
+            : fixedApi;
+          apiConnection = { kind: "connected" };
+        } catch {
+          api = undefined;
+          apiConnection = {
+            kind: "unavailable",
+            message:
+              "This tenant does not have a usable AP2 API connection. Actions are unavailable.",
+          };
+        }
       }
       setState(
         startup.kind === "signed-in"
@@ -657,6 +693,7 @@ export function createAfterPartyApp(
                 activity: "idle",
               },
               fixedProofs: readFixedProofStates(storage, startup.account),
+              apiConnection: apiConnection!,
             }
           : { kind: "signed-out" },
       );
@@ -723,6 +760,12 @@ function createAuthenticationPanel(state: ViewState): HTMLElement {
       panel.append(
         createStatus(`Signed in as ${state.account.name}`),
         createIdentityList(state.account),
+        createStatus(
+          state.apiConnection.kind === "connected"
+            ? "Connected to this tenant's AP2 API."
+            : state.apiConnection.message,
+          state.apiConnection.kind === "connected" ? "notice" : "error",
+        ),
         createButton("Sign out", "sign-out", "secondary"),
       );
       break;
@@ -762,6 +805,7 @@ function createCapabilitiesSection(
 
   const signedIn = state.kind === "signed-in" ? state : undefined;
   const actionsDisabled = signedIn === undefined ||
+    signedIn.apiConnection.kind !== "connected" ||
     isApiOperationBusy(signedIn, contactProof);
   const fixedProofs = signedIn?.fixedProofs ?? emptyFixedProofStates();
 

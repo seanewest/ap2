@@ -27,6 +27,9 @@ test("signs the dedicated operator in and out through Microsoft CBA", async ({
     page.locator("dd").getByText(STUDENT_OPERATOR, { exact: true }),
   ).toBeVisible();
   await expect(
+    page.getByText("Connected to this tenant's AP2 API.", { exact: true }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("button", {
       name: "Send one internal email: Homer → Marge",
     }),
