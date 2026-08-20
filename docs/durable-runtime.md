@@ -48,6 +48,33 @@ Proxmox snapshots, and dated backups are recovery sources, not ordinary
 execution dependencies. Routine AP2 work must not recreate the retired bridge
 or depend on a human workstation.
 
+## Central development copy
+
+The AP2 Central subscription also holds an encrypted-at-rest copy of the
+standing development runtime in the RBAC-enabled
+`kv-ap2-dev-central-6d8e` Key Vault in `rg-ap2-development`. This is shared
+development-secret infrastructure, not a home for per-Student production or
+runtime secrets. The vault uses soft delete and purge protection. Its public
+endpoint still requires TLS and explicit Entra data-plane authorization; it has
+no legacy access policies.
+
+The local runtime above remains the normal source and temporary fallback. An
+authorized agent can reconcile the central copy, verify it by using the
+retrieved Dev certificate for an ARM read, or restore an exact owner-only copy
+into a new directory:
+
+```sh
+npm run development-vault -- upload
+npm run development-vault -- prove
+npm run development-vault -- restore /new/owner-only/ap2-runtime
+```
+
+The tool uses the existing Dev certificate when `AP2_ARM_CONFIG` is available
+and otherwise uses Azure's supported default credential chain, allowing a new
+host to bootstrap after an authorized Azure sign-in or through its assigned
+workload identity. It never prints secret values. Restores refuse an existing
+target and write directories as `0700` and files as `0600`.
+
 ## Current identity boundary
 
 `AP2 Simulated User CBA` is the standing eligibility group for the enabled X.509
