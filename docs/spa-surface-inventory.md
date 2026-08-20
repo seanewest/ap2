@@ -69,7 +69,7 @@ or generalized contracts around them.
 
 ## 3. Proven scenarios
 
-These are plain descriptions of six capability compositions that were actually
+These are plain descriptions of capability compositions that were actually
 performed. They do not need generic manifests, learner roles, or currently
 runnable SPA paths.
 
@@ -87,9 +87,10 @@ runnable SPA paths.
 - **Teams group-chat membership remediation:** Create a group chat, add an
   unexpected participant, post a warning message, and have Cory remove that
   participant.
-- **Fake verification click through Win+R:** Click Verify in guest Edge, paste
-  the harmless command into Run, display Hello World, and observe the Defender
-  alert.
+- **Fake verification click through Win+R:** On an AP2-owned simulated endpoint,
+  use an AP2-owned fake Verify page and harmless command to mimic the realistic
+  Edge → clipboard → Run → PowerShell evidence chain, display Hello World, and
+  observe the Defender alert.
 
 ## Interface language
 

@@ -1,73 +1,168 @@
 # Strategy snapshot — 2026-08-20
 
 This is a compact orientation handoff for a fresh AP2 Strategist. It is not
-live workflow state, a backlog, or authorization to resume or create work.
+live workflow state, a backlog, or authorization to resume historical work.
 Use the Durable Coordinator for current goals and `docs/proven-capabilities.md`
-for the detailed evidence and limitations behind this summary.
+for detailed evidence and limitations.
 
-## Current direction
+## Start here
 
-AP2 is exploring reliable capabilities across Microsoft 365, Azure, endpoints,
-SaaS integrations, and security systems, then directly composing useful
-incident-like scenarios. It is not currently building labs, teaching content,
-or a generalized scenario framework. The SPA remains Sean's internal
-capability notebook and operator console, not a learner interface or a product
-prototype.
+Read the shared Strategist guidance in `codex-agent-tools`, then this
+repository's `AGENTS.md`, `chatgpt-strategy.md`, `docs/product-direction.md`,
+`docs/product-model.md`, and only the relevant sections of
+`docs/proven-capabilities.md`. Inspect the live Durable Coordinator state before
+assuming any work is active. The Strategist owns AP2's product direction and
+strategy documents; workers own technical execution and evidence.
 
-Prefer the smallest experiment that answers the current product question.
-Treat completed positive and negative results as evidence, not as implied next
-work. Choose any new question with Sean before dispatching it.
+Do not reconstruct the whole history or treat old work numbers, worker
+recommendations, negative boundaries, or unexplored surfaces as a backlog.
+Choose the next useful question with Sean.
 
-## Learned endpoint architecture
+## Current AP2 direction
 
-Guest-local ClickFix is now proven end to end: a trusted click in guest Edge
-wrote the exact corrected harmless command to the same guest clipboard, Win+R
-pasted and submitted it once, and PowerShell printed `Hello World`. Default
-Defender allowed the command and MDE later raised one High `Suspicious command
-in RunMRU registry` alert. The detailed run and cleanup boundary are recorded in
-`docs/proven-capabilities.md`.
+AP2 is moving from isolated capability proofs toward **more realistic technical
+scenario composition** while still remaining an exploration project rather
+than a lab-authoring system.
 
-AVD is learner transport into the desktop, not part of the fictional endpoint
-story. Endpoint background can combine orchestration outside the guest with
-genuine interaction in an authenticated user's session. The recent
-user-context proofs used the AVD remote canvas as that external control channel;
-their attribution came from the real user session, not from pretending the AVD
-transport itself was incident activity.
+Keep the mental model:
 
-Do not assume that a permanent in-guest AP2 agent is desirable. Its services,
-files, processes, credentials, logs, or control traffic could contaminate the
-incident evidence that AP2 is trying to create and observe. Machine-level Azure
-Run Command already serves cases where user attribution is irrelevant.
+**capability -> realistic scenario / incident background -> later detect,
+prevent, respond, and teaching work**
 
-A useful future product-design question is how to make deterministic,
-user-context endpoint manipulation repeatable without contaminating the
-evidence. That is an open design question, not a decision to install a guest
-agent and not authorization for new product work or experiments.
+The near-term question is increasingly not just "can Microsoft perform this one
+action?" but "can several proven actions be composed so the resulting tenant,
+endpoint, SaaS, and security evidence resembles a coherent incident?"
 
-## Defender boundary
+Do not jump from that into a generalized scenario framework, learner contract,
+assessment system, or publishing architecture. Direct code and direct scenario
+composition remain the default until repeated concrete work demonstrates a
+stable abstraction worth building.
 
-Defender is authentically on Endpoint Plan 2: more than nine hours after the
-switch, authenticated portal reads returned `overrideMdeFlavor: P2`, the
-Licenses page selected Plan 2, and classic machine-group `GET` requests returned
-`200` with an empty set. The temporary CBA repair used for that confirmation was
-fully removed and the original mapping restored.
+The current SPA is Sean's internal capability notebook/operator console. It is
+not the learner product and should not be treated as a prototype of the future
+learner interface.
 
-Classic Device groups nevertheless remained unavailable or inconsistent beyond
-Microsoft's documented six-hour window: Endpoint settings omitted the entry,
-the documented direct page redirected home, and adjacent portal surfaces still
-showed mixed provisioning state. Do not rely on narrow device-group scoping
-unless a later Microsoft-side change or support decision establishes that the
-surface is usable.
+## Realism without real harm
 
-## Worker-goal lesson
+AP2's realism comes from **mimicking the observable behavior and evidence of an
+incident**, not from using real victims, real malicious payloads, or harmful
+outcomes.
 
-Give workers a simple outcome, why it matters, the relevant context, a stopping
-point, and real boundaries. Prefer that over blanket read-only restrictions or
-procedural command lists. Workers should use ordinary judgment and repair
-harmless prerequisites within the authorized outcome, while preserving the
-actual tenant, credential, external-system, exposure, and spending boundaries.
+The Product and Student tenants, named simulated users, retained Windows
+endpoints, AP2-owned SaaS instances, and synthetic experiment data are owned
+lab assets. When a scenario calls for suspicious-looking activity, prefer the
+smallest harmless action that produces the evidence shape we actually need:
+for example a no-op persistence key, a synthetic file, a benign network request,
+or a harmless PowerShell command that still produces realistic process lineage,
+RunMRU state, browser history, Defender telemetry, or other artifacts.
 
-For deeper orientation, read `AGENTS.md`, `docs/product-direction.md`,
-`docs/product-model.md`, and only the relevant parts of
-`docs/proven-capabilities.md`. Then recover live work from the Durable
-Coordinator rather than from this snapshot or historical worker threads.
+The important fidelity question is: **would the learner and the real security
+products see the right actor, process relationships, workload artifacts,
+timing, and security evidence?** The simulation does not need a genuinely
+malicious effect to answer that question.
+
+Preserve the distinction between what was directly proven and the broader
+incident story it may later support. A harmless action that mimics one stage of
+an attack proves that technical stage and its evidence, not that a real
+compromise occurred.
+
+## How to build realistic scenarios well
+
+Start from the incident background and evidence that should exist, then choose
+the least intrusive implementation that creates it faithfully.
+
+- **Actor semantics matter.** If activity is supposed to look like Rachel,
+  Homer, Kobe, or another simulated user performed it, prefer execution in that
+  real user's Windows or Microsoft 365 context when the resulting attribution,
+  process ancestry, browser history, user registry state, or workload audit
+  matters.
+- **Use simpler control-plane actions when actor fidelity does not matter.**
+  Azure Run Command, Graph, ARM, Defender APIs, and other external control paths
+  are often better for machine-level setup, observation, cleanup, or state that
+  does not need to appear user-originated.
+- **Do not let simulation machinery become the incident.** A permanent AP2
+  service or agent inside every endpoint could create its own processes,
+  services, files, logs, credentials, network traffic, or Defender telemetry.
+  Prefer external orchestration or temporary helpers unless an in-guest
+  component is clearly the better tradeoff and its artifacts do not invalidate
+  the scenario.
+- **Separate background generation from learner access.** The incident can be
+  staged before the learner arrives. The learner should later encounter the
+  resulting endpoint and tenant state as though the fictional activity had
+  already happened.
+- **Keep proven automation.** When a realistic path is successfully composed,
+  retain the smallest reusable deterministic code needed to reproduce it. Do
+  not require a generalized scenario engine merely because one direct runner
+  exists.
+
+## Endpoint and AVD model
+
+AVD exists because the learner needs a practical way to reach retained Windows
+VMs. It is infrastructure transport, not part of the fictional employee story.
+The scenario should be reasoned about as activity on an ordinary endpoint.
+
+During exploration, AVD has also been useful as an **external remote-control
+channel** for genuine interactive user-session actions. That is legitimate
+implementation plumbing: driving a real Rachel session through the remote
+canvas can still produce authentic Rachel browser, clipboard, Run-dialog,
+process, and user-profile evidence inside the guest.
+
+This is not the only endpoint-control method. Machine-level background work has
+also been performed directly through Azure Run Command as SYSTEM. Choose the
+path according to the evidence that must look user-originated.
+
+A polished general-purpose way to manipulate arbitrary interactive Windows user
+sessions without relying on remote-canvas coordinates is still a design area,
+not a prerequisite for continuing scenario exploration. Do not assume the
+answer is a permanent guest agent.
+
+One useful recent anchor is the fully composed fake-verification path: an
+AP2-owned page in guest Edge used a trusted click to write a fixed harmless
+PowerShell command to the guest clipboard; the same user pasted it through
+Win+R; `explorer.exe` launched PowerShell; `Hello World` appeared; and Defender
+later produced a RunMRU alert. This matters mainly because it proves that a
+realistic endpoint interaction chain can be composed safely and reproducibly,
+not because ClickFix should dominate the next strategy discussion.
+
+## Security-platform evidence
+
+`docs/proven-capabilities.md` is the canonical evidence inventory. It now
+contains both isolated capabilities and several composed scenarios across
+Microsoft 365, endpoints, Defender/Purview, Global Secure Access, Azure,
+YouTrack, GitHub, and related integrations.
+
+Treat both positive and negative results as completed evidence until Sean
+chooses a materially different question. For example, Defender is authentically
+on the Endpoint Plan 2 experience, but the classic Device groups UI/surface
+remained unusable beyond Microsoft's documented propagation window. That is a
+current product fact, not an automatic task to keep retrying.
+
+## Working with the Coordinator and workers
+
+Normal execution is:
+
+**Sean <-> Strategist -> Durable Coordinator -> durable goal -> goal-owned worker**
+
+The Strategist should hand over the **outcome/question and relevant context**,
+not remotely author a procedure for the worker. A simple goal such as "Did the
+P2 activation work?" plus the necessary background can be better than a long
+contract full of speculative prohibitions.
+
+Use explicit constraints only for genuine boundaries the worker cannot safely
+infer. Avoid blanket `read-only` language merely because the purpose is
+observation; it can accidentally prohibit ordinary prerequisite repair. Trust
+workers to choose implementation, verification, correction, and reasonable
+alternative paths within the owned sandbox.
+
+Real boundaries remain credentials, administrative recovery, actor identity
+when it matters, systems outside the AP2 sandbox, public exposure, service-abuse
+limits, and spending. Do not ask Sean to paste credentials into chat.
+
+AP2 product work belongs in `ap2`. Shared harness defects or features belong in
+`codex-agent-tools` and should not become AP2 product direction.
+
+## Handoff rule
+
+A fresh Strategist should recover the compact model above, inspect live state,
+and talk with Sean about the next useful product question. Do not keep agents
+busy merely because an idea, limitation, or old work item exists.
