@@ -9,11 +9,11 @@ print certificate material.
 
 ## Run it
 
-> **Current identity prerequisite:** the protected AP2 development runtime is
-> restored and usable on `work`, but the dedicated operator certificate expired
-> on 2026-08-19 at 01:56 UTC. This browser test remains blocked until a replacement
-> operator certificate is issued and its Entra CBA mapping is updated together.
-> Do not work around that expiry by weakening CBA or reusing another identity.
+> **Current identity state:** on 2026-08-20 AP2 replaced the expired dedicated
+> operator leaf with a standing certificate under the existing trusted Lisa CBA
+> issuer. The replacement preserves the operator key and SKI mapping and is valid
+> through 2027-08-12. Do not weaken CBA or reuse another identity if this standing
+> credential later needs renewal.
 
 Install Chromium once:
 
@@ -38,14 +38,13 @@ npm run test:e2e:cba
 ```
 
 The command starts Vite at <http://localhost:5173/>, clicks the product sign-in
-button, completes Entra CBA, verifies the dedicated operator UPN and Student
-tenant ID, clicks the API-access button, and verifies the delegated caller
-without exposing its token. It then clicks the product sign-out button,
-completes Microsoft's logout redirect, and verifies the signed-out state again
-after a reload. Browser output defaults to `/tmp/ap2-playwright-cba` and
-contains no reusable storage state.
+button, completes Entra CBA, verifies the dedicated operator UPN and the enabled
+operator actions without invoking them, then clicks the product sign-out button.
+It completes Microsoft's logout redirect and verifies the signed-out state and
+disabled actions again after a reload. Browser output defaults to
+`/tmp/ap2-playwright-cba` and contains no reusable storage state.
 
-For a hosted read-only preflight, point both evidence targets explicitly:
+For a hosted non-mutating preflight, point both targets explicitly:
 
 ```sh
 export AP2_E2E_APP_URL=https://seanewest.github.io/ap2/

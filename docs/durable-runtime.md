@@ -89,10 +89,11 @@ live Microsoft capability.
 The 2026-08-20 restoration validated all 42 live secret-file hashes, the original
 migration-inventory anchor, simulated-user chains/keys/PFX files and unique SKIs,
 Dev/Graph Graph and ARM read-only authentication, GitHub read access, fresh
-Chromium, and deterministic microphone readiness. The dedicated SPA operator
-PFX is internally valid but its certificate expired on 2026-08-19 at 01:56 UTC;
-the full readiness command therefore correctly remains non-green until that
-operator certificate and Entra CBA mapping are renewed together.
+Chromium, and deterministic microphone readiness. Later that day AP2 replaced
+the expired dedicated SPA operator leaf with a standing certificate under the
+existing trusted Lisa CBA issuer. The replacement preserves the operator key and
+SKI mapping, is valid through 2027-08-12, and completed a fresh nonpersistent CBA
+sign-in through the hosted SPA. The full readiness command is green again.
 
 The initial migration, one-time WSL transfer, certificate renewal, Rachel
 addition, and exact validation evidence are retained separately in
