@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>AP2 Company Access</title>
+    <style>
+      :root { color: #182230; background: #eef3f9; font-family: "Segoe UI", sans-serif; }
+      body { margin: 0; }
+      main { box-sizing: border-box; width: min(760px, calc(100% - 48px)); margin: 80px auto; padding: 48px; border-radius: 18px; background: white; box-shadow: 0 12px 40px #20304025; }
+      .eyebrow { color: #52657b; font-weight: 700; letter-spacing: .08em; }
+      h1 { margin: 0 0 16px; font-size: 44px; }
+      p { font-size: 21px; line-height: 1.5; }
+      button { width: 100%; min-height: 92px; margin-top: 20px; border: 0; border-radius: 12px; background: #1769e0; color: white; font-size: 28px; font-weight: 700; }
+      #receipt { margin-top: 24px; padding: 18px; border-radius: 10px; background: #e8f4ea; font: 17px/1.5 Consolas, monospace; white-space: pre-wrap; }
+      .note { color: #52657b; font-size: 16px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">AP2 COMPANY ACCESS</div>
+      <h1>Welcome</h1>
+      <p>Confirm this browser can reach the company access site.</p>
+      <p class="note">This benign AP2 page does not ask for a password, collect a credential, add a sign-in method, or make a Microsoft 365 change.</p>
+      <button id="continue" type="button">Continue</button>
+      <div id="receipt" hidden aria-live="polite"></div>
+    </main>
+    <script>
+      const runId = new URL(location.href).searchParams.get("run") || "unmarked";
+      document.getElementById("continue").addEventListener("click", (event) => {
+        const clickedUtc = new Date().toISOString();
+        const trusted = event.isTrusted === true;
+        const receipt = document.getElementById("receipt");
+        receipt.hidden = false;
+        receipt.textContent = `Connection confirmed\nRun: ${runId}\nTrusted user action: ${trusted}\nTime: ${clickedUtc}`;
+        document.title = `AP2 Company Access — ${runId}`;
+        history.replaceState(null, "", `${location.pathname}?run=${encodeURIComponent(runId)}#confirmed`);
+      });
+    </script>
+  </body>
+</html>
