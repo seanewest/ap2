@@ -266,30 +266,63 @@ factual evidence, not entries in a registry or templates for future work.
 
 ## Accepted residue and limitations
 
-- **The first-leg Homer enrollment composition is not yet proven.** In bounded
-  run `AP2-HOMER-ENROLL-20260821T052732Z`, a no-input AP2-owned enrollment page
-  was staged on `ap2homerfresh` loopback without creating a visit receipt. A
-  fresh controlled Linux/Chromium context then completed genuine Homer X.509
-  authentication to Windows App - Web: Entra recorded successful interactive
-  Azure Virtual Desktop sign-ins at `05:29:55Z` and `05:37:29Z`, with the
-  preceding certificate steps explicitly successful. Microsoft exposed the
-  assigned `SessionDesktop`, but both supported desktop launches ended before
-  guest access with Windows App's “admin has restricted the type of logon”
-  error and an exact Homer AVD session stuck `Pending`. Deleting only that
-  pending Homer session, deallocating/starting the exact VM, waiting for the
-  host to return `Available`, and restarting only the staged task did not change
-  the result. The host pool still had its standing Entra-auth RDP properties;
-  no logon right, policy, or security control was changed. Therefore this run
-  proves genuine Homer authentication to the AVD control plane, but not a Homer
-  guest Edge visit, AP2-site interaction, concurrent second session, or a
-  simulated account-takeover condition. The endpoint had no installed Global
-  Secure Access client, the bounded GSA read contained no Homer row, and the
-  onboarded MDE machine produced no bounded alert; none of those absences is a
-  manufactured telemetry claim. Cleanup removed the exact task and staging
-  root, deleted the pending session, and left the VM deallocated with host
-  `Shutdown`, zero sessions, and Homer still holding only his original password
-  method. The external dependency is restoration of supported Entra AVD guest
-  logon on the retained Homer host, without weakening its logon policy.
+- **The first-leg Homer enrollment composition remains blocked at Microsoft
+  guest authorization after the supported repair paths were exhausted.** The
+  follow-up began from the clean result of
+  `AP2-HOMER-ENROLL-20260821T052732Z`: the retained personal host was assigned
+  only to Homer, deallocated with zero sessions, and Homer had only his original
+  password method. Readiness checks found the exact Desktop Virtualization User
+  and Virtual Machine User Login assignments, a healthy Entra join and
+  `AADLoginForWindows` 2.2 handler, Homer as the sole member of Remote Desktop
+  Users, and no applicable Conditional Access or legacy per-user MFA policy.
+  Windows allowed Administrators and Remote Desktop Users through Remote
+  Desktop Services and had no remote-interactive deny; its network and local
+  deny entries covered only the built-in Guest account.
+
+  The repair chronology stayed inside supported controls. Windows Cloud Login
+  tenant RDP authentication was disabled, so it was enabled once and reconciled
+  `true`. The pool was tested with modern `enablerdsaadauth:i:1` alone and then
+  restored to its retained compatible pair with `targetisaadjoined:i:1`; the
+  retired web-client URL now redirects to the same Windows App service. Exact
+  Homer or Remote Desktop Users grants were separately tested for network,
+  local-interactive, and remote-interactive logon while every deny entry was
+  held unchanged. None changed the result, so all experimental grants were
+  removed and the original allow and deny lists were verified exactly. A
+  supported reinstall of the healthy Entra login extension also did not change
+  the result. It securely rejoined the same VM under a new Entra device object;
+  its required Intune `mdmId` setting was restored, the new device authenticated
+  successfully and auto-enrolled, and the old device is soft-deleted. The new
+  Intune record is still `unknown` and has no primary user; the existing Dev app
+  can read but received `403` when asked to assign Homer, so that management
+  association now requires an Intune-authorized owner path or natural service
+  reconciliation.
+
+  The decisive connection evidence is from protected run
+  `AP2-HOMER-FIRSTLEG-20260821T074300Z` and was reproduced after every later
+  repair. Windows App parsed `enablerdsaadauth=1`, explicitly selected RDSAAD,
+  acquired an `AadAccessToken` silently, and completed the RDSAAD assertion.
+  The guest then returned `0xD000015B` / `LogonTypeNotGranted`. Windows Security
+  independently recorded Homer at domain `AzureAD`, null target SID, logon type
+  3, status `0xC000015B`, initiated by TermService as NetworkService; the local
+  session log remained empty and AVD exposed only a `Pending` Homer session.
+  This separates attribution cleanly: Chromium/Windows App and Entra supplied
+  genuine Homer X.509 and AVD authentication; AVD delivered the connection and
+  token; the retained endpoint rejected it before creating a Homer Windows
+  token. Consequently Edge never opened, the AP2 loopback enrollment page
+  retained no click receipt, and the public AP2 site was never visited. MDE is
+  only the naturally onboarded endpoint surface and no alert is claimed; the
+  endpoint still has no GSA client and no GSA event is claimed.
+
+  Final cleanup removed every exact staging task/root and pending session and
+  left `ap2homerfresh` deallocated with host `Shutdown`, zero sessions, original
+  logon rights, healthy extensions, compatible pool properties, and Homer still
+  password-only. No passkey, other authentication method, post-ATO activity,
+  credential capture, token replay, MFA bypass, payload, persistence, or
+  fabricated telemetry occurred. The remaining dependency is a Microsoft
+  Windows App/RDSAAD guest-authorization correction (plus owner-authorized
+  Intune primary-user/compliance reconciliation for the replacement device
+  identity); further local allow grants or authentication-policy changes would
+  repeat disproven techniques or weaken the retained boundary.
 
 - **Cleanup means no active AP2 artifact or effect.** It does not erase
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
