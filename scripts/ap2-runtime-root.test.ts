@@ -37,6 +37,7 @@ describe("AP2 development runtime location", () => {
     for (const relativePath of [
       "scripts/check-ap2-durable-runtime.mjs",
       "scripts/guest-clickfix-proof.mjs",
+      "scripts/rachel-enrollment-session-proof.mjs",
       "scripts/run-ap2-durable-readiness.sh",
     ]) {
       expect(readFileSync(resolve(relativePath), "utf8")).not.toContain(

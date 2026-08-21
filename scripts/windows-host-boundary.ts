@@ -93,6 +93,11 @@ const EXACT_EXCLUDED_FILES = new Set([
   // ARM guest Run Command; it does not launch or control the worker host GUI.
   "scripts/guest-clickfix-proof.mjs",
   "scripts/guest-clickfix-proof.test.ts",
+  // This first-leg proof likewise targets only Rachel's isolated remote AVD
+  // canvas and ARM guest Run Command. Its paired test rejects local process,
+  // Windows-mount, clipboard-read, and credential-literal primitives.
+  "scripts/rachel-enrollment-session-proof.mjs",
+  "scripts/rachel-enrollment-session-proof.test.ts",
 ]);
 
 const EXACT_EXCLUDED_PREFIXES = [
