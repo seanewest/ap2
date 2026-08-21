@@ -313,16 +313,48 @@ factual evidence, not entries in a registry or templates for future work.
   only the naturally onboarded endpoint surface and no alert is claimed; the
   endpoint still has no GSA client and no GSA event is claimed.
 
-  Final cleanup removed every exact staging task/root and pending session and
-  left `ap2homerfresh` deallocated with host `Shutdown`, zero sessions, original
-  logon rights, healthy extensions, compatible pool properties, and Homer still
-  password-only. No passkey, other authentication method, post-ATO activity,
-  credential capture, token replay, MFA bypass, payload, persistence, or
-  fabricated telemetry occurred. The remaining dependency is a Microsoft
-  Windows App/RDSAAD guest-authorization correction (plus owner-authorized
-  Intune primary-user/compliance reconciliation for the replacement device
-  identity); further local allow grants or authentication-policy changes would
-  repeat disproven techniques or weaken the retained boundary.
+  A final independent guest recovery path ruled out corruption unique to the
+  retained disk and stale AVD registration. The marked 2026-08-08 Trusted
+  Launch recovery snapshot was copied to a private, no-public-IP disposable
+  `Standard_D2s_v3` VM while `ap2homerfresh` stayed untouched. The restored
+  image's deleted Entra join was removed through the supported extension
+  lifecycle, producing a fresh active device object. Its stale AVD agent and
+  boot-loader packages were uninstalled and the official host-pool DSC package
+  installed them again with a short-lived registration token that was then
+  deleted. The resulting `ap2timedhomer` recovery host was `Available`, had zero
+  sessions, and passed every reported health check, including its fresh Entra
+  device ID. Homer's exact VM User Login role and personal-host assignment were
+  moved to it only after those checks.
+
+  The first connection to that separate host reproduced the boundary in run
+  `AP2-HOMER-FIRSTLEG-RECOVERY-20260821T100000Z`. Entra recorded a successful
+  interactive `Windows App - Web` / `Azure Virtual Desktop` sign-in at
+  `10:19:32Z`; the preceding expected keep-signed-in interrupt recorded Homer's
+  X.509 step as successful. AVD created one `Pending` Homer session, while the
+  recovery guest independently recorded RDSAAD failure `0xD000015B` followed by
+  handshake failure `0x8007052E` at `10:19:51Z`. No Homer Windows token or local
+  session was created. This cross-host reproduction uses a different disk, VM
+  identity, Entra device, managed-device record, and freshly installed AVD
+  agent, so further retained-guest rebuilding is no longer a useful repair
+  path; the remaining dependency is external Microsoft RDSAAD guest
+  authorization.
+
+  Final cleanup across both paths removed every exact staging task/root and
+  pending session. The disposable recovery session host, VM, disk, NIC, role,
+  Entra device, and Intune record are absent, and the registration token is
+  absent. Homer's assignment is restored to `ap2homerfresh`, deallocated with
+  host `Shutdown`, zero sessions, original logon rights, healthy extensions,
+  compatible pool properties, and Homer still password-only. Edge never opened
+  on either failed path; the enrollment visit and trusted-Continue receipts and
+  an AP2 SPA session are absent. MDE participated only as the naturally
+  onboarded endpoint surface, with no alert claimed; neither endpoint had a GSA
+  client or claimed GSA event. No passkey, other authentication method,
+  post-ATO activity, credential capture, token replay, MFA bypass, payload,
+  persistence, or fabricated telemetry occurred. Owner-authorized Intune
+  primary-user/compliance reconciliation remains relevant only to the retained
+  replacement device identity; further local allow grants, guest rebuilds, or
+  authentication-policy changes would repeat disproven techniques or weaken
+  the retained boundary.
 
 - **Cleanup means no active AP2 artifact or effect.** It does not erase
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
