@@ -266,6 +266,31 @@ factual evidence, not entries in a registry or templates for future work.
 
 ## Accepted residue and limitations
 
+- **The first-leg Homer enrollment composition is not yet proven.** In bounded
+  run `AP2-HOMER-ENROLL-20260821T052732Z`, a no-input AP2-owned enrollment page
+  was staged on `ap2homerfresh` loopback without creating a visit receipt. A
+  fresh controlled Linux/Chromium context then completed genuine Homer X.509
+  authentication to Windows App - Web: Entra recorded successful interactive
+  Azure Virtual Desktop sign-ins at `05:29:55Z` and `05:37:29Z`, with the
+  preceding certificate steps explicitly successful. Microsoft exposed the
+  assigned `SessionDesktop`, but both supported desktop launches ended before
+  guest access with Windows App's “admin has restricted the type of logon”
+  error and an exact Homer AVD session stuck `Pending`. Deleting only that
+  pending Homer session, deallocating/starting the exact VM, waiting for the
+  host to return `Available`, and restarting only the staged task did not change
+  the result. The host pool still had its standing Entra-auth RDP properties;
+  no logon right, policy, or security control was changed. Therefore this run
+  proves genuine Homer authentication to the AVD control plane, but not a Homer
+  guest Edge visit, AP2-site interaction, concurrent second session, or a
+  simulated account-takeover condition. The endpoint had no installed Global
+  Secure Access client, the bounded GSA read contained no Homer row, and the
+  onboarded MDE machine produced no bounded alert; none of those absences is a
+  manufactured telemetry claim. Cleanup removed the exact task and staging
+  root, deleted the pending session, and left the VM deallocated with host
+  `Shutdown`, zero sessions, and Homer still holding only his original password
+  method. The external dependency is restoration of supported Entra AVD guest
+  logon on the retained Homer host, without weakening its logon policy.
+
 - **Cleanup means no active AP2 artifact or effect.** It does not erase
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
   deleted-policy history.
