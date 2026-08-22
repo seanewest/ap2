@@ -1,11 +1,18 @@
 # Student tenant technical desired state
 
-AP2 uses Microsoft Graph Tenant Configuration Management (TCM), the current
-Microsoft successor path from Microsoft365DSC, for resources that round-trip
-cleanly. The first set is deliberately limited to the three standing W73
+AP2 uses Microsoft365DSC as the bounded declarative apply layer for resources
+that it models cleanly. The first configuration and invocation path are in
+`infra/microsoft365dsc/AP2StudentBaseline.ps1` and
+`scripts/invoke-microsoft365dsc-baseline.ps1`; see
+`docs/microsoft365dsc-student-baseline.md` for its exact ownership and safety
+boundary.
+
+Microsoft Graph Tenant Configuration Management (TCM) remains an independent
+drift detector. Its first monitor is deliberately limited to the three standing W73
 Conditional Access policies in
 `infra/student-tenant-desired-state/conditional-access.json`. Their existing
-object IDs are part of the contract. The two YouTrack policies and all other
+object IDs are part of the monitor contract, not the portable DSC configuration.
+The two YouTrack policies and all other
 tenant, endpoint, SaaS, Azure, scenario, and recovery state remain outside this
 set.
 
@@ -35,8 +42,9 @@ existing monitor with a different baseline. TCM evaluates monitors every six
 hours; `inspect` also performs an immediate exact Graph comparison, so a safe
 read does not depend on the next service evaluation.
 
-TCM detects drift but does not automatically remediate it. The bounded apply
-path is therefore explicit:
+TCM detects drift but does not automatically remediate it. Its earlier bounded
+Graph repair path remains available for the exact existing development policy
+IDs:
 
 ```sh
 AP2_DESIRED_STATE_APPLY=PATCH-EXISTING-W73-POLICIES \
@@ -49,10 +57,11 @@ creates or deletes a Conditional Access policy, and refuses to overwrite
 unmodeled controls. Re-run `inspect` afterward. Keep using the supported Graph,
 Intune, Azure, and workload paths for anything outside this small set.
 
-The Windows update baseline remains declaratively owned by
-`scripts/windows-update-baseline.mjs`. Do not add it to this TCM set unless TCM
-round-trips the live Intune update ring and feature-update profile without
-semantic loss.
+Microsoft365DSC now owns portable create/update convergence for these three
+policies and the W76 update objects. The retained Graph scripts remain focused
+independent inspection plus the installation-specific device-membership path.
+Do not add the Windows update objects to TCM unless it later round-trips them
+without semantic loss.
 
 Microsoft references:
 

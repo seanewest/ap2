@@ -12,6 +12,7 @@
     "check:api-container-provenance": "node scripts/api-container-provenance.ts",
     "update:api-container-base": "node scripts/update-api-container-base.ts",
     "windows-update-baseline": "node scripts/windows-update-baseline.mjs",
+    "test:microsoft365dsc-baseline": "vitest run scripts/microsoft365dsc-baseline.test.mjs",
     "check:workflow-security": "node scripts/check-github-actions-security.ts",
     "check:windows-host-boundary": "node scripts/check-windows-host-boundary.ts",
     "check:durable-runtime": "sh scripts/run-ap2-durable-readiness.sh",

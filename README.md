@@ -70,6 +70,12 @@ Credentials, certificate paths, and passphrases remain runtime secrets and are
 not part of either non-secret record. This does not provision an API or broader
 Student infrastructure.
 
+The first bounded Microsoft365DSC convergence path for stable Student tenant
+objects is documented in
+[`docs/microsoft365dsc-student-baseline.md`](docs/microsoft365dsc-student-baseline.md).
+It must run from elevated Windows PowerShell with its token and generated MOF in
+the protected runtime, never in Git.
+
 Run the deterministic checks with:
 
 ```sh

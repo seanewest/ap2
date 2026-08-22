@@ -75,6 +75,11 @@ include stable Entra Conditional Access and Intune policy resources. The initial
 AP2 DSC work should emphasize export/compare/drift visibility and bounded apply,
 not an immediate claim that every Student object is DSC-owned.
 
+The first implemented boundary is documented in
+`docs/microsoft365dsc-student-baseline.md`: the W73 policies, W76 update policies,
+and their stable assignment-group shell are converged by name, while group
+membership and other installation-specific state remain outside DSC.
+
 Do not put secrets, private certificate material, generated per-installation
 credentials, scenario content, or awkward/unsupported resources into DSC simply
 for completeness.
