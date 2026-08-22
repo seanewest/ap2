@@ -5,16 +5,28 @@ import { chromium } from "playwright";
 import { resolveAp2RuntimeRoot } from "./ap2-runtime-root.mjs";
 
 // Use one fresh AP2_RUN_ID across inspect, register, observe, and cleanup.
-// Register refuses any existing Homer FIDO2 method; cleanup accepts only the
-// one exact run marker and deletes it through Homer's own Security info page.
+// Register refuses any existing actor FIDO2 method; cleanup accepts only the
+// one exact run marker and deletes it through the actor's Security info page.
 const TENANT_ID = "92563293-315c-4b6c-9b90-bcb47ee8c970";
-const HOMER = Object.freeze({
-  objectId: "6e54e3a9-7651-4520-a331-047550ae6fca",
-  userPrincipalName: "homer.simpson@corywest.onmicrosoft.com",
+const ACTORS = Object.freeze({
+  homer: Object.freeze({
+    objectId: "6e54e3a9-7651-4520-a331-047550ae6fca",
+    userPrincipalName: "homer.simpson@corywest.onmicrosoft.com",
+  }),
+  rachel: Object.freeze({
+    objectId: "1e99b11d-f3b0-4e6f-86b5-1b4bf95012e9",
+    userPrincipalName: "rachel.green@corywest.onmicrosoft.com",
+  }),
 });
+const ACTOR_KEY = process.env.AP2_AUTH_ACTOR?.trim() || "homer";
+const ACTOR = ACTORS[ACTOR_KEY];
+if (!ACTOR) throw new Error("AP2_AUTH_ACTOR must be homer or rachel");
 const RUN_ID = process.env.AP2_RUN_ID?.trim();
-if (!RUN_ID || !/^AP2-HOMER-AUTH-[0-9]{8}T[0-9]{6}Z$/.test(RUN_ID)) {
-  throw new Error("AP2_RUN_ID must be AP2-HOMER-AUTH-YYYYMMDDTHHMMSSZ");
+const expectedRun = ACTOR_KEY === "rachel"
+  ? /^AP2-RACHEL-CHAIN-[0-9]{8}T[0-9]{6}Z$/
+  : /^AP2-HOMER-AUTH-[0-9]{8}T[0-9]{6}Z$/;
+if (!RUN_ID || !expectedRun.test(RUN_ID)) {
+  throw new Error(`AP2_RUN_ID does not match the ${ACTOR_KEY} proof format`);
 }
 const mode = process.argv[2];
 if (!new Set(["inspect", "register", "observe", "cleanup"]).has(mode)) {
@@ -27,11 +39,11 @@ const runtimeRoot = resolveAp2RuntimeRoot();
 const output = path.join(runtimeRoot, "runs", RUN_ID);
 const pfxPath = path.join(
   runtimeRoot,
-  "secrets/cba/users/homer/certificate.pfx",
+  `secrets/cba/users/${ACTOR_KEY}/certificate.pfx`,
 );
 const pfxPassphrase = fs
   .readFileSync(
-    path.join(runtimeRoot, "secrets/cba/users/homer/pfx-passphrase.txt"),
+    path.join(runtimeRoot, `secrets/cba/users/${ACTOR_KEY}/pfx-passphrase.txt`),
     "utf8",
   )
   .trim();
@@ -85,11 +97,11 @@ const policy = await graph(
   "/v1.0/policies/authenticationMethodsPolicy/authenticationMethodConfigurations/fido2",
 );
 const methods = await graph(
-  `/v1.0/users/${HOMER.objectId}/authentication/methods`,
+  `/v1.0/users/${ACTOR.objectId}/authentication/methods`,
 );
 const preflight = {
   observedUtc: new Date().toISOString(),
-  homer: HOMER,
+  actor: ACTOR,
   policy: {
     state: policy.state,
     isSelfServiceRegistrationAllowed: policy.isSelfServiceRegistrationAllowed,
@@ -131,12 +143,12 @@ async function observeEvidence() {
     : undefined;
   const [currentMethods, registration, targetedAudits, recentAudits] =
     await Promise.all([
-      graph(`/v1.0/users/${HOMER.objectId}/authentication/methods`),
+      graph(`/v1.0/users/${ACTOR.objectId}/authentication/methods`),
       graph(
-        `/v1.0/reports/authenticationMethods/userRegistrationDetails/${HOMER.objectId}`,
+        `/v1.0/reports/authenticationMethods/userRegistrationDetails/${ACTOR.objectId}`,
       ),
       graph(
-        `/v1.0/auditLogs/directoryAudits?$filter=targetResources/any(t:t/id%20eq%20%27${HOMER.objectId}%27)&$orderby=activityDateTime%20desc&$top=30`,
+        `/v1.0/auditLogs/directoryAudits?$filter=targetResources/any(t:t/id%20eq%20%27${ACTOR.objectId}%27)&$orderby=activityDateTime%20desc&$top=30`,
       ),
       graph(
         `/v1.0/auditLogs/directoryAudits?$filter=activityDateTime%20ge%20${encodeURIComponent(runStart)}&$orderby=activityDateTime%20desc&$top=100`,
@@ -151,8 +163,8 @@ async function observeEvidence() {
       /security info|passkey|authentication method|fido/i.test(
         `${audit.activityDisplayName} ${audit.resultReason}`,
       ) &&
-      (audit.initiatedBy?.user?.id === HOMER.objectId ||
-        audit.targetResources?.some((target) => target.id === HOMER.objectId)),
+      (audit.initiatedBy?.user?.id === ACTOR.objectId ||
+        audit.targetResources?.some((target) => target.id === ACTOR.objectId)),
   );
   const auditTimes = authenticationMethodAudits.map((audit) =>
     Date.parse(audit.activityDateTime),
@@ -165,7 +177,7 @@ async function observeEvidence() {
     ? Math.max(...auditTimes) + 2 * 60_000
     : Date.now();
   const signIns = await graph(
-    `/beta/auditLogs/signIns?$filter=userId%20eq%20%27${HOMER.objectId}%27%20and%20createdDateTime%20ge%20${encodeURIComponent(new Date(evidenceWindowStart).toISOString())}%20and%20createdDateTime%20le%20${encodeURIComponent(new Date(evidenceWindowEnd).toISOString())}&$orderby=createdDateTime%20desc&$top=200`,
+    `/beta/auditLogs/signIns?$filter=userId%20eq%20%27${ACTOR.objectId}%27%20and%20createdDateTime%20ge%20${encodeURIComponent(new Date(evidenceWindowStart).toISOString())}%20and%20createdDateTime%20le%20${encodeURIComponent(new Date(evidenceWindowEnd).toISOString())}&$orderby=createdDateTime%20desc&$top=200`,
   );
   const signInsInWindow = signIns.value.filter((signIn) => {
     const timestamp = Date.parse(signIn.createdDateTime);
@@ -192,7 +204,11 @@ async function observeEvidence() {
   const registrationAccountControl = accountControlSignIns
     .filter((signIn) => Date.parse(signIn.createdDateTime) >= firstAuditTime)
     .at(-1);
+  const afterPartySignIn = signInsInWindow.find(
+    (signIn) => signIn.appDisplayName === "After Party Exploratory" && signIn.isInteractive,
+  );
   const selectedSignIns = [
+    afterPartySignIn,
     registrationX509,
     registrationAccountControl,
     cleanupX509,
@@ -239,6 +255,13 @@ async function observeEvidence() {
       createdDateTime: signIn.createdDateTime,
       appDisplayName: signIn.appDisplayName,
       resourceDisplayName: signIn.resourceDisplayName,
+      userPrincipalName: signIn.userPrincipalName,
+      ipAddress: signIn.ipAddress,
+      userAgent: signIn.userAgent,
+      clientAppUsed: signIn.clientAppUsed,
+      deviceDetail: signIn.deviceDetail,
+      isThroughGlobalSecureAccess: signIn.isThroughGlobalSecureAccess,
+      globalSecureAccessIpAddress: signIn.globalSecureAccessIpAddress,
       isInteractive: signIn.isInteractive,
       status: signIn.status,
       authenticationRequirement: signIn.authenticationRequirement,
@@ -265,9 +288,11 @@ if (mode === "observe") {
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({
   viewport: { width: 1440, height: 1000 },
-  userAgent:
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-    "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+  ...(ACTOR_KEY === "homer" ? {
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+      "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+  } : {}),
   clientCertificates: [
     {
       origin: "https://certauth.login.microsoftonline.com",
@@ -304,7 +329,55 @@ async function clickIfVisible(locator) {
   return false;
 }
 
+async function authenticateAp2Session() {
+  const hostEgress = await fetch("https://api.ipify.org?format=json").then((response) => response.json());
+  await page.goto("https://seanewest.github.io/ap2/", {
+    waitUntil: "domcontentloaded",
+    timeout: 90_000,
+  });
+  await page.getByRole("button", { name: "Sign in with Microsoft" }).click();
+  for (let attempt = 0; attempt < 180; attempt += 1) {
+    const text = (await page.locator("body").innerText().catch(() => ""))
+      .replaceAll(/\s+/g, " ")
+      .trim();
+    const username = page.locator('input[name="loginfmt"]:visible').first();
+    if (await username.isVisible().catch(() => false)) {
+      await username.fill(ACTOR.userPrincipalName);
+      await page.locator('#idSIButton9,input[type="submit"]').first().click();
+      await page.waitForTimeout(800);
+      continue;
+    }
+    if (await clickIfVisible(page.getByText(/use (?:a )?certificate or smart card|sign in with (?:a )?certificate|certificate-based authentication/i).first())) continue;
+    if (await clickIfVisible(page.getByText(/sign-in options|sign in another way/i).first())) continue;
+    if (/stay signed in/i.test(text) && await clickIfVisible(page.locator('#idBtn_Back,button:has-text("No")').first())) continue;
+    if (text.includes("Signed in as Rachel Green") && text.includes(ACTOR.userPrincipalName)) {
+      const browserContext = await page.evaluate(() => ({
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        languages: navigator.languages,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }));
+      const result = {
+        authenticatedUtc: new Date().toISOString(),
+        actor: ACTOR,
+        app: "https://seanewest.github.io/ap2/",
+        hostEgressIp: hostEgress.ip,
+        browserContext,
+        sameContextContinuesToSecurityInfo: true,
+      };
+      writeJson("secondary-session.json", result);
+      const screenshot = path.join(output, "secondary-session.png");
+      await page.screenshot({ path: screenshot, fullPage: true });
+      fs.chmodSync(screenshot, 0o600);
+      return result;
+    }
+    if (attempt === 179) throw new Error(`AP2 session did not authenticate as Rachel: ${text.slice(0, 1000)}`);
+    await page.waitForTimeout(500);
+  }
+}
+
 try {
+  if (ACTOR_KEY === "rachel" && mode === "register") await authenticateAp2Session();
   await page.goto("https://mysignins.microsoft.com/security-info", {
     waitUntil: "domcontentloaded",
     timeout: 90_000,
@@ -315,7 +388,7 @@ try {
       .trim();
     const username = page.locator('input[name="loginfmt"]:visible').first();
     if (await username.isVisible().catch(() => false)) {
-      await username.fill(HOMER.userPrincipalName);
+      await username.fill(ACTOR.userPrincipalName);
       await page.locator('#idSIButton9,input[type="submit"]').first().click();
       await page.waitForTimeout(800);
       continue;
@@ -360,7 +433,7 @@ try {
       .replaceAll(/\s+/g, " ")
       .trim();
     if (!beforeText.includes(METHOD_NAME)) {
-      throw new Error("Exact marked passkey is not visible for Homer cleanup");
+      throw new Error("Exact marked passkey is not visible for actor cleanup");
     }
     await page.locator('button[aria-label="Delete Passkey"]:visible').click();
     await page.waitForTimeout(500);
@@ -380,7 +453,7 @@ try {
     let remaining;
     for (let attempt = 0; attempt < 30; attempt += 1) {
       remaining = await graph(
-        `/v1.0/users/${HOMER.objectId}/authentication/methods`,
+        `/v1.0/users/${ACTOR.objectId}/authentication/methods`,
       );
       if (
         !remaining.value.some(
@@ -398,7 +471,7 @@ try {
     }
     const cleanup = {
       completedUtc: new Date().toISOString(),
-      actor: HOMER,
+      actor: ACTOR,
       removedDisplayName: METHOD_NAME,
       remainingMethods: remaining.value.map((method) => ({
         id: method.id,
@@ -435,11 +508,12 @@ try {
           await page.screenshot({
             path: path.join(output, "register-progress.png"),
           });
+          fs.chmodSync(path.join(output, "register-progress.png"), 0o600);
           console.log(JSON.stringify({ passkeyRegistrationPending: diagnostic }));
         }
         const username = page.locator('input[name="loginfmt"]:visible').first();
         if (await username.isVisible().catch(() => false)) {
-          await username.fill(HOMER.userPrincipalName);
+          await username.fill(ACTOR.userPrincipalName);
           await page.locator('#idSIButton9,input[type="submit"]').first().click();
           await page.waitForTimeout(800);
           continue;
@@ -497,6 +571,7 @@ try {
             buttons: await page.getByRole("button").allTextContents(),
           });
           await page.screenshot({ path: path.join(output, "register-debug.png") });
+          fs.chmodSync(path.join(output, "register-debug.png"), 0o600);
           throw new Error(`Passkey registration did not complete: ${text.slice(0, 1000)}`);
         }
         await page.waitForTimeout(500);
@@ -528,6 +603,7 @@ try {
   };
   writeJson("browser-inspect.json", result);
   await page.screenshot({ path: path.join(output, "browser-inspect.png") });
+  fs.chmodSync(path.join(output, "browser-inspect.png"), 0o600);
   console.log(JSON.stringify(result, null, 2));
   if (mode === "register") {
     const evidence = await observeEvidence();
@@ -542,3 +618,4 @@ try {
   await context.close();
   await browser.close();
 }
+process.exit(0);

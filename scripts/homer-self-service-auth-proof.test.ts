@@ -8,12 +8,22 @@ const source = readFileSync(
 );
 
 describe("Homer self-service authentication proof", () => {
-  it("binds the live mutation to exact Homer and a fresh CBA browser", () => {
+  it("binds the live mutation to exact supported actors and a fresh CBA browser", () => {
     expect(source).toContain("92563293-315c-4b6c-9b90-bcb47ee8c970");
     expect(source).toContain("6e54e3a9-7651-4520-a331-047550ae6fca");
     expect(source).toContain("homer.simpson@corywest.onmicrosoft.com");
+    expect(source).toContain("1e99b11d-f3b0-4e6f-86b5-1b4bf95012e9");
+    expect(source).toContain("rachel.green@corywest.onmicrosoft.com");
     expect(source).toContain("https://mysignins.microsoft.com/security-info");
     expect(source).toContain("clientCertificates");
+    expect(source).not.toContain("storageState");
+  });
+
+  it("keeps Rachel's AP2 sign-in and passkey registration in one distinct context", () => {
+    expect(source).toContain("AP2-RACHEL-CHAIN-");
+    expect(source).toContain("authenticateAp2Session");
+    expect(source).toContain("sameContextContinuesToSecurityInfo: true");
+    expect(source).toContain("secondary-session.json");
     expect(source).not.toContain("storageState");
   });
 

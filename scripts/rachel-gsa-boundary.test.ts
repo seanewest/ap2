@@ -9,6 +9,10 @@ describe("Rachel Global Secure Access methods", () => {
     expect(standing).toContain('commandId: "RunPowerShellScript"');
     expect(edge).toContain('commandId: "RunPowerShellScript"');
     expect(edge).toContain("https://client.wvd.microsoft.com/");
+    expect(edge).toContain("company-access.html?gsaTlsProof=");
+    expect(edge).toContain("nativeProcessEvidenceRequired");
+    expect(edge).toContain("vmPowerChanged: false");
+    expect(edge).not.toContain("/deallocate?");
     expect(edge).toContain("page.keyboard");
     expect(edge).not.toContain("node:child_process");
 

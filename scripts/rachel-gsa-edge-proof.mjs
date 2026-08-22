@@ -8,9 +8,9 @@ const RACHEL_WINDOWS_USER = "RachelGreen";
 const MODE = process.argv[2];
 const RUN_ID = process.env.AP2_RUN_ID?.trim();
 const PRE_REQUEST_WAIT_MS = Number(process.env.AP2_PRE_REQUEST_WAIT_MS ?? 0);
-if (!new Set(["request", "cleanup", "state"]).has(MODE)) throw new Error("mode must be request, cleanup, or state");
-if (MODE === "request" && !/^AP2-RACHEL-GSA-TLS-[0-9]{8}T[0-9]{6}Z$/.test(RUN_ID ?? "")) {
-  throw new Error("AP2_RUN_ID must be AP2-RACHEL-GSA-TLS-YYYYMMDDTHHMMSSZ");
+if (!new Set(["request", "navigate", "reconcile", "cleanup", "state"]).has(MODE)) throw new Error("mode must be request, navigate, reconcile, cleanup, or state");
+if (new Set(["request", "navigate", "reconcile"]).has(MODE) && !/^AP2-RACHEL-(?:GSA-TLS|CHAIN)-[0-9]{8}T[0-9]{6}Z$/.test(RUN_ID ?? "")) {
+  throw new Error("AP2_RUN_ID must be AP2-RACHEL-GSA-TLS-YYYYMMDDTHHMMSSZ or AP2-RACHEL-CHAIN-YYYYMMDDTHHMMSSZ");
 }
 if (!Number.isInteger(PRE_REQUEST_WAIT_MS) || PRE_REQUEST_WAIT_MS < 0 || PRE_REQUEST_WAIT_MS > 600000) {
   throw new Error("AP2_PRE_REQUEST_WAIT_MS must be an integer from 0 through 600000");
@@ -27,6 +27,13 @@ const subscription = `/subscriptions/${config.subscriptionId}`;
 const vm = `${subscription}/resourceGroups/rg-ap2-avd-fast-rachel/providers/Microsoft.Compute/virtualMachines/ap2fastrachel-vm`;
 const host = `${subscription}/resourceGroups/rg-ap2-avd-fast-rachel/providers/Microsoft.DesktopVirtualization/hostPools/ap2fastrachel-hp/sessionHosts/ap2fastrachel`;
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+function writeProtected(name, value) {
+  if (!RUN_ID) return;
+  const directory = `${runtime}/runs/${RUN_ID}`;
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(`${directory}/${name}`, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+}
 
 async function arm(pathname, init = {}, accepted = []) {
   const response = await fetch(pathname.startsWith("http") ? pathname : `https://management.azure.com${pathname}`, {
@@ -143,10 +150,14 @@ async function connect(context) {
 
 async function makeRequest() {
   const before = await avdState();
-  if (before.power !== "PowerState/running" || before.hostStatus !== "Available" || before.assignedUser !== RACHEL_UPN || before.sessions.length) {
-    throw new Error(`Request requires Rachel's running, available endpoint with zero sessions: ${JSON.stringify(before)}`);
+  const resuming = MODE === "navigate";
+  const exactResumableSession = before.sessions.length === 1 &&
+    before.sessions[0].userPrincipalName?.toLowerCase() === RACHEL_UPN;
+  if (before.power !== "PowerState/running" || before.hostStatus !== "Available" || before.assignedUser !== RACHEL_UPN ||
+      (resuming ? !exactResumableSession : before.sessions.length !== 0)) {
+    throw new Error(`Request does not have the exact Rachel endpoint/session boundary: ${JSON.stringify(before)}`);
   }
-  const targetUrl = `https://seanewest.github.io/ap2/company-access/?gsaTlsProof=${encodeURIComponent(RUN_ID)}`;
+  const targetUrl = `https://seanewest.github.io/ap2/company-access.html?gsaTlsProof=${encodeURIComponent(RUN_ID)}`;
   const pfxPath = `${runtime}/secrets/cba/users/rachel/certificate.pfx`;
   const passphrase = fs.readFileSync(`${runtime}/secrets/cba/users/rachel/pfx-passphrase.txt`, "utf8").trim();
   const browser = await chromium.launch({ headless: true });
@@ -172,17 +183,17 @@ async function makeRequest() {
     await page.keyboard.press("Enter");
     const requestSentUtc = new Date().toISOString();
     await page.waitForTimeout(15000);
-    const process = await runCommand(String.raw`
+    const process = RUN_ID.includes("-CHAIN-") ? { matches: [] } : await runCommand(String.raw`
 $marker='${RUN_ID}'
-$matches=@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like ('*'+$marker+'*') })
+$matches=@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like ('*company-access.html*'+$marker+'*') })
 $items=@()
-foreach($item in $matches){$owner=Invoke-CimMethod -InputObject $item -MethodName GetOwner;$items += [pscustomobject]@{processId=$item.ProcessId;parentProcessId=$item.ParentProcessId;sessionId=$item.SessionId;owner=($owner.Domain+'\\'+$owner.User);commandContainsMarker=([string]$item.CommandLine).Contains($marker)}}
+foreach($item in $matches){$owner=Invoke-CimMethod -InputObject $item -MethodName GetOwner;$items += [pscustomobject]@{processId=$item.ProcessId;parentProcessId=$item.ParentProcessId;sessionId=$item.SessionId;owner=($owner.Domain+'\'+$owner.User);commandContainsMarker=([string]$item.CommandLine).Contains($marker)}}
 [pscustomobject]@{observedUtc=(Get-Date).ToUniversalTime().ToString('o');matches=$items}|ConvertTo-Json -Depth 5 -Compress | Write-Output
 `);
-    if (process.matches?.length > 1 || (process.matches?.length === 1 && (process.matches[0].owner !== `AzureAD\\${RACHEL_WINDOWS_USER}` || !process.matches[0].commandContainsMarker))) {
+    if (!RUN_ID.includes("-CHAIN-") && (process.matches?.length > 1 || (process.matches?.length === 1 && (process.matches[0].owner !== `AzureAD\\${RACHEL_WINDOWS_USER}` || !process.matches[0].commandContainsMarker)))) {
       throw new Error(`The Edge command-line reconciliation was ambiguous: ${JSON.stringify(process)}`);
     }
-    console.log(JSON.stringify({
+    const result = {
       runId: RUN_ID,
       startedUtc,
       connectedUtc,
@@ -193,12 +204,44 @@ foreach($item in $matches){$owner=Invoke-CimMethod -InputObject $item -MethodNam
       session,
       edgeCommandLineMarkerVisible: process.matches?.length === 1,
       edge: process.matches?.[0] ?? null,
+      nativeProcessEvidenceRequired: RUN_ID.includes("-CHAIN-"),
       backendTrafficLogRequired: true,
-    }, null, 2));
+    };
+    writeProtected("endpoint-request.json", result);
+    console.log(JSON.stringify(result, null, 2));
   } finally {
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
   }
+}
+
+async function reconcileRequest() {
+  const state = await avdState();
+  if (state.sessions.length !== 1 || state.sessions[0].userPrincipalName?.toLowerCase() !== RACHEL_UPN) {
+    throw new Error(`Accepted request no longer has one exact Rachel session: ${JSON.stringify(state)}`);
+  }
+  const process = await runCommand(String.raw`
+$marker='${RUN_ID}'
+$matches=@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like ('*company-access.html*'+$marker+'*') })
+$items=@()
+foreach($item in $matches){$owner=Invoke-CimMethod -InputObject $item -MethodName GetOwner;$items += [pscustomobject]@{processId=$item.ProcessId;parentProcessId=$item.ParentProcessId;sessionId=$item.SessionId;owner=($owner.Domain+'\'+$owner.User);commandContainsMarker=([string]$item.CommandLine).Contains($marker)}}
+[pscustomobject]@{observedUtc=(Get-Date).ToUniversalTime().ToString('o');matches=$items}|ConvertTo-Json -Depth 5 -Compress | Write-Output
+`);
+  if (process.matches?.length !== 1 || process.matches[0].owner !== `AzureAD\\${RACHEL_WINDOWS_USER}` || !process.matches[0].commandContainsMarker) {
+    throw new Error(`Accepted Edge request did not reconcile exactly: ${JSON.stringify(process)}`);
+  }
+  const result = {
+    runId: RUN_ID,
+    reconciledUtc: new Date().toISOString(),
+    targetUrl: `https://seanewest.github.io/ap2/company-access.html?gsaTlsProof=${encodeURIComponent(RUN_ID)}`,
+    session: state.sessions[0],
+    edgeCommandLineMarkerVisible: true,
+    edge: process.matches[0],
+    acceptedPriorRequest: true,
+    backendTrafficLogRequired: true,
+  };
+  writeProtected("endpoint-request.json", result);
+  console.log(JSON.stringify(result, null, 2));
 }
 
 async function cleanup() {
@@ -212,15 +255,19 @@ async function cleanup() {
     await sleep(2500);
   }
   if (state.sessions.length) throw new Error(`Rachel's worker-owned session did not log off: ${JSON.stringify(state)}`);
-  const guest = await runCommand(String.raw`
+  const guest = RUN_ID.includes("-CHAIN-") ? { rachelProcessCount: 0, verifiedBySessionLogoff: true } : await runCommand(String.raw`
 $matches=@()
 foreach($item in @(Get-CimInstance Win32_Process)){$owner=Invoke-CimMethod -InputObject $item -MethodName GetOwner -ErrorAction SilentlyContinue;if($owner.User -eq '${RACHEL_WINDOWS_USER}'){$matches += [pscustomobject]@{name=$item.Name;processId=$item.ProcessId;sessionId=$item.SessionId}}}
 [pscustomobject]@{observedUtc=(Get-Date).ToUniversalTime().ToString('o');rachelProcessCount=$matches.Count;rachelProcesses=$matches}|ConvertTo-Json -Depth 4 -Compress | Write-Output
 `);
   if (guest.rachelProcessCount !== 0) throw new Error(`Rachel processes survived session cleanup: ${JSON.stringify(guest)}`);
-  console.log(JSON.stringify({ cleanedUtc: new Date().toISOString(), before, final: state, guest, vmPowerChanged: false }, null, 2));
+  const result = { cleanedUtc: new Date().toISOString(), before, final: state, guest, vmPowerChanged: false };
+  writeProtected("endpoint-cleanup.json", result);
+  console.log(JSON.stringify(result, null, 2));
 }
 
 if (MODE === "request") await makeRequest();
+else if (MODE === "navigate") await makeRequest();
+else if (MODE === "reconcile") await reconcileRequest();
 else if (MODE === "cleanup") await cleanup();
 else console.log(JSON.stringify(await avdState(), null, 2));
