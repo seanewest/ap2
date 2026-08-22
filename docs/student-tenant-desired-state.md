@@ -49,10 +49,10 @@ creates or deletes a Conditional Access policy, and refuses to overwrite
 unmodeled controls. Re-run `inspect` afterward. Keep using the supported Graph,
 Intune, Azure, and workload paths for anything outside this small set.
 
-The concurrent Windows update baseline was not included because no authoritative
-live object had reached `origin/main` when this set was established. Add it only
-after its exact identity is known and TCM round-trips its current Intune resource
-without semantic loss.
+The Windows update baseline remains declaratively owned by
+`scripts/windows-update-baseline.mjs`. Do not add it to this TCM set unless TCM
+round-trips the live Intune update ring and feature-update profile without
+semantic loss.
 
 Microsoft references:
 
