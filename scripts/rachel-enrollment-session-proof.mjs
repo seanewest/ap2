@@ -10,7 +10,7 @@ const { chromium } = require("playwright");
 const RUN_ID = process.env.AP2_RUN_ID?.trim();
 if (!RUN_ID || !/^AP2-RACHEL-FIRSTLEG-[0-9]{8}T[0-9]{6}Z$/.test(RUN_ID)) throw new Error("AP2_RUN_ID must be AP2-RACHEL-FIRSTLEG-YYYYMMDDTHHMMSSZ");
 const MODE = process.argv[2];
-if (!new Set(["preflight", "stage", "drive", "secondary", "observe", "signins", "cleanup", "state"]).has(MODE)) throw new Error("mode must be preflight, stage, drive, secondary, observe, signins, cleanup, or state");
+if (!new Set(["preflight", "stage", "drive", "secondary", "observe", "signins", "cleanup", "baseline-cba-session", "state"]).has(MODE)) throw new Error("mode must be preflight, stage, drive, secondary, observe, signins, cleanup, baseline-cba-session, or state");
 
 const UPN = "rachel.green@corywest.onmicrosoft.com";
 const COMPUTER = "ap2fastrachel";
@@ -236,6 +236,109 @@ async function secondary() {
   } finally { await context.close().catch(() => {}); await browser.close().catch(() => {}); }
 }
 
+async function baselineCbaSession() {
+  const before = await avdState();
+  const identityBefore = await identitySnapshot();
+  if (
+    before.power !== "PowerState/deallocated" ||
+    before.hostStatus !== "Shutdown" ||
+    before.sessions.length !== 0 ||
+    before.declaredSessions !== 0 ||
+    before.assignedUser !== UPN
+  ) throw new Error(`Rachel endpoint not clean for baseline validation: ${JSON.stringify(before)}`);
+  await operation(await request(`${vm}/start?api-version=2024-11-01`, {
+    method: "POST",
+    body: "{}",
+  }));
+  const ready = await waitReady();
+  const pfx = `${RUNTIME}/secrets/cba/users/rachel/certificate.pfx`;
+  const passphrase = fs.readFileSync(
+    `${RUNTIME}/secrets/cba/users/rachel/pfx-passphrase.txt`,
+    "utf8",
+  ).trim();
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    clientCertificates: [
+      { origin: "https://certauth.login.microsoftonline.com", pfxPath: pfx, passphrase },
+      { origin: `https://t${config.tenantId}.certauth.login.microsoftonline.com`, pfxPath: pfx, passphrase },
+    ],
+  });
+  context.setDefaultTimeout(2500);
+  let connected;
+  let connectionError;
+  try {
+    const primer = await authenticateAp2(context);
+    await primer.page.close();
+    const result = await connect(context);
+    connected = {
+      connectedUtc: new Date().toISOString(),
+      sessionId: result.session.id,
+      userPrincipalName: result.session.properties?.userPrincipalName,
+      sessionState: result.session.properties?.sessionState,
+      canvas: result.canvas.rect,
+    };
+    if (
+      connected.userPrincipalName?.toLowerCase() !== UPN ||
+      connected.sessionState !== "Active" ||
+      connected.canvas.width < 1200 ||
+      connected.canvas.height < 700
+    ) throw new Error(`AVD CBA session was not exact: ${JSON.stringify(connected)}`);
+  } catch (error) {
+    connectionError = error;
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
+  let current = await avdState();
+  if (current.sessions.some((session) =>
+    session.properties?.userPrincipalName?.toLowerCase() !== UPN
+  )) throw new Error(`Foreign AVD session appeared: ${JSON.stringify(current.sessions)}`);
+  for (const session of current.sessions) {
+    await operation(await request(`${session.id}?api-version=2024-04-03`, {
+      method: "DELETE",
+    }));
+  }
+  await operation(await request(`${vm}/deallocate?api-version=2024-11-01`, {
+    method: "POST",
+    body: "{}",
+  }));
+  let final;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    final = await avdState();
+    if (
+      final.power === "PowerState/deallocated" &&
+      final.hostStatus === "Shutdown" &&
+      final.sessions.length === 0 &&
+      final.declaredSessions === 0
+    ) break;
+    await sleep(3000);
+  }
+  if (
+    final.power !== "PowerState/deallocated" ||
+    final.hostStatus !== "Shutdown" ||
+    final.sessions.length !== 0 ||
+    final.declaredSessions !== 0
+  ) throw new Error(`Rachel endpoint cleanup did not settle: ${JSON.stringify(final)}`);
+  const identityAfter = await identitySnapshot();
+  if (
+    JSON.stringify(identityBefore.authenticationMethods) !==
+    JSON.stringify(identityAfter.authenticationMethods)
+  ) throw new Error("Rachel authentication methods changed during AVD validation");
+  if (connectionError) throw connectionError;
+  const result = {
+    runId: RUN_ID,
+    observedUtc: new Date().toISOString(),
+    before,
+    ready,
+    connected,
+    final,
+    authenticationMethodsUnchanged: true,
+  };
+  save("baseline-cba-session.json", result);
+  console.log(JSON.stringify(result, null, 2));
+}
+
 async function observe() {
   const execution = JSON.parse(fs.readFileSync(`${OUTPUT}/execution.json`, "utf8"));
   const secondary = JSON.parse(fs.readFileSync(`${OUTPUT}/secondary.json`, "utf8"));
@@ -290,4 +393,5 @@ else if (MODE === "secondary") await secondary();
 else if (MODE === "observe") await observe();
 else if (MODE === "signins") await signins();
 else if (MODE === "cleanup") await cleanup();
+else if (MODE === "baseline-cba-session") await baselineCbaSession();
 else console.log(JSON.stringify(await avdState(), null, 2));

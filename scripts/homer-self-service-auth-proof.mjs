@@ -422,6 +422,21 @@ try {
         const text = (await page.locator("body").innerText().catch(() => ""))
           .replaceAll(/\s+/g, " ")
           .trim();
+        if (attempt > 0 && attempt % 30 === 0) {
+          const diagnostic = {
+            observedUtc: new Date().toISOString(),
+            attempt,
+            url: page.url(),
+            visibleText: text.slice(0, 8_000),
+            credentialCount: credentials.credentials.length,
+            buttons: await page.getByRole("button").allTextContents(),
+          };
+          writeJson("register-progress.json", diagnostic);
+          await page.screenshot({
+            path: path.join(output, "register-progress.png"),
+          });
+          console.log(JSON.stringify({ passkeyRegistrationPending: diagnostic }));
+        }
         const username = page.locator('input[name="loginfmt"]:visible').first();
         if (await username.isVisible().catch(() => false)) {
           await username.fill(HOMER.userPrincipalName);
