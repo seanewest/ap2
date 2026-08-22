@@ -31,13 +31,20 @@ Do not create additional identities merely to make a diagram more complete.
 ### Keep development authority stable
 
 Pass 3 intentionally avoids permission churn. Reuse existing standing Dev-app,
-API-managed-identity, and simulated-user authority when it supports the question.
-Do not repeatedly revoke, narrow, and regrant permissions between experiments to
-simulate production hardening.
+API-managed-identity, directory-role, Defender, Azure, and simulated-user
+authority when it supports the question. If ordinary sandbox exploration exposes
+a missing supported permission or role, workers may grant that authority through
+the existing administrative path and should normally leave it standing for later
+work. Do not repeatedly revoke, narrow, and regrant permissions between
+experiments to simulate production hardening.
 
-A grant should normally be removed only when it was explicitly introduced as
-temporary for the current experiment, when actor attribution is itself under
-test, or when the permission choice changes the architecture materially.
+A newly granted permission is not temporary merely because one worker first
+needed it. Remove it only when Sean explicitly made it temporary, when the grant
+is itself scenario state or changes the actor semantics under test, or when
+retaining it would cross a real architectural or recovery boundary. Microsoft
+splits broad authority across Graph application permissions, directory roles,
+Azure RBAC, Defender permissions, delegated user roles, and other surfaces; there
+is no single universal development permission to grant once.
 
 Stable broad development authority does not permit secrets in the SPA. Public
 browser code may contain public IDs but never client secrets, certificates,

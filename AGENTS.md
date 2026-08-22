@@ -31,9 +31,16 @@ sandbox assets.
 Preserve the retained control plane by default: tenant identity, application and
 service-principal setup, standing development authority, simulated-user identity
 and authentication setup, licensing, protected credentials, and selected
-baseline infrastructure. Mail, files, meetings, Teams activity, temporary
-memberships or grants, endpoint artifacts, marked Azure resources, and other
-scenario state are disposable or resettable according to the experiment.
+baseline infrastructure. Broad supported authority needed by the AP2 development
+identity is intentionally standing: when ordinary sandbox work requires another
+Graph permission, directory role, Azure role, Defender permission, or comparable
+control-plane grant, workers may add it through the existing admin path and
+should normally retain it for future work rather than revoke it as cleanup.
+Remove authority only when Sean made it explicitly temporary, it is itself part
+of the scenario/actor semantics, or retaining it would cross a real boundary.
+Mail, files, meetings, Teams activity, temporary scenario memberships or grants,
+endpoint artifacts, marked Azure resources, and other scenario state are
+disposable or resettable according to the experiment.
 
 Protect the boundaries that materially matter:
 

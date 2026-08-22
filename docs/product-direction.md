@@ -81,12 +81,22 @@ Simulated-user identity objects, licenses, and authentication setup are retained
 infrastructure. Their mailbox, calendar, files, Teams activity, scenario-specific
 memberships, temporary grants, and other staged workload state are disposable.
 
-Pass 3 intentionally avoids permission churn. Existing broad development
-authority may remain when it supports exploration. Do not repeatedly revoke,
-narrow, and regrant standing permissions merely to approximate production least
-privilege. Temporary grants created specifically for one experiment remain
-cleanup candidates. Revisit standing authority when actor semantics or another
-architectural boundary materially changes.
+Pass 3 intentionally avoids permission churn. Broad development authority is a
+standing capability of the owned sandbox, not something workers should repeatedly
+remove after using it. When the AP2 development identity needs an additional
+supported Graph application permission, Azure role, Defender permission,
+directory role, or comparable control-plane authority to perform ordinary
+exploration, it should normally be granted and retained for future work rather
+than treated as temporary merely because the first need arose during one goal.
+There is no single Microsoft "can do anything" permission, so useful standing
+authority necessarily accumulates across several authorization surfaces.
+
+Remove or narrow a grant only when Sean explicitly made it temporary, when the
+grant exists solely to model the experiment itself, when retaining it would
+change actor attribution or another architectural boundary materially, or when
+it threatens a real boundary such as administrative recovery or systems outside
+the sandbox. Do not revoke useful development authority merely to approximate
+production least privilege.
 
 Scenario state—messages, meetings, files, calls, temporary permissions, marked
 resources, security signals, and other staged activity—is disposable. Azure can
