@@ -101,6 +101,12 @@ A polished coordinate-free way to manipulate arbitrary interactive Windows user
 sessions remains a design area, not a prerequisite for continued scenario work.
 Do not assume the answer is a permanent guest agent.
 
+Retained AVD endpoints already have idle auto-deallocation. After ordinary worker
+use, clean temporary artifacts and close/log off worker-owned sessions, but do
+not explicitly shut down or deallocate the VM merely as cleanup; leave power
+state to the standing idle policy unless a specific experiment requires
+otherwise.
+
 A useful recent anchor is the composed fake-verification path: an AP2-owned page
 in guest Edge used a trusted click to place one fixed harmless PowerShell command
 on the guest clipboard; the simulated user pasted it through Win+R;
