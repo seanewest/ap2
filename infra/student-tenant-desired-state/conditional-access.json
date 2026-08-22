@@ -1,0 +1,76 @@
+{
+  "displayName": "AP2 Student W73 Conditional Access baseline",
+  "description": "Exact standing Conditional Access resources established by W73. Scenario and unrelated tenant state are outside this baseline.",
+  "resources": [
+    {
+      "displayName": "AP2 baseline - Require MFA for all users",
+      "resourceType": "microsoft.entra.conditionalaccesspolicy",
+      "properties": {
+        "DisplayName": "AP2 baseline - Require MFA for all users",
+        "Id": "fda244bc-08d9-464e-b225-2e38256bdbcb",
+        "State": "enabled",
+        "IncludeApplications": ["All"],
+        "ExcludeApplications": [],
+        "IncludeUserActions": [],
+        "AuthenticationContexts": [],
+        "IncludeUsers": ["All"],
+        "ExcludeUsers": [],
+        "IncludeGroups": [],
+        "ExcludeGroups": [],
+        "IncludeRoles": [],
+        "ExcludeRoles": [],
+        "ClientAppTypes": ["all"],
+        "GrantControlOperator": "OR",
+        "BuiltInControls": ["mfa"],
+        "Ensure": "Present"
+      }
+    },
+    {
+      "displayName": "AP2 baseline - Block legacy authentication",
+      "resourceType": "microsoft.entra.conditionalaccesspolicy",
+      "properties": {
+        "DisplayName": "AP2 baseline - Block legacy authentication",
+        "Id": "9ee37be3-2941-4045-908a-282cbd267131",
+        "State": "enabled",
+        "IncludeApplications": ["All"],
+        "ExcludeApplications": [],
+        "IncludeUserActions": [],
+        "AuthenticationContexts": [],
+        "IncludeUsers": ["All"],
+        "ExcludeUsers": [],
+        "IncludeGroups": [],
+        "ExcludeGroups": [],
+        "IncludeRoles": [],
+        "ExcludeRoles": [],
+        "ClientAppTypes": ["exchangeActiveSync", "other"],
+        "GrantControlOperator": "OR",
+        "BuiltInControls": ["block"],
+        "Ensure": "Present"
+      }
+    },
+    {
+      "displayName": "AP2 baseline - Block device code flow",
+      "resourceType": "microsoft.entra.conditionalaccesspolicy",
+      "properties": {
+        "DisplayName": "AP2 baseline - Block device code flow",
+        "Id": "083bbb56-e8a3-4382-aca2-78b463e1d3db",
+        "State": "enabled",
+        "IncludeApplications": ["All"],
+        "ExcludeApplications": [],
+        "IncludeUserActions": [],
+        "AuthenticationContexts": [],
+        "IncludeUsers": ["All"],
+        "ExcludeUsers": [],
+        "IncludeGroups": [],
+        "ExcludeGroups": [],
+        "IncludeRoles": [],
+        "ExcludeRoles": [],
+        "ClientAppTypes": ["all"],
+        "GrantControlOperator": "OR",
+        "BuiltInControls": ["block"],
+        "TransferMethods": "deviceCodeFlow",
+        "Ensure": "Present"
+      }
+    }
+  ]
+}

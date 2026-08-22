@@ -14,6 +14,7 @@
     "check:workflow-security": "node scripts/check-github-actions-security.ts",
     "check:windows-host-boundary": "node scripts/check-windows-host-boundary.ts",
     "check:durable-runtime": "sh scripts/run-ap2-durable-readiness.sh",
+    "check:student-desired-state": "node scripts/student-tenant-desired-state.mjs inspect",
     "development-vault": "node scripts/development-key-vault.mjs",
     "check:spa-bundle": "node scripts/check-spa-bundle-budget.ts",
     "check:api-routes": "node scripts/check-api-route-contracts.ts",
