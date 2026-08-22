@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { X509Certificate } from "node:crypto";
 import { ClientCertificateCredential } from "@azure/identity";
 import { resolveAp2RuntimeRoot } from "./ap2-runtime-root.mjs";
 
@@ -13,12 +15,22 @@ const DEFAULT_APP_ROLE_ID = "00000000-0000-0000-0000-000000000000";
 const ENTRA_SUITE_SKU_ID = "f9602137-2203-447b-9fff-41b36e08ce5d";
 const INTERNET_ACCESS_PLAN_ID = "8d23cb83-ab07-418f-8517-d7aca77307dc";
 const INSTALLER_URL = "https://aka.ms/GlobalSecureAccess-Windows";
+const INTERNET_RESOURCE_APP_ID = "5dc48733-b5df-475c-a49b-fa307ef00853";
+const TLS_CA_NAME = "AP2RachelCA";
+const TLS_CA_COMMON_NAME = "AP2 Student GSA TLS Root CA";
+const TLS_CA_ORGANIZATION = "After Party Exploratory";
+const TLS_POLICY_NAME = "AP2 Rachel narrow TLS inspection";
+const TLS_RULE_NAME = "Inspect AP2 company access host";
+const FILTERING_PROFILE_NAME = "AP2 Rachel TLS inspection profile";
+const FILTERING_PROFILE_PRIORITY = 100;
+const INSPECTION_CA_POLICY_NAME = "AP2 Rachel TLS inspection assignment";
+const INSPECTION_FQDN = "seanewest.github.io";
 const MODE = process.argv[2];
 const SINCE = process.argv[3];
 const DESTINATION_FQDN = process.argv[4];
 
-if (!new Set(["inspect", "assign", "install", "guest", "traffic"]).has(MODE)) {
-  throw new Error("mode must be inspect, assign, install, guest, or traffic");
+if (!new Set(["inspect", "inspection", "tls-reconcile", "assign", "install", "guest", "traffic"]).has(MODE)) {
+  throw new Error("mode must be inspect, inspection, tls-reconcile, assign, install, guest, or traffic");
 }
 
 const runtime = resolveAp2RuntimeRoot();
@@ -49,7 +61,7 @@ async function request(origin, token, pathname, init = {}, accepted = []) {
   let body;
   try { body = text ? JSON.parse(text) : null; } catch { body = { text: text.slice(0, 800) }; }
   if (!response.ok && !accepted.includes(response.status)) {
-    throw new Error(`${init.method ?? "GET"} ${pathname} -> ${response.status} ${body?.error?.code ?? "unknown"}`);
+    throw new Error(`${init.method ?? "GET"} ${pathname} -> ${response.status} ${body?.error?.code ?? "unknown"}: ${body?.error?.message ?? "no message"}`);
   }
   return { response, body };
 }
@@ -279,16 +291,398 @@ async function traffic() {
     destinationFQDN: entry.destinationFQDN,
     destinationUrl: entry.destinationUrl,
     destinationPort: entry.destinationPort,
+    filteringProfileId: entry.filteringProfileId,
+    filteringProfileName: entry.filteringProfileName,
+    policyId: entry.policyId,
+    policyName: entry.policyName,
+    policyRuleId: entry.policyRuleId,
+    policyRuleName: entry.policyRuleName,
     action: entry.action,
     operationStatus: entry.operationStatus,
     initiatingProcessName: entry.initiatingProcessName,
     httpMethod: entry.httpMethod,
     responseCode: entry.responseCode,
+    tlsDetails: entry.tlsDetails,
     popProcessingRegion: entry.popProcessingRegion,
     connectionId: entry.connectionId,
   }));
   if (DESTINATION_FQDN && !logs.length) throw new Error(`No Rachel traffic was visible for ${DESTINATION_FQDN}`);
   console.log(JSON.stringify({ observedUtc: new Date().toISOString(), since: SINCE, destinationFQDN: DESTINATION_FQDN, state, logs }, null, 2));
+}
+
+async function inspectionState() {
+  const [certificates, policies, profiles, conditionalAccess] = await Promise.all([
+    graph("/beta/networkAccess/tls/externalCertificateAuthorityCertificates", { headers: { Prefer: "include-unknown-enum-members" } }),
+    graph("/beta/networkAccess/tlsInspectionPolicies?$expand=policyRules"),
+    graph("/beta/networkAccess/filteringProfiles?$expand=policies($expand=policy)"),
+    graph("/beta/identity/conditionalAccess/policies?$select=id,displayName,state,conditions,sessionControls"),
+  ]);
+  return {
+    observedUtc: new Date().toISOString(),
+    certificates: (certificates.body.value ?? []).map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      commonName: entry.commonName,
+      organizationName: entry.organizationName,
+      status: entry.status,
+      validity: entry.validity,
+      hasCertificate: Boolean(entry.certificate),
+      hasChain: Boolean(entry.chain),
+      hasCertificateSigningRequest: Boolean(entry.certificateSigningRequest),
+    })),
+    policies: policies.body.value ?? [],
+    profiles: profiles.body.value ?? [],
+    conditionalAccess: (conditionalAccess.body.value ?? []).filter((entry) =>
+      entry.sessionControls?.globalSecureAccessFilteringProfile ||
+      entry.conditions?.users?.includeUsers?.includes(RACHEL_ID)
+    ),
+  };
+}
+
+function requireSingleExact(items, name, label) {
+  const exact = items.filter((entry) => entry.name === name || entry.displayName === name);
+  if (exact.length > 1) throw new Error(`More than one ${label} has the exact retained name`);
+  return exact[0];
+}
+
+function ensureRootCertificate() {
+  const directory = path.join(runtime, "secrets/gsa-rachel-tls");
+  const keyPath = path.join(directory, "root-ca.key");
+  const certificatePath = path.join(directory, "root-ca.pem");
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  fs.chmodSync(directory, 0o700);
+  const keyExists = fs.existsSync(keyPath);
+  const certificateExists = fs.existsSync(certificatePath);
+  if (keyExists !== certificateExists) throw new Error("Protected TLS root material is incomplete; refusing replacement");
+  let changed = false;
+  if (!keyExists) {
+    execFileSync("openssl", [
+      "req", "-x509", "-newkey", "rsa:4096", "-sha256", "-days", "3650", "-nodes",
+      "-keyout", keyPath, "-out", certificatePath,
+      "-subj", `/CN=${TLS_CA_COMMON_NAME}/O=${TLS_CA_ORGANIZATION}`,
+      "-addext", "basicConstraints=critical,CA:TRUE",
+      "-addext", "keyUsage=critical,keyCertSign,cRLSign",
+      "-addext", "subjectKeyIdentifier=hash",
+    ], { stdio: "ignore" });
+    changed = true;
+  }
+  fs.chmodSync(keyPath, 0o600);
+  fs.chmodSync(certificatePath, 0o600);
+  const certificate = fs.readFileSync(certificatePath, "utf8");
+  const x509 = new X509Certificate(certificate);
+  if (!x509.ca || !x509.subject.includes(`CN=${TLS_CA_COMMON_NAME}`)) throw new Error("Protected TLS root certificate contract changed");
+  return {
+    directory,
+    keyPath,
+    certificatePath,
+    certificate,
+    thumbprint: x509.fingerprint.replaceAll(":", "").toUpperCase(),
+    changed,
+  };
+}
+
+async function reconcileCertificateAuthority() {
+  const root = ensureRootCertificate();
+  const certificateSelect = "$select=id,name,commonName,organizationName,status,validity,certificateSigningRequest,certificate,chain";
+  const enumHeaders = { headers: { Prefer: "include-unknown-enum-members" } };
+  const csrPath = path.join(root.directory, "gsa-issuer.csr.pem");
+  let collection = (await graph("/beta/networkAccess/tls/externalCertificateAuthorityCertificates")).body.value ?? [];
+  let authority = requireSingleExact(collection, TLS_CA_NAME, "TLS certificate authority");
+  let created = false;
+  if (!authority) {
+    authority = (await graph("/beta/networkAccess/tls/externalCertificateAuthorityCertificates", {
+      method: "POST",
+      body: JSON.stringify({
+        "@odata.type": "#microsoft.graph.networkaccess.externalCertificateAuthorityCertificate",
+        name: TLS_CA_NAME,
+        commonName: TLS_CA_COMMON_NAME,
+        organizationName: TLS_CA_ORGANIZATION,
+      }),
+    })).body;
+    created = true;
+  }
+  authority = (await graph(`/beta/networkAccess/tls/externalCertificateAuthorityCertificates/${authority.id}?${certificateSelect}`, enumHeaders)).body;
+  if (authority.name !== TLS_CA_NAME || authority.commonName !== TLS_CA_COMMON_NAME || authority.organizationName !== TLS_CA_ORGANIZATION) {
+    throw new Error("The retained TLS certificate authority identity changed");
+  }
+  let recreatedForCsr = false;
+  if (authority.status === "csrGenerated" && !authority.certificateSigningRequest && !fs.existsSync(csrPath)) {
+    if (authority.certificate || authority.chain) throw new Error("TLS certificate authority has certificate material but no retrievable CSR");
+    await graph(`/beta/networkAccess/tls/externalCertificateAuthorityCertificates/${authority.id}`, { method: "DELETE" });
+    await graph(`/beta/networkAccess/tls/externalCertificateAuthorityCertificates/${authority.id}`, {}, [404]);
+    authority = (await graph("/beta/networkAccess/tls/externalCertificateAuthorityCertificates", {
+      method: "POST",
+      body: JSON.stringify({
+        "@odata.type": "#microsoft.graph.networkaccess.externalCertificateAuthorityCertificate",
+        name: TLS_CA_NAME,
+        commonName: TLS_CA_COMMON_NAME,
+        organizationName: TLS_CA_ORGANIZATION,
+      }),
+    })).body;
+    recreatedForCsr = true;
+    if (authority.certificateSigningRequest) fs.writeFileSync(csrPath, authority.certificateSigningRequest, { mode: 0o600 });
+  }
+  let uploaded = false;
+  if (authority.status === "csrGenerated") {
+    const csr = authority.certificateSigningRequest ?? (fs.existsSync(csrPath) ? fs.readFileSync(csrPath, "utf8") : null);
+    if (!csr) throw new Error(`TLS certificate authority is ${authority.status} without a retrievable CSR after one supported recreate`);
+    const issuerPath = path.join(root.directory, "gsa-issuer.pem");
+    const serialPath = path.join(root.directory, "root-ca.srl");
+    fs.writeFileSync(csrPath, csr, { mode: 0o600 });
+    const args = [
+      "x509", "-req", "-in", csrPath, "-CA", root.certificatePath, "-CAkey", root.keyPath,
+      "-out", issuerPath, "-days", "365", "-sha256", "-copy_extensions", "copyall",
+    ];
+    if (fs.existsSync(serialPath)) args.push("-CAserial", serialPath);
+    else args.push("-CAcreateserial");
+    execFileSync("openssl", args, { stdio: "ignore" });
+    fs.rmSync(path.join(root.directory, "gsa-issuer.ext"), { force: true });
+    for (const protectedPath of [csrPath, issuerPath, serialPath]) {
+      if (fs.existsSync(protectedPath)) fs.chmodSync(protectedPath, 0o600);
+    }
+    const issuer = fs.readFileSync(issuerPath, "utf8");
+    const issuerCertificate = new X509Certificate(issuer);
+    if (!issuerCertificate.ca || !issuerCertificate.checkIssued(new X509Certificate(root.certificate))) {
+      throw new Error("Generated GSA issuer certificate does not chain to the retained TLS root");
+    }
+    await graph(`/beta/networkAccess/tls/externalCertificateAuthorityCertificates/${authority.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ certificate: issuer, chain: root.certificate }),
+    });
+    uploaded = true;
+  }
+  let enabled = false;
+  if (authority.status === "disabled") {
+    await graph(`/beta/networkAccess/tls/externalCertificateAuthorityCertificates/${authority.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "enabled" }),
+    });
+    enabled = true;
+  }
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    authority = (await graph(`/beta/networkAccess/tls/externalCertificateAuthorityCertificates/${authority.id}?${certificateSelect}`, enumHeaders)).body;
+    if (new Set(["active", "enabled", "expiring"]).has(authority.status)) break;
+    if (new Set(["expired", "disabled", "revoked"]).has(authority.status)) throw new Error(`TLS certificate authority reached ${authority.status}`);
+    if (attempt < 59) await sleep(5000);
+  }
+  if (!new Set(["active", "enabled", "expiring"]).has(authority.status)) {
+    throw new Error(`TLS certificate authority remained ${authority.status} after upload`);
+  }
+  return { root, authority, created, recreatedForCsr, uploaded, enabled };
+}
+
+async function installRootTrust(root) {
+  const encoded = Buffer.from(root.certificate, "utf8").toString("base64");
+  const result = await runCommand(String.raw`
+$ErrorActionPreference = 'Stop'
+$thumbprint = '${root.thumbprint}'
+$existing = Get-ChildItem Cert:\LocalMachine\Root | Where-Object Thumbprint -eq $thumbprint
+$changed = $false
+if (!$existing) {
+  $stage = Join-Path $env:ProgramData 'AP2\GSATrust'
+  $certificate = Join-Path $stage 'root-ca.pem'
+  New-Item -ItemType Directory -Path $stage -Force | Out-Null
+  try {
+    [IO.File]::WriteAllBytes($certificate, [Convert]::FromBase64String('${encoded}'))
+    & certutil.exe -f -addstore Root $certificate | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "certutil failed with $LASTEXITCODE" }
+    $changed = $true
+  } finally {
+    Remove-Item $certificate -Force -ErrorAction SilentlyContinue
+    Remove-Item $stage -Force -ErrorAction SilentlyContinue
+  }
+}
+$current = @(Get-ChildItem Cert:\LocalMachine\Root | Where-Object Thumbprint -eq $thumbprint)
+[pscustomobject]@{
+  observedUtc=(Get-Date).ToUniversalTime().ToString('o')
+  changed=$changed
+  trustedCount=$current.Count
+  subject=$current[0].Subject
+  notAfter=$current[0].NotAfter.ToUniversalTime().ToString('o')
+  stageAbsent=(-not (Test-Path (Join-Path $env:ProgramData 'AP2\GSATrust')))
+} | ConvertTo-Json -Compress | Write-Output
+`);
+  if (result.trustedCount !== 1 || !result.stageAbsent || !String(result.subject).includes(TLS_CA_COMMON_NAME)) {
+    throw new Error(`Rachel endpoint TLS root trust is unhealthy: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
+async function reconcileTlsPolicy() {
+  let policies = (await graph("/beta/networkAccess/tlsInspectionPolicies?$expand=policyRules")).body.value ?? [];
+  let policy = requireSingleExact(policies, TLS_POLICY_NAME, "TLS inspection policy");
+  let policyCreated = false;
+  if (!policy) {
+    policy = (await graph("/beta/networkAccess/tlsInspectionPolicies", {
+      method: "POST",
+      body: JSON.stringify({
+        name: TLS_POLICY_NAME,
+        description: "Inspect only AP2's existing benign company-access host; bypass all other TLS traffic.",
+        settings: { defaultAction: "bypass" },
+      }),
+    })).body;
+    policyCreated = true;
+  }
+  policy = (await graph(`/beta/networkAccess/tlsInspectionPolicies/${policy.id}?$expand=policyRules`)).body;
+  if (policy.settings?.defaultAction !== "bypass") throw new Error("Retained TLS policy no longer defaults to bypass");
+  const exactRules = (policy.policyRules ?? []).filter((entry) => entry.name === TLS_RULE_NAME);
+  if (exactRules.length > 1) throw new Error("More than one exact TLS inspection rule exists");
+  let rule = exactRules[0];
+  let ruleCreated = false;
+  if (!rule) {
+    rule = (await graph(`/beta/networkAccess/tlsInspectionPolicies/${policy.id}/policyRules`, {
+      method: "POST",
+      body: JSON.stringify({
+        "@odata.type": "#microsoft.graph.networkaccess.tlsInspectionRule",
+        name: TLS_RULE_NAME,
+        description: "Inspect only AP2's existing harmless public proof host.",
+        action: "inspect",
+        priority: 100,
+        settings: { status: "enabled" },
+        matchingConditions: {
+          destinations: [{
+            "@odata.type": "#microsoft.graph.networkaccess.tlsInspectionFqdnDestination",
+            values: [INSPECTION_FQDN],
+          }],
+        },
+      }),
+    })).body;
+    ruleCreated = true;
+  }
+  const destination = rule.matchingConditions?.destinations?.find((entry) => entry["@odata.type"]?.endsWith("tlsInspectionFqdnDestination"));
+  if (rule.action !== "inspect" || rule.settings?.status !== "enabled" || rule.priority !== 100 || JSON.stringify(destination?.values) !== JSON.stringify([INSPECTION_FQDN])) {
+    throw new Error("Retained TLS inspection rule is not the exact narrow enabled rule");
+  }
+  const systemBypass = (policy.policyRules ?? []).filter((entry) => entry.name === "System Bypass TLS inspection rule");
+  const recommendedBypass = (policy.policyRules ?? []).filter((entry) => entry.name === "Recommended TLS inspection bypass categories rule");
+  const recommendedCategories = new Set(recommendedBypass[0]?.matchingConditions?.destinations?.flatMap((entry) => entry.values ?? []) ?? []);
+  if (
+    systemBypass.length !== 1 || systemBypass[0].action !== "bypass" || systemBypass[0].settings?.status !== "enabled" ||
+    recommendedBypass.length !== 1 || recommendedBypass[0].action !== "bypass" || recommendedBypass[0].settings?.status !== "enabled" ||
+    !["Education", "Finance", "Government", "HealthAndMedicine"].every((category) => recommendedCategories.has(category))
+  ) throw new Error("Microsoft's system or recommended TLS bypass behavior is not intact and enabled");
+  return { policy, rule, policyCreated, ruleCreated };
+}
+
+async function reconcileFilteringProfile(policy) {
+  let profiles = (await graph("/beta/networkAccess/filteringProfiles?$expand=policies($expand=policy)")).body.value ?? [];
+  let profile = requireSingleExact(profiles, FILTERING_PROFILE_NAME, "filtering profile");
+  let profileCreated = false;
+  if (!profile) {
+    profile = (await graph("/beta/networkAccess/filteringProfiles", {
+      method: "POST",
+      body: JSON.stringify({ name: FILTERING_PROFILE_NAME, description: "Rachel-only narrow TLS inspection for AP2's proof host.", state: "enabled", priority: FILTERING_PROFILE_PRIORITY, policies: [] }),
+    })).body;
+    profileCreated = true;
+  }
+  if (profile.state !== "enabled" || profile.priority !== FILTERING_PROFILE_PRIORITY) throw new Error("Retained filtering profile is not enabled at the intended priority");
+  profile = (await graph(`/beta/networkAccess/filteringProfiles/${profile.id}?$expand=policies($expand=policy)`)).body;
+  let links = (profile.policies ?? []).filter((entry) => entry.policy?.id === policy.id);
+  if (links.length > 1) throw new Error("TLS inspection policy is linked more than once");
+  let linkCreated = false;
+  if (!links.length) {
+    await graph(`/beta/networkAccess/filteringProfiles/${profile.id}/policies`, {
+      method: "POST",
+      body: JSON.stringify({
+        "@odata.type": "#microsoft.graph.networkaccess.tlsInspectionPolicyLink",
+        state: "enabled",
+        policy: { "@odata.type": "#microsoft.graph.networkaccess.tlsInspectionPolicy", id: policy.id },
+      }),
+    });
+    linkCreated = true;
+    profile = (await graph(`/beta/networkAccess/filteringProfiles/${profile.id}?$expand=policies($expand=policy)`)).body;
+    links = (profile.policies ?? []).filter((entry) => entry.policy?.id === policy.id);
+  }
+  if (links.length !== 1 || links[0].state !== "enabled" || (profile.policies ?? []).length !== 1) {
+    throw new Error("Retained filtering profile does not contain exactly one enabled TLS policy link");
+  }
+  return { profile, link: links[0], profileCreated, linkCreated };
+}
+
+async function reconcileTlsAssignment(profile) {
+  let policies = (await graph("/beta/identity/conditionalAccess/policies?$select=id,displayName,state,conditions,sessionControls")).body.value ?? [];
+  let assignment = requireSingleExact(policies, INSPECTION_CA_POLICY_NAME, "TLS inspection Conditional Access policy");
+  let created = false;
+  if (!assignment) {
+    assignment = (await graph("/beta/identity/conditionalAccess/policies", {
+      method: "POST",
+      body: JSON.stringify({
+        displayName: INSPECTION_CA_POLICY_NAME,
+        state: "enabled",
+        conditions: {
+          applications: { includeApplications: [INTERNET_RESOURCE_APP_ID] },
+          users: { includeUsers: [RACHEL_ID] },
+        },
+        sessionControls: {
+          globalSecureAccessFilteringProfile: { profileId: profile.id, isEnabled: true },
+        },
+      }),
+    })).body;
+    created = true;
+  }
+  let observedAssignment;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const current = await graph(`/beta/identity/conditionalAccess/policies/${assignment.id}`, {}, [404]);
+    if (current.response.ok) { observedAssignment = current.body; break; }
+    if (attempt < 11) await sleep(2500);
+  }
+  if (!observedAssignment) throw new Error("The accepted TLS inspection assignment did not become observable");
+  assignment = observedAssignment;
+  if (
+    assignment.state !== "enabled" ||
+    JSON.stringify(assignment.conditions?.applications?.includeApplications) !== JSON.stringify([INTERNET_RESOURCE_APP_ID]) ||
+    JSON.stringify(assignment.conditions?.users?.includeUsers) !== JSON.stringify([RACHEL_ID]) ||
+    assignment.conditions?.users?.excludeUsers?.length || assignment.conditions?.users?.includeGroups?.length ||
+    assignment.sessionControls?.globalSecureAccessFilteringProfile?.profileId !== profile.id ||
+    assignment.sessionControls?.globalSecureAccessFilteringProfile?.isEnabled !== true
+  ) throw new Error("TLS inspection assignment is not the exact Rachel-only Internet-resource session control");
+  return { assignment, created };
+}
+
+async function tlsReconcile() {
+  const before = await standingState();
+  validateStanding(before);
+  if (before.endpoint.power !== "PowerState/running" || before.endpoint.hostStatus !== "Available" || before.endpoint.sessions.length) {
+    throw new Error("TLS reconciliation requires Rachel's running, available endpoint with zero sessions");
+  }
+  const certificate = await reconcileCertificateAuthority();
+  const trust = await installRootTrust(certificate.root);
+  const tls = await reconcileTlsPolicy();
+  const filtering = await reconcileFilteringProfile(tls.policy);
+  const assignment = await reconcileTlsAssignment(filtering.profile);
+  const after = await standingState();
+  validateStanding(after);
+  const inspection = await inspectionState();
+  console.log(JSON.stringify({
+    observedUtc: new Date().toISOString(),
+    changed: {
+      root: certificate.root.changed,
+      certificateAuthority: certificate.created,
+      certificateAuthorityRecreatedForCsr: certificate.recreatedForCsr,
+      certificateUpload: certificate.uploaded,
+      certificateEnabled: certificate.enabled,
+      endpointTrust: trust.changed,
+      tlsPolicy: tls.policyCreated,
+      tlsRule: tls.ruleCreated,
+      filteringProfile: filtering.profileCreated,
+      policyLink: filtering.linkCreated,
+      conditionalAccessAssignment: assignment.created,
+    },
+    certificateAuthority: {
+      id: certificate.authority.id,
+      name: certificate.authority.name,
+      commonName: certificate.authority.commonName,
+      organizationName: certificate.authority.organizationName,
+      status: certificate.authority.status,
+      validity: certificate.authority.validity,
+    },
+    endpointTrust: trust,
+    tlsPolicy: { id: tls.policy.id, name: tls.policy.name, settings: tls.policy.settings, rule: tls.rule },
+    filteringProfile: filtering.profile,
+    assignment: assignment.assignment,
+    standing: after,
+    inspection,
+  }, null, 2));
 }
 
 async function guest() {
@@ -319,7 +713,9 @@ if (MODE === "inspect") {
   const state = await standingState();
   validateStanding(state);
   console.log(JSON.stringify(state, null, 2));
-} else if (MODE === "assign") await assign();
+} else if (MODE === "inspection") console.log(JSON.stringify(await inspectionState(), null, 2));
+else if (MODE === "tls-reconcile") await tlsReconcile();
+else if (MODE === "assign") await assign();
 else if (MODE === "install") await install();
 else if (MODE === "guest") await guest();
 else await traffic();

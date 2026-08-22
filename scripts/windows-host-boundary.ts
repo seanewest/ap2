@@ -98,9 +98,13 @@ const EXACT_EXCLUDED_FILES = new Set([
   // Windows-mount, clipboard-read, and credential-literal primitives.
   "scripts/rachel-enrollment-session-proof.mjs",
   "scripts/rachel-enrollment-session-proof.test.ts",
-  // This standing GSA reconciler executes only through ARM guest Run Command
-  // on Rachel's isolated AVD VM; it has no local launch primitive.
+  // These Rachel GSA methods use only ARM guest Run Command and an isolated
+  // remote AVD canvas for Windows interaction. Their paired test constrains
+  // local child-process use to the Linux OpenSSL binary and rejects worker-host
+  // Windows mounts, GUI bridges, and desktop automation dependencies.
   "scripts/rachel-gsa-standing.mjs",
+  "scripts/rachel-gsa-edge-proof.mjs",
+  "scripts/rachel-gsa-boundary.test.ts",
 ]);
 
 const EXACT_EXCLUDED_PREFIXES = [

@@ -37,6 +37,7 @@ The protected runtime contains the standing development material used by AP2:
   files, passphrase references, and sanitized records;
 - the dedicated SPA operator certificate material;
 - the Dev/Graph automation certificate and protected configuration;
+- Rachel's standing GSA TLS root and issuer signing material;
 - public certificates and sanitized metadata beside their protected sources.
 
 Create a fresh nonpersistent browser context from the applicable standing
@@ -125,3 +126,8 @@ sign-in through the hosted SPA. The full readiness command is green again.
 The initial migration, one-time WSL transfer, certificate renewal, Rachel
 addition, and exact validation evidence are retained separately in
 [the runtime migration history](durable-runtime-migration-history.md).
+
+The 2026-08-22 standing GSA TLS addition placed five owner-only CA files under
+the existing protected runtime. The encrypted central snapshot then contained
+48 files; a retrieval proved all hashes and reused the restored Dev credential
+for an enabled ARM subscription read without changing the local runtime.
