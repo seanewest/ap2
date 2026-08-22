@@ -13,6 +13,7 @@
     "update:api-container-base": "node scripts/update-api-container-base.ts",
     "windows-update-baseline": "node scripts/windows-update-baseline.mjs",
     "rachel-retained-avd": "node scripts/rachel-retained-avd-execution.mjs",
+    "windows-hello-passkeys": "node scripts/windows-hello-passkey-profile.mjs",
     "test:microsoft365dsc-baseline": "vitest run scripts/microsoft365dsc-baseline.test.mjs",
     "check:workflow-security": "node scripts/check-github-actions-security.ts",
     "check:windows-host-boundary": "node scripts/check-windows-host-boundary.ts",

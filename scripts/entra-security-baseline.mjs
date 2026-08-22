@@ -13,6 +13,24 @@ export const RETAINED_YOUTRACK_POLICY_IDS = Object.freeze([
   "fe9e0dfa-06b8-433c-9c89-23d9b1345334",
   "ad0f2a27-e0c6-4f54-b23f-9adcb8f08da7",
 ]);
+export const DEFAULT_PASSKEY_PROFILE_ID = "00000000-0000-0000-0000-000000000001";
+export const WINDOWS_HELLO_PASSKEY_PROFILE_ID = "a71d5820-68f6-417f-a4ef-19c5577ea0a5";
+export const WINDOWS_HELLO_PASSKEY_AAGUIDS = Object.freeze([
+  "08987058-cadc-4b81-b6e1-30de50dcbe96",
+  "9ddd1817-af5a-4672-a2b9-3e3dd95000a9",
+  "6028b017-b1d4-4c02-b4b3-afcdafc96bb2",
+]);
+export const WINDOWS_HELLO_PASSKEY_PROFILE = Object.freeze({
+  id: WINDOWS_HELLO_PASSKEY_PROFILE_ID,
+  name: "AP2 Windows Hello passkeys",
+  passkeyTypes: "deviceBound",
+  attestationEnforcement: "disabled",
+  keyRestrictions: {
+    isEnforced: true,
+    enforcementType: "allow",
+    aaGuids: WINDOWS_HELLO_PASSKEY_AAGUIDS,
+  },
+});
 
 const RUN_ID = process.env.AP2_RUN_ID?.trim();
 const MODE = process.argv[2];
@@ -207,6 +225,8 @@ async function main() {
         isSelfServiceRegistrationAllowed: fido.isSelfServiceRegistrationAllowed,
         isAttestationEnforced: fido.isAttestationEnforced,
         keyRestrictions: fido.keyRestrictions,
+        defaultPasskeyProfile: fido.defaultPasskeyProfile,
+        passkeyProfiles: fido.passkeyProfiles,
       },
       recovery: {
         humanAdminMethodTypes: adminMethods.value.map((method) => method["@odata.type"]).sort(),
@@ -234,6 +254,33 @@ async function main() {
       !state.fido.includeTargets.some((target) => target.id === "all_users") ||
       state.fido.excludeTargets.length !== 0
     ) throw new Error("FIDO2/passkey policy changed unexpectedly");
+    const allUsers = state.fido.includeTargets.filter((target) => target.id === "all_users");
+    const defaultProfile = state.fido.passkeyProfiles.filter((profile) => profile.id === DEFAULT_PASSKEY_PROFILE_ID);
+    const windowsProfile = state.fido.passkeyProfiles.filter((profile) => profile.id === WINDOWS_HELLO_PASSKEY_PROFILE_ID);
+    if (
+      state.fido.defaultPasskeyProfile !== DEFAULT_PASSKEY_PROFILE_ID ||
+      state.fido.includeTargets.length !== 1 || allUsers.length !== 1 ||
+      JSON.stringify(allUsers[0].allowedPasskeyProfiles) !== JSON.stringify([
+        DEFAULT_PASSKEY_PROFILE_ID,
+        WINDOWS_HELLO_PASSKEY_PROFILE_ID,
+      ]) ||
+      defaultProfile.length !== 1 ||
+      JSON.stringify({
+        id: defaultProfile[0].id,
+        name: defaultProfile[0].name,
+        passkeyTypes: defaultProfile[0].passkeyTypes,
+        attestationEnforcement: defaultProfile[0].attestationEnforcement,
+        keyRestrictions: defaultProfile[0].keyRestrictions,
+      }) !== JSON.stringify({
+        id: DEFAULT_PASSKEY_PROFILE_ID,
+        name: "Default passkey profile",
+        passkeyTypes: "deviceBound,synced",
+        attestationEnforcement: "disabled",
+        keyRestrictions: { isEnforced: false, enforcementType: "block", aaGuids: [] },
+      }) ||
+      windowsProfile.length !== 1 ||
+      JSON.stringify(windowsProfile[0]) !== JSON.stringify(WINDOWS_HELLO_PASSKEY_PROFILE)
+    ) throw new Error("Passkey profile baseline changed unexpectedly");
     const methodTypes = new Set(state.recovery.humanAdminMethodTypes);
     if (!methodTypes.has("#microsoft.graph.passwordAuthenticationMethod") ||
         !methodTypes.has("#microsoft.graph.microsoftAuthenticatorAuthenticationMethod")) {
