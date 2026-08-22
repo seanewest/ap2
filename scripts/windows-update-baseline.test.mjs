@@ -6,6 +6,7 @@ import {
   assertRetainedInventory,
   assertRingShape,
   featureUpdateBody,
+  summarizeDeviceStatus,
   updateRingBody,
 } from "./windows-update-baseline.mjs";
 
@@ -47,5 +48,19 @@ describe("retained Windows update baseline", () => {
     expect(feature.featureUpdateVersion).toBe("Windows 11, version 24H2");
     expect(feature.installFeatureUpdatesOptional).toBe(false);
     expect(() => assertFeatureShape({ ...feature, id: crypto.randomUUID() })).not.toThrow();
+  });
+
+  it("preserves device versus user context in native policy status", () => {
+    expect(summarizeDeviceStatus({
+      deviceDisplayName: "ap2fastrachel",
+      userPrincipalName: "System account",
+      status: "compliant",
+      lastReportedDateTime: "2026-08-22T05:42:42Z",
+    })).toEqual({
+      deviceDisplayName: "ap2fastrachel",
+      userPrincipalName: "System account",
+      status: "compliant",
+      lastReportedDateTime: "2026-08-22T05:42:42Z",
+    });
   });
 });

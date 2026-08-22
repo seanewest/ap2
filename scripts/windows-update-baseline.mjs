@@ -71,6 +71,15 @@ export function summarizeManagedDevice(device) {
   };
 }
 
+export function summarizeDeviceStatus(status) {
+  return {
+    deviceDisplayName: status.deviceDisplayName,
+    userPrincipalName: status.userPrincipalName || null,
+    status: status.status,
+    lastReportedDateTime: status.lastReportedDateTime,
+  };
+}
+
 export function assertRetainedInventory(devices) {
   const byName = new Map();
   for (const device of devices) {
@@ -301,11 +310,7 @@ async function main() {
       displayName: state.ring.displayName,
       settings: updateRingBody(),
       exactAssignment: assignmentIsExact(state.ringAssignments),
-      deviceStatuses: state.ringStatuses.map((status) => ({
-        deviceDisplayName: status.deviceDisplayName,
-        status: status.status,
-        lastReportedDateTime: status.lastReportedDateTime,
-      })),
+      deviceStatuses: state.ringStatuses.map(summarizeDeviceStatus),
     } : null,
     featureUpdate: state.feature ? {
       id: state.feature.id,
