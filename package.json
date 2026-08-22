@@ -14,6 +14,7 @@
     "windows-update-baseline": "node scripts/windows-update-baseline.mjs",
     "global-secure-access-baseline": "node scripts/global-secure-access-baseline.mjs",
     "rachel-retained-avd": "node scripts/rachel-retained-avd-execution.mjs",
+    "retained-avd-sso": "node scripts/retained-avd-sso-proof.mjs",
     "windows-hello-passkeys": "node scripts/windows-hello-passkey-profile.mjs",
     "test:microsoft365dsc-baseline": "vitest run scripts/microsoft365dsc-baseline.test.mjs",
     "check:workflow-security": "node scripts/check-github-actions-security.ts",
