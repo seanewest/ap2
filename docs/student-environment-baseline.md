@@ -21,7 +21,14 @@ managed enterprise environment before AP2 stages an incident:
 - Defender/EDR and other security products observe normal activity;
 - there is **no assumption of a strict default-deny application allowlist**;
 - scenario-specific controls and artifacts remain separate from standing
-  infrastructure.
+  infrastructure;
+- standing infrastructure should use **conventional enterprise deployment,
+  targeting, and management patterns** where practical. A narrow direct-user,
+  manual, or endpoint-local technique can be appropriate while proving a
+  capability, but it should not silently become the canonical baseline merely
+  because it worked. Before a proven capability becomes standing infrastructure,
+  prefer to normalize it toward the ordinary centrally managed pattern a typical
+  enterprise would reasonably use.
 
 This distinction matters for realism. A standard user may still execute software
 in their own context when Windows and the standing security controls permit it,
@@ -41,7 +48,7 @@ require elevation.
 | Defender / endpoint security | Microsoft Defender Antivirus and Defender for Endpoint P2 are standing endpoint protections. AP2 does not assume a standing AppLocker/WDAC default-deny policy unless a specific future baseline decision adds one. Reputation, EDR, ASR, browser, DLP, and related controls may still restrict activity without creating a universal application whitelist. |
 | Windows updates | Windows quality/security updating is centrally managed through Intune/Windows Update for Business with deliberate restart/deadline behavior. Feature-update movement is controlled rather than left to consumer defaults. The exact current policy is technical desired state and should be represented declaratively where practical. |
 | Standard software | Corporate software should increasingly be represented as centrally managed Intune applications rather than one-off endpoint setup. A standing application baseline does not imply that all user-context executables must originate from Intune. |
-| Global Secure Access | Where licensed for the installation, retained endpoints can carry the supported GSA client and normal Internet traffic acquisition as standing infrastructure. This provides attributable corporate network/SWG telemetry in addition to MDE. |
+| Global Secure Access | Where licensed for the installation, retained endpoints can carry the supported GSA client and normal Internet traffic acquisition as standing infrastructure. The standing form should follow ordinary enterprise administration: centrally deploy the client (normally through Intune for managed Windows endpoints) and target traffic profiles through normal organizational groups or equivalent managed scope rather than preserve proof-only direct-user/manual assignments. Narrow development-only controls such as Rachel's TLS-inspection profile can remain separately scoped when they are intentionally exceptional. This provides attributable corporate network/SWG telemetry in addition to MDE. |
 | TLS inspection | TLS inspection is an available enterprise-control option, not an assumption every AP2 lab must rely on. Development may keep a known endpoint/profile capable of decryption so AP2 can compare FQDN-only traffic evidence with full URL/HTTP transaction evidence. Labs that depend on decrypted SWG evidence should say so explicitly. Technical/system and appropriate privacy/incompatibility bypasses remain part of a realistic inspection configuration. |
 | AVD transport | AVD is learner/development transport to retained Windows endpoints, not part of the fictional incident. Retained VMs use standing idle auto-deallocation. After ordinary work, clean temporary state and log off worker-owned sessions, but do not manually deallocate merely as cleanup. |
 | SaaS integrations | Required SaaS integrations such as YouTrack and GitHub are standing installation infrastructure when a lab family relies on them. Their identity/lifecycle integration is distinct from disposable scenario content inside those services. |
