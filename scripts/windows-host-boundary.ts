@@ -78,6 +78,7 @@ const EXECUTABLE_EXTENSIONS = new Set([
 
 const EXACT_EXCLUDED_FILES = new Set([
   "package-lock.json",
+  "scripts/windows-host-boundary.ts",
   "scripts/windows-host-boundary-signatures.ts",
   // These fixed recovered methods send input only to an isolated remote AVD
   // canvas or ARM guest Run Command. Their tests reject local launch
@@ -105,6 +106,15 @@ const EXACT_EXCLUDED_FILES = new Set([
   "scripts/rachel-gsa-standing.mjs",
   "scripts/rachel-gsa-edge-proof.mjs",
   "scripts/rachel-gsa-boundary.test.ts",
+  // This bounded seam sends input only to Rachel's isolated remote AVD canvas
+  // and observes it through AVD state plus native GSA traffic. It never controls
+  // a local Windows GUI or manually stops/deallocates the retained VM.
+  "scripts/rachel-retained-avd-execution.mjs",
+  "scripts/rachel-retained-avd-execution.test.ts",
+  // These are intentionally invoked inside elevated Windows PowerShell 5.1;
+  // neither is a Linux-worker bridge to a mounted or shared Windows host.
+  "infra/microsoft365dsc/AP2StudentBaseline.ps1",
+  "scripts/invoke-microsoft365dsc-baseline.ps1",
 ]);
 
 const EXACT_EXCLUDED_PREFIXES = [
