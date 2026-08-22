@@ -26,6 +26,12 @@ describe("retained Windows update baseline", () => {
     expect(() => assertRetainedInventory(devices.map((device) =>
       device.deviceName === "ap2homerfresh" ? { ...device, managementAgent: "eas" } : device,
     ))).toThrow("unexpected management state");
+    expect(() => assertRetainedInventory(devices.map((device) =>
+      device.deviceName === "ap2fastrachel" ? { ...device, osVersion: "10.0.26200.9168" } : device,
+    ))).not.toThrow();
+    expect(() => assertRetainedInventory(devices.map((device) =>
+      device.deviceName === "ap2fastrachel" ? { ...device, osVersion: "10.0.22631.5909" } : device,
+    ))).toThrow("below the retained Windows 11 24H2 baseline");
   });
 
   it("uses a quality deadline with restart warning and no user pause or scan override", () => {

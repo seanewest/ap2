@@ -11,10 +11,10 @@ const RACHEL_UPN = "rachel.green@corywest.onmicrosoft.com";
 const INTERNET_PROFILE_ID = "30c157cf-f64e-4520-99e0-fe32a2dd01fc";
 const INTERNET_PROFILE_SP_ID = "7560b19f-6b50-45c9-88da-f10b5c391c23";
 const INTERNET_PROFILE_SP_NAME = "GSA-Internettrafficforwardingprofile";
-const DEFAULT_APP_ROLE_ID = "00000000-0000-0000-0000-000000000000";
+const RETAINED_GSA_USER_GROUP_ID = "73eab301-5ce4-4079-b79a-5d4cafe6778a";
+const RETAINED_GSA_USER_GROUP_NAME = "AP2 retained managed Windows users";
 const ENTRA_SUITE_SKU_ID = "f9602137-2203-447b-9fff-41b36e08ce5d";
 const INTERNET_ACCESS_PLAN_ID = "8d23cb83-ab07-418f-8517-d7aca77307dc";
-const INSTALLER_URL = "https://aka.ms/GlobalSecureAccess-Windows";
 const INTERNET_RESOURCE_APP_ID = "5dc48733-b5df-475c-a49b-fa307ef00853";
 const TLS_CA_NAME = "AP2RachelCA";
 const TLS_CA_COMMON_NAME = "AP2 Student GSA TLS Root CA";
@@ -29,8 +29,8 @@ const MODE = process.argv[2];
 const SINCE = process.argv[3];
 const DESTINATION_FQDN = process.argv[4];
 
-if (!new Set(["inspect", "inspection", "tls-reconcile", "assign", "install", "guest", "traffic"]).has(MODE)) {
-  throw new Error("mode must be inspect, inspection, tls-reconcile, assign, install, guest, or traffic");
+if (!new Set(["inspect", "inspection", "tls-reconcile", "guest", "traffic"]).has(MODE)) {
+  throw new Error("mode must be inspect, inspection, tls-reconcile, guest, or traffic");
 }
 
 const runtime = resolveAp2RuntimeRoot();
@@ -89,16 +89,18 @@ async function avdState() {
 }
 
 async function standingState() {
-  const [profile, servicePrincipal, assigned, user, subscribedSkus, policies, endpoint] = await Promise.all([
+  const [profile, servicePrincipal, assigned, group, groupMembers, user, subscribedSkus, policies, endpoint] = await Promise.all([
     graph(`/beta/networkAccess/forwardingProfiles/${INTERNET_PROFILE_ID}`),
-    graph(`/v1.0/servicePrincipals/${INTERNET_PROFILE_SP_ID}?$select=id,appId,displayName,accountEnabled,appRoleAssignmentRequired`),
+    graph(`/v1.0/servicePrincipals/${INTERNET_PROFILE_SP_ID}?$select=id,appId,displayName,accountEnabled,appRoleAssignmentRequired,tags`),
     graph(`/v1.0/servicePrincipals/${INTERNET_PROFILE_SP_ID}/appRoleAssignedTo`),
+    graph(`/v1.0/groups/${RETAINED_GSA_USER_GROUP_ID}?$select=id,displayName,securityEnabled,mailEnabled`),
+    graph(`/v1.0/groups/${RETAINED_GSA_USER_GROUP_ID}/members?$select=id,displayName,userPrincipalName`),
     graph(`/v1.0/users/${RACHEL_ID}?$select=id,userPrincipalName,accountEnabled,assignedLicenses,licenseAssignmentStates`),
     graph("/v1.0/subscribedSkus"),
     graph("/v1.0/identity/conditionalAccess/policies?$select=id,displayName,state"),
     avdState(),
   ]);
-  const assignment = assigned.body.value?.find((entry) => entry.principalId === RACHEL_ID);
+  const assignment = assigned.body.value?.find((entry) => entry.principalId === RETAINED_GSA_USER_GROUP_ID);
   const suite = subscribedSkus.body.value?.find((entry) => entry.skuId === ENTRA_SUITE_SKU_ID);
   const suiteAssignment = user.body.assignedLicenses?.find((entry) => entry.skuId === ENTRA_SUITE_SKU_ID);
   const boundaryPolicyIds = new Set([
@@ -128,11 +130,21 @@ async function standingState() {
       appRoleId: assignment.appRoleId,
       createdDateTime: assignment.createdDateTime,
     },
+    assignmentCount: assigned.body.value?.length ?? 0,
+    retainedUserGroup: {
+      id: group.body.id,
+      displayName: group.body.displayName,
+      securityEnabled: group.body.securityEnabled,
+      mailEnabled: group.body.mailEnabled,
+      rachelDirectMember: groupMembers.body.value?.some((entry) => entry.id === RACHEL_ID) ?? false,
+      memberCount: groupMembers.body.value?.length ?? 0,
+    },
     profileServicePrincipal: {
       id: servicePrincipal.body.id,
       displayName: servicePrincipal.body.displayName,
       accountEnabled: servicePrincipal.body.accountEnabled,
       appRoleAssignmentRequired: servicePrincipal.body.appRoleAssignmentRequired,
+      tags: servicePrincipal.body.tags ?? [],
     },
     rachel: {
       id: user.body.id,
@@ -152,7 +164,7 @@ async function standingState() {
   };
 }
 
-function validateStanding(state, requireAssignment = true) {
+function validateStanding(state) {
   if (state.profile.id !== INTERNET_PROFILE_ID || state.profile.trafficForwardingType !== "internet" || state.profile.state !== "enabled") {
     throw new Error("The built-in Internet forwarding profile is not enabled");
   }
@@ -169,36 +181,20 @@ function validateStanding(state, requireAssignment = true) {
     state.rachel.internetAccessLicense.assigned !== true ||
     state.rachel.internetAccessLicense.servicePlanEnabled !== true
   ) throw new Error("Rachel's Entra Internet Access license is not active");
-  if (requireAssignment && (!state.assignment || state.assignment.appRoleId !== DEFAULT_APP_ROLE_ID)) {
-    throw new Error("Rachel is not directly assigned to the Internet forwarding profile");
+  if (
+    state.assignmentCount !== 1 || state.assignment?.principalId !== RETAINED_GSA_USER_GROUP_ID ||
+    state.assignment?.principalType !== "Group" || state.retainedUserGroup.id !== RETAINED_GSA_USER_GROUP_ID ||
+    state.retainedUserGroup.displayName !== RETAINED_GSA_USER_GROUP_NAME ||
+    state.retainedUserGroup.securityEnabled !== true || state.retainedUserGroup.mailEnabled !== false ||
+    state.retainedUserGroup.memberCount !== 4 || state.retainedUserGroup.rachelDirectMember !== true ||
+    !state.profileServicePrincipal.tags.includes("HideApp")
+  ) {
+    throw new Error("Rachel does not receive the hidden Internet forwarding profile through the exact retained managed-user group");
   }
   if (state.retainedConditionalAccess.length !== 5 || state.retainedConditionalAccess.some((entry) => entry.state !== "enabled")) {
     throw new Error("W73 or a retained YouTrack Conditional Access policy is not intact and enabled");
   }
   if (state.endpoint.assignedUser !== RACHEL_UPN) throw new Error("Rachel is no longer the exact endpoint assignment");
-}
-
-async function assign() {
-  const before = await standingState();
-  validateStanding(before, false);
-  if (!before.assignment) {
-    await graph(`/v1.0/users/${RACHEL_ID}/appRoleAssignments`, {
-      method: "POST",
-      body: JSON.stringify({ principalId: RACHEL_ID, resourceId: INTERNET_PROFILE_SP_ID, appRoleId: DEFAULT_APP_ROLE_ID }),
-    });
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      await sleep(2500);
-      const current = await standingState();
-      if (current.assignment) {
-        validateStanding(current);
-        console.log(JSON.stringify({ changed: true, state: current }, null, 2));
-        return;
-      }
-    }
-    throw new Error("The accepted profile assignment did not become observable");
-  }
-  validateStanding(before);
-  console.log(JSON.stringify({ changed: false, state: before }, null, 2));
 }
 
 async function runCommand(script) {
@@ -222,50 +218,6 @@ async function runCommand(script) {
   const output = entries.find((entry) => /StdOut/i.test(entry.code))?.message?.trim();
   if (!output) throw new Error("ARM Run Command completed without guest output");
   try { return JSON.parse(output); } catch { throw new Error(`Guest output was not JSON: ${output.slice(0, 300)}`); }
-}
-
-const guestInventory = String.raw`
-$ErrorActionPreference = 'Stop'
-$products = @(Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match 'Global Secure Access' } | Select-Object DisplayName,DisplayVersion,InstallLocation)
-$services = @(Get-Service | Where-Object { $_.Name -match 'GlobalSecure|GSA' -or $_.DisplayName -match 'Global Secure Access' } | Select-Object Name,DisplayName,@{n='Status';e={$_.Status.ToString()}},@{n='StartType';e={$_.StartType.ToString()}})
-[pscustomobject]@{ observedUtc=(Get-Date).ToUniversalTime().ToString('o'); products=$products; services=$services } | ConvertTo-Json -Depth 5 -Compress | Write-Output
-`;
-
-async function install() {
-  const before = await standingState();
-  validateStanding(before);
-  if (before.endpoint.power !== "PowerState/running" || before.endpoint.hostStatus !== "Available" || before.endpoint.sessions.length) {
-    throw new Error("Install requires Rachel's running, available endpoint with zero sessions");
-  }
-  let guest = await runCommand(guestInventory);
-  let changed = false;
-  if (!guest.products?.length) {
-    const installer = String.raw`
-$ErrorActionPreference = 'Stop'
-$stage = Join-Path $env:ProgramData 'AP2\GSAInstall'
-New-Item -ItemType Directory -Path $stage -Force | Out-Null
-$installer = Join-Path $stage 'GlobalSecureAccessClient.exe'
-try {
-  Invoke-WebRequest -UseBasicParsing -Uri '${INSTALLER_URL}' -OutFile $installer
-  $process = Start-Process -FilePath $installer -ArgumentList '/quiet' -Wait -PassThru
-  if ($process.ExitCode -notin @(0, 3010, 1641)) { throw "Installer exit $($process.ExitCode)" }
-} finally {
-  Remove-Item $installer -Force -ErrorAction SilentlyContinue
-  Remove-Item $stage -Force -ErrorAction SilentlyContinue
-}
-${guestInventory}
-`;
-    guest = await runCommand(installer);
-    changed = true;
-  }
-  if (
-    !guest.products?.some((entry) => entry.DisplayName === "Global Secure Access Client" && entry.DisplayVersion) ||
-    guest.services?.length < 4 ||
-    guest.services.some((entry) => entry.StartType !== "Automatic" || entry.Status !== "Running")
-  ) {
-    throw new Error(`GSA guest state is not healthy: ${JSON.stringify(guest)}`);
-  }
-  console.log(JSON.stringify({ changed, standing: before, guest }, null, 2));
 }
 
 async function traffic() {
@@ -715,7 +667,5 @@ if (MODE === "inspect") {
   console.log(JSON.stringify(state, null, 2));
 } else if (MODE === "inspection") console.log(JSON.stringify(await inspectionState(), null, 2));
 else if (MODE === "tls-reconcile") await tlsReconcile();
-else if (MODE === "assign") await assign();
-else if (MODE === "install") await install();
 else if (MODE === "guest") await guest();
 else await traffic();

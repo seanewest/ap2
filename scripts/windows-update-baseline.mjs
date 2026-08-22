@@ -101,8 +101,9 @@ export function assertRetainedInventory(devices) {
       throw new Error(`${device.deviceName} has unexpected management state (${device.managementAgent})`);
     }
     if (!device.azureADDeviceId) throw new Error(`${device.deviceName} has no Entra device binding`);
-    if (!/^10\.0\.26100\./.test(device.osVersion ?? "")) {
-      throw new Error(`${device.deviceName} is not already on Windows 11 24H2 (${device.osVersion})`);
+    const [major, minor, build] = String(device.osVersion ?? "").split(".").map(Number);
+    if (major !== 10 || minor !== 0 || !Number.isInteger(build) || build < 26100) {
+      throw new Error(`${device.deviceName} is below the retained Windows 11 24H2 baseline (${device.osVersion})`);
     }
   }
   return retained;
@@ -318,7 +319,10 @@ async function main() {
       featureUpdateVersion: state.feature.featureUpdateVersion,
       endOfSupportDate: state.feature.endOfSupportDate,
       exactAssignment: assignmentIsExact(state.featureAssignments),
-      retainedDevicesAlreadyAtTarget: state.retained.every((device) => /^10\.0\.26100\./.test(device.osVersion ?? "")),
+      retainedDevicesAtOrBeyondTarget: state.retained.every((device) => {
+        const build = Number(String(device.osVersion ?? "").split(".")[2]);
+        return Number.isInteger(build) && build >= 26100;
+      }),
     } : null,
   };
   if (mode !== "inspect") {
