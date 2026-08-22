@@ -276,9 +276,9 @@ factual evidence, not entries in a registry or templates for future work.
 
 ## Accepted residue and limitations
 
-- **The Homer retained-AVD variant remains blocked at Microsoft guest
-  authorization after its supported repair paths were exhausted; it is not a
-  scenario-wide blocker.** The Rachel composition above proves the broader
+- **The Homer retained-AVD variant was blocked at Microsoft guest authorization
+  after its supported repair paths were exhausted and is now retired; it is not
+  a scenario-wide blocker.** The Rachel composition above proves the broader
   enrollment-to-distinct-session first leg on a healthy retained endpoint. The
   follow-up began from the clean result of
   `AP2-HOMER-ENROLL-20260821T052732Z`: the retained personal host was assigned
@@ -369,6 +369,33 @@ factual evidence, not entries in a registry or templates for future work.
   replacement device identity; further local allow grants, guest rebuilds, or
   authentication-policy changes would repeat disproven techniques or weaken
   the retained boundary.
+
+  A bounded 2026-08-22 retirement follow-up supersedes that retained-endpoint
+  final state. From a running, `Available`, zero-session `ap2homerfresh` host,
+  it issued one short-lived pool token, force-cleared Homer's direct personal
+  assignment, removed the session-host child, and reran the existing official
+  AVD DSC registration extension on the same VM. The extension reported
+  `Succeeded`, but no new session-host record appeared during the 15-minute
+  observation window; the token was deleted, no replacement was created, and
+  no further guest repair was attempted. The authorized fallback then submitted
+  one exact Defender offboard action, removed only Homer's reference from the
+  shared retained-personal scaling plan, and deleted the dedicated
+  `rg-ap2-avd-timed-homer` resource group. The VM, host pool, application group,
+  workspace, disk, NIC, snapshot, network, and scoped roles are absent, as are
+  the current `ap2homerfresh` Entra device and its incomplete Intune record.
+  The temporary `Machine.Offboard` app role and Cloud Device Administrator
+  directory role used for exact cleanup were removed; the independent CBA
+  Global Administrator performed the latter removal after Graph prevented the
+  Dev service principal from removing its own temporary directory role. The
+  Defender service retains its historical machine row and accepted offboard
+  action, whose last observed state was `InProgress` after the sensor stopped
+  checking in; that provider history is not an active endpoint resource.
+  Homer remains enabled with unchanged licenses and groups, and his live
+  password, TAP, Microsoft Authenticator, and FIDO2 passkey inventory matched
+  the exact pre-removal IDs and metadata. Rachel, Kobe, and Marge retained their
+  original VM/session-host identities, assignments, zero-session state, and
+  enabled scaling-plan references. Later Homer endpoint recreation is explicitly
+  deferred.
 
 - **Cleanup means no active AP2 artifact or effect.** It does not erase
   Microsoft audit, message, cancellation, recycle-bin, deleted-item, or
