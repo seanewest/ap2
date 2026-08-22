@@ -71,8 +71,11 @@ to operate AP2. Preserve both sides by default.
 
 A different product could centralize more execution infrastructure in a
 provider tenant and leave a student's tenant lighter. That is a different
-architecture and not a current goal. Microsoft365DSC or similar tooling may
-eventually help describe and restore the retained Student-tenant baseline.
+architecture and not a current goal. The desired connected-Student standing state is defined in
+[`student-environment-baseline.md`](student-environment-baseline.md).
+Microsoft365DSC is one intended desired-state mechanism where it models a
+resource cleanly; Azure provisioning, Intune, and direct Microsoft APIs remain
+appropriate for other layers.
 
 Simulated-user identity objects, licenses, and authentication setup are retained
 infrastructure. Their mailbox, calendar, files, Teams activity, scenario-specific

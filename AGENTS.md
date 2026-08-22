@@ -85,6 +85,7 @@ Use each canonical document for one job:
 - `docs/development-workflow.md` — the AP2 exploration loop;
 - `docs/proven-capabilities.md` — completed live evidence and limitations;
 - `docs/durable-runtime.md` — current protected execution boundary;
+- `docs/student-environment-baseline.md` — desired standing state for a connected Student installation and the boundary between baseline convergence and scenario state;
 - `chatgpt-strategy.md` — AP2 Strategist supplement;
 - `coordinator-strategy.md` — AP2 Coordinator supplement;
 - `STRATEGY-SNAPSHOT.md` — point-in-time Strategist handoff, never live workflow

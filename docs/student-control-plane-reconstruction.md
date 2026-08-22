@@ -1,12 +1,19 @@
 # Student control-plane reconstruction specification
 
-Status: **captured; awaiting replacement-tenant implementation**
+Status: **historical Pass 3 reconstruction capture; not the current connected-Student baseline**
 
 The authoritative machine-readable desired state is
 [`infra/student-control-plane.manifest.json`](../infra/student-control-plane.manifest.json).
 This document explains how to read it. Together they capture the intentional
 broad AP2 Pass 3 Student baseline; they are not a bootstrap, backup, migration,
 teardown, or least-privilege design.
+
+For current product direction, standing security/device/network expectations, and
+the future connected-Student convergence boundary, use
+[`student-environment-baseline.md`](student-environment-baseline.md). This older
+reconstruction capture remains useful technical provenance but must not override
+newer live baseline decisions such as the Conditional Access, retained-endpoint,
+update-management, GSA, or installation-specific configuration direction.
 
 The capture used current repository architecture plus read-only Microsoft Graph,
 ARM, licensing, CBA, and role observations from the Self Employed tenant. No
